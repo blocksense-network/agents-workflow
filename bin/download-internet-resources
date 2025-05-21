@@ -1,0 +1,148 @@
+#!/usr/bin/env ruby
+
+require 'uri'
+require 'fileutils'
+require 'open-uri'
+require 'shellwords'
+require_relative 'lib/agent_tasks'
+
+tasks = AgentTasks.new
+unless tasks.is_on_task_branch?
+  puts "This is not a task branch. No resources to download."
+  exit 0
+end
+
+task_output = tasks.get_agent_prompt
+
+# Define the base directory for downloads
+BASE_DOWNLOAD_DIR = "/workspace/internet-resources/"
+
+# Ensure the download directory exists
+FileUtils.mkdir_p(BASE_DOWNLOAD_DIR)
+
+# Function to sanitize filenames
+def sanitize_filename(filename)
+  # Remove potentially problematic characters, replace with underscore
+  # Allow alphanumeric, dot, underscore, hyphen
+  sanitized = filename.gsub(/[^0-9A-Za-z.\-_]/, '_')
+  # Prevent filenames that are just dots or empty after sanitization
+  sanitized = "_#{sanitized}" if sanitized.match?(/\A\.+\z/)
+  sanitized.empty? ? "unnamed_file_#{Time.now.to_i}" : sanitized
+end
+
+# Extract URLs from the task output
+# Consider only http and https schemes
+urls = URI.extract(task_output.to_s, ['http', 'https'])
+
+if urls.empty?
+  puts "No URLs found in the task description."
+else
+  urls.each_with_index do |url_str, index|
+    puts "\nProcessing URL #{index + 1}/#{urls.length}: #{url_str}"
+    begin
+      uri = URI.parse(url_str)
+      hostname = uri.host
+      path = uri.path
+
+      # Check if it's a known Git provider URL or ends with .git
+      is_git_repo = url_str.match?(%r{\b(github\.com|gitlab\.com|bitbucket\.org)\b}i) || url_str.end_with?('.git')
+
+      if is_git_repo
+        # Attempt to derive a repo name from the path
+        repo_name_from_path = File.basename(path.chomp('/'), '.git')
+        repo_name = if repo_name_from_path.empty? || repo_name_from_path == '.' || repo_name_from_path == '/'
+                      # Fallback to hostname if path doesn't give a good name (e.g. https://github.com/)
+                      # Though cloning such a URL directly is unlikely to be a valid repo.
+                      hostname
+                    else
+                      repo_name_from_path
+                    end
+        
+        sanitized_repo_name = sanitize_filename(repo_name)
+        # Ensure sanitized_repo_name is not empty
+        sanitized_repo_name = "git_repo_#{Time.now.to_i}" if sanitized_repo_name.empty?
+
+        clone_target_path = File.join(BASE_DOWNLOAD_DIR, sanitized_repo_name)
+
+        puts "Attempting to clone Git repository: #{url_str} into #{clone_target_path}"
+        
+        if Dir.exist?(clone_target_path) && !(Dir.entries(clone_target_path) - %w[. ..]).empty?
+          puts "Directory #{clone_target_path} already exists and is not empty. Skipping clone."
+          next
+        end
+        
+        # Using Shellwords.escape for security with external commands
+        clone_command = "git clone --depth 1 #{Shellwords.escape(url_str)} #{Shellwords.escape(clone_target_path)}"
+        puts "Executing: #{clone_command}"
+        clone_success = system(clone_command)
+        
+        if clone_success
+          puts "Successfully cloned #{url_str} to #{clone_target_path}"
+        else
+          puts "Failed to clone #{url_str}. Git command exited with status #{$?.exitstatus}"
+        end
+      else
+        # Download as a web page
+        path_basename = File.basename(uri.path)
+        page_filename_base = if path_basename.empty? || path_basename == '/'
+                               hostname # e.g., for http://example.com or http://example.com/
+                             else
+                               path_basename # e.g., for http://example.com/page.html or http://example.com/page
+                             end
+
+        # Ensure .html extension if not present or if it looks like a directory
+        # (path ends with / or basename has no extension)
+        if File.extname(page_filename_base).empty? || uri.path.end_with?('/')
+          page_filename_with_ext = page_filename_base + ".html"
+        else
+          page_filename_with_ext = page_filename_base
+        end
+        
+        filename = sanitize_filename(page_filename_with_ext)
+        # Fallback if filename becomes problematic (e.g. just ".html" or empty)
+        if filename.gsub(/\.html$/, '').gsub(/\.$/, '').strip.empty?
+            filename = sanitize_filename(uri.host + "_fallback_" + Time.now.to_i.to_s + ".html")
+        end
+
+        download_file_path = File.join(BASE_DOWNLOAD_DIR, filename)
+
+        puts "Attempting to download web page: #{url_str} to #{download_file_path}"
+        
+        downloaded_content = URI.open(url_str, "rb", redirect: :safe) do |f|
+            # Log redirection if any
+            if f.base_uri.to_s != url_str
+                puts "Redirected from #{url_str} to #{f.base_uri}"
+            end
+            # Set User-Agent to mimic a browser, some sites block default open-uri agent
+            # This part is tricky with URI.open block form, better to set globally or use Net::HTTP for headers
+            # For simplicity, we'll rely on default open-uri behavior or assume target sites are permissive.
+            # Alternatively, one could do:
+            # URI.open(url_str, "User-Agent" => "Mozilla/5.0 ...", "rb", redirect: :safe).read
+            f.read
+        end
+        
+        File.open(download_file_path, "wb") do |file|
+          file.write(downloaded_content)
+        end
+        puts "Successfully downloaded #{url_str} to #{download_file_path}"
+      end
+
+    rescue URI::InvalidURIError => e
+      puts "Skipping invalid URL: #{url_str} - #{e.message}"
+    rescue OpenURI::HTTPError => e
+      puts "HTTP error downloading #{url_str}: #{e.message} (Status: #{e.io.status[0]})"
+    rescue SocketError => e
+      puts "Socket error (e.g., host not found, network unreachable) for #{url_str}: #{e.message}"
+    rescue Errno::ECONNREFUSED => e
+      puts "Connection refused for #{url_str}: #{e.message}"
+    rescue Errno::ENOENT => e # Can happen if git command is not found
+      puts "File or command not found error for #{url_str}: #{e.message}"
+    rescue StandardError => e
+      puts "An unexpected error occurred for URL #{url_str}: #{e.class} - #{e.message}"
+      # For debugging, uncomment the next line or set ENV['DEBUG']
+      # puts e.backtrace.join("\n") if ENV['DEBUG']
+    end
+  end
+
+  puts "\Downloading Internet Resources Done."
+end

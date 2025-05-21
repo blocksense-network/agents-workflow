@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+echo "Executing Codex Setup"
+bin/install-nix
