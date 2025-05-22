@@ -1,63 +1,10 @@
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
+require_relative 'test_helper'
 
-ROOT = File.expand_path('..', __dir__)
-START_TASK = File.join(ROOT, 'bin', 'start-task')
+include RepoTestHelper
 
-# helper to run git commands in repo
-def git(repo, *args)
-  cmd = ['git', *args]
-  system({'GIT_CONFIG_NOSYSTEM'=>'1'}, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
-end
-
-def setup_git_repo
-  remote = Dir.mktmpdir('remote')
-  system('git', 'init', '--bare', remote, out: File::NULL)
-  repo = Dir.mktmpdir('repo')
-  system('git', 'init', '-b', 'main', repo, out: File::NULL)
-  git(repo, 'config', 'user.email', 'tester@example.com')
-  git(repo, 'config', 'user.name', 'Tester')
-  File.write(File.join(repo, 'README.md'), 'initial')
-  git(repo, 'add', 'README.md')
-  git(repo, 'commit', '-m', 'initial')
-  git(repo, 'remote', 'add', 'origin', remote)
-  [repo, remote]
-end
-
-# run start-task with given editor content
-# branch: branch name to pass as argument
-# lines: array of lines to write to temp file
-# editor_exit: exit code for editor
-# input: text to send to start-task via stdin
-
-def run_start_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
-  dir = Dir.mktmpdir('editor')
-  script = File.join(dir, 'fake_editor.sh')
-  marker = File.join(dir, 'called')
-  File.write(script, <<~SH)
-    #!/bin/sh
-    echo yes > #{marker}
-    cat <<'EOS' > "$1"
-    #{lines.join("\n")}
-    EOS
-    exit #{editor_exit}
-  SH
-  File.chmod(0755, script)
-  output = nil
-  status = nil
-  Dir.chdir(repo) do
-    IO.popen({'EDITOR'=>script}, [START_TASK, branch], 'r+') do |io|
-      io.write input
-      io.close_write
-      output = io.read
-    end
-    status = $?
-  end
-  executed = File.exist?(marker)
-  FileUtils.remove_entry(dir)
-  [status, output, executed]
-end
 
 class StartTaskGitTest < Minitest::Test
   def assert_task_branch_created(repo, remote, branch)
