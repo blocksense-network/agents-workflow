@@ -1,5 +1,5 @@
 
-Create a test suite for the `start-task` command.
+Create a test suite for the `agent-task` command.
 
 All tests should be carried out separately for git, fossil, bzr and hg (the version
 control systems supported by this project)
@@ -7,7 +7,7 @@ control systems supported by this project)
 The test suite should work with temporary git repositories created within the file
 system and it should test the following scenarios:
 
-1) In a clear repository state, from a main branch, run `start-task` and observe
+1) In a clear repository state, from a main branch, run `agent-task` and observe
    that the following is true:
 
    - a branch with the desired name was created.
@@ -16,20 +16,20 @@ system and it should test the following scenarios:
      be no other files in the commit.
    - the branch was pushed to the default remote
      (the remote should reside in another directory in the file system)
-   - the working copy was switched back to the main brach after the `start-task`
+   - the working copy was switched back to the main brach after the `agent-task`
      execution completes.
 
-Please note that `start-task` will launch an editor. I suggest overriding the
+Please note that `agent-task` will launch an editor. I suggest overriding the
 EDITOR env variable with a simple program that writes the required task definition
 and them immediately exists.
 
 2) We want the above scenario to work in the same way when the working copy is dirty:
-  
+
    - when there are staged files (for the version control systems where this exists)
    - when there aren't staged files
 
    The expected behavior is that the state of the working copy will be fully preserved
-   after the execution of `start-task` completes. All other tested properties, specified
+   after the execution of `agent-task` completes. All other tested properties, specified
    in 1) should hold.
 
 3) Make sure that all edge cases are handled correctly when executing the EDITOR command:

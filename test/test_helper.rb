@@ -1,6 +1,6 @@
 module RepoTestHelper
   ROOT = File.expand_path('..', __dir__)
-  START_TASK = File.join(ROOT, 'bin', 'start-task')
+  AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
 
   def git(repo, *args)
@@ -22,7 +22,7 @@ module RepoTestHelper
     [repo, remote]
   end
 
-  def run_start_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
+  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
     dir = Dir.mktmpdir('editor')
     script = File.join(dir, 'fake_editor.sh')
     marker = File.join(dir, 'called')
@@ -38,7 +38,7 @@ module RepoTestHelper
     output = nil
     status = nil
     Dir.chdir(repo) do
-      IO.popen({'EDITOR'=>script}, [START_TASK, branch], 'r+') do |io|
+      IO.popen({'EDITOR'=>script}, [AGENT_TASK, branch], 'r+') do |io|
         io.write input
         io.close_write
         output = io.read

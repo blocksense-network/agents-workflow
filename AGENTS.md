@@ -23,5 +23,6 @@
 
 # Writing git commit messages
 
+- You MUST use multiline git commit messages.
 - Use the convential commits style for the first line of the commit message.
-- Write the summary that you are using in PRs in the git commit body.
+- Use the summary section of your final response as the remaining lines in the commit message.

@@ -3,7 +3,7 @@ Some tasks to improve the quality of this repo:
 - Add an EditorConfig
 - Add a Github CI (test on Linux, macOS and Windows)
 - Add a just command for linting (modify AGENTS.md to mention it)
-- Add a nix flake that exposes the start-task command under the name `agent-task`
+- Add a nix flake that exposes the agent-task command under the name `agent-task`
 - Prepare `agent-task` for publishing as a Ruby gem as well
 - Create a just task for publishing the gem
 - Create a MAINTAINERS.md file that covers running the test suite, linting and publishing the Ruby gem (link it from the README)

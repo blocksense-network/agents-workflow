@@ -13,8 +13,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3
+      - name: Setup just
+        uses: extractions/setup-just@v1
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
+      - name: Install RuboCop
+        run: gem install rubocop
+      - name: Run linter
+        run: just lint
       - name: Run test suite
-        run: ruby -Itest -e 'Dir["test/test_*.rb"].each { |f| require File.expand_path(f) }'
+        run: just test

@@ -9,8 +9,8 @@ include RepoTestHelper
 class GetTaskTest < Minitest::Test
   def test_get_task_after_start
     repo, remote = setup_git_repo
-    status, _, _ = run_start_task(repo, branch: 'feat', lines: ['my task'])
-    # start-task should succeed
+    status, _, _ = run_agent_task(repo, branch: 'feat', lines: ['my task'])
+    # agent-task should succeed
     assert_equal 0, status.exitstatus
     git(repo, 'checkout', 'feat')
     status2, output = run_get_task(repo)
@@ -24,8 +24,8 @@ class GetTaskTest < Minitest::Test
 
   def test_get_task_on_work_branch
     repo, remote = setup_git_repo
-    status, _, _ = run_start_task(repo, branch: 'feat', lines: ['follow task'])
-    # start-task should succeed
+    status, _, _ = run_agent_task(repo, branch: 'feat', lines: ['follow task'])
+    # agent-task should succeed
     assert_equal 0, status.exitstatus
     git(repo, 'checkout', 'feat')
     git(repo, 'checkout', '-b', 'work')
