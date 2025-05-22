@@ -114,12 +114,19 @@ class VCSRepo
   end
 
   def first_commit_in_current_branch
+    # Find the first commit that belongs to the current branch.
+    #
+    # If we are on the main development branch ("main" or "master") the answer
+    # is simply the root commit. For feature branches we find the merge base with
+    # the branch's upstream (if configured) or fall back to the primary branch
+    # and then return the first commit after that point.
     commit_hash = nil
     Dir.chdir(@root) do
       case @vcs_type
       when :git
         current_branch_name = `git rev-parse --abbrev-ref HEAD`.strip
-        
+
+        # Detect whether the current branch is one of the primary branches.
         is_primary_branch = false
         if current_branch_name == "main" && system("git rev-parse --verify --quiet refs/heads/main", :err => File::NULL, :out => File::NULL)
           is_primary_branch = true
@@ -131,26 +138,31 @@ class VCSRepo
           # The command can sometimes output "commit <hash>\n<hash>". We need the last line.
           commit_hash = `git rev-list --max-parents=0 HEAD --pretty=%H`.lines.last&.strip
         else
-          # For feature branches
-          candidates = []
+          # For feature branches try to determine the branch point.
+          base_branch_ref = nil
+
+          # Start with the configured upstream branch. Some branches may track
+          # themselves, so ignore the upstream if it points at the current commit.
           upstream = `git rev-parse --abbrev-ref @{u} 2>/dev/null`.strip
           if $?.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}", :err => File::NULL, :out => File::NULL)
-            candidates << upstream
-          end
-          if system("git rev-parse --verify --quiet refs/heads/main^{commit}", :err => File::NULL, :out => File::NULL)
-            candidates << 'main'
-          end
-          if system("git rev-parse --verify --quiet refs/heads/master^{commit}", :err => File::NULL, :out => File::NULL)
-            candidates << 'master'
+            upstream_commit = `git rev-parse #{upstream}`.strip
+            head_commit = `git rev-parse HEAD`.strip
+            base_branch_ref = upstream unless upstream_commit == head_commit
           end
 
-          candidates.each do |ref|
-            merge_base_commit = `git merge-base #{ref} HEAD`.strip
-            next if merge_base_commit.empty? || merge_base_commit == `git rev-parse HEAD`.strip
-            chash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
-            if $?.success? && !chash.empty?
-              commit_hash = chash
-              break
+          # Fallback to main or master if we couldn't use the upstream.
+          if base_branch_ref.nil?
+            if system("git rev-parse --verify --quiet refs/heads/main^{commit}", :err => File::NULL, :out => File::NULL)
+              base_branch_ref = "main"
+            elsif system("git rev-parse --verify --quiet refs/heads/master^{commit}", :err => File::NULL, :out => File::NULL)
+              base_branch_ref = "master"
+            end
+          end
+
+          if base_branch_ref
+            merge_base_commit = `git merge-base #{base_branch_ref} HEAD`.strip
+            if $?.success? && !merge_base_commit.empty?
+              commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
             end
           end
         end
