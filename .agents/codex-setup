@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
 
 echo "Executing Codex Setup"
-bin/install-nix
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  git \
+  fossil \
+  mercurial \
+  just
