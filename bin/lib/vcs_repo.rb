@@ -61,8 +61,8 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        system("git add #{file_path}")
-        system("git commit -m '#{message}'")
+        system('git', 'add', '--', file_path)
+        system('git', 'commit', '-m', message, '--', file_path)
       when :hg
         system("hg add #{file_path}")
         system("hg commit -m '#{message}'")

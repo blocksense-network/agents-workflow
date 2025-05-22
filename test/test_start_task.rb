@@ -60,21 +60,25 @@ def run_start_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
 end
 
 class StartTaskGitTest < Minitest::Test
+  def assert_task_branch_created(repo, remote, branch)
+    # start-task should switch back to main after creating the feature branch
+    assert_equal 'main', `git -C #{repo} rev-parse --abbrev-ref HEAD`.strip
+    # verify that exactly one commit was created on the new branch
+    assert_equal 1, `git -C #{repo} rev-list main..#{branch} --count`.to_i
+    commit = `git -C #{repo} rev-parse #{branch}`.strip
+    # list the files from the new commit to ensure only the task file was added
+    files = `git -C #{repo} diff-tree --no-commit-id --name-only -r #{commit}`.split
+    assert_equal 1, files.length
+    assert_match %r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-#{branch}}, files.first
+    # confirm the feature branch was pushed to the remote repository
+    assert_equal commit, `git --git-dir=#{remote} rev-parse #{branch}`.strip
+  end
+
   def test_clean_repo
     repo, remote = setup_git_repo
     status, _, _ = run_start_task(repo, branch: 'feature', lines: ['task'])
     assert_equal 0, status.exitstatus
-    # start-task should switch back to main after creating the feature branch
-    assert_equal 'main', `git -C #{repo} rev-parse --abbrev-ref HEAD`.strip
-    # verify that exactly one commit was created on the new branch
-    assert_equal 1, `git -C #{repo} rev-list main..feature --count`.to_i
-    commit=`git -C #{repo} rev-parse feature`
-    # list the files from the new commit to ensure only the task file was added
-    files=`git -C #{repo} diff-tree --no-commit-id --name-only -r #{commit}`.split
-    assert_equal 1, files.length
-    assert_match %r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-feature}, files.first
-    # confirm the feature branch was pushed to the remote repository
-    assert_equal commit.strip, `git --git-dir=#{remote} rev-parse feature`.strip
+    assert_task_branch_created(repo, remote, 'feature')
   ensure
     FileUtils.remove_entry(repo)
     FileUtils.remove_entry(remote)
@@ -84,10 +88,12 @@ class StartTaskGitTest < Minitest::Test
     repo, remote = setup_git_repo
     File.write(File.join(repo, 'foo.txt'), 'foo')
     git(repo, 'add', 'foo.txt')
+    status_before = `git -C #{repo} status --porcelain`
     status, _, _ = run_start_task(repo, branch: 's1', lines: ['task'])
     assert_equal 0, status.exitstatus
-    # ensure staged changes are restored and nothing else changed
-    assert_equal '', `git -C #{repo} status --porcelain`
+    # ensure staged changes are preserved and nothing else changed
+    assert_equal status_before, `git -C #{repo} status --porcelain`
+    assert_task_branch_created(repo, remote, 's1')
   ensure
     FileUtils.remove_entry(repo)
     FileUtils.remove_entry(remote)
@@ -101,6 +107,7 @@ class StartTaskGitTest < Minitest::Test
     assert_equal 0, status.exitstatus
     # unstaged modifications should remain exactly as they were
     assert_equal status_before, `git -C #{repo} status --porcelain`
+    assert_task_branch_created(repo, remote, 's2')
   ensure
     FileUtils.remove_entry(repo)
     FileUtils.remove_entry(remote)
