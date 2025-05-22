@@ -5,6 +5,7 @@ require 'English'
 require 'uri'
 require 'fileutils'
 require 'open-uri'
+require 'net/http'
 require 'shellwords'
 require_relative 'lib/agent_tasks'
 
@@ -102,22 +103,16 @@ else
 
         filename = sanitize_filename(page_filename_with_ext)
         # Fallback if filename becomes problematic (e.g. just ".html" or empty)
-        filename = sanitize_filename("#{uri.host}_fallback_#{Time.now.to_i}.html") if filename.gsub(/\.html$/, '').gsub(/\.$/, '').strip.empty?
+        needs_fallback = filename.gsub(/\.html$/, '').gsub(/\.$/, '').strip.empty?
+        filename = sanitize_filename("#{uri.host}_fallback_#{Time.now.to_i}.html") if needs_fallback
 
         download_file_path = File.join(BASE_DOWNLOAD_DIR, filename)
 
         puts "Attempting to download web page: #{url_str} to #{download_file_path}"
 
-        downloaded_content = URI.open(url_str, 'rb', redirect: :safe) do |f|
-          # Log redirection if any
-          puts "Redirected from #{url_str} to #{f.base_uri}" if f.base_uri.to_s != url_str
-          # Set User-Agent to mimic a browser, some sites block default open-uri agent
-          # This part is tricky with URI.open block form, better to set globally or use Net::HTTP for headers
-          # For simplicity, we'll rely on default open-uri behavior or assume target sites are permissive.
-          # Alternatively, one could do:
-          # URI.open(url_str, "User-Agent" => "Mozilla/5.0 ...", "rb", redirect: :safe).read
-          f.read
-        end
+        http_response = Net::HTTP.get_response(uri)
+        puts "Redirected from #{url_str} to #{http_response['location']}" if http_response.is_a?(Net::HTTPRedirection)
+        downloaded_content = http_response.body
 
         File.binwrite(download_file_path, downloaded_content)
         puts "Successfully downloaded #{url_str} to #{download_file_path}"
