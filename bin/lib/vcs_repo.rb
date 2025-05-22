@@ -28,22 +28,23 @@ class VCSRepo
   end
 
   def start_branch(branch_name)
+    success = false
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        system("git checkout -b #{branch_name}")
+        success = system("git checkout -b #{branch_name}")
       when :hg
-        system("hg branch #{branch_name}")
+        success = system("hg branch #{branch_name}")
       when :bzr
-        system("bzr switch -b #{branch_name}")
+        success = system("bzr switch -b #{branch_name}")
       when :fossil
-        system("fossil branch new #{branch_name} trunk")
-        system("fossil update #{branch_name}")
+        success = system("fossil branch new #{branch_name} trunk") &&
+                  system("fossil update #{branch_name}")
       else
-        puts "Error: Unknown VCS type (#{@vcs_type}) to start branch"
-        exit 1
+        raise "Error: Unknown VCS type (#{@vcs_type}) to start branch"
       end
     end
+    raise "Error: Failed to create branch '#{branch_name}'" unless success
   end
 
   def commit_file(file_path, message)

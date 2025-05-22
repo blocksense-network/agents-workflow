@@ -34,10 +34,14 @@ This process will:
 ## Using the Workflow
 
 1.  **Starting a Task (Developer):**
-    When a developer needs to assign a task to the agent, they run the `start-task` command within their repository:
+    When a developer needs to assign a task to the agent, they run the `start-task` command with the desired branch name:
+
+    ```bash
+    start-task <branch-name>
+    ```
 
     This script will:
-    -   Prompt the developer to enter a branch name and the task description in an editor.
+    -   Prompt the developer to enter the task description in an editor.
     -   Create a new Git branch based on the provided name.
     -   Commit the task description to a file within a `.agents/tasks/` directory on the new branch.
     -   Push the branch to the default remote.

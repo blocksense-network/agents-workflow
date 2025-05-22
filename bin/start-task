@@ -11,33 +11,20 @@ def find_default_editor
   editors.find { |e| system("command -v #{e} > /dev/null 2>&1") } || 'nano'
 end
 
-# Create a temporary file with "branch:" as its contents
-tempfile = Tempfile.new(['branch', '.txt'])
-tempfile.write("branch:")
-tempfile.flush
+
+branch_name = ARGV.shift
+if branch_name.nil? || branch_name.strip.empty?
+  abort("Usage: #{File.basename(__FILE__)} <branch-name>")
+end
+
+# Create a temporary file for the task description
+tempfile = Tempfile.new(['task', '.txt'])
 
 editor = find_default_editor
 system("#{editor} #{tempfile.path}") || abort("Error: Failed to open the editor.")
 tempfile.close
 
-all_lines = File.readlines(tempfile.path, chomp: true)
-branch_line = all_lines.first || ""
-
-# Strip "branch: " prefix if present, otherwise use the entire line
-branch_name = if branch_line.start_with?("branch: ")
-  branch_line.sub(/^branch: /, '')
-else
-  branch_line
-end
-
-# Replace all continuous characters not allowed in git branch names with a single "-"
-sanitized_branch = branch_name.gsub(%r{[^A-Za-z0-9/_\-.]+}, '-')
-sanitized_branch.gsub!(%r{(^[-.]+|[-.]+$)}, '') # trim leading/trailing - or .
-sanitized_branch.gsub!(%r{/{2,}}, '/')          # collapse multiple slashes
-sanitized_branch.gsub!(%r{\.+}, '.')            # collapse multiple dots
-
-# The rest of the file is task content
-task_content = all_lines.drop(1).join("\n")
+task_content = File.read(tempfile.path)
 
 begin
   repo = VCSRepo.new
@@ -51,7 +38,7 @@ root = repo.root
 orig_branch = repo.current_branch
 
 # Start a new branch
-repo.start_branch(sanitized_branch)
+repo.start_branch(branch_name)
 
 # Create the agents task file path
 now = Time.now.utc
@@ -60,11 +47,11 @@ month = "%02d" % now.month
 day = "%02d" % now.day
 hour = "%02d" % now.hour
 min = "%02d" % now.min
-filename = "#{day}-#{hour}#{min}-#{sanitized_branch}"
+filename = "#{day}-#{hour}#{min}-#{branch_name}"
 tasks_dir = File.join(repo.root, ".agents", "tasks", year.to_s, month)
 FileUtils.mkdir_p(tasks_dir)
 task_file = File.join(tasks_dir, filename)
-commit_msg = "start-agent-task: #{sanitized_branch}"
+commit_msg = "start-agent-task: #{branch_name}"
 
 # Write the task content
 File.write(task_file, task_content)
@@ -77,7 +64,7 @@ print "Push to default remote? [Y/n]: "
 answer = STDIN.gets.strip
 answer = "y" if answer.empty?
 if answer.downcase.start_with?("y")
-  repo.push_current_branch(sanitized_branch)
+  repo.push_current_branch(branch_name)
 end
 
 # Return to original branch
