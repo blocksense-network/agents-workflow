@@ -1,7 +1,13 @@
+require 'rbconfig'
+
 module RepoTestHelper
   ROOT = File.expand_path('..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
+
+  def windows?
+    RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+  end
 
   def git(repo, *args)
     cmd = ['git', *args]
@@ -38,7 +44,8 @@ module RepoTestHelper
     output = nil
     status = nil
     Dir.chdir(repo) do
-      IO.popen({'EDITOR'=>script}, [AGENT_TASK, branch], 'r+') do |io|
+      cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
+      IO.popen({'EDITOR'=>script}, cmd, 'r+') do |io|
         io.write input
         io.close_write
         output = io.read
@@ -54,7 +61,8 @@ module RepoTestHelper
     output = nil
     status = nil
     Dir.chdir(repo) do
-      output = `#{GET_TASK}`
+      cmd = windows? ? ['ruby', GET_TASK] : [GET_TASK]
+      output = IO.popen(cmd, &:read)
       status = $?
     end
     [status, output]
