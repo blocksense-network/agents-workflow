@@ -1,0 +1,11 @@
+
+After some testing, I've decided that specifying the branch name in the first line
+in the created file (through the $EDITOR) is not convenient.
+
+Instead, let's specify the branch name as an argument to the start-task command.
+This would also simplify the logic in the code and the test suite.
+
+We don't have to sanitize the branch name anymore. We can produce an error if the
+branch name entered by the user won't be valid in the current version control system.
+
+Refactor the code and the test suite to achieve the desired behavior.
