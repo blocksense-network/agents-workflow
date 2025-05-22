@@ -60,3 +60,4 @@ We envision that the manual step of prompting the agent to run `get-task` could 
 
 -   An API integration with Codex.
 -   (interim) A browser extension that drives the Codex WebUI.
+See [MAINTAINERS.md](MAINTAINERS.md) for maintainer tasks.
