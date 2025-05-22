@@ -7,6 +7,7 @@ apt-get install -y --no-install-recommends \
   git \
   fossil \
   mercurial \
-  just
+  just \
+  ruby-full
 
 sudo gem install rubocop
