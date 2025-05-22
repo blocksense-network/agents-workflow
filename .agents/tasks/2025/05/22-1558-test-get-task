@@ -1,0 +1,22 @@
+
+Your task is to expand the test suite with a test for the `get-task` command.
+Please note that the command is not implemented correctly at the moment.
+
+The test should do the following:
+
+After `start-task` completes, switch into the created branch.
+Running `get-task` here should print the message specified with the editor
+while executing `start-task`.
+
+Potential design issue in the code:
+
+Since the `get-task` command is intended for AI agents that will run it in
+automated workflows, sometimes these agents will switch to their own git branch
+before their coding session begins.
+
+In other words, `start-task` create a branch for the task and we launch the
+coding agent there, but it immediately switches to another branch `work` which
+may trip the logic in the code that tries to identify where the task branch
+starts.
+
+I suggest adding additional tests for this scenario.
