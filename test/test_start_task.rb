@@ -65,12 +65,16 @@ class StartTaskGitTest < Minitest::Test
     repo, remote = setup_git_repo
     status, _ = run_start_task(repo, lines: ['branch: feature', 'task'])
     assert_equal 0, status.exitstatus
+    # start-task should switch back to main after creating the feature branch
     assert_equal 'main', `git -C #{repo} rev-parse --abbrev-ref HEAD`.strip
+    # verify that exactly one commit was created on the new branch
     assert_equal 1, `git -C #{repo} rev-list main..feature --count`.to_i
     commit=`git -C #{repo} rev-parse feature`
+    # list the files from the new commit to ensure only the task file was added
     files=`git -C #{repo} diff-tree --no-commit-id --name-only -r #{commit}`.split
     assert_equal 1, files.length
     assert_match %r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-feature}, files.first
+    # confirm the feature branch was pushed to the remote repository
     assert_equal commit.strip, `git --git-dir=#{remote} rev-parse feature`.strip
   ensure
     FileUtils.remove_entry(repo)
@@ -83,6 +87,7 @@ class StartTaskGitTest < Minitest::Test
     git(repo, 'add', 'foo.txt')
     status, _ = run_start_task(repo, lines: ['branch: s1', 'task'])
     assert_equal 0, status.exitstatus
+    # ensure staged changes are restored and nothing else changed
     assert_equal '', `git -C #{repo} status --porcelain`
   ensure
     FileUtils.remove_entry(repo)
@@ -95,6 +100,7 @@ class StartTaskGitTest < Minitest::Test
     status_before = `git -C #{repo} status --porcelain`
     status, _ = run_start_task(repo, lines: ['branch: s2', 'task'])
     assert_equal 0, status.exitstatus
+    # unstaged modifications should remain exactly as they were
     assert_equal status_before, `git -C #{repo} status --porcelain`
   ensure
     FileUtils.remove_entry(repo)
@@ -105,6 +111,7 @@ class StartTaskGitTest < Minitest::Test
     repo, remote = setup_git_repo
     status, _ = run_start_task(repo, lines: ['branch: bad'], editor_exit: 1)
     assert status.exitstatus != 0
+    # when the editor fails, no branch should have been created
     refute `git -C #{repo} branch --list bad`.strip.size > 0
   ensure
     FileUtils.remove_entry(repo)
@@ -116,6 +123,7 @@ class StartTaskGitTest < Minitest::Test
     status, _ = run_start_task(repo, lines: [])
     assert_equal 0, status.exitstatus
     branches = `git -C #{repo} branch --list`.split("\n").map(&:strip)
+    # saving an empty task file should leave only the main branch
     assert_equal ['* main'], branches
   ensure
     FileUtils.remove_entry(repo)
@@ -126,6 +134,7 @@ class StartTaskGitTest < Minitest::Test
     repo, remote = setup_git_repo
     status, _ = run_start_task(repo, lines: ['branch: inv@lid name', 'task'])
     assert_equal 0, status.exitstatus
+    # the branch name should be sanitized of invalid characters
     assert `git -C #{repo} branch --list inv-lid-name`.strip.size > 0
   ensure
     FileUtils.remove_entry(repo)
