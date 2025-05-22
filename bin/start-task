@@ -17,28 +17,37 @@ if branch_name.nil? || branch_name.strip.empty?
   abort("Usage: #{File.basename(__FILE__)} <branch-name>")
 end
 
-# Create a temporary file for the task description
-tempfile = Tempfile.new(['task', '.txt'])
-
-editor = find_default_editor
-system("#{editor} #{tempfile.path}") || abort("Error: Failed to open the editor.")
-tempfile.close
-
-task_content = File.read(tempfile.path)
-
+# Initialize repository and create branch first
 begin
   repo = VCSRepo.new
 rescue StandardError => e
   puts e.message
   exit 1
 end
-root = repo.root
 
-# Save current branch for later
 orig_branch = repo.current_branch
 
-# Start a new branch
-repo.start_branch(branch_name)
+begin
+  repo.start_branch(branch_name)
+rescue StandardError => e
+  puts e.message
+  exit 1
+end
+
+# Create a temporary file for the task description
+tempfile = Tempfile.new(['task', '.txt'])
+
+editor = find_default_editor
+unless system("#{editor} #{tempfile.path}")
+  repo.checkout_branch(orig_branch) if orig_branch
+  if repo.vcs_type == :git
+    system('git', 'branch', '-D', branch_name, chdir: repo.root, out: File::NULL, err: File::NULL)
+  end
+  abort("Error: Failed to open the editor.")
+end
+tempfile.close
+
+task_content = File.read(tempfile.path)
 
 # Create the agents task file path
 now = Time.now.utc

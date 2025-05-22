@@ -41,8 +41,9 @@ This process will:
     ```
 
     This script will:
+    -   Create the branch first and abort early with the VCS error message if
+        the name is invalid.
     -   Prompt the developer to enter the task description in an editor.
-    -   Create a new Git branch based on the provided name.
     -   Commit the task description to a file within a `.agents/tasks/` directory on the new branch.
     -   Push the branch to the default remote.
 

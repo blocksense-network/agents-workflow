@@ -1,3 +1,5 @@
+require 'open3'
+
 class VCSRepo
   attr_reader :root, :vcs_type
 
@@ -28,23 +30,31 @@ class VCSRepo
   end
 
   def start_branch(branch_name)
-    success = false
+    require 'open3'
+    output = ''
+    status = nil
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        success = system("git checkout -b #{branch_name}")
+        output, status = Open3.capture2e('git', 'checkout', '-b', branch_name)
       when :hg
-        success = system("hg branch #{branch_name}")
+        output, status = Open3.capture2e('hg', 'branch', branch_name)
       when :bzr
-        success = system("bzr switch -b #{branch_name}")
+        output, status = Open3.capture2e('bzr', 'switch', '-b', branch_name)
       when :fossil
-        success = system("fossil branch new #{branch_name} trunk") &&
-                  system("fossil update #{branch_name}")
+        output, status = Open3.capture2e('fossil', 'branch', 'new', branch_name, 'trunk')
+        if status.success?
+          extra, status = Open3.capture2e('fossil', 'update', branch_name)
+          output << extra unless status.success?
+        end
       else
         raise "Error: Unknown VCS type (#{@vcs_type}) to start branch"
       end
     end
-    raise "Error: Failed to create branch '#{branch_name}'" unless success
+    unless status && status.success?
+      message = output.strip.empty? ? "Error: Failed to create branch '#{branch_name}'" : output.strip
+      raise message
+    end
   end
 
   def commit_file(file_path, message)
