@@ -1,6 +1,7 @@
 # Testing your changes
 
 - You can execute the test suite with `just test`.
+- You can lint the codebase with `just lint`.
 
 # Code quality guidelines
 
