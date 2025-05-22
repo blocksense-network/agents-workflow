@@ -132,23 +132,25 @@ class VCSRepo
           commit_hash = `git rev-list --max-parents=0 HEAD --pretty=%H`.lines.last&.strip
         else
           # For feature branches
-          base_branch_ref = nil
-          # Try upstream first
+          candidates = []
           upstream = `git rev-parse --abbrev-ref @{u} 2>/dev/null`.strip
           if $?.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}", :err => File::NULL, :out => File::NULL)
-            base_branch_ref = upstream
-          # Fallback to main
-          elsif system("git rev-parse --verify --quiet refs/heads/main^{commit}", :err => File::NULL, :out => File::NULL)
-            base_branch_ref = "main"
-          # Fallback to master
-          elsif system("git rev-parse --verify --quiet refs/heads/master^{commit}", :err => File::NULL, :out => File::NULL)
-            base_branch_ref = "master"
+            candidates << upstream
+          end
+          if system("git rev-parse --verify --quiet refs/heads/main^{commit}", :err => File::NULL, :out => File::NULL)
+            candidates << 'main'
+          end
+          if system("git rev-parse --verify --quiet refs/heads/master^{commit}", :err => File::NULL, :out => File::NULL)
+            candidates << 'master'
           end
 
-          if base_branch_ref
-            merge_base_commit = `git merge-base #{base_branch_ref} HEAD`.strip
-            if $?.success? && !merge_base_commit.empty?
-              commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
+          candidates.each do |ref|
+            merge_base_commit = `git merge-base #{ref} HEAD`.strip
+            next if merge_base_commit.empty? || merge_base_commit == `git rev-parse HEAD`.strip
+            chash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
+            if $?.success? && !chash.empty?
+              commit_hash = chash
+              break
             end
           end
         end
