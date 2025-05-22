@@ -33,22 +33,25 @@ module RepoTestHelper
 
   def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
     dir = Dir.mktmpdir('editor')
-    script = File.join(dir, 'fake_editor.sh')
+    script = File.join(dir, 'fake_editor.rb')
     marker = File.join(dir, 'called')
-    File.write(script, <<~SH)
-      #!/bin/sh
-      echo yes > #{marker}
-      cat <<'EOS' > "$1"
-      #{lines.join("\n")}
-      EOS
+    File.write(script, <<~RB)
+      #!/usr/bin/env ruby
+      File.write('#{marker}', "yes\n")
+      File.open(ARGV[0], 'w') do |f|
+        content = #{lines.inspect}.join("\n")
+        f.write(content)
+        f.write("\n") unless content.empty?
+      end
       exit #{editor_exit}
-    SH
+    RB
     File.chmod(0o755, script)
     output = nil
     status = nil
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
-      IO.popen({ 'EDITOR' => script }, cmd, 'r+') do |io|
+      editor_cmd = windows? ? "ruby #{script}" : script
+      IO.popen({ 'EDITOR' => editor_cmd }, cmd, 'r+') do |io|
         io.write input
         io.close_write
         output = io.read
