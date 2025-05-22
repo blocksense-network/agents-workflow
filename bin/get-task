@@ -1,14 +1,15 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
 require 'fileutils'
 require 'resolv'
-require_relative 'lib/vcs_repo' 
+require_relative 'lib/vcs_repo'
 require_relative 'lib/agent_tasks' # Updated path
 
 # Main execution
 begin
-  retriever = AgentTasks.new # Updated class name
-  message = retriever.get_agent_prompt
+  retriever = AgentTasks.new
+  message = retriever.agent_prompt
   puts message
 rescue StandardError => e
   puts e.message

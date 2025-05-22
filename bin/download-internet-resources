@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
+require 'English'
 require 'uri'
 require 'fileutils'
 require 'open-uri'
@@ -7,15 +9,15 @@ require 'shellwords'
 require_relative 'lib/agent_tasks'
 
 tasks = AgentTasks.new
-unless tasks.is_on_task_branch?
-  puts "This is not a task branch. No resources to download."
+unless tasks.on_task_branch?
+  puts 'This is not a task branch. No resources to download.'
   exit 0
 end
 
-task_output = tasks.get_agent_prompt
+task_output = tasks.agent_prompt
 
 # Define the base directory for downloads
-BASE_DOWNLOAD_DIR = "/workspace/internet-resources/"
+BASE_DOWNLOAD_DIR = '/workspace/internet-resources/'
 
 # Ensure the download directory exists
 FileUtils.mkdir_p(BASE_DOWNLOAD_DIR)
@@ -32,10 +34,10 @@ end
 
 # Extract URLs from the task output
 # Consider only http and https schemes
-urls = URI.extract(task_output.to_s, ['http', 'https'])
+urls = URI.extract(task_output.to_s, %w[http https])
 
 if urls.empty?
-  puts "No URLs found in the task description."
+  puts 'No URLs found in the task description.'
 else
   urls.each_with_index do |url_str, index|
     puts "\nProcessing URL #{index + 1}/#{urls.length}: #{url_str}"
@@ -45,7 +47,7 @@ else
       path = uri.path
 
       # Check if it's a known Git provider URL or ends with .git
-      is_git_repo = url_str.match?(%r{\b(github\.com|gitlab\.com|bitbucket\.org)\b}i) || url_str.end_with?('.git')
+      is_git_repo = url_str.match?(/\b(github\.com|gitlab\.com|bitbucket\.org)\b/i) || url_str.end_with?('.git')
 
       if is_git_repo
         # Attempt to derive a repo name from the path
@@ -57,7 +59,7 @@ else
                     else
                       repo_name_from_path
                     end
-        
+
         sanitized_repo_name = sanitize_filename(repo_name)
         # Ensure sanitized_repo_name is not empty
         sanitized_repo_name = "git_repo_#{Time.now.to_i}" if sanitized_repo_name.empty?
@@ -65,21 +67,21 @@ else
         clone_target_path = File.join(BASE_DOWNLOAD_DIR, sanitized_repo_name)
 
         puts "Attempting to clone Git repository: #{url_str} into #{clone_target_path}"
-        
+
         if Dir.exist?(clone_target_path) && !(Dir.entries(clone_target_path) - %w[. ..]).empty?
           puts "Directory #{clone_target_path} already exists and is not empty. Skipping clone."
           next
         end
-        
+
         # Using Shellwords.escape for security with external commands
         clone_command = "git clone --depth 1 #{Shellwords.escape(url_str)} #{Shellwords.escape(clone_target_path)}"
         puts "Executing: #{clone_command}"
         clone_success = system(clone_command)
-        
+
         if clone_success
           puts "Successfully cloned #{url_str} to #{clone_target_path}"
         else
-          puts "Failed to clone #{url_str}. Git command exited with status #{$?.exitstatus}"
+          puts "Failed to clone #{url_str}. Git command exited with status #{$CHILD_STATUS.exitstatus}"
         end
       else
         # Download as a web page
@@ -92,41 +94,34 @@ else
 
         # Ensure .html extension if not present or if it looks like a directory
         # (path ends with / or basename has no extension)
-        if File.extname(page_filename_base).empty? || uri.path.end_with?('/')
-          page_filename_with_ext = page_filename_base + ".html"
-        else
-          page_filename_with_ext = page_filename_base
-        end
-        
+        page_filename_with_ext = if File.extname(page_filename_base).empty? || uri.path.end_with?('/')
+                                   "#{page_filename_base}.html"
+                                 else
+                                   page_filename_base
+                                 end
+
         filename = sanitize_filename(page_filename_with_ext)
         # Fallback if filename becomes problematic (e.g. just ".html" or empty)
-        if filename.gsub(/\.html$/, '').gsub(/\.$/, '').strip.empty?
-            filename = sanitize_filename(uri.host + "_fallback_" + Time.now.to_i.to_s + ".html")
-        end
+        filename = sanitize_filename("#{uri.host}_fallback_#{Time.now.to_i}.html") if filename.gsub(/\.html$/, '').gsub(/\.$/, '').strip.empty?
 
         download_file_path = File.join(BASE_DOWNLOAD_DIR, filename)
 
         puts "Attempting to download web page: #{url_str} to #{download_file_path}"
-        
-        downloaded_content = URI.open(url_str, "rb", redirect: :safe) do |f|
-            # Log redirection if any
-            if f.base_uri.to_s != url_str
-                puts "Redirected from #{url_str} to #{f.base_uri}"
-            end
-            # Set User-Agent to mimic a browser, some sites block default open-uri agent
-            # This part is tricky with URI.open block form, better to set globally or use Net::HTTP for headers
-            # For simplicity, we'll rely on default open-uri behavior or assume target sites are permissive.
-            # Alternatively, one could do:
-            # URI.open(url_str, "User-Agent" => "Mozilla/5.0 ...", "rb", redirect: :safe).read
-            f.read
+
+        downloaded_content = URI.open(url_str, 'rb', redirect: :safe) do |f|
+          # Log redirection if any
+          puts "Redirected from #{url_str} to #{f.base_uri}" if f.base_uri.to_s != url_str
+          # Set User-Agent to mimic a browser, some sites block default open-uri agent
+          # This part is tricky with URI.open block form, better to set globally or use Net::HTTP for headers
+          # For simplicity, we'll rely on default open-uri behavior or assume target sites are permissive.
+          # Alternatively, one could do:
+          # URI.open(url_str, "User-Agent" => "Mozilla/5.0 ...", "rb", redirect: :safe).read
+          f.read
         end
-        
-        File.open(download_file_path, "wb") do |file|
-          file.write(downloaded_content)
-        end
+
+        File.binwrite(download_file_path, downloaded_content)
         puts "Successfully downloaded #{url_str} to #{download_file_path}"
       end
-
     rescue URI::InvalidURIError => e
       puts "Skipping invalid URL: #{url_str} - #{e.message}"
     rescue OpenURI::HTTPError => e

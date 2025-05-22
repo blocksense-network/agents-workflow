@@ -1,12 +1,12 @@
+# frozen_string_literal: true
+
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require_relative 'test_helper'
 
-include RepoTestHelper
-
-
 class StartTaskGitTest < Minitest::Test
+  include RepoTestHelper
   def assert_task_branch_created(repo, remote, branch)
     # agent-task should switch back to main after creating the feature branch
     assert_equal 'main', `git -C #{repo} rev-parse --abbrev-ref HEAD`.strip
@@ -23,7 +23,7 @@ class StartTaskGitTest < Minitest::Test
 
   def test_clean_repo
     repo, remote = setup_git_repo
-    status, _, _ = run_agent_task(repo, branch: 'feature', lines: ['task'])
+    status, = run_agent_task(repo, branch: 'feature', lines: ['task'])
     assert_equal 0, status.exitstatus
     assert_task_branch_created(repo, remote, 'feature')
   ensure
@@ -36,7 +36,7 @@ class StartTaskGitTest < Minitest::Test
     File.write(File.join(repo, 'foo.txt'), 'foo')
     git(repo, 'add', 'foo.txt')
     status_before = `git -C #{repo} status --porcelain`
-    status, _, _ = run_agent_task(repo, branch: 's1', lines: ['task'])
+    status, = run_agent_task(repo, branch: 's1', lines: ['task'])
     assert_equal 0, status.exitstatus
     # ensure staged changes are preserved and nothing else changed
     assert_equal status_before, `git -C #{repo} status --porcelain`
@@ -50,7 +50,7 @@ class StartTaskGitTest < Minitest::Test
     repo, remote = setup_git_repo
     File.write(File.join(repo, 'bar.txt'), 'bar')
     status_before = `git -C #{repo} status --porcelain`
-    status, _, _ = run_agent_task(repo, branch: 's2', lines: ['task'])
+    status, = run_agent_task(repo, branch: 's2', lines: ['task'])
     assert_equal 0, status.exitstatus
     # unstaged modifications should remain exactly as they were
     assert_equal status_before, `git -C #{repo} status --porcelain`
@@ -62,10 +62,10 @@ class StartTaskGitTest < Minitest::Test
 
   def test_editor_failure
     repo, remote = setup_git_repo
-    status, _, _ = run_agent_task(repo, branch: 'bad', lines: [], editor_exit: 1)
+    status, = run_agent_task(repo, branch: 'bad', lines: [], editor_exit: 1)
     assert status.exitstatus != 0
     # when the editor fails, no branch should have been created
-    refute `git -C #{repo} branch --list bad`.strip.size > 0
+    refute `git -C #{repo} branch --list bad`.strip.size.positive?
   ensure
     FileUtils.remove_entry(repo)
     FileUtils.remove_entry(remote)
@@ -73,7 +73,7 @@ class StartTaskGitTest < Minitest::Test
 
   def test_empty_file
     repo, remote = setup_git_repo
-    status, _, _ = run_agent_task(repo, branch: 'empty', lines: [])
+    status, = run_agent_task(repo, branch: 'empty', lines: [])
     assert_equal 0, status.exitstatus
     branches = `git -C #{repo} branch --list`.split("\n").map(&:strip)
     # an empty task file should still result in the new branch being created
@@ -90,7 +90,7 @@ class StartTaskGitTest < Minitest::Test
     refute executed, 'editor should not run when branch creation fails'
     assert status.exitstatus != 0
     # no branch should be created when the branch name is invalid
-    refute `git -C #{repo} branch --list 'inv@lid name'`.strip.size > 0
+    refute `git -C #{repo} branch --list 'inv@lid name'`.strip.size.positive?
   ensure
     FileUtils.remove_entry(repo)
     FileUtils.remove_entry(remote)

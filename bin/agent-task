@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
 require 'tempfile'
 require 'fileutils'
@@ -7,15 +8,13 @@ require_relative 'lib/vcs_repo'
 
 def find_default_editor
   return ENV['EDITOR'] if ENV['EDITOR']
+
   editors = %w[nano pico micro vim helix vi]
   editors.find { |e| system("command -v #{e} > /dev/null 2>&1") } || 'nano'
 end
 
-
 branch_name = ARGV.shift
-if branch_name.nil? || branch_name.strip.empty?
-  abort("Usage: #{File.basename(__FILE__)} <branch-name>")
-end
+abort("Usage: #{File.basename(__FILE__)} <branch-name>") if branch_name.nil? || branch_name.strip.empty?
 
 # Initialize repository and create branch first
 begin
@@ -40,10 +39,8 @@ tempfile = Tempfile.new(['task', '.txt'])
 editor = find_default_editor
 unless system("#{editor} #{tempfile.path}")
   repo.checkout_branch(orig_branch) if orig_branch
-  if repo.vcs_type == :git
-    system('git', 'branch', '-D', branch_name, chdir: repo.root, out: File::NULL, err: File::NULL)
-  end
-  abort("Error: Failed to open the editor.")
+  system('git', 'branch', '-D', branch_name, chdir: repo.root, out: File::NULL, err: File::NULL) if repo.vcs_type == :git
+  abort('Error: Failed to open the editor.')
 end
 tempfile.close
 
@@ -52,12 +49,12 @@ task_content = File.read(tempfile.path)
 # Create the agents task file path
 now = Time.now.utc
 year = now.year
-month = "%02d" % now.month
-day = "%02d" % now.day
-hour = "%02d" % now.hour
-min = "%02d" % now.min
+month = format('%02d', now.month)
+day = format('%02d', now.day)
+hour = format('%02d', now.hour)
+min = format('%02d', now.min)
 filename = "#{day}-#{hour}#{min}-#{branch_name}"
-tasks_dir = File.join(repo.root, ".agents", "tasks", year.to_s, month)
+tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
 FileUtils.mkdir_p(tasks_dir)
 task_file = File.join(tasks_dir, filename)
 commit_msg = "start-agent-task: #{branch_name}"
@@ -69,14 +66,10 @@ File.write(task_file, task_content)
 repo.commit_file(task_file, commit_msg)
 
 # Ask to push to default remote
-print "Push to default remote? [Y/n]: "
-answer = STDIN.gets.strip
-answer = "y" if answer.empty?
-if answer.downcase.start_with?("y")
-  repo.push_current_branch(branch_name)
-end
+print 'Push to default remote? [Y/n]: '
+answer = $stdin.gets.strip
+answer = 'y' if answer.empty?
+repo.push_current_branch(branch_name) if answer.downcase.start_with?('y')
 
 # Return to original branch
-if orig_branch
-  repo.checkout_branch(orig_branch)
-end
+repo.checkout_branch(orig_branch) if orig_branch

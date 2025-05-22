@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+require 'English'
 require 'open3'
 
 class VCSRepo
@@ -6,6 +9,7 @@ class VCSRepo
   def initialize(path_in_repo = Dir.pwd)
     @root = find_repo_root(path_in_repo)
     raise "Error: Could not find repository root from #{path_in_repo}" unless @root
+
     @vcs_type = determine_vcs_type(@root)
     raise "Error: Could not determine VCS type for repository at #{@root}" unless @vcs_type
   end
@@ -25,6 +29,7 @@ class VCSRepo
       end
     end
     return branch if branch && !branch.empty?
+
     puts "Error: Could not determine branch in repository at #{@root}"
     exit 1
   end
@@ -51,10 +56,10 @@ class VCSRepo
         raise "Error: Unknown VCS type (#{@vcs_type}) to start branch"
       end
     end
-    unless status && status.success?
-      message = output.strip.empty? ? "Error: Failed to create branch '#{branch_name}'" : output.strip
-      raise message
-    end
+    return if status&.success?
+
+    message = output.strip.empty? ? "Error: Failed to create branch '#{branch_name}'" : output.strip
+    raise message
   end
 
   def commit_file(file_path, message)
@@ -86,9 +91,9 @@ class VCSRepo
       when :hg
         system("hg push --rev #{branch_name}")
       when :bzr
-        system("bzr push")
+        system('bzr push')
       when :fossil
-        system("fossil push")
+        system('fossil push')
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to push branch"
       end
@@ -97,6 +102,7 @@ class VCSRepo
 
   def checkout_branch(branch_name)
     return unless branch_name && !branch_name.empty?
+
     Dir.chdir(@root) do
       case @vcs_type
       when :git
@@ -128,9 +134,11 @@ class VCSRepo
 
         # Detect whether the current branch is one of the primary branches.
         is_primary_branch = false
-        if current_branch_name == "main" && system("git rev-parse --verify --quiet refs/heads/main", :err => File::NULL, :out => File::NULL)
+        if current_branch_name == 'main' && system('git rev-parse --verify --quiet refs/heads/main',
+                                                   err: File::NULL, out: File::NULL)
           is_primary_branch = true
-        elsif current_branch_name == "master" && system("git rev-parse --verify --quiet refs/heads/master", :err => File::NULL, :out => File::NULL)
+        elsif current_branch_name == 'master' && system('git rev-parse --verify --quiet refs/heads/master',
+                                                        err: File::NULL, out: File::NULL)
           is_primary_branch = true
         end
 
@@ -144,7 +152,8 @@ class VCSRepo
           # Start with the configured upstream branch. Some branches may track
           # themselves, so ignore the upstream if it points at the current commit.
           upstream = `git rev-parse --abbrev-ref @{u} 2>/dev/null`.strip
-          if $?.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}", :err => File::NULL, :out => File::NULL)
+          if $CHILD_STATUS.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}",
+                                                                  err: File::NULL, out: File::NULL)
             upstream_commit = `git rev-parse #{upstream}`.strip
             head_commit = `git rev-parse HEAD`.strip
             base_branch_ref = upstream unless upstream_commit == head_commit
@@ -152,18 +161,17 @@ class VCSRepo
 
           # Fallback to main or master if we couldn't use the upstream.
           if base_branch_ref.nil?
-            if system("git rev-parse --verify --quiet refs/heads/main^{commit}", :err => File::NULL, :out => File::NULL)
-              base_branch_ref = "main"
-            elsif system("git rev-parse --verify --quiet refs/heads/master^{commit}", :err => File::NULL, :out => File::NULL)
-              base_branch_ref = "master"
+            if system('git rev-parse --verify --quiet refs/heads/main^{commit}', err: File::NULL, out: File::NULL)
+              base_branch_ref = 'main'
+            elsif system('git rev-parse --verify --quiet refs/heads/master^{commit}', err: File::NULL,
+                                                                                      out: File::NULL)
+              base_branch_ref = 'master'
             end
           end
 
           if base_branch_ref
             merge_base_commit = `git merge-base #{base_branch_ref} HEAD`.strip
-            if $?.success? && !merge_base_commit.empty?
-              commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
-            end
+            commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip if $CHILD_STATUS.success? && !merge_base_commit.empty?
           end
         end
       when :hg
@@ -182,7 +190,9 @@ class VCSRepo
           # Fossil branch names can contain characters that need escaping in SQL,
           # but typically they are simple. Using as is, assuming simple names.
           # For more complex names, proper SQL escaping would be needed.
-          commit_hash = `fossil sql "SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid WHERE event.type='ci' AND event.branch = '#{current_fossil_branch.gsub("'", "''")}' ORDER BY event.mtime ASC LIMIT 1"`.strip
+          commit_hash = `fossil sql "SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid WHERE event.type='ci' AND event.branch = '#{current_fossil_branch.gsub(
+            "'", "''"
+          )}' ORDER BY event.mtime ASC LIMIT 1"`.strip
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to find first commit"
@@ -190,6 +200,7 @@ class VCSRepo
       end
     end
     return commit_hash if commit_hash && !commit_hash.empty?
+
     nil
   end
 
@@ -202,12 +213,12 @@ class VCSRepo
       when :git
         # For git, this shows files changed in the specified commit
         output = `git diff-tree --no-commit-id --name-only -r #{commit_hash}`.strip
-        files = output.split("\n") if $?.success?
+        files = output.split("\n") if $CHILD_STATUS.success?
       when :hg
         # For hg, this lists files modified in the specified changeset
         output = `hg status --rev #{commit_hash} --print0 --no-status --added --modified --removed`.strip
         # --print0 uses null byte as separator
-        files = output.split("\0") if $?.success? && !output.empty?
+        files = output.split("\0") if $CHILD_STATUS.success? && !output.empty?
       when :bzr
         # For bzr, whatchanged shows files modified in the revision.
         # We need to parse its output. It lists files under "added:", "removed:", "modified:".
@@ -228,7 +239,7 @@ class VCSRepo
         # `bzr version-info --show-diff <rev>` might be better.
         # `bzr whatchanged -r #{commit_hash} --short` lists files prefixed by status (A, M, D)
         output = `bzr whatchanged -r #{commit_hash} --short`.strip
-        if $?.success?
+        if $CHILD_STATUS.success?
           output.split("\n").each do |line|
             # Example lines: "A  path/to/file.txt", "M  another.txt"
             # We just need the file path part.
@@ -243,7 +254,7 @@ class VCSRepo
         # 'fossil diff --name-only --from HASH^ --to HASH'
         # The simplest seems to be 'changes'
         output = `fossil changes --hash #{commit_hash} --name-only --no-header`.strip
-        files = output.split("\n") if $?.success?
+        files = output.split("\n") if $CHILD_STATUS.success?
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to list files in commit"
       end
@@ -257,13 +268,14 @@ class VCSRepo
     current_dir = File.expand_path(start_path)
     current_dir = File.dirname(current_dir) unless File.directory?(current_dir)
 
-    until current_dir == "/" ||
+    until current_dir == '/' ||
           Dir.exist?(File.join(current_dir, '.git')) ||
           Dir.exist?(File.join(current_dir, '.hg')) ||
           Dir.exist?(File.join(current_dir, '.bzr')) ||
           Dir.exist?(File.join(current_dir, '.fossil'))
-      parent_dir = File.expand_path("..", current_dir)
+      parent_dir = File.expand_path('..', current_dir)
       break if parent_dir == current_dir
+
       current_dir = parent_dir
     end
 
@@ -273,6 +285,7 @@ class VCSRepo
        Dir.exist?(File.join(current_dir, '.fossil'))
       return current_dir
     end
+
     nil
   end
 
@@ -281,6 +294,7 @@ class VCSRepo
     return :hg if Dir.exist?(File.join(root_path, '.hg'))
     return :bzr if Dir.exist?(File.join(root_path, '.bzr'))
     return :fossil if Dir.exist?(File.join(root_path, '.fossil'))
+
     nil
   end
 end

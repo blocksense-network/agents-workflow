@@ -1,21 +1,23 @@
+# frozen_string_literal: true
+
 require_relative 'vcs_repo'
 require 'fileutils'
 require 'resolv'
 
-class AgentTasks # Renamed from AgentTaskRetriever
+# Renamed from AgentTaskRetriever
+class AgentTasks
   def initialize(path_in_repo = Dir.pwd)
     @repo = VCSRepo.new(path_in_repo) # This can raise if repo is not found
   end
 
   def agent_tasks_in_current_branch
     first_commit_hash = @repo.first_commit_in_current_branch
-    unless first_commit_hash
-      raise StandardError, "Error: Could not find the first commit in the current branch '#{@repo.current_branch}'."
-    end
+    raise StandardError, "Error: Could not find the first commit in the current branch '#{@repo.current_branch}'." unless first_commit_hash
 
     files_in_commit = @repo.files_in_commit(first_commit_hash)
     if files_in_commit.nil? || files_in_commit.empty?
-      raise StandardError, "Error: No files found in the first commit ('#{first_commit_hash}') of branch '#{@repo.current_branch}'."
+      raise StandardError,
+            "Error: No files found in the first commit ('#{first_commit_hash}') of branch '#{@repo.current_branch}'."
     end
 
     first_file_relative_path = files_in_commit.first
@@ -23,32 +25,35 @@ class AgentTasks # Renamed from AgentTaskRetriever
     agents_dir = File.dirname(first_file_absolute_path)
 
     unless Dir.exist?(agents_dir)
-      raise StandardError, "Error: Determined task directory #{agents_dir} does not exist.\n       (Derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')"
+      raise StandardError, <<~MSG
+        Error: Determined task directory #{agents_dir} does not exist.
+        (Derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')
+      MSG
     end
 
     files = Dir.entries(agents_dir).select { |f| f != '.' && f != '..' }
     if files.empty?
-      raise StandardError, "Error: No task files found in the determined task directory #{agents_dir}.\n       (Directory derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')"
+      raise StandardError, <<~MSG
+        Error: No task files found in the determined task directory #{agents_dir}.
+        (Directory derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')
+      MSG
     end
 
     files.sort.map { |f| File.join(agents_dir, f) }
   end
 
-  def is_on_task_branch?
-  end
+  def on_task_branch?; end
 
   def online?
-    begin
-      resolver = Resolv::DNS.new(nameserver: '8.8.8.8', timeout: 3)
-      resolver.getaddress('google.com')
-      true
-    rescue
-      false
-    end
+    resolver = Resolv::DNS.new(nameserver: '8.8.8.8', timeout: 3)
+    resolver.getaddress('google.com')
+    true
+  rescue StandardError
+    false
   end
 
   def build_message(task_files)
-    message = ""
+    message = ''
 
     if task_files.length == 1
       message = File.read(task_files[0])
@@ -57,13 +62,13 @@ class AgentTasks # Renamed from AgentTaskRetriever
         date = File.basename(file_path)
         content = File.read(file_path)
 
-        if index == 0
-          message += "On #{date}, you were given the following task:\n#{content}\n"
-        elsif index == task_files.length - 1
-          message += "Your current task is:\n#{content}\n"
-        else
-          message += "On #{date}, you were given a follow-up task:\n#{content}\n"
-        end
+        message += if index.zero?
+                     "On #{date}, you were given the following task:\n#{content}\n"
+                   elsif index == task_files.length - 1
+                     "Your current task is:\n#{content}\n"
+                   else
+                     "On #{date}, you were given a follow-up task:\n#{content}\n"
+                   end
       end
     end
 
@@ -74,17 +79,17 @@ class AgentTasks # Renamed from AgentTaskRetriever
 
         All URLs mentioned in the task description(s) have been downloaded
         to the /workspace/internet_resources directory.
-        
+
         If it's difficult for you to achieve a task without access to additional
         internet resources, you can always propose more URLs that we should make
         available offline.
-        
+
         Downloading development, dependencies may also fail to download due
         to the lack of internet connectivity. We are trying to maintain the
         script `.agents/build_all_targets.sh` that is also executed before
         your development session starts while your computer is still connected
         to the internet.
-        
+
         The script tries to run all build commands that have development
         dependencies in order to cache the dependencies for offline use.
         Please propose changes to this script when you introduce new build
@@ -107,12 +112,12 @@ class AgentTasks # Renamed from AgentTaskRetriever
         resources that are part of your Nix environment.
       NIX_MESSAGE
     end
-    
+
     message
   end
 
-  def get_agent_prompt
+  def agent_prompt
     task_file_paths = agent_tasks_in_current_branch
     build_message(task_file_paths)
   end
-end 
+end

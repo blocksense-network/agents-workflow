@@ -1,15 +1,16 @@
+# frozen_string_literal: true
+
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require 'open3'
 require_relative 'test_helper'
 
-include RepoTestHelper
-
 class GetTaskTest < Minitest::Test
+  include RepoTestHelper
   def test_get_task_after_start
     repo, remote = setup_git_repo
-    status, _, _ = run_agent_task(repo, branch: 'feat', lines: ['my task'])
+    status, = run_agent_task(repo, branch: 'feat', lines: ['my task'])
     # agent-task should succeed
     assert_equal 0, status.exitstatus
     git(repo, 'checkout', 'feat')
@@ -24,7 +25,7 @@ class GetTaskTest < Minitest::Test
 
   def test_get_task_on_work_branch
     repo, remote = setup_git_repo
-    status, _, _ = run_agent_task(repo, branch: 'feat', lines: ['follow task'])
+    status, = run_agent_task(repo, branch: 'feat', lines: ['follow task'])
     # agent-task should succeed
     assert_equal 0, status.exitstatus
     git(repo, 'checkout', 'feat')
@@ -38,4 +39,3 @@ class GetTaskTest < Minitest::Test
     FileUtils.remove_entry(remote)
   end
 end
-

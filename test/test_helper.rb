@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+require 'English'
 require 'rbconfig'
 
 module RepoTestHelper
@@ -11,7 +14,7 @@ module RepoTestHelper
 
   def git(repo, *args)
     cmd = ['git', *args]
-    system({'GIT_CONFIG_NOSYSTEM' => '1'}, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
+    system({ 'GIT_CONFIG_NOSYSTEM' => '1' }, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
   def setup_git_repo
@@ -40,17 +43,17 @@ module RepoTestHelper
       EOS
       exit #{editor_exit}
     SH
-    File.chmod(0755, script)
+    File.chmod(0o755, script)
     output = nil
     status = nil
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
-      IO.popen({'EDITOR'=>script}, cmd, 'r+') do |io|
+      IO.popen({ 'EDITOR' => script }, cmd, 'r+') do |io|
         io.write input
         io.close_write
         output = io.read
       end
-      status = $?
+      status = $CHILD_STATUS
     end
     executed = File.exist?(marker)
     FileUtils.remove_entry(dir)
@@ -63,9 +66,8 @@ module RepoTestHelper
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', GET_TASK] : [GET_TASK]
       output = IO.popen(cmd, &:read)
-      status = $?
+      status = $CHILD_STATUS
     end
     [status, output]
   end
 end
-
