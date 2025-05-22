@@ -12,7 +12,10 @@ class AgentTasks
 
   def agent_tasks_in_current_branch
     first_commit_hash = @repo.first_commit_in_current_branch
-    raise StandardError, "Error: Could not find the first commit in the current branch '#{@repo.current_branch}'." unless first_commit_hash
+    unless first_commit_hash
+      raise StandardError,
+            "Error: Could not find the first commit in the current branch '#{@repo.current_branch}'."
+    end
 
     files_in_commit = @repo.files_in_commit(first_commit_hash)
     if files_in_commit.nil? || files_in_commit.empty?
