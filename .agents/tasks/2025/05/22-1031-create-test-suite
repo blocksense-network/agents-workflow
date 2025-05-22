@@ -1,0 +1,47 @@
+
+Create a test suite for the `start-task` command.
+
+All tests should be carried out separately for git, fossil, bzr and hg (the version
+control systems supported by this project)
+
+The test suite should work with temporary git repositories created within the file
+system and it should test the following scenarios:
+
+1) In a clear repository state, from a main branch, run `start-task` and observe
+   that the following is true:
+
+   - a branch with the desired name was created.
+   - A single commit was created in the branch, including the desired file with
+     the task description was created in the .agents/tasks folder. There should
+     be no other files in the commit.
+   - the branch was pushed to the default remote
+     (the remote should reside in another directory in the file system)
+   - the working copy was switched back to the main brach after the `start-task`
+     execution completes.
+
+Please note that `start-task` will launch an editor. I suggest overriding the
+EDITOR env variable with a simple program that writes the required task definition
+and them immediately exists.
+
+2) We want the above scenario to work in the same way when the working copy is dirty:
+  
+   - when there are staged files (for the version control systems where this exists)
+   - when there aren't staged files
+
+   The expected behavior is that the state of the working copy will be fully preserved
+   after the execution of `start-task` completes. All other tested properties, specified
+   in 1) should hold.
+
+3) Make sure that all edge cases are handled correctly when executing the EDITOR command:
+
+   - The command may crash (non-zero exit code)
+   - The user may save an empty file
+   - The user might save a file with charaters that a not valid in a git branch name
+   - The user might leave the "branch:" prefix or remove it.
+   - The user might enter multiple spaces after the "branch:" prefix
+     (these should be removed from the branch name)
+   - The user may or may not enter a task description after the first line that indicates
+     the branch.
+
+The test suite should be executed with `just test`. Create a `Justfile` at the root of the
+repo for this purpose.
