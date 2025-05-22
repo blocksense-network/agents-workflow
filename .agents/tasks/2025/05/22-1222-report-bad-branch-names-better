@@ -1,0 +1,9 @@
+After manual testing, I've noticed that entering an invalid branch name still
+opens the editor first, before reaching the stage where the branch creation
+failure is reported. This is incovenient.
+
+We should first create the branch (or fail) and only then launch the editor.
+Futhermore, when the branch creation fails, we dispay a Ruby stack trace that
+obscures the original error message from git (or any other VCS).
+
+Instead, we should display only the original message from the VCS.
