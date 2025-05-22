@@ -1,0 +1,11 @@
+In a previous task defined in .agents/tasks/2025/05/22-1031-create-test-suite
+I instructed you to create a test suite that verifies that all tested properties
+in the case of clean repo state apply to dirty repos as well.
+
+The test suite you created doesn't do this. It doesn't have all assertions in the
+dirty case.
+
+To fix this issue, I propose a simple refactor:
+
+Extract the assertions from test_clean_repo in a reusable function and test them
+in the dirty working copy cases as well.
