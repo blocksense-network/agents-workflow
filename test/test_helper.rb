@@ -24,6 +24,12 @@ module RepoTestHelper
     system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
+  def hg_available?
+    system('hg', '--version', out: File::NULL, err: File::NULL)
+  rescue Errno::ENOENT
+    false
+  end
+
   def capture(repo, tool, *args)
     IO.popen([tool, *args], chdir: repo, &:read).strip
   end
@@ -43,6 +49,8 @@ module RepoTestHelper
       git(repo, 'commit', '-m', 'initial')
       git(repo, 'remote', 'add', 'origin', remote)
     when :hg
+      raise Minitest::Skip, 'Skipping Mercurial tests: hg not installed' unless hg_available?
+
       system('hg', 'init', remote, out: File::NULL)
       system('hg', 'init', repo, out: File::NULL)
       File.write(File.join(repo, 'README.md'), 'initial')
