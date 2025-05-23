@@ -1,0 +1,6 @@
+Expand the current test suite with support for Mercurial (hg).
+
+The scenarios should remain exactly the same as in the current git test suite.
+To avoid code duplication, I suggeset expanding the abstraction in bin/lib/vcs_repo.rb
+with additional methods that would allow the test suite to be defined in a more
+generic way.

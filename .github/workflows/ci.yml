@@ -13,6 +13,17 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3
+      - name: Install SCM tools
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y fossil
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install fossil mercurial
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            choco install hg fossil -y
+          fi
+        shell: bash
       - name: Setup just
         uses: extractions/setup-just@v1
       - uses: ruby/setup-ruby@v1

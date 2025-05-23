@@ -38,6 +38,8 @@ class VCSRepo
     require 'open3'
     output = ''
     status = nil
+    raise "Error: Invalid branch name '#{branch_name}'" unless valid_branch_name?(branch_name)
+
     Dir.chdir(@root) do
       case @vcs_type
       when :git
@@ -69,8 +71,8 @@ class VCSRepo
         system('git', 'add', '--', file_path)
         system('git', 'commit', '-m', message, '--', file_path)
       when :hg
-        system("hg add #{file_path}")
-        system("hg commit -m '#{message}'")
+        system('hg', 'add', file_path)
+        system('hg', 'commit', '-m', message, file_path)
       when :bzr
         system("bzr add #{file_path}")
         system("bzr commit -m '#{message}'")
@@ -115,6 +117,100 @@ class VCSRepo
         system("fossil update #{branch_name}")
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to checkout branch"
+      end
+    end
+  end
+
+  def create_local_branch(branch_name)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        system('git', 'checkout', '-b', branch_name)
+      when :hg
+        system('hg', 'bookmark', branch_name)
+        system('hg', 'update', branch_name)
+      end
+    end
+  end
+
+  def default_branch
+    case @vcs_type
+    when :git
+      'main'
+    when :hg
+      'default'
+    else
+      'main'
+    end
+  end
+
+  def add_file(file_path)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        system('git', 'add', file_path)
+      when :hg
+        system('hg', 'add', file_path)
+      end
+    end
+  end
+
+  def working_copy_status
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        `git status --porcelain`
+      when :hg
+        `hg status`
+      else
+        ''
+      end
+    end.strip
+  end
+
+  def tip_commit(branch = current_branch)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        `git rev-parse #{branch}`.strip
+      when :hg
+        commit = `hg log -r #{branch} --template '{node}'`.strip
+        commit = commit[1..-2] if commit.start_with?("'") && commit.end_with?("'")
+        commit
+      else
+        ''
+      end
+    end
+  end
+
+  def commit_count(base_branch, branch)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        `git rev-list #{base_branch}..#{branch} --count`.to_i
+      when :hg
+        revset = "branch(#{branch}) and not ancestors(#{base_branch})"
+        out, = Open3.capture2('hg', 'log', '-r', revset, '--template', '{node}\n')
+        out.lines.count
+      else
+        0
+      end
+    end
+  end
+
+  def branch_exists?(branch_name)
+    branches.include?(branch_name)
+  end
+
+  def branches
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        `git branch --list`.split("\n").map(&:strip)
+      when :hg
+        `hg branches`.lines.map { |l| l.split.first }
+      else
+        []
       end
     end
   end
@@ -171,7 +267,9 @@ class VCSRepo
 
           if base_branch_ref
             merge_base_commit = `git merge-base #{base_branch_ref} HEAD`.strip
-            commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip if $CHILD_STATUS.success? && !merge_base_commit.empty?
+            if $CHILD_STATUS.success? && !merge_base_commit.empty?
+              commit_hash = `git log --reverse --pretty=%H #{merge_base_commit}..HEAD | head -n 1`.strip
+            end
           end
         end
       when :hg
@@ -190,9 +288,11 @@ class VCSRepo
           # Fossil branch names can contain characters that need escaping in SQL,
           # but typically they are simple. Using as is, assuming simple names.
           # For more complex names, proper SQL escaping would be needed.
-          commit_hash = `fossil sql "SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid WHERE event.type='ci' AND event.branch = '#{current_fossil_branch.gsub(
-            "'", "''"
-          )}' ORDER BY event.mtime ASC LIMIT 1"`.strip
+          escaped_branch = current_fossil_branch.gsub("'", "''")
+          sql = 'SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid ' \
+                "WHERE event.type='ci' AND event.branch = '#{escaped_branch}' " \
+                'ORDER BY event.mtime ASC LIMIT 1'
+          commit_hash = `fossil sql "#{sql}"`.strip
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to find first commit"
@@ -216,9 +316,8 @@ class VCSRepo
         files = output.split("\n") if $CHILD_STATUS.success?
       when :hg
         # For hg, this lists files modified in the specified changeset
-        output = `hg status --rev #{commit_hash} --print0 --no-status --added --modified --removed`.strip
-        # --print0 uses null byte as separator
-        files = output.split("\0") if $CHILD_STATUS.success? && !output.empty?
+        output = `hg status --change #{commit_hash} --no-status`.strip
+        files = output.split("\n") if $CHILD_STATUS.success? && !output.empty?
       when :bzr
         # For bzr, whatchanged shows files modified in the revision.
         # We need to parse its output. It lists files under "added:", "removed:", "modified:".
@@ -259,10 +358,24 @@ class VCSRepo
         puts "Error: Unknown VCS type (#{@vcs_type}) to list files in commit"
       end
     end
-    files.compact.map(&:strip).reject(&:empty?).uniq
+    files.compact
+         .map { |f| f.to_s.strip.tr('\\', '/') }
+         .reject(&:empty?)
+         .uniq
   end
 
   private
+
+  # The branch name validation is intentionally simple and mirrors the common
+  # subset of rules for Git and Mercurial. See the Git reference format
+  # documentation[1] and the Mercurial branch naming guide[2] for the full
+  # specifications.
+  #
+  # [1]: https://git-scm.com/docs/git-check-ref-format
+  # [2]: https://www.mercurial-scm.org/repo/hg/help/branches
+  def valid_branch_name?(name)
+    !!(name =~ /\A[a-zA-Z0-9._-]+\z/)
+  end
 
   def find_repo_root(start_path)
     current_dir = File.expand_path(start_path)
