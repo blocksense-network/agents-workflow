@@ -5,94 +5,119 @@ require 'tmpdir'
 require 'fileutils'
 require_relative 'test_helper'
 
-class StartTaskGitTest < Minitest::Test
-  include RepoTestHelper
+module StartTaskCases
   def assert_task_branch_created(repo, remote, branch)
-    # agent-task should switch back to main after creating the feature branch
-    assert_equal 'main', `git -C #{repo} rev-parse --abbrev-ref HEAD`.strip
+    r = VCSRepo.new(repo)
+    # agent-task should switch back to the main branch after creating the feature branch
+    assert_equal r.default_branch, r.current_branch
+
+    commit = r.tip_commit(branch)
+    count = r.commit_count(r.default_branch, branch)
     # verify that exactly one commit was created on the new branch
-    assert_equal 1, `git -C #{repo} rev-list main..#{branch} --count`.to_i
-    commit = `git -C #{repo} rev-parse #{branch}`.strip
+    assert_equal 1, count
+
+    files = r.files_in_commit(commit)
     # list the files from the new commit to ensure only the task file was added
-    files = `git -C #{repo} diff-tree --no-commit-id --name-only -r #{commit}`.split
     assert_equal 1, files.length
-    assert_match %r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-#{branch}}, files.first
+    assert_match(%r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-#{branch}}, files.first)
+
+    remote_commit = if r.vcs_type == :git
+                      capture(remote, 'git', 'rev-parse', branch)
+                    else
+                      capture(remote, 'hg', 'log', '-r', 'tip', '--template', '{node}')
+                    end
     # confirm the feature branch was pushed to the remote repository
-    assert_equal commit, `git --git-dir=#{remote} rev-parse #{branch}`.strip
+    assert_equal commit, remote_commit
   end
 
   def test_clean_repo
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     status, = run_agent_task(repo, branch: 'feature', lines: ['task'])
     assert_equal 0, status.exitstatus
     assert_task_branch_created(repo, remote, 'feature')
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_dirty_repo_staged
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     File.write(File.join(repo, 'foo.txt'), 'foo')
-    git(repo, 'add', 'foo.txt')
-    status_before = `git -C #{repo} status --porcelain`
+    r = VCSRepo.new(repo)
+    r.add_file('foo.txt')
+    status_before = r.working_copy_status
     status, = run_agent_task(repo, branch: 's1', lines: ['task'])
     assert_equal 0, status.exitstatus
     # ensure staged changes are preserved and nothing else changed
-    assert_equal status_before, `git -C #{repo} status --porcelain`
+    after = r.working_copy_status
+    assert_equal status_before, after
     assert_task_branch_created(repo, remote, 's1')
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_dirty_repo_unstaged
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     File.write(File.join(repo, 'bar.txt'), 'bar')
-    status_before = `git -C #{repo} status --porcelain`
+    r = VCSRepo.new(repo)
+    status_before = r.working_copy_status
     status, = run_agent_task(repo, branch: 's2', lines: ['task'])
     assert_equal 0, status.exitstatus
     # unstaged modifications should remain exactly as they were
-    assert_equal status_before, `git -C #{repo} status --porcelain`
+    after = r.working_copy_status
+    assert_equal status_before, after
     assert_task_branch_created(repo, remote, 's2')
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_editor_failure
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     status, = run_agent_task(repo, branch: 'bad', lines: [], editor_exit: 1)
     assert status.exitstatus != 0
     # when the editor fails, no branch should have been created
-    refute `git -C #{repo} branch --list bad`.strip.size.positive?
+    refute VCSRepo.new(repo).branch_exists?('bad')
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_empty_file
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     status, = run_agent_task(repo, branch: 'empty', lines: [])
     assert_equal 0, status.exitstatus
-    branches = `git -C #{repo} branch --list`.split("\n").map(&:strip)
+    branches = VCSRepo.new(repo).branches
     # an empty task file should still result in the new branch being created
     assert_includes branches, 'empty'
-    assert_includes branches, '* main'
+    assert_includes branches, VCSRepo.new(repo).vcs_type == :git ? '* main' : 'default'
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_invalid_branch
-    repo, remote = setup_git_repo
+    repo, remote = setup_repo(self.class::VCS_TYPE)
     status, _, executed = run_agent_task(repo, branch: 'inv@lid name', lines: ['task'])
     refute executed, 'editor should not run when branch creation fails'
     assert status.exitstatus != 0
     # no branch should be created when the branch name is invalid
-    refute `git -C #{repo} branch --list 'inv@lid name'`.strip.size.positive?
+    refute VCSRepo.new(repo).branch_exists?('inv@lid name')
   ensure
-    FileUtils.remove_entry(repo)
-    FileUtils.remove_entry(remote)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
+end
+
+class StartTaskGitTest < Minitest::Test
+  include RepoTestHelper
+  include StartTaskCases
+  VCS_TYPE = :git
+end
+
+class StartTaskHgTest < Minitest::Test
+  include RepoTestHelper
+  include StartTaskCases
+  VCS_TYPE = :hg
 end
