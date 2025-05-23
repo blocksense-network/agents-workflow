@@ -2,6 +2,8 @@
 
 require 'English'
 require 'rbconfig'
+require 'tmpdir'
+require_relative '../bin/lib/vcs_repo'
 
 module RepoTestHelper
   ROOT = File.expand_path('..', __dir__)
@@ -17,17 +19,46 @@ module RepoTestHelper
     system({ 'GIT_CONFIG_NOSYSTEM' => '1' }, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
-  def setup_git_repo
+  def hg(repo, *args)
+    cmd = ['hg', *args]
+    system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
+  end
+
+  def capture(repo, tool, *args)
+    IO.popen([tool, *args], chdir: repo, &:read).strip
+  end
+
+  def setup_repo(vcs_type)
     remote = Dir.mktmpdir('remote')
-    system('git', 'init', '--bare', remote, out: File::NULL)
     repo = Dir.mktmpdir('repo')
-    system('git', 'init', '-b', 'main', repo, out: File::NULL)
-    git(repo, 'config', 'user.email', 'tester@example.com')
-    git(repo, 'config', 'user.name', 'Tester')
-    File.write(File.join(repo, 'README.md'), 'initial')
-    git(repo, 'add', 'README.md')
-    git(repo, 'commit', '-m', 'initial')
-    git(repo, 'remote', 'add', 'origin', remote)
+
+    case vcs_type
+    when :git
+      system('git', 'init', '--bare', remote, out: File::NULL)
+      system('git', 'init', '-b', 'main', repo, out: File::NULL)
+      git(repo, 'config', 'user.email', 'tester@example.com')
+      git(repo, 'config', 'user.name', 'Tester')
+      File.write(File.join(repo, 'README.md'), 'initial')
+      git(repo, 'add', 'README.md')
+      git(repo, 'commit', '-m', 'initial')
+      git(repo, 'remote', 'add', 'origin', remote)
+    when :hg
+      system('hg', 'init', remote, out: File::NULL)
+      system('hg', 'init', repo, out: File::NULL)
+      File.write(File.join(repo, 'README.md'), 'initial')
+      Dir.chdir(repo) do
+        hg(repo, 'add', 'README.md')
+        hg(repo, 'commit', '-m', 'initial', '-u', 'Tester <tester@example.com>')
+        hgrc = File.join('.hg', 'hgrc')
+        File.open(hgrc, 'a') do |f|
+          f.puts '[paths]'
+          f.puts "default = #{remote}"
+        end
+      end
+    else
+      raise "Unsupported VCS type '#{vcs_type}'"
+    end
+
     [repo, remote]
   end
 
