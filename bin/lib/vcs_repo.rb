@@ -174,7 +174,9 @@ class VCSRepo
       when :git
         `git rev-parse #{branch}`.strip
       when :hg
-        `hg log -r #{branch} --template '{node}'`.strip
+        commit = `hg log -r #{branch} --template '{node}'`.strip
+        commit = commit[1..-2] if commit.start_with?("'") && commit.end_with?("'")
+        commit
       else
         ''
       end
