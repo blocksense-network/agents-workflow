@@ -1,0 +1,12 @@
+Document the newly added `agent-task` options in the README
+
+In `agent-task`, I don't like how the branch clean up in the abort
+paths is duplicated twice. You can refactor the code to perform the
+clean up in an ensure block. The clean up will be guarded by a variable
+that will be "defused" in the happy path.
+
+In the test modules, please add comments around the assertions that
+clarify what is being tested in the assertion. Add an AGENTS.md file
+in the test folder with suitable guidance for you, so you can always
+explain your intentions behind the assertions in the tests in the future.
+
