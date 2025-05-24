@@ -27,9 +27,10 @@ module StartTaskCases
                     when :hg
                       capture(remote, 'hg', 'log', '-r', 'tip', '--template', '{node}')
                     when :fossil
-                      sql = 'SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid ' \
-                            "WHERE event.type='ci' AND event.branch='#{branch}' " \
-                            'ORDER BY event.mtime DESC LIMIT 1'
+                      sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+                            'JOIN blob ON tagxref.rid=blob.rid ' \
+                            "WHERE tag.tagname='sym-#{branch}' " \
+                            'ORDER BY tagxref.mtime DESC LIMIT 1'
                       capture(remote, 'fossil', 'sql', sql).gsub("'", '')
                     end
     # confirm the feature branch was pushed to the remote repository
@@ -94,10 +95,12 @@ module StartTaskCases
     repo, remote = setup_repo(self.class::VCS_TYPE)
     status, = run_agent_task(repo, branch: 'empty', lines: [])
     assert_equal 0, status.exitstatus
-    branches = VCSRepo.new(repo).branches
+    r = VCSRepo.new(repo)
+    branches = r.branches
     # an empty task file should still result in the new branch being created
     assert_includes branches, 'empty'
-    assert_includes branches, VCSRepo.new(repo).vcs_type == :git ? '* main' : 'default'
+    expected_primary = r.vcs_type == :git ? "* #{r.default_branch}" : r.default_branch
+    assert_includes branches, expected_primary
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)

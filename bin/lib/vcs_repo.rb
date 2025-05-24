@@ -77,8 +77,8 @@ class VCSRepo
         system("bzr add #{file_path}")
         system("bzr commit -m '#{message}'")
       when :fossil
-        system("fossil add #{file_path}")
-        system("fossil commit -m '#{message}'")
+        system('fossil', 'add', file_path)
+        system('fossil', 'commit', '-m', message, '--', file_path)
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to commit file"
       end
@@ -188,7 +188,7 @@ class VCSRepo
         commit
       when :fossil
         escaped = branch.gsub("'", "''")
-        sql = 'SELECT lower(hex(blob.uuid)) FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
               "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped}' " \
               'ORDER BY tagxref.mtime DESC LIMIT 1'
         `fossil sql "#{sql}"`.strip.gsub("'", '')
@@ -211,7 +211,8 @@ class VCSRepo
         escaped = branch.gsub("'", "''")
         sql = 'SELECT count(*) FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid WHERE ' \
               "tag.tagname='sym-#{escaped}'"
-        `fossil sql "#{sql}"`.to_i
+        count = `fossil sql "#{sql}"`.to_i
+        [count - 1, 0].max
       else
         0
       end
@@ -308,7 +309,7 @@ class VCSRepo
         # Ensure branch name is not empty and is safe for SQL query
         if current_fossil_branch && !current_fossil_branch.empty? && current_fossil_branch.match?(/\A[a-zA-Z0-9._-]+\z/)
           escaped_branch = current_fossil_branch.gsub("'", "''")
-          sql = 'SELECT lower(hex(blob.uuid)) FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+          sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
                 "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped_branch}' " \
                 'ORDER BY tagxref.mtime ASC LIMIT 1'
           commit_hash = `fossil sql "#{sql}"`.strip.gsub("'", '')
@@ -368,9 +369,9 @@ class VCSRepo
         end
       when :fossil
         sql = 'SELECT filename.name FROM filename JOIN mlink ON filename.fnid=mlink.fnid ' \
-              "JOIN blob ON mlink.mid=blob.rid WHERE lower(hex(blob.uuid))='#{commit_hash.downcase}'"
+              "JOIN blob ON mlink.mid=blob.rid WHERE blob.uuid='#{commit_hash}'"
         output = `fossil sql "#{sql}"`.strip
-        files = output.split("\n") if $CHILD_STATUS.success?
+        files = output.split("\n").map { |line| line.delete("'") } if $CHILD_STATUS.success?
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to list files in commit"
       end
