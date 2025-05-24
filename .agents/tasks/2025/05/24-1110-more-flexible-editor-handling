@@ -1,0 +1,29 @@
+in `test/test_start_task.rb`, the function `test_empty_file` currently
+checks that creating a task with an empty description still results in
+a branch being created.
+
+This is not a desired behavior of the program. We should allow the user
+to abort the task creation process by entering en empty message. Perhaps
+we can make this work like git. We create a file with a single empty line
+at the top, followed by an explanation, like this:
+
+```
+
+# Please write your task prompt above.
+# Enter an empty prompt to abort the task creation process.
+# Feel free to leave this comment in the file. It will be ignored.
+```
+
+The implementation can delete the precise comment message from the saved
+file and then check wether the remaining lines consists entirely of whitespace.
+This would indicate that the user doesn't want to proceed.
+
+To make the program easier to use in non-interactive environments, we can
+add additional options `--prompt=STRING` and `--prompt-file=FILE`.
+
+Introduce these and make sure they are well tested. Don't remove the previous
+tests with the fake editor, but rather test all possible ways to interact with
+the program.
+
+Don't duplicate code. Instead, make run_agent_task and the test routines more
+parametric in order to handle all scenarios with the same set of assertions.
