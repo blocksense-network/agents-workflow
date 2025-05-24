@@ -2,12 +2,14 @@
 
 - You can execute the test suite with `just test`.
 - You can lint the codebase with `just lint`.
+  Don't disable lints just to make the linter happy. ALWAYS try to fix the code first.
 
 # Keeping notes
 
 In the `.agents/codebase-insights.txt` file, we try to maintain useful tips that may help
 you in your development tasks. When you discover something important or surprising about
-the codebase, please add a remark there.
+the codebase, add a remark in a comment near the relevant code or in the codebase-insights
+file. ALWAYS remove older remarks if they are no longer true.
 
 You can consult this file before starting your coding tasks.
 
