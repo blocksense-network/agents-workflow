@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'fileutils'
 require_relative 'test_helper'
 
-module StartTaskCases
+module StartTaskCases # rubocop:disable Metrics/ModuleLength
   def assert_task_branch_created(repo, remote, branch)
     r = VCSRepo.new(repo)
     # agent-task should switch back to the main branch after creating the feature branch
@@ -93,15 +93,58 @@ module StartTaskCases
 
   def test_empty_file
     repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'empty', lines: [], push_to_remote: true)
-    assert_equal 0, status.exitstatus
-    r = VCSRepo.new(repo)
-    branches = r.branches
-    # an empty task file should still result in the new branch being created
-    assert_includes branches, 'empty'
-    expected_primary = r.vcs_type == :git ? "* #{r.default_branch}" : r.default_branch
-    assert_includes branches, expected_primary
+    status, = run_agent_task(repo, branch: 'empty', lines: [], push_to_remote: false)
+    assert status.exitstatus != 0
+    refute VCSRepo.new(repo).branch_exists?('empty')
   ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_prompt_option
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    status, = run_agent_task(repo, branch: 'p1', prompt: 'prompt text', push_to_remote: true)
+    assert_equal 0, status.exitstatus
+    assert_task_branch_created(repo, remote, 'p1')
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_prompt_file_option
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    dir = Dir.mktmpdir('pf')
+    file = File.join(dir, 'msg.txt')
+    File.write(file, "file text\n")
+    status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: true)
+    assert_equal 0, status.exitstatus
+    assert_task_branch_created(repo, remote, 'pf1')
+  ensure
+    FileUtils.remove_entry(dir) if dir && File.exist?(dir)
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_prompt_option_empty
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    status, = run_agent_task(repo, branch: 'poe', prompt: '   ', push_to_remote: false)
+    assert status.exitstatus != 0
+    refute VCSRepo.new(repo).branch_exists?('poe')
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_prompt_file_empty
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    dir = Dir.mktmpdir('pfe')
+    file = File.join(dir, 'msg.txt')
+    File.write(file, "\n")
+    status, = run_agent_task(repo, branch: 'pfe', prompt_file: file, push_to_remote: false)
+    assert status.exitstatus != 0
+    refute VCSRepo.new(repo).branch_exists?('pfe')
+  ensure
+    FileUtils.remove_entry(dir) if dir && File.exist?(dir)
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end

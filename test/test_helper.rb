@@ -82,41 +82,53 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
 
   # push_to_remote option avoids interactive prompts in CI
   # rubocop:disable Metrics/ParameterLists
-  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil)
-    dir = Dir.mktmpdir('editor')
-    script = File.join(dir, 'fake_editor.rb')
-    marker = File.join(dir, 'called')
-    File.write(script, <<~RB)
-      #!/usr/bin/env ruby
-      File.write('#{marker}', "yes\n")
-      File.open(ARGV[0], 'w') do |f|
-        content = #{lines.inspect}.join("\n")
-        f.write(content)
-        f.write("\n") unless content.empty?
-      end
-      exit #{editor_exit}
-    RB
-    File.chmod(0o755, script)
+  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil, prompt: nil,
+                     prompt_file: nil)
+    dir = nil
+    script = nil
+    marker = nil
+
+    unless prompt || prompt_file
+      dir = Dir.mktmpdir('editor')
+      script = File.join(dir, 'fake_editor.rb')
+      marker = File.join(dir, 'called')
+      File.write(script, <<~RB)
+        #!/usr/bin/env ruby
+        File.write('#{marker}', "yes\n")
+        File.open(ARGV[0], 'w') do |f|
+          content = #{lines.inspect}.join("\n")
+          f.write(content)
+          f.write("\n") unless content.empty?
+        end
+        exit #{editor_exit}
+      RB
+      File.chmod(0o755, script)
+    end
     output = nil
     status = nil
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
       cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
-      editor_cmd = windows? ? "ruby #{script}" : script
+      cmd << "--prompt=#{prompt}" if prompt
+      cmd << "--prompt-file=#{prompt_file}" if prompt_file
+      env = {}
+      if script
+        env['EDITOR'] = windows? ? "ruby #{script}" : script
+      end
       answer = input
       if answer.nil?
         repo_type = VCSRepo.new(repo).vcs_type
         answer = repo_type == :fossil ? "n\n" : "y\n"
       end
-      IO.popen({ 'EDITOR' => editor_cmd }, cmd, 'r+') do |io|
+      IO.popen(env, cmd, 'r+') do |io|
         io.write(answer) if push_to_remote.nil?
         io.close_write
         output = io.read
       end
       status = $CHILD_STATUS
     end
-    executed = File.exist?(marker)
-    FileUtils.remove_entry(dir)
+    executed = marker && File.exist?(marker)
+    FileUtils.remove_entry(dir) if dir
     [status, output, executed]
   end
   # rubocop:enable Metrics/ParameterLists
