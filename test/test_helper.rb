@@ -80,7 +80,9 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     [repo, remote]
   end
 
-  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil)
+  # push_to_remote option avoids interactive prompts in CI
+  # rubocop:disable Metrics/ParameterLists
+  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil)
     dir = Dir.mktmpdir('editor')
     script = File.join(dir, 'fake_editor.rb')
     marker = File.join(dir, 'called')
@@ -99,6 +101,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     status = nil
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
+      cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
       editor_cmd = windows? ? "ruby #{script}" : script
       answer = input
       if answer.nil?
@@ -106,7 +109,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
         answer = repo_type == :fossil ? "n\n" : "y\n"
       end
       IO.popen({ 'EDITOR' => editor_cmd }, cmd, 'r+') do |io|
-        io.write answer
+        io.write(answer) if push_to_remote.nil?
         io.close_write
         output = io.read
       end
@@ -116,6 +119,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     FileUtils.remove_entry(dir)
     [status, output, executed]
   end
+  # rubocop:enable Metrics/ParameterLists
 
   def run_get_task(repo)
     output = nil
