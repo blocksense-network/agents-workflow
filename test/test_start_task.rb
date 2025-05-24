@@ -21,10 +21,16 @@ module StartTaskCases
     assert_equal 1, files.length
     assert_match(%r{\.agents/tasks/\d{4}/\d{2}/\d{2}-\d{4}-#{branch}}, files.first)
 
-    remote_commit = if r.vcs_type == :git
+    remote_commit = case r.vcs_type
+                    when :git
                       capture(remote, 'git', 'rev-parse', branch)
-                    else
+                    when :hg
                       capture(remote, 'hg', 'log', '-r', 'tip', '--template', '{node}')
+                    when :fossil
+                      sql = 'SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid ' \
+                            "WHERE event.type='ci' AND event.branch='#{branch}' " \
+                            'ORDER BY event.mtime DESC LIMIT 1'
+                      capture(remote, 'fossil', 'sql', sql).gsub("'", '')
                     end
     # confirm the feature branch was pushed to the remote repository
     assert_equal commit, remote_commit
@@ -120,4 +126,10 @@ class StartTaskHgTest < Minitest::Test
   include RepoTestHelper
   include StartTaskCases
   VCS_TYPE = :hg
+end
+
+class StartTaskFossilTest < Minitest::Test
+  include RepoTestHelper
+  include StartTaskCases
+  VCS_TYPE = :fossil
 end

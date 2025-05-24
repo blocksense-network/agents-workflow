@@ -5,7 +5,7 @@ require 'rbconfig'
 require 'tmpdir'
 require_relative '../bin/lib/vcs_repo'
 
-module RepoTestHelper
+module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ROOT = File.expand_path('..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
@@ -21,6 +21,11 @@ module RepoTestHelper
 
   def hg(repo, *args)
     cmd = ['hg', *args]
+    system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
+  end
+
+  def fossil(repo, *args)
+    cmd = ['fossil', *args]
     system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
@@ -55,6 +60,18 @@ module RepoTestHelper
           f.puts "default = #{remote}"
         end
       end
+    when :fossil
+      remote_file = File.join(remote, 'remote.fossil')
+      system('fossil', 'init', '--admin-user', 'Tester', remote_file, out: File::NULL)
+      Dir.chdir(repo) do
+        system('fossil', 'open', remote_file, '--user', 'Tester', out: File::NULL)
+        fossil(repo, 'user', 'default', 'Tester')
+        fossil(repo, 'settings', 'autosync', 'off')
+        File.write('README.md', 'initial')
+        fossil(repo, 'add', 'README.md')
+        fossil(repo, 'commit', '-m', 'initial', '--user', 'Tester')
+      end
+      remote = repo
     else
       raise "Unsupported VCS type '#{vcs_type}'"
     end
