@@ -8,6 +8,8 @@ fi
 
 ruby "$AGENTS_WORKFLOW_DIR/bin/download-internet-resources"
 
+sudo ln -s "$AGENTS_WORKFLOW_DIR/bin/get-task" /usr/local/bin/get-task
+
 if [ -f .agents/codex-setup ]; then
   .agents/codex-setup
 fi
