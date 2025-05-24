@@ -51,3 +51,9 @@ class GetTaskHgTest < Minitest::Test
   include GetTaskCases
   VCS_TYPE = :hg
 end
+
+class GetTaskFossilTest < Minitest::Test
+  include RepoTestHelper
+  include GetTaskCases
+  VCS_TYPE = :fossil
+end

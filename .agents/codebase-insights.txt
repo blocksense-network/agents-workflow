@@ -1,1 +1,4 @@
-No insights yet. Please add content here and remove this line.
+The VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands.
+For the Fossil tests we initialise a repository file and open it directly as
+the working copy.  The same directory is used for the "remote" in tests so
+`fossil push` becomes a no-op but commits still appear in the repository file.
