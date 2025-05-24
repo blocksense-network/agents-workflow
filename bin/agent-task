@@ -39,8 +39,12 @@ tempfile = Tempfile.new(['task', '.txt'])
 editor = find_default_editor
 unless system("#{editor} #{tempfile.path}")
   repo.checkout_branch(orig_branch) if orig_branch
-  if repo.vcs_type == :git
+  case repo.vcs_type
+  when :git
     system('git', 'branch', '-D', branch_name,
+           chdir: repo.root, out: File::NULL, err: File::NULL)
+  when :fossil
+    system('fossil', 'branch', 'close', branch_name,
            chdir: repo.root, out: File::NULL, err: File::NULL)
   end
   abort('Error: Failed to open the editor.')

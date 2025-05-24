@@ -66,6 +66,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
       Dir.chdir(repo) do
         system('fossil', 'open', remote_file, '--user', 'Tester', out: File::NULL)
         fossil(repo, 'user', 'default', 'Tester')
+        fossil(repo, 'remote', "file://#{remote_file}")
         fossil(repo, 'settings', 'autosync', 'off')
         File.write('README.md', 'initial')
         fossil(repo, 'add', 'README.md')
@@ -79,7 +80,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     [repo, remote]
   end
 
-  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
+  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil)
     dir = Dir.mktmpdir('editor')
     script = File.join(dir, 'fake_editor.rb')
     marker = File.join(dir, 'called')
@@ -99,8 +100,13 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
       editor_cmd = windows? ? "ruby #{script}" : script
+      answer = input
+      if answer.nil?
+        repo_type = VCSRepo.new(repo).vcs_type
+        answer = repo_type == :fossil ? "n\n" : "y\n"
+      end
       IO.popen({ 'EDITOR' => editor_cmd }, cmd, 'r+') do |io|
-        io.write input
+        io.write answer
         io.close_write
         output = io.read
       end
