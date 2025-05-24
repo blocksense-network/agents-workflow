@@ -4,7 +4,7 @@ This repository provides an opinionated workflow designed to enhance collaborati
 
 The core components include:
 -   `codex-setup`: A script to initialize the workspace, download necessary internet resources, and run project-specific setup.
--   `start-task`: A script for developers to begin a new task, automatically creating a dedicated branch and storing the task description.
+-   `agent-task`: A script for developers to begin a new task, automatically creating a dedicated branch and storing the task description.
 -   `get-task`: A script for the coding agent to retrieve its current task instructions.
 -   `download-internet-resources`: A helper script that scans task descriptions for URLs and downloads them (or clones Git repositories) for offline access.
 
@@ -34,10 +34,10 @@ This process will:
 ## Using the Workflow
 
 1.  **Starting a Task (Developer):**
-    When a developer needs to assign a task to the agent, they run the `start-task` command with the desired branch name:
+    When a developer needs to assign a task to the agent, they run the `agent-task` command with the desired branch name:
 
     ```bash
-    start-task <branch-name>
+    agent-task <branch-name>
     ```
 
     This script will:
@@ -46,6 +46,12 @@ This process will:
     -   Prompt the developer to enter the task description in an editor.
     -   Commit the task description to a file within a `.agents/tasks/` directory on the new branch.
     -   Push the branch to the default remote.
+    
+    The command accepts a few options for non-interactive use:
+    
+    - `--push-to-remote=BOOL` – automatically push to the default remote without prompting.
+    - `--prompt=STRING` – use `STRING` as the task description instead of launching an editor.
+    - `--prompt-file=FILE` – read the task description from `FILE`.
 
 2.  **Retrieving a Task (Coding Agent):**
     Once the developer has set up the task and switched Codex to the new branch, they instruct the agent to retrieve its instructions. A typical prompt for Codex would be:

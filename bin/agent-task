@@ -66,17 +66,72 @@ rescue StandardError => e
   exit 1
 end
 
-# Obtain the task description
-task_content = nil
-if prompt_content.nil?
-  tempfile = Tempfile.new(['task', '.txt'])
-  tempfile.write("\n")
-  tempfile.write(EDITOR_HINT)
-  tempfile.close
+# Set up branch cleanup in case we abort
+cleanup_branch = true
 
-  editor = find_default_editor
-  unless system("#{editor} #{tempfile.path}")
-    repo.checkout_branch(orig_branch) if orig_branch
+begin
+  # Obtain the task description
+  task_content = nil
+  if prompt_content.nil?
+    tempfile = Tempfile.new(['task', '.txt'])
+    tempfile.write("\n")
+    tempfile.write(EDITOR_HINT)
+    tempfile.close
+
+    editor = find_default_editor
+    abort('Error: Failed to open the editor.') unless system("#{editor} #{tempfile.path}")
+
+    task_content = File.read(tempfile.path)
+    task_content.sub!("\n#{EDITOR_HINT}", '')
+    task_content.sub!(EDITOR_HINT, '')
+  else
+    task_content = prompt_content
+  end
+  # Normalize CRLF line endings from editors and prompts to avoid Fossil commit issues
+  task_content.gsub!("\r\n", "\n")
+  abort('Aborted: empty task prompt.') if task_content.strip.empty?
+
+  # Create the agents task file path
+  now = Time.now.utc
+  year = now.year
+  month = format('%02d', now.month)
+  day = format('%02d', now.day)
+  hour = format('%02d', now.hour)
+  min = format('%02d', now.min)
+  filename = "#{day}-#{hour}#{min}-#{branch_name}"
+  tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
+  FileUtils.mkdir_p(tasks_dir)
+  task_file = File.join(tasks_dir, filename)
+  commit_msg = "start-agent-task: #{branch_name}"
+
+  # Write the task content without automatic CRLF conversion
+  File.binwrite(task_file, task_content)
+
+  # Add and commit the file
+  repo.commit_file(task_file, commit_msg)
+
+  # Ask to push to default remote
+  push = nil
+  if options.key?(:push_to_remote)
+    val = options[:push_to_remote].to_s.downcase
+    truthy = %w[1 true yes y].include?(val)
+    falsy = %w[0 false no n].include?(val)
+    abort("Error: Invalid value for --push-to-remote: '#{options[:push_to_remote]}'") unless truthy || falsy
+    push = truthy
+  else
+    print 'Push to default remote? [Y/n]: '
+    input = $stdin.gets
+    abort('Error: Non-interactive environment, use --push-to-remote option.') if input.nil?
+    answer = input.strip
+    answer = 'y' if answer.empty?
+    push = answer.downcase.start_with?('y')
+  end
+  repo.push_current_branch(branch_name) if push
+
+  cleanup_branch = false
+ensure
+  repo.checkout_branch(orig_branch) if orig_branch
+  if cleanup_branch
     case repo.vcs_type
     when :git
       system('git', 'branch', '-D', branch_name,
@@ -85,65 +140,5 @@ if prompt_content.nil?
       system('fossil', 'branch', 'close', branch_name,
              chdir: repo.root, out: File::NULL, err: File::NULL)
     end
-    abort('Error: Failed to open the editor.')
   end
-  task_content = File.read(tempfile.path)
-  task_content.sub!("\n#{EDITOR_HINT}", '')
-  task_content.sub!(EDITOR_HINT, '')
-else
-  task_content = prompt_content
 end
-# Normalize CRLF line endings from editors and prompts to avoid Fossil commit issues
-task_content.gsub!("\r\n", "\n")
-if task_content.strip.empty?
-  repo.checkout_branch(orig_branch) if orig_branch
-  case repo.vcs_type
-  when :git
-    system('git', 'branch', '-D', branch_name,
-           chdir: repo.root, out: File::NULL, err: File::NULL)
-  when :fossil
-    system('fossil', 'branch', 'close', branch_name,
-           chdir: repo.root, out: File::NULL, err: File::NULL)
-  end
-  abort('Aborted: empty task prompt.')
-end
-
-# Create the agents task file path
-now = Time.now.utc
-year = now.year
-month = format('%02d', now.month)
-day = format('%02d', now.day)
-hour = format('%02d', now.hour)
-min = format('%02d', now.min)
-filename = "#{day}-#{hour}#{min}-#{branch_name}"
-tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
-FileUtils.mkdir_p(tasks_dir)
-task_file = File.join(tasks_dir, filename)
-commit_msg = "start-agent-task: #{branch_name}"
-
-# Write the task content without automatic CRLF conversion
-File.binwrite(task_file, task_content)
-
-# Add and commit the file
-repo.commit_file(task_file, commit_msg)
-
-# Ask to push to default remote
-push = nil
-if options.key?(:push_to_remote)
-  val = options[:push_to_remote].to_s.downcase
-  truthy = %w[1 true yes y].include?(val)
-  falsy = %w[0 false no n].include?(val)
-  abort("Error: Invalid value for --push-to-remote: '#{options[:push_to_remote]}'") unless truthy || falsy
-  push = truthy
-else
-  print 'Push to default remote? [Y/n]: '
-  input = $stdin.gets
-  abort('Error: Non-interactive environment, use --push-to-remote option.') if input.nil?
-  answer = input.strip
-  answer = 'y' if answer.empty?
-  push = answer.downcase.start_with?('y')
-end
-repo.push_current_branch(branch_name) if push
-
-# Return to original branch
-repo.checkout_branch(orig_branch) if orig_branch
