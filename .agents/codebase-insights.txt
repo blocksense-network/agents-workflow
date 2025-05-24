@@ -1,1 +1,2 @@
 The VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands.
+

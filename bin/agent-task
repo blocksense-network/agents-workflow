@@ -52,6 +52,8 @@ end
 tempfile.close
 
 task_content = File.read(tempfile.path)
+# Normalize CRLF line endings from editors to avoid Fossil commit issues
+task_content.gsub!("\r\n", "\n")
 
 # Create the agents task file path
 now = Time.now.utc
@@ -74,7 +76,9 @@ repo.commit_file(task_file, commit_msg)
 
 # Ask to push to default remote
 print 'Push to default remote? [Y/n]: '
-answer = $stdin.gets.strip
+# STDIN.gets returns nil in non-interactive environments such as CI
+input = $stdin.gets
+answer = input ? input.strip : 'n'
 answer = 'y' if answer.empty?
 repo.push_current_branch(branch_name) if answer.downcase.start_with?('y')
 
