@@ -1,0 +1,29 @@
+name: 'Setup Development Environment'
+description: 'Sets up SCM tools, just, Ruby, and RuboCop for the agents-workflow project'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install SCM tools
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y fossil
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install fossil mercurial
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          choco install hg fossil -y
+        fi
+      shell: bash
+
+    - name: Setup just
+      uses: extractions/setup-just@v1
+
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.2'
+
+    - name: Install RuboCop
+      run: gem install rubocop
+      shell: bash
