@@ -77,8 +77,8 @@ class VCSRepo
         system("bzr add #{file_path}")
         system("bzr commit -m '#{message}'")
       when :fossil
-        system("fossil add #{file_path}")
-        system("fossil commit -m '#{message}'")
+        system('fossil', 'add', file_path)
+        system('fossil', 'commit', '-m', message, '--', file_path)
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to commit file"
       end
@@ -129,6 +129,9 @@ class VCSRepo
       when :hg
         system('hg', 'bookmark', branch_name)
         system('hg', 'update', branch_name)
+      when :fossil
+        system('fossil', 'branch', 'new', branch_name, current_branch)
+        system('fossil', 'update', branch_name)
       end
     end
   end
@@ -139,6 +142,8 @@ class VCSRepo
       'main'
     when :hg
       'default'
+    when :fossil
+      'trunk'
     else
       'main'
     end
@@ -151,6 +156,8 @@ class VCSRepo
         system('git', 'add', file_path)
       when :hg
         system('hg', 'add', file_path)
+      when :fossil
+        system('fossil', 'add', file_path)
       end
     end
   end
@@ -162,6 +169,8 @@ class VCSRepo
         `git status --porcelain`
       when :hg
         `hg status`
+      when :fossil
+        `fossil changes`
       else
         ''
       end
@@ -177,6 +186,12 @@ class VCSRepo
         commit = `hg log -r #{branch} --template '{node}'`.strip
         commit = commit[1..-2] if commit.start_with?("'") && commit.end_with?("'")
         commit
+      when :fossil
+        escaped = branch.gsub("'", "''")
+        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+              "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped}' " \
+              'ORDER BY tagxref.mtime DESC LIMIT 1'
+        `fossil sql "#{sql}"`.strip.gsub("'", '')
       else
         ''
       end
@@ -192,6 +207,12 @@ class VCSRepo
         revset = "branch(#{branch}) and not ancestors(#{base_branch})"
         out, = Open3.capture2('hg', 'log', '-r', revset, '--template', '{node}\n')
         out.lines.count
+      when :fossil
+        escaped = branch.gsub("'", "''")
+        sql = 'SELECT count(*) FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid WHERE ' \
+              "tag.tagname='sym-#{escaped}'"
+        count = `fossil sql "#{sql}"`.to_i
+        [count - 1, 0].max
       else
         0
       end
@@ -209,6 +230,8 @@ class VCSRepo
         `git branch --list`.split("\n").map(&:strip)
       when :hg
         `hg branches`.lines.map { |l| l.split.first }
+      when :fossil
+        `fossil branch list`.lines.map { |l| l.sub(/^[ *]+/, '').strip }
       else
         []
       end
@@ -285,14 +308,11 @@ class VCSRepo
         current_fossil_branch = `fossil branch current`.strip
         # Ensure branch name is not empty and is safe for SQL query
         if current_fossil_branch && !current_fossil_branch.empty? && current_fossil_branch.match?(/\A[a-zA-Z0-9._-]+\z/)
-          # Fossil branch names can contain characters that need escaping in SQL,
-          # but typically they are simple. Using as is, assuming simple names.
-          # For more complex names, proper SQL escaping would be needed.
           escaped_branch = current_fossil_branch.gsub("'", "''")
-          sql = 'SELECT lower(hex(blob.uuid)) FROM event JOIN blob ON event.objid=blob.rid ' \
-                "WHERE event.type='ci' AND event.branch = '#{escaped_branch}' " \
-                'ORDER BY event.mtime ASC LIMIT 1'
-          commit_hash = `fossil sql "#{sql}"`.strip
+          sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+                "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped_branch}' " \
+                'ORDER BY tagxref.mtime ASC LIMIT 1'
+          commit_hash = `fossil sql "#{sql}"`.strip.gsub("'", '')
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to find first commit"
@@ -348,12 +368,10 @@ class VCSRepo
           end
         end
       when :fossil
-        # For fossil, 'fossil changes --hash HASH --name-only' lists files changed in that commit.
-        # Or 'fossil finfo -b HASH' lists all files in that checkin.
-        # 'fossil diff --name-only --from HASH^ --to HASH'
-        # The simplest seems to be 'changes'
-        output = `fossil changes --hash #{commit_hash} --name-only --no-header`.strip
-        files = output.split("\n") if $CHILD_STATUS.success?
+        sql = 'SELECT filename.name FROM filename JOIN mlink ON filename.fnid=mlink.fnid ' \
+              "JOIN blob ON mlink.mid=blob.rid WHERE blob.uuid='#{commit_hash}'"
+        output = `fossil sql "#{sql}"`.strip
+        files = output.split("\n").map { |line| line.delete("'") } if $CHILD_STATUS.success?
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to list files in commit"
       end
@@ -385,7 +403,8 @@ class VCSRepo
           Dir.exist?(File.join(current_dir, '.git')) ||
           Dir.exist?(File.join(current_dir, '.hg')) ||
           Dir.exist?(File.join(current_dir, '.bzr')) ||
-          Dir.exist?(File.join(current_dir, '.fossil'))
+          File.exist?(File.join(current_dir, '.fslckout')) ||
+          File.exist?(File.join(current_dir, '_FOSSIL_'))
       parent_dir = File.expand_path('..', current_dir)
       break if parent_dir == current_dir
 
@@ -395,7 +414,8 @@ class VCSRepo
     if Dir.exist?(File.join(current_dir, '.git')) ||
        Dir.exist?(File.join(current_dir, '.hg')) ||
        Dir.exist?(File.join(current_dir, '.bzr')) ||
-       Dir.exist?(File.join(current_dir, '.fossil'))
+       File.exist?(File.join(current_dir, '.fslckout')) ||
+       File.exist?(File.join(current_dir, '_FOSSIL_'))
       return current_dir
     end
 
@@ -406,7 +426,8 @@ class VCSRepo
     return :git if Dir.exist?(File.join(root_path, '.git'))
     return :hg if Dir.exist?(File.join(root_path, '.hg'))
     return :bzr if Dir.exist?(File.join(root_path, '.bzr'))
-    return :fossil if Dir.exist?(File.join(root_path, '.fossil'))
+    return :fossil if File.exist?(File.join(root_path, '.fslckout')) ||
+                      File.exist?(File.join(root_path, '_FOSSIL_'))
 
     nil
   end

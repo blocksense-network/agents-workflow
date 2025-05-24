@@ -1,0 +1,6 @@
+Expand the current test suite with support for Fossil (fossil).
+
+The tested scenarios should remain the same as in the existing git and mercurial
+test suites. The  majority of the work will be fixing implementation details in
+the fossil branches in vcs_repo.rb
+

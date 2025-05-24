@@ -5,7 +5,7 @@ require 'rbconfig'
 require 'tmpdir'
 require_relative '../bin/lib/vcs_repo'
 
-module RepoTestHelper
+module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ROOT = File.expand_path('..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
@@ -21,6 +21,11 @@ module RepoTestHelper
 
   def hg(repo, *args)
     cmd = ['hg', *args]
+    system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
+  end
+
+  def fossil(repo, *args)
+    cmd = ['fossil', *args]
     system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
@@ -55,6 +60,19 @@ module RepoTestHelper
           f.puts "default = #{remote}"
         end
       end
+    when :fossil
+      remote_file = File.join(remote, 'remote.fossil')
+      system('fossil', 'init', '--admin-user', 'Tester', remote_file, out: File::NULL)
+      Dir.chdir(repo) do
+        system('fossil', 'open', remote_file, '--user', 'Tester', out: File::NULL)
+        fossil(repo, 'user', 'default', 'Tester')
+        fossil(repo, 'remote', "file://#{remote_file}")
+        fossil(repo, 'settings', 'autosync', 'off')
+        File.write('README.md', 'initial')
+        fossil(repo, 'add', 'README.md')
+        fossil(repo, 'commit', '-m', 'initial', '--user', 'Tester')
+      end
+      remote = repo
     else
       raise "Unsupported VCS type '#{vcs_type}'"
     end
@@ -62,7 +80,9 @@ module RepoTestHelper
     [repo, remote]
   end
 
-  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: "y\n")
+  # push_to_remote option avoids interactive prompts in CI
+  # rubocop:disable Metrics/ParameterLists
+  def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil)
     dir = Dir.mktmpdir('editor')
     script = File.join(dir, 'fake_editor.rb')
     marker = File.join(dir, 'called')
@@ -81,9 +101,15 @@ module RepoTestHelper
     status = nil
     Dir.chdir(repo) do
       cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
+      cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
       editor_cmd = windows? ? "ruby #{script}" : script
+      answer = input
+      if answer.nil?
+        repo_type = VCSRepo.new(repo).vcs_type
+        answer = repo_type == :fossil ? "n\n" : "y\n"
+      end
       IO.popen({ 'EDITOR' => editor_cmd }, cmd, 'r+') do |io|
-        io.write input
+        io.write(answer) if push_to_remote.nil?
         io.close_write
         output = io.read
       end
@@ -93,6 +119,7 @@ module RepoTestHelper
     FileUtils.remove_entry(dir)
     [status, output, executed]
   end
+  # rubocop:enable Metrics/ParameterLists
 
   def run_get_task(repo)
     output = nil

@@ -4,6 +4,7 @@
 require 'tempfile'
 require 'fileutils'
 require 'time'
+require 'optparse'
 require_relative 'lib/vcs_repo'
 
 def find_default_editor
@@ -12,6 +13,13 @@ def find_default_editor
   editors = %w[nano pico micro vim helix vi]
   editors.find { |e| system("command -v #{e} > /dev/null 2>&1") } || 'nano'
 end
+
+options = {}
+OptionParser.new do |opts|
+  opts.on('--push-to-remote=BOOL', 'Push branch to remote automatically') do |val|
+    options[:push_to_remote] = val
+  end
+end.parse!(ARGV)
 
 branch_name = ARGV.shift
 abort("Usage: #{File.basename(__FILE__)} <branch-name>") if branch_name.nil? || branch_name.strip.empty?
@@ -39,8 +47,12 @@ tempfile = Tempfile.new(['task', '.txt'])
 editor = find_default_editor
 unless system("#{editor} #{tempfile.path}")
   repo.checkout_branch(orig_branch) if orig_branch
-  if repo.vcs_type == :git
+  case repo.vcs_type
+  when :git
     system('git', 'branch', '-D', branch_name,
+           chdir: repo.root, out: File::NULL, err: File::NULL)
+  when :fossil
+    system('fossil', 'branch', 'close', branch_name,
            chdir: repo.root, out: File::NULL, err: File::NULL)
   end
   abort('Error: Failed to open the editor.')
@@ -48,6 +60,8 @@ end
 tempfile.close
 
 task_content = File.read(tempfile.path)
+# Normalize CRLF line endings from editors to avoid Fossil commit issues
+task_content.gsub!("\r\n", "\n")
 
 # Create the agents task file path
 now = Time.now.utc
@@ -62,17 +76,29 @@ FileUtils.mkdir_p(tasks_dir)
 task_file = File.join(tasks_dir, filename)
 commit_msg = "start-agent-task: #{branch_name}"
 
-# Write the task content
-File.write(task_file, task_content)
+# Write the task content without automatic CRLF conversion
+File.binwrite(task_file, task_content)
 
 # Add and commit the file
 repo.commit_file(task_file, commit_msg)
 
 # Ask to push to default remote
-print 'Push to default remote? [Y/n]: '
-answer = $stdin.gets.strip
-answer = 'y' if answer.empty?
-repo.push_current_branch(branch_name) if answer.downcase.start_with?('y')
+push = nil
+if options.key?(:push_to_remote)
+  val = options[:push_to_remote].to_s.downcase
+  truthy = %w[1 true yes y].include?(val)
+  falsy = %w[0 false no n].include?(val)
+  abort("Error: Invalid value for --push-to-remote: '#{options[:push_to_remote]}'") unless truthy || falsy
+  push = truthy
+else
+  print 'Push to default remote? [Y/n]: '
+  input = $stdin.gets
+  abort('Error: Non-interactive environment, use --push-to-remote option.') if input.nil?
+  answer = input.strip
+  answer = 'y' if answer.empty?
+  push = answer.downcase.start_with?('y')
+end
+repo.push_current_branch(branch_name) if push
 
 # Return to original branch
 repo.checkout_branch(orig_branch) if orig_branch

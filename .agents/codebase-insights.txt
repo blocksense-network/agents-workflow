@@ -1,1 +1,3 @@
-No insights yet. Please add content here and remove this line.
+The VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands.
+When writing task files, use binary mode to avoid CRLF conversion on Windows.
+

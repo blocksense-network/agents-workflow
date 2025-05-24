@@ -19,8 +19,38 @@ class AgentTasks
 
     files_in_commit = @repo.files_in_commit(first_commit_hash)
     if files_in_commit.nil? || files_in_commit.empty?
-      raise StandardError,
-            "Error: No files found in the first commit ('#{first_commit_hash}') of branch '#{@repo.current_branch}'."
+      if @repo.vcs_type == :fossil
+        branch = @repo.current_branch
+        escaped = branch.gsub("'", "''")
+        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+              "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped}' " \
+              'ORDER BY tagxref.mtime ASC'
+        commits = `fossil sql "#{sql}"`.split("\n").map { |c| c.delete("'") }
+        commits.each do |hash|
+          files = @repo.files_in_commit(hash)
+          next if files.nil? || files.empty?
+
+          first_commit_hash = hash
+          files_in_commit = files
+          break
+        end
+        if (files_in_commit.nil? || files_in_commit.empty?) && !commits.empty?
+          parent_sql = 'SELECT p.uuid FROM plink JOIN blob c ON plink.cid=c.rid ' \
+                       "JOIN blob p ON plink.pid=p.rid WHERE c.uuid='#{first_commit_hash}'"
+          parent = `fossil sql "#{parent_sql}"`.strip.delete("'")
+          unless parent.empty?
+            files = @repo.files_in_commit(parent)
+            unless files.nil? || files.empty?
+              first_commit_hash = parent
+              files_in_commit = files
+            end
+          end
+        end
+      end
+      if files_in_commit.nil? || files_in_commit.empty?
+        raise StandardError,
+              "Error: No files found in the first commit ('#{first_commit_hash}') of branch '#{@repo.current_branch}'."
+      end
     end
 
     first_file_relative_path = files_in_commit.first

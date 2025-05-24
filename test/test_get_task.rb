@@ -9,7 +9,7 @@ require_relative 'test_helper'
 module GetTaskCases
   def test_get_task_after_start
     repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'feat', lines: ['my task'])
+    status, = run_agent_task(repo, branch: 'feat', lines: ['my task'], push_to_remote: true)
     # agent-task should succeed
     assert_equal 0, status.exitstatus
     VCSRepo.new(repo).checkout_branch('feat')
@@ -24,7 +24,7 @@ module GetTaskCases
 
   def test_get_task_on_work_branch
     repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'feat', lines: ['follow task'])
+    status, = run_agent_task(repo, branch: 'feat', lines: ['follow task'], push_to_remote: true)
     # agent-task should succeed
     assert_equal 0, status.exitstatus
     r = VCSRepo.new(repo)
@@ -50,4 +50,10 @@ class GetTaskHgTest < Minitest::Test
   include RepoTestHelper
   include GetTaskCases
   VCS_TYPE = :hg
+end
+
+class GetTaskFossilTest < Minitest::Test
+  include RepoTestHelper
+  include GetTaskCases
+  VCS_TYPE = :fossil
 end
