@@ -1,0 +1,44 @@
+{
+  "github.copilot.enable": {
+    "*": true,
+    "yaml": true,
+    "plaintext": true,
+    "markdown": true,
+    "ruby": true,
+    "nix": true
+  },
+  "github.copilot.chat.experimental.generateTests": true,
+  "github.copilot.chat.experimental.codeActions": true,
+  "github.copilot.editor.enableAutoCompletions": true,
+  "github.copilot.editor.enableCodeActions": true,
+  "github.copilot.terminal.enable": true,
+  "github.copilot.advanced": {
+    "debug.overrideEngine": "copilot-chat",
+    "debug.useNodeDebugger": true
+  },
+  "ruby.lsp.enabledFeatures": {
+    "codeActions": true,
+    "diagnostics": true,
+    "documentHighlights": true,
+    "documentLink": true,
+    "documentSymbols": true,
+    "foldingRanges": true,
+    "formatting": true,
+    "hover": true,
+    "inlayHint": true,
+    "onTypeFormatting": true,
+    "selectionRanges": true,
+    "semanticHighlighting": true,
+    "completion": true,
+    "codeLens": true,
+    "definition": true,
+    "workspaceSymbol": true,
+    "signatureHelp": true,
+    "typeHierarchy": true
+  },
+  "files.associations": {
+    "*.nix": "nix",
+    "flake.nix": "nix",
+    "flake.lock": "json"
+  }
+}

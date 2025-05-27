@@ -1,3 +1,47 @@
 The VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands.
 When writing task files, use binary mode to avoid CRLF conversion on Windows.
 
+# DevContainer Caching Strategy
+
+## Cache Synchronization Commands
+- `sync-cargo-caches`: Developer command to sync container caches with host system
+- Automatically runs on container start via postStartCommand
+- Can be run manually anytime to pick up new host packages
+
+## Persistent Storage Volumes
+- `agents-workflow-nix-store`: Persists Nix packages across container rebuilds
+- `agents-workflow-cargo-cache`: Caches Rust/Cargo dependencies and build artifacts
+
+Benefits:
+- Faster package installation (no re-downloading)
+- Reduced bandwidth usage
+- Incremental sync - only new packages are copied
+- Manual control over when sync happens
+
+## Cache Sync Behavior
+- Nix substituters: Configured once at build time
+- Cargo cache: Synced at container start and on-demand
+- Efficient copying with COW/hard links when possible
+- Graceful fallback when host caches unavailable
+
+## API Key Management
+Environment variables are propagated from host to container:
+- OPENAI_API_KEY: Required for OpenAI Codex integration
+- GITHUB_TOKEN: For GitHub API access and Copilot authentication
+- Custom API keys can be added to containerEnv in devcontainer.json
+
+Security considerations:
+- Keys are not stored in container images
+- Environment-based propagation is secure and flexible
+- Keys are only available during container runtime
+
+## Nix Flakes Configuration
+- No channels configuration needed (removed .devcontainer/nix file)
+- Flakes provide deterministic package management
+- Experimental features enabled for full flake support
+
+## Performance Optimizations
+- Nix configured for multi-core builds (cores = 0, max-jobs = auto)
+- Cargo cache persisted to avoid re-downloading crates
+- Build tools pre-installed for native dependency compilation
+
