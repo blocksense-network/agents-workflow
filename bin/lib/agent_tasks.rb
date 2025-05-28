@@ -4,7 +4,6 @@ require_relative 'vcs_repo'
 require 'fileutils'
 require 'resolv'
 
-# Renamed from AgentTaskRetriever
 class AgentTasks
   def initialize(path_in_repo = Dir.pwd)
     @repo = VCSRepo.new(path_in_repo) # This can raise if repo is not found
@@ -108,7 +107,7 @@ class AgentTasks
     unless online?
       message += <<~OFFLINE_MESSAGE
         Please note that during development, certain commands will fail because
-        you don't have access to the intenet.
+        you don't have access to the internet.
 
         All URLs mentioned in the task description(s) have been downloaded
         to the /workspace/internet_resources directory.

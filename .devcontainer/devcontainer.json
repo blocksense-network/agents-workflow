@@ -32,7 +32,6 @@
           "secret_key": "github.copilot.autoApprove",
           "length": 1
         },
-        "github.copilot.editor.enableAutoCompletions": true,
         "github.copilot.editor.enableCodeActions": true,
         "github.copilot.terminal.enable": true,
         "terminal.integrated.defaultProfile.linux": "bash",

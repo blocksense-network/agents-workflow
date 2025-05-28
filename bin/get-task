@@ -4,9 +4,8 @@
 require 'fileutils'
 require 'resolv'
 require_relative 'lib/vcs_repo'
-require_relative 'lib/agent_tasks' # Updated path
+require_relative 'lib/agent_tasks'
 
-# Main execution
 begin
   retriever = AgentTasks.new
   message = retriever.agent_prompt
