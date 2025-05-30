@@ -4,8 +4,9 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
 
-if [ -f .agents/codex-setup ]; then
-  .agents/codex-setup
+# We want to run
+if [ -f .agents/open-hands-setup ]; then
+  .agents/open-hands-setup
 fi
 
 if [ -f .agents/common-post-setup ]; then

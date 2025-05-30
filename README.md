@@ -79,26 +79,72 @@ The primary goal of this workflow is to:
     along with instructions for accessing the downloaded internet resources
     and working with the git history.
 
-## Setting up with OpenAI Codex
+## Supported Agent Systems
 
-The `codex-setup` script in this repo is intended to be used as a
-custom setup step within an OpenAI Codex workspace.
+This workflow supports setup for multiple AI coding agent systems:
 
-Just add the following commands in all of our workspaces:
+- **[Codex](https://openai.com/blog/openai-codex)** - OpenAI's code generation model
+- **[Jules](https://jules.google.com/)** - AI pair programming assistant
+- **[Goose](https://github.com/square/goose)** - AI-powered development tool
+- **[Open Hands](https://github.com/All-Hands-AI/OpenHands)** - Open-source AI coding assistant
+- **[GitHub Copilot](https://github.com/features/copilot)** - GitHub's AI pair programmer
 
-```bash
+## Setup Script Architecture
+
+Each agent system has a dedicated setup script (e.g., `codex-setup`, `jules-setup`) that follows a three-phase setup process:
+
+1. `.agents/common-pre-setup` runs first (if it exists in your project)
+2. `.agents/{agent}-setup` runs for agent-specific configuration (if it exists)
+3. `.agents/common-post-setup` runs last for finalization tasks (if it exists)
+
+This architecture allows you to share common setup logic across all agent systems while customizing setup for specific agents when needed.
+
+## Usage by Agent System
+
+### Codex
+
+In your Codex environment's Advanced settings, enter the following setup script:
+
+```
 git clone https://github.com/metacraft-labs/agents-workflow
 agents-workflow/codex-setup
 ```
 
-This process will:
--   Install Nix if specified (via the `NIX=1` environment variable).
--   Download internet resources mentioned in task descriptions.
--   Execute a project-specific setup script located at `.agents/codex-setup` in your repository, if one exists. This allows for custom setup actions tailored to the project Codex will be working on.
+### Jules
+
+In the Jules web-interface, select a codebase in the left-hand-side panel, click
+"Configuration" and enter the following Initial Script:
+
+```
+git clone https://github.com/metacraft-labs/agents-workflow
+agents-workflow/codex-setup
+```
+
+### Goose
+
+**TBD** - Usage instructions for Goose will be added once integration is tested.
+
+### Open Hands
+
+**TBD** - Usage instructions for Open Hands will be added once integration is tested.
+
+### GitHub Copilot
+
+**TBD** - Usage instructions for GitHub Copilot will be added once integration is tested.
+
+## Environment Variables
+
+- `NIX=1` - Set this to enable Nix installation during common-pre-setup
 
 ### Installing as a Ruby gem
 
-TBD
+The scripts can be installed as a gem for easier reuse:
+
+```bash
+gem install --local agents-workflow.gem
+```
+
+This will provide the `agent-task`, `get-task`, and `download-internet-resources` executables in your `PATH`.
 
 ### What's included?
 
@@ -114,14 +160,3 @@ We envision that the manual step of prompting the agent to run `get-task` could 
 
 -   An API integration with Codex.
 -   (interim) A browser extension that drives the Codex WebUI.
-
-### RubyGem Installation
-
-All Ruby scripts are bundled into a single gem for easier reuse:
-
-```bash
-gem install --local agent-task-*.gem
-```
-
-This will provide the `agent-task`, `get-task`, and `download-internet-resources` executables in your `PATH`.
-The gem also exposes its functionality via `AgentTask::CLI` so it can be invoked programmatically.

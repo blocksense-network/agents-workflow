@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+if [ "$NIX" = "1" ]; then
+  bash "$AGENTS_WORKFLOW_DIR/bin/install-nix"
+fi
+
+ruby "$AGENTS_WORKFLOW_DIR/bin/download-internet-resources"
+
+# When agents-workflow is cloned within another repository, an agent
+# may accidentally execute a command such as `git add .` and include
+# the cloned agents-workflow in proposed PRs.
+#
+# Here, we prevent this with two simple tricks:
+#
+# 1) We create an "ignore everything" .gitignore file in the cloned
+#    agents-workflow repo
+echo "*" > "$AGENTS_WORKFLOW_DIR/.gitignore"
+# 2) We rename the .git directory, so git doesn't think this is a
+#    submodule (submodules get special treatment and the gitignore
+#    trick doesn't cover them).
+mv "$AGENTS_WORKFLOW_DIR/.git" "$AGENTS_WORKFLOW_DIR/.git-disabled"
+
+# We want to make the `get-task` command available for the agent:
+sudo ln -s "$AGENTS_WORKFLOW_DIR/bin/get-task" /usr/local/bin/get-task
+
+if [ -f .agents/common-pre-setup ]; then
+  .agents/common-pre-setup
+fi
+
