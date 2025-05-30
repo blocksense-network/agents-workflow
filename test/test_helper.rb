@@ -10,6 +10,24 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
 
+  GEM_HOME = Dir.mktmpdir('gem_home')
+  Gem.paths = { 'GEM_HOME' => GEM_HOME, 'GEM_PATH' => GEM_HOME }
+  Dir.chdir(ROOT) do
+    system('gem', 'build', 'agent-task.gemspec', out: File::NULL)
+    gem_file = Dir['agent-task-*.gem'].first
+    system('gem', 'install', '--no-document', '--install-dir', GEM_HOME, gem_file,
+           out: File::NULL)
+    FileUtils.rm_f(gem_file)
+  end
+  AGENT_TASK_GEM = File.join(GEM_HOME, 'bin', 'agent-task')
+  GET_TASK_GEM = File.join(GEM_HOME, 'bin', 'get-task')
+  GEM_AGENT_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_agent_task.rb')
+  GEM_GET_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_get_task.rb')
+  GEM_ENV = { 'GEM_HOME' => GEM_HOME, 'GEM_PATH' => GEM_HOME }.freeze
+
+  AGENT_TASK_BINARIES = [AGENT_TASK, AGENT_TASK_GEM, GEM_AGENT_TASK_SCRIPT].freeze
+  GET_TASK_BINARIES = [GET_TASK, GET_TASK_GEM, GEM_GET_TASK_SCRIPT].freeze
+
   def windows?
     RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
   end
@@ -83,7 +101,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   # push_to_remote option avoids interactive prompts in CI
   # rubocop:disable Metrics/ParameterLists
   def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil, prompt: nil,
-                     prompt_file: nil)
+                     prompt_file: nil, tool: AGENT_TASK)
     dir = nil
     script = nil
     marker = nil
@@ -107,11 +125,11 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     output = nil
     status = nil
     Dir.chdir(repo) do
-      cmd = windows? ? ['ruby', AGENT_TASK, branch] : [AGENT_TASK, branch]
+      cmd = windows? ? ['ruby', tool, branch] : [tool, branch]
       cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
       cmd << "--prompt=#{prompt}" if prompt
       cmd << "--prompt-file=#{prompt_file}" if prompt_file
-      env = {}
+      env = GEM_ENV.dup
       if script
         env['EDITOR'] = windows? ? "ruby #{script}" : script
       end
@@ -133,12 +151,12 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   end
   # rubocop:enable Metrics/ParameterLists
 
-  def run_get_task(repo)
+  def run_get_task(repo, tool: GET_TASK)
     output = nil
     status = nil
     Dir.chdir(repo) do
-      cmd = windows? ? ['ruby', GET_TASK] : [GET_TASK]
-      output = IO.popen(cmd, &:read)
+      cmd = windows? ? ['ruby', tool] : [tool]
+      output = IO.popen(GEM_ENV, cmd, &:read)
       status = $CHILD_STATUS
     end
     [status, output]

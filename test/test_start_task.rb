@@ -38,137 +38,163 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
   end
 
   def test_clean_repo
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'feature', lines: ['task'], push_to_remote: true)
-    # agent-task should succeed
-    assert_equal 0, status.exitstatus
-    assert_task_branch_created(repo, remote, 'feature')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'feature', lines: ['task'], push_to_remote: true, tool: bin)
+      # agent-task should succeed
+      assert_equal 0, status.exitstatus
+      assert_task_branch_created(repo, remote, 'feature')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_dirty_repo_staged
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    File.write(File.join(repo, 'foo.txt'), 'foo')
-    r = VCSRepo.new(repo)
-    r.add_file('foo.txt')
-    status_before = r.working_copy_status
-    status, = run_agent_task(repo, branch: 's1', lines: ['task'], push_to_remote: true)
-    # agent-task should succeed
-    assert_equal 0, status.exitstatus
-    # ensure staged changes are preserved and nothing else changed
-    after = r.working_copy_status
-    assert_equal status_before, after
-    assert_task_branch_created(repo, remote, 's1')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      File.write(File.join(repo, 'foo.txt'), 'foo')
+      r = VCSRepo.new(repo)
+      r.add_file('foo.txt')
+      status_before = r.working_copy_status
+      status, = run_agent_task(repo, branch: 's1', lines: ['task'], push_to_remote: true, tool: bin)
+      # agent-task should succeed
+      assert_equal 0, status.exitstatus
+      # ensure staged changes are preserved and nothing else changed
+      after = r.working_copy_status
+      assert_equal status_before, after
+      assert_task_branch_created(repo, remote, 's1')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_dirty_repo_unstaged
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    File.write(File.join(repo, 'bar.txt'), 'bar')
-    r = VCSRepo.new(repo)
-    status_before = r.working_copy_status
-    status, = run_agent_task(repo, branch: 's2', lines: ['task'], push_to_remote: true)
-    # agent-task should succeed
-    assert_equal 0, status.exitstatus
-    # unstaged modifications should remain exactly as they were
-    after = r.working_copy_status
-    assert_equal status_before, after
-    assert_task_branch_created(repo, remote, 's2')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      File.write(File.join(repo, 'bar.txt'), 'bar')
+      r = VCSRepo.new(repo)
+      status_before = r.working_copy_status
+      status, = run_agent_task(repo, branch: 's2', lines: ['task'], push_to_remote: true, tool: bin)
+      # agent-task should succeed
+      assert_equal 0, status.exitstatus
+      # unstaged modifications should remain exactly as they were
+      after = r.working_copy_status
+      assert_equal status_before, after
+      assert_task_branch_created(repo, remote, 's2')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_editor_failure
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'bad', lines: [], editor_exit: 1, push_to_remote: false)
-    # agent-task should fail when the editor exits with a non-zero status
-    assert status.exitstatus != 0
-    # when the editor fails, no branch should have been created
-    refute VCSRepo.new(repo).branch_exists?('bad')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'bad', lines: [], editor_exit: 1, push_to_remote: false, tool: bin)
+      # agent-task should fail when the editor exits with a non-zero status
+      assert status.exitstatus != 0
+      # when the editor fails, no branch should have been created
+      refute VCSRepo.new(repo).branch_exists?('bad')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_empty_file
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'empty', lines: [], push_to_remote: false)
-    # an empty task should cause agent-task to fail
-    assert status.exitstatus != 0
-    refute VCSRepo.new(repo).branch_exists?('empty')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'empty', lines: [], push_to_remote: false, tool: bin)
+      # an empty task should cause agent-task to fail
+      assert status.exitstatus != 0
+      refute VCSRepo.new(repo).branch_exists?('empty')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_prompt_option
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'p1', prompt: 'prompt text', push_to_remote: true)
-    # agent-task should succeed when --prompt is provided
-    assert_equal 0, status.exitstatus
-    assert_task_branch_created(repo, remote, 'p1')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'p1', prompt: 'prompt text', push_to_remote: true, tool: bin)
+      # agent-task should succeed when --prompt is provided
+      assert_equal 0, status.exitstatus
+      assert_task_branch_created(repo, remote, 'p1')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_prompt_file_option
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    dir = Dir.mktmpdir('pf')
-    file = File.join(dir, 'msg.txt')
-    File.write(file, "file text\n")
-    status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: true)
-    # agent-task should succeed when --prompt-file is provided
-    assert_equal 0, status.exitstatus
-    assert_task_branch_created(repo, remote, 'pf1')
-  ensure
-    FileUtils.remove_entry(dir) if dir && File.exist?(dir)
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      dir = Dir.mktmpdir('pf')
+      file = File.join(dir, 'msg.txt')
+      File.write(file, "file text\n")
+      status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: true, tool: bin)
+      # agent-task should succeed when --prompt-file is provided
+      assert_equal 0, status.exitstatus
+      assert_task_branch_created(repo, remote, 'pf1')
+    ensure
+      FileUtils.remove_entry(dir) if dir && File.exist?(dir)
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_prompt_option_empty
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, = run_agent_task(repo, branch: 'poe', prompt: '   ', push_to_remote: false)
-    # a blank prompt should result in failure
-    assert status.exitstatus != 0
-    refute VCSRepo.new(repo).branch_exists?('poe')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'poe', prompt: '   ', push_to_remote: false, tool: bin)
+      # a blank prompt should result in failure
+      assert status.exitstatus != 0
+      refute VCSRepo.new(repo).branch_exists?('poe')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_prompt_file_empty
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    dir = Dir.mktmpdir('pfe')
-    file = File.join(dir, 'msg.txt')
-    File.write(file, "\n")
-    status, = run_agent_task(repo, branch: 'pfe', prompt_file: file, push_to_remote: false)
-    # a blank prompt file should result in failure
-    assert status.exitstatus != 0
-    refute VCSRepo.new(repo).branch_exists?('pfe')
-  ensure
-    FileUtils.remove_entry(dir) if dir && File.exist?(dir)
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      dir = Dir.mktmpdir('pfe')
+      file = File.join(dir, 'msg.txt')
+      File.write(file, "\n")
+      status, = run_agent_task(repo, branch: 'pfe', prompt_file: file, push_to_remote: false, tool: bin)
+      # a blank prompt file should result in failure
+      assert status.exitstatus != 0
+      refute VCSRepo.new(repo).branch_exists?('pfe')
+    ensure
+      FileUtils.remove_entry(dir) if dir && File.exist?(dir)
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 
   def test_invalid_branch
-    repo, remote = setup_repo(self.class::VCS_TYPE)
-    status, _, executed = run_agent_task(repo, branch: 'inv@lid name', lines: ['task'], push_to_remote: false)
-    refute executed, 'editor should not run when branch creation fails'
-    # the command should fail when the branch name is invalid
-    assert status.exitstatus != 0
-    # no branch should be created when the branch name is invalid
-    refute VCSRepo.new(repo).branch_exists?('inv@lid name')
-  ensure
-    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, _, executed = run_agent_task(
+        repo,
+        branch: 'inv@lid name',
+        lines: ['task'],
+        push_to_remote: false,
+        tool: bin
+      )
+      refute executed, 'editor should not run when branch creation fails'
+      # the command should fail when the branch name is invalid
+      assert status.exitstatus != 0
+      # no branch should be created when the branch name is invalid
+      refute VCSRepo.new(repo).branch_exists?('inv@lid name')
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
   end
 end
 

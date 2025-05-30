@@ -66,3 +66,13 @@ We envision that the manual step of prompting the agent to run `get-task` could 
 
 -   An API integration with Codex.
 -   (interim) A browser extension that drives the Codex WebUI.
+
+### RubyGem Installation
+
+All Ruby scripts can be installed as a gem for easier reuse:
+
+```bash
+gem install --local agent-task-*.gem
+```
+
+This will provide the `agent-task`, `get-task`, and `download-internet-resources` executables in your `PATH`.
