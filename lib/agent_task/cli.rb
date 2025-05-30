@@ -20,8 +20,8 @@ module AgentTask
       require 'fileutils'
       require 'time'
       require 'optparse'
-      require_relative '../../bin/lib/vcs_repo'
-      require_relative '../../bin/lib/agent_tasks'
+      require_relative '../vcs_repo'
+      require_relative '../agent_tasks'
 
       options = {}
       OptionParser.new do |opts|
@@ -148,8 +148,8 @@ module AgentTask
     def run_get_task
       require 'resolv'
       require 'fileutils'
-      require_relative '../../bin/lib/vcs_repo'
-      require_relative '../../bin/lib/agent_tasks'
+      require_relative '../vcs_repo'
+      require_relative '../agent_tasks'
 
       retriever = AgentTasks.new
       message = retriever.agent_prompt

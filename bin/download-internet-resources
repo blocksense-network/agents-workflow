@@ -7,7 +7,7 @@ require 'fileutils'
 require 'open-uri'
 require 'net/http'
 require 'shellwords'
-require_relative 'lib/agent_tasks'
+require_relative '../lib/agent_tasks'
 
 tasks = AgentTasks.new
 unless tasks.on_task_branch?

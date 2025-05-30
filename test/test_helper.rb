@@ -3,7 +3,7 @@
 require 'English'
 require 'rbconfig'
 require 'tmpdir'
-require_relative '../bin/lib/vcs_repo'
+require_relative '../lib/vcs_repo'
 
 module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ROOT = File.expand_path('..', __dir__)
