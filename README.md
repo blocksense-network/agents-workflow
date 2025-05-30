@@ -69,10 +69,11 @@ We envision that the manual step of prompting the agent to run `get-task` could 
 
 ### RubyGem Installation
 
-All Ruby scripts can be installed as a gem for easier reuse:
+All Ruby scripts are bundled into a single gem for easier reuse:
 
 ```bash
 gem install --local agent-task-*.gem
 ```
 
 This will provide the `agent-task`, `get-task`, and `download-internet-resources` executables in your `PATH`.
+The gem also exposes its functionality via `AgentTask::CLI` so it can be invoked programmatically.
