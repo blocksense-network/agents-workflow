@@ -1,16 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'fileutils'
-require 'resolv'
-require_relative 'lib/vcs_repo'
-require_relative 'lib/agent_tasks'
+require 'agent_task/cli'
 
-begin
-  retriever = AgentTasks.new
-  message = retriever.agent_prompt
-  puts message
-rescue StandardError => e
-  puts e.message
-  exit 1
-end
+AgentTask::CLI.run_get_task

@@ -1,0 +1,25 @@
+Your previous task was:
+
+Make the ruby scripts and libraries available in this repo installable as
+a Ruby gem.
+
+Besides testing all binaries directly, the test suite should make sure all
+cases work when the files when the executable were installed as a gem.
+This should be easy to achieve, just pass the gem binary names into the
+parametric tests.
+
+Finally, create additional simple ruby scripts that import the gems and
+executes the operations that simulates the execution of `agent-task` and
+`get-task`. Execute all test scenarios with these scripts as well (again,
+by passing the names of the created binaries in the parametric test suite).
+
+You've made good progress so far, but I'd like you to make the following
+changes:
+
+Instead of having multiple gems, have a single gem with multiple binaries
+
+In the scripts/gem_get_task.rb and scripts/gem_get_task.rb that are used
+within the tests, don't call the gem binaries. Instead, use functions
+exported by the gem (the goal is to test that the public API of gem works).
+
+You'll need to update the tests and the README.
