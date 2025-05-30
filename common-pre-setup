@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 if [ "$NIX" = "1" ]; then
   bash "$AGENTS_WORKFLOW_DIR/bin/install-nix"
 fi
