@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'agent_task'
-load Gem.bin_path('agent-task', 'agent-task')
+require 'agent_task/cli'
+
+AgentTask::CLI.start_task(ARGV)
