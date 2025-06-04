@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# We move the agents-workflow dir away from the workspace in order
+# to prevent the agents from looking into it (this wastes their time)
+sudo mv "$AGENTS_WORKFLOW_DIR" /agents-workflow
+
+# We want to make the `get-task` command available for the agent:
+sudo ln -s "/agents-workflow/bin/get-task" /usr/local/bin/get-task

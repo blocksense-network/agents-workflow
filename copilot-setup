@@ -11,3 +11,5 @@ fi
 if [ -f .agents/common-post-setup ]; then
   .agents/common-post-setup
 fi
+
+bash "$AGENTS_WORKFLOW_DIR/common-post-setup"
