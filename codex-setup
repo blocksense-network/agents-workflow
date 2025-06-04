@@ -4,12 +4,15 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
 
+echo "Checking if there is a project-specific Codex setup file"
 if [ -f .agents/codex-setup ]; then
   .agents/codex-setup
 fi
 
+echo "Checking if there is a project-specific post-setup file"
 if [ -f .agents/common-post-setup ]; then
   .agents/common-post-setup
 fi
 
+echo "Running the agents-workflow post-setup"
 bash "$AGENTS_WORKFLOW_DIR/common-post-setup"

@@ -22,7 +22,7 @@ fi
 # Try to move the directory - this should work since the script is loaded in memory
 # This prevents agents from looking into it (wastes their time)
 if ! mv "$AGENTS_WORKFLOW_DIR" "$TEMP_AGENTS_DIR"; then
-  echo "Move failed, falling back to copy strategy" >&2
+  echo "Move failed, falling back to copy strategy"
   cp -r "$AGENTS_WORKFLOW_DIR" "$TEMP_AGENTS_DIR"
   rm -rf "$AGENTS_WORKFLOW_DIR" || true
 fi
@@ -34,7 +34,7 @@ if [ -d "/usr/local/bin" ]; then
 elif [ -d "/usr/bin" ]; then
   BIN_DIR="/usr/bin"
 else
-  echo "Cannot find suitable bin directory to install get-task" >&2
+  echo "Cannot find suitable bin directory to install get-task"
   exit 1
 fi
 
