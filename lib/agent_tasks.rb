@@ -2,7 +2,8 @@
 
 require_relative 'vcs_repo'
 require 'fileutils'
-require 'resolv'
+require 'net/http'
+require 'uri'
 
 class AgentTasks
   def initialize(path_in_repo = Dir.pwd)
@@ -77,9 +78,16 @@ class AgentTasks
   def on_task_branch?; end
 
   def online?
-    resolver = Resolv::DNS.new(nameserver: '8.8.8.8', timeout: 3)
-    resolver.getaddress('google.com')
-    true
+    # Use Google's connectivity check service - a lightweight endpoint designed for connectivity testing
+    # This service is globally distributed and operated by Google, making it highly reliable
+    # Reference: https://developers.google.com/speed/public-dns/docs/doh
+    uri = URI('http://connectivitycheck.gstatic.com/generate_204')
+
+    Net::HTTP.start(uri.host, uri.port, open_timeout: 3, read_timeout: 3) do |http|
+      response = http.get(uri.path)
+      # Google's connectivity check returns 204 No Content on success
+      response.code == '204'
+    end
   rescue StandardError
     false
   end
@@ -106,6 +114,7 @@ class AgentTasks
 
     unless online?
       message += <<~OFFLINE_MESSAGE
+
         Please note that during development, certain commands will fail because
         you don't have access to the internet.
 
@@ -138,6 +147,7 @@ class AgentTasks
 
     if system('which nix > /dev/null 2>&1')
       message += <<~NIX_MESSAGE
+
         Since Nix is available in your PATH, you can discover the paths to
         all Nix dependencies by examining the current environment variables.
         This can be helpful for finding documentation, source code, or other
