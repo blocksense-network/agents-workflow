@@ -55,24 +55,7 @@ class AgentTasks
 
     first_file_relative_path = files_in_commit.first
     first_file_absolute_path = File.join(@repo.root, first_file_relative_path)
-    agents_dir = File.dirname(first_file_absolute_path)
-
-    unless Dir.exist?(agents_dir)
-      raise StandardError, <<~MSG
-        Error: Determined task directory #{agents_dir} does not exist.
-        (Derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')
-      MSG
-    end
-
-    files = Dir.entries(agents_dir).select { |f| f != '.' && f != '..' }
-    if files.empty?
-      raise StandardError, <<~MSG
-        Error: No task files found in the determined task directory #{agents_dir}.
-        (Directory derived from the first file '#{first_file_relative_path}' in commit '#{first_commit_hash}')
-      MSG
-    end
-
-    files.sort.map { |f| File.join(agents_dir, f) }
+    [first_file_absolute_path]
   end
 
   def on_task_branch?; end
