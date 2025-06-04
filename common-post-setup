@@ -1,10 +1,46 @@
 #!/usr/bin/env bash
 
+set -e  # Exit on any error
+
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# We move the agents-workflow dir away from the workspace in order
-# to prevent the agents from looking into it (this wastes their time)
-sudo mv "$AGENTS_WORKFLOW_DIR" /agents-workflow
+# Use portable temp directory that works across all environments
+TEMP_DIR="${TMPDIR:-${TMP:-${TEMP:-/tmp}}}"
+TEMP_AGENTS_DIR="$TEMP_DIR/agents-workflow"
 
-# We want to make the `get-task` command available for the agent:
-sudo ln -s "/agents-workflow/bin/get-task" /usr/local/bin/get-task
+# Create the temp directory if it doesn't exist
+sudo mkdir -p "$TEMP_DIR"
+
+echo "About to move the agents-workflow dir from $AGENTS_WORKFLOW_DIR to $TEMP_AGENTS_DIR"
+
+# Remove any existing temp directory to avoid conflicts
+if [ -d "$TEMP_AGENTS_DIR" ]; then
+  echo "Removing exisitng $TEMP_AGENTS_DIR"
+  rm -rf "$TEMP_AGENTS_DIR"
+fi
+
+# Try to move the directory - this should work since the script is loaded in memory
+# This prevents agents from looking into it (wastes their time)
+if ! mv "$AGENTS_WORKFLOW_DIR" "$TEMP_AGENTS_DIR"; then
+  echo "Move failed, falling back to copy strategy" >&2
+  cp -r "$AGENTS_WORKFLOW_DIR" "$TEMP_AGENTS_DIR"
+  rm -rf "$AGENTS_WORKFLOW_DIR" || true
+fi
+
+# Try standard system directories that are already in PATH for all users
+# Use the first one that's writable or can be made writable
+if [ -d "/usr/local/bin" ]; then
+  BIN_DIR="/usr/local/bin"
+elif [ -d "/usr/bin" ]; then
+  BIN_DIR="/usr/bin"
+else
+  echo "Cannot find suitable bin directory to install get-task" >&2
+  exit 1
+fi
+
+# Create the get-task symlink in the chosen directory
+sudo ln -sf "$TEMP_AGENTS_DIR/bin/get-task" "$BIN_DIR/get-task"
+
+echo "Final get-task script location: $BIN_DIR/get-task"
+echo "Final get-task script:"
+cat "$BIN_DIR/get-task"
