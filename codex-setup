@@ -2,6 +2,22 @@
 
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+cat > ../AGENTS.md << 'EOF'
+When you a given a task description or developer instructions that just state "go",
+execute the shell command `get-task` and follow the instructions provided in the output.
+
+If the task description or developer instructions are a longer and detailed, before starting
+work, I'd like you to do the following:
+
+1) mkdir -p ".agents/tasks/$(date +%Y)/$(date +%m)"
+
+2) In this directory, create a file with a verbatim copy of the task description or developer
+   instructions. The file name should be named "$(date +%d-%H%M)-${TASK_BRANCH_NAME}", where
+   $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task
+   description of developer instructions.
+
+EOF
+
 bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
 
 echo "Checking if there is a project-specific Codex setup file"
