@@ -11,8 +11,6 @@ TEMP_AGENTS_DIR="$TEMP_DIR/agents-workflow"
 # Create the temp directory if it doesn't exist
 sudo mkdir -p "$TEMP_DIR"
 
-echo "About to move the agents-workflow dir from $AGENTS_WORKFLOW_DIR to $TEMP_AGENTS_DIR"
-
 # Remove any existing temp directory to avoid conflicts
 if [ -d "$TEMP_AGENTS_DIR" ]; then
   echo "Removing exisitng $TEMP_AGENTS_DIR"
@@ -40,7 +38,4 @@ fi
 
 # Create the get-task symlink in the chosen directory
 sudo ln -sf "$TEMP_AGENTS_DIR/bin/get-task" "$BIN_DIR/get-task"
-
-echo "Final get-task script location: $BIN_DIR/get-task"
-echo "Final get-task script:"
-cat "$BIN_DIR/get-task"
+echo "get-task installed to $BIN_DIR/get-task"
