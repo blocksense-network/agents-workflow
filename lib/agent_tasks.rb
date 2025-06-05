@@ -98,6 +98,8 @@ class AgentTasks
     unless online?
       message += <<~OFFLINE_MESSAGE
 
+        # Appendix (Lack of internet access)
+
         Please note that during development, certain commands will fail because
         you don't have access to the internet.
 
@@ -130,6 +132,8 @@ class AgentTasks
 
     if system('which nix > /dev/null 2>&1')
       message += <<~NIX_MESSAGE
+
+        # Appendix (Using Nix)
 
         Since Nix is available in your PATH, you can discover the paths to
         all Nix dependencies by examining the current environment variables.
