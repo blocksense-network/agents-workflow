@@ -2,19 +2,16 @@
 
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+# BEWARE! The heredoc below is intentially using long lines, becuase otherwise
+# Codex gets confused sometimes by the terminal output in its environment that
+# splits the lines in unexpected ways (Codex decides the file is truncated).
 cat > ../AGENTS.md << 'EOF'
-When you a given a task description or developer instructions that just state "go",
-execute the shell command `get-task` and follow the instructions provided in the output.
+When you a given a task description or developer instructions that just state "go", execute the shell command `get-task` and follow the instructions provided in the output.
 
-If the task description or developer instructions are a longer and detailed, before starting
-work, I'd like you to do the following:
+If the task description or developer instructions are a longer and detailed, before starting work, I'd like you to do the following:
 
 1) mkdir -p ".agents/tasks/$(date +%Y)/$(date +%m)"
-
-2) In this directory, create a file with a verbatim copy of the task description or developer
-   instructions. The file name should be named "$(date +%d-%H%M)-${TASK_BRANCH_NAME}", where
-   $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task
-   description of developer instructions.
+2) In this directory, create a file with a verbatim copy of the task description or developer instructions. The file name should be named "$(date +%d-%H%M)-${TASK_BRANCH_NAME}", where $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task description of developer instructions.
 
 EOF
 
