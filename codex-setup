@@ -16,12 +16,39 @@ fi
 # TODO: Support GitLab and BitBucket
 
 cat > ../AGENTS.md << EOF
-When you a given a task description or developer instructions that just state "go", execute the shell command \`${GET_TASK_CMD}\` and follow the instructions provided in the output.
+When you a given a task description or developer instructions that
+just state "go", execute the shell command \`${GET_TASK_CMD}\` and
+follow the instructions provided in the output.
 
-If the task description or developer instructions are a longer and detailed, before starting work, I'd like you to do the following:
+Only when the task description or developer instructions are not
+"go", take a look at the WEBUI_TASK_INSTRUCTIONS.md file and honor
+all instructions provided there.
 
-1) mkdir -p ".agents/tasks/$(date -u +%Y)/$(date -u +%m)"
-2) In this directory, create a file with a verbatim copy of the task description or developer instructions. The file name should be named "$(date -u +%d-%H%M)-${TASK_BRANCH_NAME}", where $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task description of developer instructions.
+EOF
+
+cat > ../WEBUI_TASK_INSTRUCTIONS.md << EOF
+Before starting work, I'd like you to do the following:
+
+1) mkdir -p ".agents/tasks/\$(date -u +%Y)/\$(date -u +%m)"
+2) In this directory, create a file with a verbatim copy of the task
+description or developer instructions. The file should be named exactly
+"\$(date -u +%d-%H%M)-\${TASK_BRANCH_NAME}.txt", where \$TASK_BRANCH_NAME
+is an appropriate short branch name that would describe well the task
+description or developer instructions.
+
+When you are given follow-up task description/developer instructions,
+or a QA review, append a verbatim copy to the same task file. You can
+make sure the file is the same by inspecting its contents which should
+match the original message. Use the separator "--- FOLLOW UP TASK ---"
+to indicate where the new content has been appended.
+
+Before starting work on the follow-up task, take note of the current
+HEAD commit. I'd like this commit to be preserved. Don't squash it
+with other commits at the end of the task.
+
+In general, when you complete a task or a follow task, take a look
+at the changes introduced in this specific coding session and write
+a detailed summary of them in a single commit for each coding session.
 
 EOF
 
