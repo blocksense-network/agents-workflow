@@ -10,8 +10,8 @@ When you a given a task description or developer instructions that just state "g
 
 If the task description or developer instructions are a longer and detailed, before starting work, I'd like you to do the following:
 
-1) mkdir -p ".agents/tasks/$(date +%Y)/$(date +%m)"
-2) In this directory, create a file with a verbatim copy of the task description or developer instructions. The file name should be named "$(date +%d-%H%M)-${TASK_BRANCH_NAME}", where $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task description of developer instructions.
+1) mkdir -p ".agents/tasks/$(date -u +%Y)/$(date -u +%m)"
+2) In this directory, create a file with a verbatim copy of the task description or developer instructions. The file name should be named "$(date -u +%d-%H%M)-${TASK_BRANCH_NAME}", where $TASK_BRANCH_NAME is an appropriate short branch name that would describe well the task description of developer instructions.
 
 EOF
 
