@@ -5,8 +5,18 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # BEWARE! The heredoc below is intentially using long lines, becuase otherwise
 # Codex gets confused sometimes by the terminal output in its environment that
 # splits the lines in unexpected ways (Codex decides the file is truncated).
-cat > ../AGENTS.md << 'EOF'
-When you a given a task description or developer instructions that just state "go", execute the shell command `get-task` and follow the instructions provided in the output.
+
+# Conditionally set the autopush flag based on GITHUB_ACCESS_TOKEN availability
+if [ -n "${GITHUB_ACCESS_TOKEN}" ]; then
+  GET_TASK_CMD="get-task --autopush"
+else
+  GET_TASK_CMD="get-task"
+fi
+
+# TODO: Support GitLab and BitBucket
+
+cat > ../AGENTS.md << EOF
+When you a given a task description or developer instructions that just state "go", execute the shell command \`${GET_TASK_CMD}\` and follow the instructions provided in the output.
 
 If the task description or developer instructions are a longer and detailed, before starting work, I'd like you to do the following:
 

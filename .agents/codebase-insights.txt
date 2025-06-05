@@ -45,3 +45,26 @@ Security considerations:
 - Cargo cache persisted to avoid re-downloading crates
 - Build tools pre-installed for native dependency compilation
 
+# Agent Task Target Remote Recording
+
+When agent-task is executed, the commit message now includes:
+- Start-Agent-Branch: {task branch} (renamed from start-agent-task for consistency)
+- Target-Remote: {HTTP URL of default remote}
+
+The format ensures no empty line between Start-Agent-Branch and Target-Remote lines.
+SSH URLs are automatically converted to HTTPS format in the Target-Remote line.
+
+When get-task is executed with --autopush, the system:
+1. Extracts the target remote URL from "Target-Remote:" line using regex: `^Target-Remote:\s*(.+?)$/m`
+2. Extracts the branch name from "Start-Agent-Branch:" line using regex: `^Start-Agent-Branch:\s*(.+?)$/m`
+3. Uses extracted values to generate GIT_MESSAGE with proper remote/branch info
+4. Falls back to placeholder values if extraction fails
+
+VCSRepo class supports:
+- default_remote_http_url(): Gets HTTP URL of default remote with SSH-to-HTTPS conversion
+- commit_message(commit_hash): Retrieves commit message for specific commit
+- SSH URL conversion handles multiple formats:
+  - git@host:path -> https://host/path
+  - ssh://git@host/path -> https://host/path
+  - ssh://git@host:port/path -> https://host/path (port removed)
+

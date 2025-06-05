@@ -382,6 +382,75 @@ class VCSRepo
          .uniq
   end
 
+  # Get the HTTP URL of the default remote (origin)
+  # Converts SSH URLs to HTTP format for use in authentication with tokens
+  def default_remote_http_url
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        # Get the URL of the 'origin' remote
+        url = `git remote get-url origin 2>/dev/null`.strip
+        return nil if !$CHILD_STATUS.success? || url.empty?
+
+        # Convert SSH URL to HTTPS format
+        # SSH formats to convert:
+        # - git@github.com:user/repo.git -> https://github.com/user/repo.git
+        # - ssh://git@github.com/user/repo.git -> https://github.com/user/repo.git
+        # - ssh://git@gitlab.com:2222/user/repo.git -> https://gitlab.com/user/repo.git
+        if url.match?(/^git@([^:]+):(.+)$/)
+          # Standard SSH format: git@host:path
+          url.sub(/^git@([^:]+):/, 'https://\1/')
+        elsif (match = url.match(%r{^ssh://git@([^/]+?)(?::\d+)?/(.+)$}))
+          # SSH protocol format: ssh://git@host[:port]/path
+          "https://#{match[1]}/#{match[2]}"
+        else
+          url
+        end
+      when :hg
+        # Get the default remote URL for Mercurial
+        url = `hg paths default 2>/dev/null`.strip
+        return nil if !$CHILD_STATUS.success? || url.empty?
+
+        url
+      when :bzr
+        # Get the parent branch URL for Bazaar
+        url = `bzr config parent_location 2>/dev/null`.strip
+        return nil if !$CHILD_STATUS.success? || url.empty?
+
+        url
+      when :fossil
+        # Fossil doesn't have a direct equivalent to Git remotes
+        # Return the configured sync URL if available
+        url = `fossil remote 2>/dev/null | head -n 1`.strip
+        return nil if !$CHILD_STATUS.success? || url.empty?
+
+        url
+      end
+    end
+  end
+
+  # Get the commit message for a specific commit hash
+  def commit_message(commit_hash)
+    return nil if commit_hash.nil? || commit_hash.empty?
+
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        message = `git log -1 --pretty=format:%B #{commit_hash} 2>/dev/null`.strip
+        $CHILD_STATUS.success? ? message : nil
+      when :hg
+        message = `hg log -r #{commit_hash} --template "{desc}" 2>/dev/null`.strip
+        $CHILD_STATUS.success? ? message : nil
+      when :bzr
+        message = `bzr log -r #{commit_hash} --show-ids 2>/dev/null | grep -A 1000 'message:' | tail -n +2`.strip
+        $CHILD_STATUS.success? ? message : nil
+      when :fossil
+        message = `fossil timeline -n 1 #{commit_hash} 2>/dev/null | grep -o 'comment:.*' | sed 's/comment://'`.strip
+        $CHILD_STATUS.success? ? message : nil
+      end
+    end
+  end
+
   private
 
   # The branch name validation is intentionally simple and mirrors the common

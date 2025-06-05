@@ -3,4 +3,4 @@
 
 require 'agent_task'
 
-AgentTask::CLI.run_get_task
+AgentTask::CLI.run_get_task(ARGV)

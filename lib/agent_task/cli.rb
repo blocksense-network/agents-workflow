@@ -108,7 +108,13 @@ module AgentTask
         tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
         FileUtils.mkdir_p(tasks_dir)
         task_file = File.join(tasks_dir, filename)
-        commit_msg = "start-agent-task: #{branch_name}"
+
+        # Build commit message with target remote and branch information
+        commit_msg = "Start-Agent-Branch: #{branch_name}"
+
+        # Get the target remote URL (HTTP format for token authentication)
+        target_remote = repo.default_remote_http_url
+        commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
 
         File.binwrite(task_file, task_content)
         repo.commit_file(task_file, commit_msg)
@@ -145,14 +151,22 @@ module AgentTask
     end
 
     # Print the current task description, replicating the `get-task` command.
-    def run_get_task
+    def run_get_task(args = [])
       require 'resolv'
       require 'fileutils'
+      require 'optparse'
       require_relative '../vcs_repo'
       require_relative '../agent_tasks'
 
+      options = {}
+      OptionParser.new do |opts|
+        opts.on('--autopush', 'Tells the agent to automatically push its changes') do
+          options[:autopush] = true
+        end
+      end.parse!(args)
+
       retriever = AgentTasks.new
-      message = retriever.agent_prompt
+      message = retriever.agent_prompt(autopush: options[:autopush])
       puts message
     rescue StandardError => e
       puts e.message
