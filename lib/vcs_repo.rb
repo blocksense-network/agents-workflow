@@ -462,9 +462,12 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        `git log -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
+        # Search across all branches to locate the commit that started the
+        # current agent task. This allows retrieving the task even when the
+        # repository is not checked out on the task branch.
+        `git log --all -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
       when :hg
-        revset = "reverse(ancestors(.) and grep('^Start-Agent-Branch:'))"
+        revset = "reverse(grep('^Start-Agent-Branch:'))"
         `hg log -r #{revset} --limit 1 --template '{node}\n'`.strip
       when :fossil
         branch = current_branch
