@@ -17,8 +17,8 @@ fi
 
 cat > ../AGENTS.md << EOF
 When you a given a task description or developer instructions that
-just state "go", execute the shell command \`${GET_TASK_CMD}\` and
-follow the instructions provided in the output.
+just state "go", execute the shell command \`${GET_TASK_CMD}\` under
+the repository root and follow the instructions provided in the output.
 
 When the task description or developer instructions are not "go",
 you should follow the given instructions while also adhering to the
@@ -36,8 +36,10 @@ description or developer instructions.
 When you are given follow-up task description/developer instructions,
 or a QA review, append a verbatim copy to the same task file. You can
 make sure the file is the same by inspecting its contents which should
-match the original message. Use the separator "--- FOLLOW UP TASK ---"
-to indicate where the new content has been appended.
+match the original message.
+
+Use the separator "\\n--- FOLLOW UP TASK ---\\n" to indicate where the
+new content has been appended.
 
 Before starting work on the follow-up task, take note of the current
 HEAD commit. I'd like this commit to be preserved. Don't squash it

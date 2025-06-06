@@ -128,7 +128,7 @@ class TestCommitMessageFormat < Minitest::Test
       error = assert_raises(StandardError) do
         agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
       end
-      assert_includes error.message, 'GITHUB_ACCESS_TOKEN environment variable is not set'
+      assert_includes error.message, 'The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, specified as a secret'
 
       # Test with token present
       ENV['GITHUB_ACCESS_TOKEN'] = 'test_token_123'
@@ -170,7 +170,7 @@ class TestCommitMessageFormat < Minitest::Test
       error = assert_raises(StandardError) do
         agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
       end
-      assert_includes error.message, 'Target-Remote not found in commit message'
+      assert_includes error.message, 'You are not currently on a agent task branch'
     ensure
       # Restore original token
       if original_token

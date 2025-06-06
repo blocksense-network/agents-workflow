@@ -45,18 +45,21 @@ The primary goal of this workflow is to:
 1.  **Starting a Task (Developer):**
 
     When a developer needs to assign a task to the agent, they run
-    the `agent-task` command with the desired branch name:
+    the `agent-task` command. If a branch name is provided it starts a
+    new branch, otherwise it appends a follow-up task on the current
+    branch.
 
     ```bash
-    agent-task <branch-name>
+    agent-task [branch-name]
     ```
 
     This script will:
-    -   Create the branch first and abort early with the VCS error message
-        if the name is invalid.
+    -   When a branch name is supplied, create the branch first and abort
+        early with the VCS error message if the name is invalid.
     -   Prompt the developer to enter the task description in an editor.
     -   Commit the task description to a file within a `.agents/tasks/`
-        directory on the new branch.
+        directory on the new branch or append it as a follow-up task if
+        no branch was given.
     -   Push the branch to the default remote.
 
     The command accepts a few options for non-interactive use:

@@ -451,6 +451,30 @@ class VCSRepo
     end
   end
 
+  # Find the most recent commit in the current branch that starts with
+  # 'Start-Agent-Branch:'. Returns the commit hash or nil if not found.
+  def latest_agent_branch_commit
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        `git log -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
+      when :hg
+        revset = "reverse(ancestors(.) and grep('^Start-Agent-Branch:'))"
+        `hg log -r #{revset} --limit 1 --template '{node}\n'`.strip
+      when :fossil
+        branch = current_branch
+        escaped = branch.gsub("'", "''")
+        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
+              'JOIN event ON tagxref.rid=event.objid JOIN blob ON event.objid=blob.rid ' \
+              "WHERE tag.tagname='sym-#{escaped}' AND event.type='ci' " \
+              "AND event.comment LIKE 'Start-Agent-Branch:%' ORDER BY tagxref.mtime DESC LIMIT 1"
+        `fossil sql \"#{sql}\"`.strip.delete("'")
+      else
+        ''
+      end
+    end
+  end
+
   private
 
   # The branch name validation is intentionally simple and mirrors the common
