@@ -67,6 +67,7 @@ The primary goal of this workflow is to:
     - `--push-to-remote=BOOL` – automatically push to the default remote without prompting.
     - `--prompt=STRING` – use `STRING` as the task description instead of launching an editor.
     - `--prompt-file=FILE` – read the task description from `FILE`.
+    - `--devshell=NAME` (`-s`) – record the given Nix dev shell in the initial commit message.
 
 2.  **Retrieving a Task (Coding Agent):**
 
@@ -148,6 +149,8 @@ gem install --local agents-workflow.gem
 ```
 
 This will provide the `agent-task`, `get-task`, and `download-internet-resources` executables in your `PATH`.
+
+To enable bash completion for `agent-task`, source the script `scripts/agent-task-completion.bash` in your shell profile.
 
 ### What's included?
 

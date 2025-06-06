@@ -176,6 +176,70 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
     end
   end
 
+  def test_devshell_option
+    # Only test with the direct binary script, not gem wrappers
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    File.write(File.join(repo, 'flake.nix'), <<~NIX)
+      { outputs = { self }: { devShells.x86_64-linux.default = pkgs.mkShell {}; devShells.x86_64-linux.custom = pkgs.mkShell {}; }; }
+    NIX
+    status, = run_agent_task(
+      repo,
+      branch: 'ds1',
+      lines: ['task'],
+      devshell: 'custom',
+      push_to_remote: false,
+      tool: RepoTestHelper::AGENT_TASK
+    )
+    assert_equal 0, status.exitstatus
+    r = VCSRepo.new(repo)
+    r.checkout_branch('ds1')
+    commit = r.first_commit_in_current_branch
+    msg = r.commit_message(commit)
+    assert_includes msg, 'Dev-Shell: custom'
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_devshell_option_invalid
+    # Only test with the direct binary script, not gem wrappers
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    File.write(File.join(repo, 'flake.nix'), <<~NIX)
+      { outputs = { self }: { devShells.x86_64-linux.default = pkgs.mkShell {}; }; }
+    NIX
+    status, = run_agent_task(
+      repo,
+      branch: 'ds2',
+      lines: ['task'],
+      devshell: 'missing',
+      push_to_remote: false,
+      tool: RepoTestHelper::AGENT_TASK
+    )
+    assert status.exitstatus != 0
+    refute VCSRepo.new(repo).branch_exists?('ds2')
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_devshell_without_flake
+    # Only test with the direct binary script, not gem wrappers
+    repo, remote = setup_repo(self.class::VCS_TYPE)
+    status, = run_agent_task(
+      repo,
+      branch: 'ds3',
+      lines: ['task'],
+      devshell: 'any',
+      push_to_remote: false,
+      tool: RepoTestHelper::AGENT_TASK
+    )
+    assert status.exitstatus != 0
+    refute VCSRepo.new(repo).branch_exists?('ds3')
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
   def test_invalid_branch
     RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
       repo, remote = setup_repo(self.class::VCS_TYPE)

@@ -119,7 +119,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   # push_to_remote option avoids interactive prompts in CI
   # rubocop:disable Metrics/ParameterLists
   def run_agent_task(repo, branch:, lines: [], editor_exit: 0, input: nil, push_to_remote: nil, prompt: nil,
-                     prompt_file: nil, tool: AGENT_TASK)
+                     prompt_file: nil, devshell: nil, tool: AGENT_TASK)
     dir = nil
     script = nil
     marker = nil
@@ -148,6 +148,7 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
       cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
       cmd << "--prompt=#{prompt}" if prompt
       cmd << "--prompt-file=#{prompt_file}" if prompt_file
+      cmd << "--devshell=#{devshell}" if devshell
       env = GEM_ENV.dup
       if script
         env['EDITOR'] = windows? ? "ruby #{script}" : script
