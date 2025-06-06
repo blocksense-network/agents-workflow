@@ -1,0 +1,24 @@
+I discovered some issues in the behavior of `agent-task`, so I'd like to introduce new logic that will provide good support for follow-up tasks and deep branching of feature branches.
+
+The new behavior should work in the following way:
+
+1) The branch name of `agent-task` becomes an optional parameter.
+
+2) When the branch name is given, `agent-task` behaves like it behaves currently, starting a new branch and committing a task description file in it.
+
+3) When a branch name is not given, `agent-task` looks in the commit history for the most recent commit that has a `Start-Agent-Branch` tag (the first line of the commit message). It determines which task file was created by this commit (there will be only a single created file in the commit) and then appends the newly created task description to this file with a "--- FOLLOW UP TASK ---" separator (similar to the logic described in the `codex-setup` file). This creates a commit which is then pushed to the current branch (asking the user for confirmation just like we do now). `agent-task` should refuse to operate in the current branch if the current branch is the main branch (or master/trunk/etc).
+
+This would require the following changes in `get-task`:
+
+1) We use the same utility function to find the most recent commit with the `Start-Agent-Branch` tag. 2) We get the task file from it.
+3) Instead of the current logic that stitches together multiple files (On date X, you wire given task X, ..., Your current task is ...), we now split the task file on the basis of the separators. We format the same message as before (which would have been produced if there were multiple task files), but please note that writing the dates when the previous tasks were given is not that important and we can drop this requirement.
+
+This new functionality will have to be tested properly. Make sure to add the following tests:
+
+1) Test that `agent-task` can successfully append tasks (with commits from the agent working on the task in between). After each commit created by `agent-task`, `get-task` should return the right composite message.
+
+2) Test that `agent-task` refuses to operate on the main branch.
+
+3) Test that we can start a new branch from an existing branch, created with `agent-task`. Then `get-task` should return only task descriptions created in the newly created branch. You can test two levels of nesting for completeness.
+
+You've made some progress in d00924a948cbc79fae6eb7177a9488b8615a95b9. Please finish all the tasks above.

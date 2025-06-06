@@ -14,7 +14,7 @@ class AgentTasks
     start_commit_hash = @repo.latest_agent_branch_commit
     unless start_commit_hash && !start_commit_hash.empty?
       raise StandardError,
-            "Error: Could not find a Start-Agent-Branch commit in branch '#{@repo.current_branch}'."
+            'You are not currently on a agent task branch'
     end
 
     files_in_commit = @repo.files_in_commit(start_commit_hash)
@@ -124,10 +124,6 @@ class AgentTasks
     end
 
     if autopush
-      # Check if GITHUB_ACCESS_TOKEN is set
-      github_token = ENV.fetch('GITHUB_ACCESS_TOKEN', nil)
-      raise StandardError, 'Error: GITHUB_ACCESS_TOKEN environment variable is not set' unless github_token
-
       # Extract target remote and branch from the task commit message
       first_commit_hash = @repo.latest_agent_branch_commit
       raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
@@ -149,12 +145,21 @@ class AgentTasks
       target_branch = branch_match[1].strip
       raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-      # Add GitHub token authentication to the remote URL
-      remote_url = if target_remote.start_with?('https://github.com/')
-                     target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
-                   else
-                     target_remote
-                   end
+      # Only check for GITHUB_ACCESS_TOKEN if using GitHub URLs
+      if target_remote.start_with?('https://github.com/')
+        github_token = ENV.fetch('GITHUB_ACCESS_TOKEN', nil)
+        unless github_token
+          raise StandardError,
+                'Error: The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, ' \
+                'specified as a secret'
+        end
+
+        # Add GitHub token authentication to the remote URL
+        remote_url = target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
+      else
+        # For non-GitHub remotes (filesystem, SSH, etc.), use the URL as-is
+        remote_url = target_remote
+      end
       # TODO: Implement support for GitLab and BitBucket
 
       push_branch = target_branch
