@@ -1,0 +1,1 @@
+The test_start_work tests are supposed to test a bit unusual scenario where the repo has been configured to use a different user before `start-work` is executed. Make sure to implement such a step just before start-work is called (start-work restores the git user to the one who created the current agent task)
