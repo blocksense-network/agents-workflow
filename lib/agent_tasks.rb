@@ -10,7 +10,7 @@ class AgentTasks
     @repo = VCSRepo.new(path_in_repo) # This can raise if repo is not found
   end
 
-  def agent_tasks_in_current_branch
+  def agent_task_file_in_current_branch
     start_commit_hash = @repo.latest_agent_branch_commit
     unless start_commit_hash && !start_commit_hash.empty?
       raise StandardError,
@@ -23,8 +23,7 @@ class AgentTasks
             "Error: No files found in the task start commit ('#{start_commit_hash}')."
     end
 
-    task_file = File.join(@repo.root, files_in_commit.first)
-    [task_file]
+    File.join(@repo.root, files_in_commit.first)
   end
 
   def on_task_branch?; end
@@ -44,35 +43,21 @@ class AgentTasks
     false
   end
 
-  def build_message(task_files, autopush: false)
-    message = ''
-
-    if task_files.length == 1
-      contents = File.read(task_files[0])
-      tasks = contents.split("\n--- FOLLOW UP TASK ---\n")
-      if tasks.length == 1
-        message = tasks[0]
-      else
-        tasks.each_with_index do |task_text, index|
-          message += if index.zero?
-                       "You were given the following task:\n#{task_text}\n"
-                     elsif index == tasks.length - 1
-                       "Your current task is:\n#{task_text}\n"
-                     else
-                       "You were given a follow-up task:\n#{task_text}\n"
-                     end
-        end
-      end
+  def agent_prompt(autopush: false)
+    task_file_contents = File.read(agent_task_file_in_current_branch)
+    tasks = task_file_contents.split("\n--- FOLLOW UP TASK ---\n")
+    if tasks.length == 1
+      message = tasks[0]
     else
-      task_files.each_with_index do |file_path, index|
-        content = File.read(file_path)
+      message = ''
+      tasks.each_with_index do |task_text, index|
         message += if index.zero?
-                     "You were given the following task:\n#{content}\n"
-                   elsif index == task_files.length - 1
-                     "Your current task is:\n#{content}\n"
-                   else
-                     "You were given a follow-up task:\n#{content}\n"
-                   end
+                      "You were given the following task:\n#{task_text}\n"
+                    elsif index == tasks.length - 1
+                      "Your current task is:\n#{task_text}\n"
+                    else
+                      "You were given a follow-up task:\n#{task_text}\n"
+                    end
       end
     end
 
@@ -185,10 +170,5 @@ class AgentTasks
     end
 
     message
-  end
-
-  def agent_prompt(autopush: false)
-    task_file_paths = agent_tasks_in_current_branch
-    build_message(task_file_paths, autopush: autopush)
   end
 end

@@ -86,7 +86,7 @@ class TestCommitMessageFormat < Minitest::Test
     begin
       ENV['GITHUB_ACCESS_TOKEN'] = 'test_token_123'
       # Test autopush message generation
-      message = agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
+      message = agent_tasks.agent_prompt(autopush: true)
 
       assert_includes message, 'extraction test task'
       assert_includes message, 'git remote add target_remote "https://x-access-token:test_token_123@github.com/testuser/test-repo.git"'
@@ -126,13 +126,13 @@ class TestCommitMessageFormat < Minitest::Test
       # Test with missing token
       ENV.delete('GITHUB_ACCESS_TOKEN')
       error = assert_raises(StandardError) do
-        agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
+        agent_tasks.agent_prompt(autopush: true)
       end
       assert_includes error.message, 'The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, specified as a secret'
 
       # Test with token present
       ENV['GITHUB_ACCESS_TOKEN'] = 'test_token_123'
-      message = agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
+      message = agent_tasks.agent_prompt(autopush: true)
       assert_includes message, 'git remote add target_remote "https://x-access-token:test_token_123@github.com/testuser/test-repo.git"'
       assert_includes message, 'git push target_remote HEAD:token-test'
     ensure
@@ -168,7 +168,7 @@ class TestCommitMessageFormat < Minitest::Test
     begin
       # Should raise error because commit doesn't have Target-Remote
       error = assert_raises(StandardError) do
-        agent_tasks.build_message(agent_tasks.agent_tasks_in_current_branch, autopush: true)
+        agent_tasks.agent_prompt(autopush: true)
       end
       assert_includes error.message, 'You are not currently on a agent task branch'
     ensure
