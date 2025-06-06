@@ -128,7 +128,9 @@ class TestCommitMessageFormat < Minitest::Test
       error = assert_raises(StandardError) do
         agent_tasks.agent_prompt(autopush: true)
       end
-      assert_includes error.message, 'The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, specified as a secret'
+      assert_includes error.message,
+                      'The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, ' \
+                      'specified as a secret'
 
       # Test with token present
       ENV['GITHUB_ACCESS_TOKEN'] = 'test_token_123'

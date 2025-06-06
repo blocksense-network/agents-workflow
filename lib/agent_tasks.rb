@@ -52,12 +52,12 @@ class AgentTasks
       message = ''
       tasks.each_with_index do |task_text, index|
         message += if index.zero?
-                      "You were given the following task:\n#{task_text}\n"
-                    elsif index == tasks.length - 1
-                      "Your current task is:\n#{task_text}\n"
-                    else
-                      "You were given a follow-up task:\n#{task_text}\n"
-                    end
+                     "You were given the following task:\n#{task_text}\n"
+                   elsif index == tasks.length - 1
+                     "Your current task is:\n#{task_text}\n"
+                   else
+                     "You were given a follow-up task:\n#{task_text}\n"
+                   end
       end
     end
 
