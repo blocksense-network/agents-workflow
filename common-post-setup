@@ -39,3 +39,6 @@ fi
 # Create the get-task symlink in the chosen directory
 sudo ln -sf "$TEMP_AGENTS_DIR/bin/get-task" "$BIN_DIR/get-task"
 echo "get-task installed to $BIN_DIR/get-task"
+# Create the start-work symlink as well
+sudo ln -sf "$TEMP_AGENTS_DIR/bin/start-work" "$BIN_DIR/start-work"
+echo "start-work installed to $BIN_DIR/start-work"

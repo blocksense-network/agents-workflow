@@ -7,6 +7,32 @@ module AgentTask
   module CLI # rubocop:disable Metrics/ModuleLength
     module_function
 
+    def discover_repos
+      repos = []
+      begin
+        repos << [nil, AgentTasks.new]
+        return repos
+      rescue RepositoryNotFoundError
+        # continue to scan subdirectories
+      end
+
+      Dir.children(Dir.pwd).sort.each do |entry|
+        candidate = File.join(Dir.pwd, entry)
+        next unless File.directory?(candidate)
+
+        vcs_dirs = %w[.git .hg .bzr .fslckout _FOSSIL_]
+        next unless vcs_dirs.any? { |v| File.exist?(File.join(candidate, v)) || Dir.exist?(File.join(candidate, v)) }
+
+        begin
+          repos << [entry, AgentTasks.new(candidate)]
+        rescue StandardError
+          next
+        end
+      end
+
+      repos
+    end
+
     EDITOR_HINT = <<~HINT
       # Please write your task prompt above.
       # Enter an empty prompt to abort the task creation process.
@@ -181,27 +207,26 @@ module AgentTask
         end
       end.parse!(args)
 
-      begin
-        retriever = AgentTasks.new
-        puts retriever.agent_prompt(autopush: options[:autopush])
+      repos = discover_repos
+      if repos.empty?
+        puts "Error: Could not find repository root from #{Dir.pwd}"
+        exit 1
+      end
+
+      if repos.length == 1 && repos[0][0].nil?
+        puts repos[0][1].agent_prompt(autopush: options[:autopush])
         return
-      rescue RepositoryNotFoundError
-        # Expected when current directory is not in a VCS repo - continue to scan subdirectories
       end
 
       dir_messages = []
-      Dir.children(Dir.pwd).sort.each do |entry|
-        candidate = File.join(Dir.pwd, entry)
-        next unless File.directory?(candidate)
-
-        vcs_dirs = %w[.git .hg .bzr .fslckout _FOSSIL_]
-        next unless vcs_dirs.any? { |v| File.exist?(File.join(candidate, v)) || Dir.exist?(File.join(candidate, v)) }
+      repos.each do |dir, at|
+        next if dir.nil?
 
         begin
-          msg = AgentTasks.new(candidate).agent_prompt(autopush: options[:autopush])
-          dir_messages << [entry, msg] if msg && !msg.empty?
+          msg = at.agent_prompt(autopush: options[:autopush])
+          dir_messages << [dir, msg] if msg && !msg.empty?
         rescue StandardError
-          # Ignore repositories without an active agent task
+          next
         end
       end
 
@@ -214,6 +239,21 @@ module AgentTask
         output = dir_messages.map { |dir, msg| "In directory `#{dir}`:\n#{msg}" }.join("\n\n")
         puts output
       end
+    rescue StandardError => e
+      puts e.message
+      exit 1
+    end
+
+    def run_start_work(_args = [])
+      require_relative '../agent_tasks'
+
+      repos = discover_repos
+      if repos.empty?
+        puts "Error: Could not find repository root from #{Dir.pwd}"
+        exit 1
+      end
+
+      repos.to_h.each_value(&:prepare_work_environment)
     rescue StandardError => e
       puts e.message
       exit 1
