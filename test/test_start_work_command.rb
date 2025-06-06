@@ -22,6 +22,9 @@ module StartWorkCases
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       VCSRepo.new(repo).checkout_branch('feat')
+      # simulate a repository that changed git user after the task was started
+      git(repo, 'config', 'user.name', 'Other')
+      git(repo, 'config', 'user.email', 'other@example.com')
       status2, = run_start_work(repo, tool: sb)
       # start-work should succeed
       assert_equal 0, status2.exitstatus
@@ -41,6 +44,9 @@ module StartWorkCases
       r = VCSRepo.new(repo)
       r.checkout_branch('feat')
       r.create_local_branch('work')
+      # change git user before running start-work to ensure it resets correctly
+      git(repo, 'config', 'user.name', 'Other')
+      git(repo, 'config', 'user.email', 'other@example.com')
       status2, = run_start_work(repo, tool: sb)
       # start-work should succeed on a different branch
       assert_equal 0, status2.exitstatus
@@ -58,6 +64,9 @@ module StartWorkCases
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       outer = Dir.mktmpdir('outer')
+      # modify git user before moving repo to parent directory
+      git(repo, 'config', 'user.name', 'Other')
+      git(repo, 'config', 'user.email', 'other@example.com')
       FileUtils.mv(repo, File.join(outer, 'repo'))
       status2, = run_start_work(outer, tool: sb)
       # start-work should succeed when launched from parent directory
@@ -80,6 +89,11 @@ module StartWorkCases
       # second repo setup
       assert_equal 0, status.exitstatus
       outer = Dir.mktmpdir('outer')
+      # change git user in both repos before moving them
+      git(repo_a, 'config', 'user.name', 'Other')
+      git(repo_a, 'config', 'user.email', 'other@example.com')
+      git(repo_b, 'config', 'user.name', 'Other')
+      git(repo_b, 'config', 'user.email', 'other@example.com')
       FileUtils.mv(repo_a, File.join(outer, 'a'))
       FileUtils.mv(repo_b, File.join(outer, 'b'))
       status2, = run_start_work(outer, tool: sb)
