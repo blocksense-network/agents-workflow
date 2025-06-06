@@ -37,7 +37,7 @@ module AgentTask
       end.parse!(args)
 
       branch_name = args.shift
-      abort('Usage: agent-task <branch-name>') if branch_name.nil? || branch_name.strip.empty?
+      start_new_branch = branch_name && !branch_name.strip.empty?
       abort('Error: --prompt and --prompt-file are mutually exclusive') if options[:prompt] && options[:prompt_file]
 
       prompt_content = nil
@@ -59,14 +59,20 @@ module AgentTask
       end
 
       orig_branch = repo.current_branch
-      begin
-        repo.start_branch(branch_name)
-      rescue StandardError => e
-        stdout.puts e.message
-        exit 1
+      if start_new_branch
+        begin
+          repo.start_branch(branch_name)
+        rescue StandardError => e
+          stdout.puts e.message
+          exit 1
+        end
+      else
+        branch_name = orig_branch
+        main_names = [repo.default_branch, 'main', 'master', 'trunk', 'default']
+        abort('Error: Refusing to run on the main branch') if main_names.include?(branch_name)
       end
 
-      cleanup_branch = true
+      cleanup_branch = start_new_branch
 
       begin
         task_content = nil
@@ -98,26 +104,36 @@ module AgentTask
         task_content.gsub!("\r\n", "\n")
         abort('Aborted: empty task prompt.') if task_content.strip.empty?
 
-        now = Time.now.utc
-        year = now.year
-        month = format('%02d', now.month)
-        day = format('%02d', now.day)
-        hour = format('%02d', now.hour)
-        min = format('%02d', now.min)
-        filename = "#{day}-#{hour}#{min}-#{branch_name}"
-        tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
-        FileUtils.mkdir_p(tasks_dir)
-        task_file = File.join(tasks_dir, filename)
+        if start_new_branch
+          now = Time.now.utc
+          year = now.year
+          month = format('%02d', now.month)
+          day = format('%02d', now.day)
+          hour = format('%02d', now.hour)
+          min = format('%02d', now.min)
+          filename = "#{day}-#{hour}#{min}-#{branch_name}"
+          tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
+          FileUtils.mkdir_p(tasks_dir)
+          task_file = File.join(tasks_dir, filename)
 
-        # Build commit message with target remote and branch information
-        commit_msg = "Start-Agent-Branch: #{branch_name}"
+          commit_msg = "Start-Agent-Branch: #{branch_name}"
+          target_remote = repo.default_remote_http_url
+          commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
 
-        # Get the target remote URL (HTTP format for token authentication)
-        target_remote = repo.default_remote_http_url
-        commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
-
-        File.binwrite(task_file, task_content)
-        repo.commit_file(task_file, commit_msg)
+          File.binwrite(task_file, task_content)
+          repo.commit_file(task_file, commit_msg)
+        else
+          start_commit = repo.latest_agent_branch_commit
+          abort('Error: Could not locate task start commit') unless start_commit
+          files = repo.files_in_commit(start_commit)
+          abort('Error: Task start commit should introduce exactly one file') unless files.length == 1
+          task_file = File.join(repo.root, files.first)
+          File.open(task_file, 'a') do |f|
+            f.write("\n--- FOLLOW UP TASK ---\n")
+            f.write(task_content)
+          end
+          repo.commit_file(task_file, 'Follow-up task')
+        end
 
         push = nil
         if options.key?(:push_to_remote)

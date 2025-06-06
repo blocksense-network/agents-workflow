@@ -125,7 +125,8 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     output = nil
     status = nil
     Dir.chdir(repo) do
-      cmd = windows? ? ['ruby', tool, branch] : [tool, branch]
+      cmd = windows? ? ['ruby', tool] : [tool]
+      cmd << branch if branch
       cmd << "--push-to-remote=#{push_to_remote}" unless push_to_remote.nil?
       cmd << "--prompt=#{prompt}" if prompt
       cmd << "--prompt-file=#{prompt_file}" if prompt_file

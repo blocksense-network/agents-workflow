@@ -63,6 +63,8 @@ When get-task is executed with --autopush, the system:
 VCSRepo class supports:
 - default_remote_http_url(): Gets HTTP URL of default remote with SSH-to-HTTPS conversion
 - commit_message(commit_hash): Retrieves commit message for specific commit
+- latest_agent_branch_commit(): Finds the last commit containing the
+  'Start-Agent-Branch:' marker in the current branch
 - SSH URL conversion handles multiple formats:
   - git@host:path -> https://host/path
   - ssh://git@host/path -> https://host/path

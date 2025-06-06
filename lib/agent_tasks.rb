@@ -11,51 +11,20 @@ class AgentTasks
   end
 
   def agent_tasks_in_current_branch
-    first_commit_hash = @repo.first_commit_in_current_branch
-    unless first_commit_hash
+    start_commit_hash = @repo.latest_agent_branch_commit
+    unless start_commit_hash && !start_commit_hash.empty?
       raise StandardError,
-            "Error: Could not find the first commit in the current branch '#{@repo.current_branch}'."
+            "Error: Could not find a Start-Agent-Branch commit in branch '#{@repo.current_branch}'."
     end
 
-    files_in_commit = @repo.files_in_commit(first_commit_hash)
+    files_in_commit = @repo.files_in_commit(start_commit_hash)
     if files_in_commit.nil? || files_in_commit.empty?
-      if @repo.vcs_type == :fossil
-        branch = @repo.current_branch
-        escaped = branch.gsub("'", "''")
-        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
-              "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped}' " \
-              'ORDER BY tagxref.mtime ASC'
-        commits = `fossil sql "#{sql}"`.split("\n").map { |c| c.delete("'") }
-        commits.each do |hash|
-          files = @repo.files_in_commit(hash)
-          next if files.nil? || files.empty?
-
-          first_commit_hash = hash
-          files_in_commit = files
-          break
-        end
-        if (files_in_commit.nil? || files_in_commit.empty?) && !commits.empty?
-          parent_sql = 'SELECT p.uuid FROM plink JOIN blob c ON plink.cid=c.rid ' \
-                       "JOIN blob p ON plink.pid=p.rid WHERE c.uuid='#{first_commit_hash}'"
-          parent = `fossil sql "#{parent_sql}"`.strip.delete("'")
-          unless parent.empty?
-            files = @repo.files_in_commit(parent)
-            unless files.nil? || files.empty?
-              first_commit_hash = parent
-              files_in_commit = files
-            end
-          end
-        end
-      end
-      if files_in_commit.nil? || files_in_commit.empty?
-        raise StandardError,
-              "Error: No files found in the first commit ('#{first_commit_hash}') of branch '#{@repo.current_branch}'."
-      end
+      raise StandardError,
+            "Error: No files found in the task start commit ('#{start_commit_hash}')."
     end
 
-    first_file_relative_path = files_in_commit.first
-    first_file_absolute_path = File.join(@repo.root, first_file_relative_path)
-    [first_file_absolute_path]
+    task_file = File.join(@repo.root, files_in_commit.first)
+    [task_file]
   end
 
   def on_task_branch?; end
@@ -79,18 +48,30 @@ class AgentTasks
     message = ''
 
     if task_files.length == 1
-      message = File.read(task_files[0])
+      contents = File.read(task_files[0])
+      tasks = contents.split("\n--- FOLLOW UP TASK ---\n")
+      if tasks.length == 1
+        message = tasks[0]
+      else
+        tasks.each_with_index do |task_text, index|
+          message += if index.zero?
+                       "You were given the following task:\n#{task_text}\n"
+                     elsif index == tasks.length - 1
+                       "Your current task is:\n#{task_text}\n"
+                     else
+                       "You were given a follow-up task:\n#{task_text}\n"
+                     end
+        end
+      end
     else
       task_files.each_with_index do |file_path, index|
-        date = File.basename(file_path)
         content = File.read(file_path)
-
         message += if index.zero?
-                     "On #{date}, you were given the following task:\n#{content}\n"
+                     "You were given the following task:\n#{content}\n"
                    elsif index == task_files.length - 1
                      "Your current task is:\n#{content}\n"
                    else
-                     "On #{date}, you were given a follow-up task:\n#{content}\n"
+                     "You were given a follow-up task:\n#{content}\n"
                    end
       end
     end
@@ -148,7 +129,7 @@ class AgentTasks
       raise StandardError, 'Error: GITHUB_ACCESS_TOKEN environment variable is not set' unless github_token
 
       # Extract target remote and branch from the task commit message
-      first_commit_hash = @repo.first_commit_in_current_branch
+      first_commit_hash = @repo.latest_agent_branch_commit
       raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
 
       commit_msg = @repo.commit_message(first_commit_hash)
