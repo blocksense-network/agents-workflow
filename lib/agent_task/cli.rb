@@ -181,9 +181,39 @@ module AgentTask
         end
       end.parse!(args)
 
-      retriever = AgentTasks.new
-      message = retriever.agent_prompt(autopush: options[:autopush])
-      puts message
+      begin
+        retriever = AgentTasks.new
+        puts retriever.agent_prompt(autopush: options[:autopush])
+        return
+      rescue RepositoryNotFoundError
+        # Expected when current directory is not in a VCS repo - continue to scan subdirectories
+      end
+
+      dir_messages = []
+      Dir.children(Dir.pwd).sort.each do |entry|
+        candidate = File.join(Dir.pwd, entry)
+        next unless File.directory?(candidate)
+
+        vcs_dirs = %w[.git .hg .bzr .fslckout _FOSSIL_]
+        next unless vcs_dirs.any? { |v| File.exist?(File.join(candidate, v)) || Dir.exist?(File.join(candidate, v)) }
+
+        begin
+          msg = AgentTasks.new(candidate).agent_prompt(autopush: options[:autopush])
+          dir_messages << [entry, msg] if msg && !msg.empty?
+        rescue StandardError
+          # Ignore repositories without an active agent task
+        end
+      end
+
+      if dir_messages.empty?
+        puts "Error: Could not find repository root from #{Dir.pwd}"
+        exit 1
+      elsif dir_messages.length == 1
+        puts dir_messages[0][1]
+      else
+        output = dir_messages.map { |dir, msg| "In directory `#{dir}`:\n#{msg}" }.join("\n\n")
+        puts output
+      end
     rescue StandardError => e
       puts e.message
       exit 1

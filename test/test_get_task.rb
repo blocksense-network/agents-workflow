@@ -42,6 +42,53 @@ module GetTaskCases
       FileUtils.remove_entry(remote) if remote && File.exist?(remote)
     end
   end
+
+  def test_get_task_from_parent_directory
+    RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo, branch: 'feat', lines: ['outer task'], push_to_remote: true, tool: ab)
+      # agent-task should succeed
+      assert_equal 0, status.exitstatus
+      outer = Dir.mktmpdir('outer')
+      FileUtils.mv(repo, File.join(outer, 'repo'))
+      status2, output = run_get_task(outer, tool: gb)
+      # get-task should succeed when launched from the parent directory
+      assert_equal 0, status2.exitstatus
+      # the output should contain the task description without directory hints
+      assert_includes output, 'outer task'
+      refute_includes output, 'In directory'
+    ensure
+      FileUtils.remove_entry(outer) if outer && File.exist?(outer)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    end
+  end
+
+  def test_get_task_from_parent_directory_multiple_repos
+    RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
+      repo_a, remote_a = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo_a, branch: 'feat', lines: ['task a'], push_to_remote: true, tool: ab)
+      # first repo should be prepared successfully
+      assert_equal 0, status.exitstatus
+      repo_b, remote_b = setup_repo(self.class::VCS_TYPE)
+      status, = run_agent_task(repo_b, branch: 'feat', lines: ['task b'], push_to_remote: true, tool: ab)
+      # second repo should also be prepared successfully
+      assert_equal 0, status.exitstatus
+      outer = Dir.mktmpdir('outer')
+      FileUtils.mv(repo_a, File.join(outer, 'a'))
+      FileUtils.mv(repo_b, File.join(outer, 'b'))
+      status2, output = run_get_task(outer, tool: gb)
+      # get-task should return tasks for both repositories
+      assert_equal 0, status2.exitstatus
+      assert_includes output, 'In directory `a`'
+      assert_includes output, 'task a'
+      assert_includes output, 'In directory `b`'
+      assert_includes output, 'task b'
+    ensure
+      FileUtils.remove_entry(outer) if outer && File.exist?(outer)
+      FileUtils.remove_entry(remote_a) if remote_a && File.exist?(remote_a)
+      FileUtils.remove_entry(remote_b) if remote_b && File.exist?(remote_b)
+    end
+  end
 end
 
 class GetTaskGitTest < Minitest::Test

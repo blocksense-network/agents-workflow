@@ -23,7 +23,15 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   GET_TASK_GEM = File.join(GEM_HOME, 'bin', 'get-task')
   GEM_AGENT_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_agent_task.rb')
   GEM_GET_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_get_task.rb')
-  GEM_ENV = { 'GEM_HOME' => GEM_HOME, 'GEM_PATH' => GEM_HOME }.freeze
+  GEM_ENV = {
+    'GEM_HOME' => GEM_HOME,
+    'GEM_PATH' => GEM_HOME,
+    # Prevent Git from prompting for authentication in tests
+    'GIT_CONFIG_NOSYSTEM' => '1',
+    'GIT_TERMINAL_PROMPT' => '0',
+    'GIT_ASKPASS' => 'echo',
+    'SSH_ASKPASS' => 'echo'
+  }.freeze
 
   AGENT_TASK_BINARIES = [AGENT_TASK, AGENT_TASK_GEM, GEM_AGENT_TASK_SCRIPT].freeze
   GET_TASK_BINARIES = [GET_TASK, GET_TASK_GEM, GEM_GET_TASK_SCRIPT].freeze
@@ -34,7 +42,13 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
 
   def git(repo, *args)
     cmd = ['git', *args]
-    system({ 'GIT_CONFIG_NOSYSTEM' => '1' }, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
+    env = {
+      'GIT_CONFIG_NOSYSTEM' => '1',
+      'GIT_TERMINAL_PROMPT' => '0',
+      'GIT_ASKPASS' => 'echo',
+      'SSH_ASKPASS' => 'echo'
+    }
+    system(env, *cmd, chdir: repo, out: File::NULL, err: File::NULL)
   end
 
   def hg(repo, *args)
@@ -152,10 +166,10 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   end
   # rubocop:enable Metrics/ParameterLists
 
-  def run_get_task(repo, tool: GET_TASK)
+  def run_get_task(working_dir, tool: GET_TASK)
     output = nil
     status = nil
-    Dir.chdir(repo) do
+    Dir.chdir(working_dir) do
       cmd = windows? ? ['ruby', tool] : [tool]
       output = IO.popen(GEM_ENV, cmd, &:read)
       status = $CHILD_STATUS

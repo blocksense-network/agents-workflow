@@ -3,15 +3,20 @@
 require 'English'
 require 'open3'
 
+# Custom exception classes for VCS operations
+class VCSError < StandardError; end
+class RepositoryNotFoundError < VCSError; end
+class VCSTypeNotFoundError < VCSError; end
+
 class VCSRepo
   attr_reader :root, :vcs_type
 
   def initialize(path_in_repo = Dir.pwd)
     @root = find_repo_root(path_in_repo)
-    raise "Error: Could not find repository root from #{path_in_repo}" unless @root
+    raise RepositoryNotFoundError, "Could not find repository root from #{path_in_repo}" unless @root
 
     @vcs_type = determine_vcs_type(@root)
-    raise "Error: Could not determine VCS type for repository at #{@root}" unless @vcs_type
+    raise VCSTypeNotFoundError, "Could not determine VCS type for repository at #{@root}" unless @vcs_type
   end
 
   def current_branch

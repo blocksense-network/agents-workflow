@@ -18,7 +18,7 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo = VCSRepo.new(repo)
     git(repo, 'remote', 'set-url', 'origin', 'https://github.com/testuser/test-repo.git')
 
-    status, = run_agent_task(repo, branch: 'feature-branch', lines: ['test task'], push_to_remote: true)
+    status, = run_agent_task(repo, branch: 'feature-branch', lines: ['test task'], push_to_remote: false)
     assert_equal 0, status.exitstatus
 
     # Verify commit message format
@@ -49,7 +49,7 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo = VCSRepo.new(repo)
     git(repo, 'remote', 'set-url', 'origin', 'git@github.com:testuser/test-repo.git')
 
-    status, = run_agent_task(repo, branch: 'ssh-test', lines: ['ssh test task'], push_to_remote: true)
+    status, = run_agent_task(repo, branch: 'ssh-test', lines: ['ssh test task'], push_to_remote: false)
     assert_equal 0, status.exitstatus
 
     # Verify SSH URL is converted to HTTPS in commit message
@@ -73,7 +73,7 @@ class TestCommitMessageFormat < Minitest::Test
     git(repo, 'remote', 'set-url', 'origin', 'https://github.com/testuser/test-repo.git')
 
     # Create task
-    status, = run_agent_task(repo, branch: 'extract-test', lines: ['extraction test task'], push_to_remote: true)
+    status, = run_agent_task(repo, branch: 'extract-test', lines: ['extraction test task'], push_to_remote: false)
     assert_equal 0, status.exitstatus
 
     # Switch to the task branch and test extraction
@@ -112,7 +112,7 @@ class TestCommitMessageFormat < Minitest::Test
     git(repo, 'remote', 'set-url', 'origin', 'https://github.com/testuser/test-repo.git')
 
     # Create task
-    status, = run_agent_task(repo, branch: 'token-test', lines: ['token test task'], push_to_remote: true)
+    status, = run_agent_task(repo, branch: 'token-test', lines: ['token test task'], push_to_remote: false)
     assert_equal 0, status.exitstatus
 
     # Switch to the task branch

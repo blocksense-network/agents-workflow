@@ -1,0 +1,13 @@
+If `get-task` is launched in a directory that is not nested within a VCS repo (e.g. git), look for a VCS directory that is directly nested within the current working directory and if you find one, assume that this is a directory where get-task should operate upon (in other words, pretend that get-task was executed within the discovered VCS repo).
+
+If there are multiple candidate directories, try getting a task message in each of them. If you get more than one valid task message, present a combined task description like this:
+
+In directory `x`:
+<task description from directory x>
+
+In directory `y`:
+<task description from directory y>
+
+If there is only a single valid task description obtained, just display it without the hint for the directory.
+
+Add test cases to verify that the described behaviors works.
