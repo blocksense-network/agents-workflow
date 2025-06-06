@@ -7,6 +7,16 @@ module AgentTask
   module CLI # rubocop:disable Metrics/ModuleLength
     module_function
 
+    def devshell_names(root)
+      file = File.join(root, 'flake.nix')
+      return [] unless File.exist?(file)
+
+      File.readlines(file).map do |line|
+        match = line.match(/^\s*([A-Za-z0-9._-]+)\s*=\s*pkgs\.mkShell/)
+        match[1] if match
+      end.compact.uniq
+    end
+
     def discover_repos
       repos = []
       begin
@@ -60,6 +70,9 @@ module AgentTask
         opts.on('--prompt-file=FILE', 'Read the task prompt from FILE') do |val|
           options[:prompt_file] = val
         end
+        opts.on('-sNAME', '--devshell=NAME', 'Record the dev shell name in the commit') do |val|
+          options[:devshell] = val
+        end
       end.parse!(args)
 
       branch_name = args.shift
@@ -92,10 +105,19 @@ module AgentTask
           stdout.puts e.message
           exit 1
         end
+        if options[:devshell]
+          flake_path = File.join(repo.root, 'flake.nix')
+          abort('Error: Repository does not contain a flake.nix file') unless File.exist?(flake_path)
+          shells = devshell_names(repo.root)
+          unless shells.include?(options[:devshell])
+            abort("Error: Dev shell '#{options[:devshell]}' not found in flake.nix")
+          end
+        end
       else
         branch_name = orig_branch
         main_names = [repo.default_branch, 'main', 'master', 'trunk', 'default']
         abort('Error: Refusing to run on the main branch') if main_names.include?(branch_name)
+        abort('Error: --devshell is only supported when creating a new branch') if options[:devshell]
       end
 
       cleanup_branch = start_new_branch
@@ -145,6 +167,7 @@ module AgentTask
           commit_msg = "Start-Agent-Branch: #{branch_name}"
           target_remote = repo.default_remote_http_url
           commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
+          commit_msg += "\nDev-Shell: #{options[:devshell]}" if options[:devshell]
 
           File.binwrite(task_file, task_content)
           repo.commit_file(task_file, commit_msg)

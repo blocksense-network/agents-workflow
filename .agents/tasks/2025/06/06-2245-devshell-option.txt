@@ -1,0 +1,5 @@
+agent-task should gain an optional parameter `--devshell` (`-s` for short).
+When specified, the commit message should include an additional tag `Dev-Shell: <param-value>`.
+This parameter should be allowed only when the current repository hosts a Nix flake and the flake has a dev shell with the given name.
+
+Can agent-task support shell autocompletion of its parameters somehow?
