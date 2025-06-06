@@ -6,6 +6,8 @@ require 'net/http'
 require 'uri'
 
 class AgentTasks
+  attr_reader :repo
+
   def initialize(path_in_repo = Dir.pwd)
     @repo = VCSRepo.new(path_in_repo) # This can raise if repo is not found
   end
@@ -41,6 +43,52 @@ class AgentTasks
     end
   rescue StandardError
     false
+  end
+
+  def git_details
+    # Extract target remote and branch from the task commit message
+    first_commit_hash = @repo.latest_agent_branch_commit
+    raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
+
+    commit_msg = @repo.commit_message(first_commit_hash)
+    raise StandardError, 'Error: Could not retrieve commit message from first commit' unless commit_msg
+
+    remote_match = commit_msg.match(/^Target-Remote:\s*(.+?)$/m)
+    raise StandardError, 'Error: Target-Remote not found in commit message' unless remote_match
+
+    target_remote = remote_match[1].strip
+    raise StandardError, 'Error: Target-Remote is empty in commit message' if target_remote.empty?
+
+    branch_match = commit_msg.match(/^Start-Agent-Branch:\s*(.+?)$/m)
+    raise StandardError, 'Error: Start-Agent-Branch not found in commit message' unless branch_match
+
+    target_branch = branch_match[1].strip
+    raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
+
+    if target_remote.start_with?('https://github.com/')
+      github_token = ENV.fetch('GITHUB_ACCESS_TOKEN', nil)
+      unless github_token
+        raise StandardError,
+              'Error: The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, specified as a secret'
+      end
+
+      remote_url = target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
+    else
+      remote_url = target_remote
+    end
+
+    { remote_url: remote_url, push_branch: target_branch }
+  end
+
+  def prepare_work_environment
+    details = git_details
+    Dir.chdir(@repo.root) do
+      author_name = `git log -1 --pretty=format:%an`.strip
+      author_email = `git log -1 --pretty=format:%ae`.strip
+      system('git', 'config', '--local', 'user.name', author_name)
+      system('git', 'config', '--local', 'user.email', author_email)
+      system('git', 'remote', 'add', 'target_remote', details[:remote_url])
+    end
   end
 
   def agent_prompt(autopush: false)
@@ -130,33 +178,13 @@ class AgentTasks
       target_branch = branch_match[1].strip
       raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-      # Only check for GITHUB_ACCESS_TOKEN if using GitHub URLs
-      if target_remote.start_with?('https://github.com/')
-        github_token = ENV.fetch('GITHUB_ACCESS_TOKEN', nil)
-        unless github_token
-          raise StandardError,
-                'Error: The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, ' \
-                'specified as a secret'
-        end
-
-        # Add GitHub token authentication to the remote URL
-        remote_url = target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
-      else
-        # For non-GitHub remotes (filesystem, SSH, etc.), use the URL as-is
-        remote_url = target_remote
-      end
-      # TODO: Implement support for GitLab and BitBucket
-
-      push_branch = target_branch
+      details = git_details
+      push_branch = details[:push_branch]
       message += <<~GIT_MESSAGE
 
         # Appendix (Using Git)
 
-        Before starting work, execute the following command:
-
-        git config --local user.name "$(git log -1 --pretty=format:%an)" && \\
-        git config --local user.email "$(git log -1 --pretty=format:%ae)"
-        git remote add target_remote "#{remote_url}"
+        Before starting work, execute the `start-work` command.
 
         Once you complete your task, examine all the changes that you've made
         and squash your work in a single commit.
