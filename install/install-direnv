@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Install direnv - directory-based environment management
+# See: https://direnv.net/
+
+set -euo pipefail
+
+# Check if we're in test mode
+if [ "${TEST_MODE:-}" = "1" ]; then
+    echo "TEST: Installing direnv..."
+
+    # Test mode mock check if direnv is already available
+    if [ "${MOCK_DIRENV_INSTALLED:-}" = "1" ]; then
+        echo "TEST: direnv is already installed: direnv 2.32.3"
+        exit 0
+    fi
+
+    # Test mode mock OS detection
+    OS="$(uname -s)"
+    ARCH="$(uname -m)"
+
+    case "$OS" in
+        Linux*)
+            if [ "${MOCK_NIX_AVAILABLE:-}" = "1" ]; then
+                echo "TEST: Installing direnv via Nix..."
+                echo "TEST: nix profile install nixpkgs#direnv"
+                sleep 0.1
+                echo "TEST: direnv installed successfully via Nix"
+            else
+                echo "TEST: Installing direnv binary for Linux..."
+                echo "TEST: Downloading direnv v2.32.3 for linux-${ARCH}"
+                sleep 0.1
+                echo "TEST: Installing to /usr/local/bin/direnv"
+                echo "TEST: Setting executable permissions"
+            fi
+            ;;
+        Darwin*)
+            if [ "${MOCK_NIX_AVAILABLE:-}" = "1" ]; then
+                echo "TEST: Installing direnv via Nix..."
+                echo "TEST: nix profile install nixpkgs#direnv"
+                sleep 0.1
+                echo "TEST: direnv installed successfully via Nix"
+            else
+                echo "TEST: Installing direnv binary for macOS..."
+                echo "TEST: Downloading direnv v2.32.3 for darwin-${ARCH}"
+                sleep 0.1
+                echo "TEST: Installing to /usr/local/bin/direnv"
+                echo "TEST: Setting executable permissions"
+            fi
+            ;;
+    esac
+
+    echo "TEST: direnv successfully installed: direnv 2.32.3"
+    echo ""
+    echo "TEST: To enable direnv in your shell, add this to your shell's configuration file:"
+    echo ""
+    case "$SHELL" in
+        */bash) echo 'eval "$(direnv hook bash)"' ;;
+        */zsh) echo 'eval "$(direnv hook zsh)"' ;;
+        */fish) echo 'direnv hook fish | source' ;;
+        *) echo "See https://direnv.net/docs/hook.html for shell-specific instructions" ;;
+    esac
+    echo ""
+    exit 0
+fi
+
+echo "Installing direnv..."
+
+# Check if direnv is already available
+if command -v direnv >/dev/null 2>&1; then
+    echo "direnv is already installed: $(direnv version)"
+    exit 0
+fi
+
+# Detect the operating system
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+case "$OS" in
+    Linux*)
+        # Use Nix if available, otherwise install binary directly
+        if command -v nix >/dev/null 2>&1; then
+            echo "Installing direnv via Nix..."
+            nix profile install nixpkgs#direnv
+        else
+            echo "Installing direnv binary for Linux..."
+            # Install latest version from GitHub releases
+            DIRENV_VERSION=$(curl -s https://api.github.com/repos/direnv/direnv/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+            curl -sfL "https://github.com/direnv/direnv/releases/download/${DIRENV_VERSION}/direnv.linux-${ARCH}" -o /usr/local/bin/direnv
+            chmod +x /usr/local/bin/direnv
+        fi
+        ;;
+    Darwin*)
+        # Use Nix if available, otherwise use Homebrew
+        if command -v nix >/dev/null 2>&1; then
+            echo "Installing direnv via Nix..."
+            nix profile install nixpkgs#direnv
+        elif command -v brew >/dev/null 2>&1; then
+            echo "Installing direnv via Homebrew..."
+            brew install direnv
+        else
+            echo "Installing direnv binary for macOS..."
+            DIRENV_VERSION=$(curl -s https://api.github.com/repos/direnv/direnv/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+            curl -sfL "https://github.com/direnv/direnv/releases/download/${DIRENV_VERSION}/direnv.darwin-${ARCH}" -o /usr/local/bin/direnv
+            chmod +x /usr/local/bin/direnv
+        fi
+        ;;
+    *)
+        echo "Unsupported operating system: $OS"
+        exit 1
+        ;;
+esac
+
+# Verify installation
+if command -v direnv >/dev/null 2>&1; then
+    echo "direnv successfully installed: $(direnv version)"
+
+    # Add shell hook instructions
+    echo ""
+    echo "To enable direnv in your shell, add this to your shell's configuration file:"
+    echo ""
+    case "$SHELL" in
+        */bash)
+            echo 'eval "$(direnv hook bash)"'
+            ;;
+        */zsh)
+            echo 'eval "$(direnv hook zsh)"'
+            ;;
+        */fish)
+            echo 'direnv hook fish | source'
+            ;;
+        *)
+            echo "See https://direnv.net/docs/hook.html for shell-specific instructions"
+            ;;
+    esac
+    echo ""
+else
+    echo "ERROR: direnv installation failed"
+    exit 1
+fi

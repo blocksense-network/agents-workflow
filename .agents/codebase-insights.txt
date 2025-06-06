@@ -49,24 +49,70 @@ Security considerations:
 
 When agent-task is executed, the commit message now includes:
 - Start-Agent-Branch: {task branch} (renamed from start-agent-task for consistency)
-- Target-Remote: {HTTP URL of default remote}
 
-The format ensures no empty line between Start-Agent-Branch and Target-Remote lines.
-SSH URLs are automatically converted to HTTPS format in the Target-Remote line.
+# EXTRAS Framework for Component Installation (Ruby Implementation)
 
-When get-task is executed with --autopush, the system:
-1. Extracts the target remote URL from "Target-Remote:" line using regex: `^Target-Remote:\s*(.+?)$/m`
-2. Extracts the branch name from "Start-Agent-Branch:" line using regex: `^Start-Agent-Branch:\s*(.+?)$/m`
-3. Uses extracted values to generate GIT_MESSAGE with proper remote/branch info
-4. Falls back to placeholder values if extraction fails
+## Overview
+The EXTRAS framework provides a flexible way to install additional components during setup.
+It replaces the legacy NIX=1 environment variable with a more extensible Ruby-based system.
+The framework was rewritten from bash to Ruby to match existing codebase patterns.
 
-VCSRepo class supports:
-- default_remote_http_url(): Gets HTTP URL of default remote with SSH-to-HTTPS conversion
-- commit_message(commit_hash): Retrieves commit message for specific commit
-- latest_agent_branch_commit(): Finds the last commit containing the
-  'Start-Agent-Branch:' marker in the current branch
-- SSH URL conversion handles multiple formats:
-  - git@host:path -> https://host/path
-  - ssh://git@host/path -> https://host/path
-  - ssh://git@host:port/path -> https://host/path (port removed)
+## Architecture
+The Ruby implementation is designed with clean separation of concerns:
+- ExtrasInstaller: Focused on component parsing, validation, and installation
+- Rake integration: Leverages Rake's built-in dependency system for proper dependency resolution
+- CLI interface: Provides command-line access following existing codebase patterns
+
+## Dependency Management
+IMPORTANT: Dependency resolution is handled by Rake's native task dependency system in Rakefile.extras.
+Individual Rake tasks (nix, direnv, cachix) declare their dependencies using Rake's task: syntax.
+This eliminates the need for custom dependency resolution logic in the Ruby code.
+
+## Usage
+Set the EXTRAS environment variable with component names separated by various delimiters:
+- EXTRAS="nix,direnv,cachix"    # Comma separated
+- EXTRAS="nix;direnv+cachix"    # Mixed separators (semicolon, plus)
+- EXTRAS="nix direnv cachix"    # Space separated
+- EXTRAS="nix|direnv"           # Pipe separated
+
+## Components
+- nix: Nix package manager (foundational component)
+- direnv: Directory-based environment management (requires nix)
+- cachix: Binary cache service for Nix (requires nix)
+
+## Ruby Implementation Details
+- ExtrasInstaller class handles parsing, validation, and individual component installation
+- ExtrasTask::CLI provides command-line interface following existing patterns
+- Rake tasks in Rakefile.extras handle dependency resolution automatically
+- Marker-based duplicate prevention using .install-markers/ directory
+- Test mode support with mock installations
+- Comprehensive error handling with custom exception classes
+- Legacy NIX=1 compatibility maintained
+
+## Files
+- bin/install-extras: Main Ruby implementation script
+- lib/extras_installer.rb: Core ExtrasInstaller class (refactored to eliminate redundant dependency logic)
+- lib/extras_task/cli.rb: CLI interface following AgentTask::CLI patterns
+- lib/extras_task.rb: Main module file
+- Rakefile.extras: Rake tasks with proper dependency declarations
+- test/test_extras_installer.rb: Comprehensive test suite with 25+ test cases
+- install/install-*: Individual component installation scripts (unchanged)
+- common-pre-setup: Updated to use Ruby framework
+
+## Testing
+- Run tests with `just test` or individual test files
+- All install scripts support TEST_MODE=1 for mock output
+- Use `./bin/install-extras --clean` to reset installation markers
+- Use `./bin/install-extras --help` for usage information
+
+## Key Refactoring Completion
+The bash-based extras framework has been completely removed and replaced with the Ruby implementation.
+All redundant dependency logic was eliminated by leveraging Rake's built-in dependency system.
+The ExtrasInstaller was refactored to remove COMPONENT_DEPENDENCIES and resolve_dependencies() method
+in favor of using Rake's native task dependency declarations in Rakefile.extras.
+All bash framework files have been removed from git and all references updated.
+The framework now exclusively uses `bin/install-extras` (Ruby implementation) with full backward compatibility.
+The ExtrasInstaller tests (25 tests, 40 assertions) pass completely, confirming the refactoring success.
+The Ruby framework maintains full backward compatibility while providing cleaner, more maintainable code.
+All references to the deprecated bash script have been removed from the codebase.
 

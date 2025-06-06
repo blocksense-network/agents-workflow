@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Install cachix - binary cache service for Nix
+# See: https://cachix.org/
+
+set -euo pipefail
+
+# Check if we're in test mode
+if [ "${TEST_MODE:-}" = "1" ]; then
+    echo "TEST: Installing cachix..."
+
+    # Test mode mock check if Nix is available (required dependency)
+    if [ "${MOCK_NIX_AVAILABLE:-}" != "1" ]; then
+        echo "TEST: ERROR: Nix is required for cachix installation"
+        echo "TEST: Please install Nix first"
+        exit 1
+    fi
+
+    # Test mode mock check if cachix is already available
+    if [ "${MOCK_CACHIX_INSTALLED:-}" = "1" ]; then
+        echo "TEST: cachix is already installed: cachix 1.6.1"
+        exit 0
+    fi
+
+    echo "TEST: Installing cachix via Nix..."
+    echo "TEST: nix profile install nixpkgs#cachix"
+    sleep 0.1
+
+    echo "TEST: cachix successfully installed: cachix 1.6.1"
+    echo ""
+    echo "TEST: Cachix is now available. Common usage:"
+    echo "  cachix use <cache-name>  # Use a binary cache"
+    echo "  cachix push <cache-name> # Push to a binary cache (requires auth)"
+    echo ""
+    echo "For more information, visit: https://docs.cachix.org/"
+    exit 0
+fi
+
+echo "Installing cachix..."
+
+# Check if Nix is available (required dependency)
+if ! command -v nix >/dev/null 2>&1; then
+    echo "ERROR: Nix is required for cachix installation"
+    echo "Please install Nix first"
+    exit 1
+fi
+
+# Check if cachix is already available
+if command -v cachix >/dev/null 2>&1; then
+    echo "cachix is already installed: $(cachix --version)"
+    exit 0
+fi
+
+echo "Installing cachix via Nix..."
+
+# Install cachix using Nix
+nix profile install nixpkgs#cachix
+
+# Verify installation
+if command -v cachix >/dev/null 2>&1; then
+    echo "cachix successfully installed: $(cachix --version)"
+
+    echo ""
+    echo "Cachix is now available. Common usage:"
+    echo "  cachix use <cache-name>  # Use a binary cache"
+    echo "  cachix push <cache-name> # Push to a binary cache (requires auth)"
+    echo ""
+    echo "For more information, visit: https://docs.cachix.org/"
+else
+    echo "ERROR: cachix installation failed"
+    exit 1
+fi

@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Install Nix package manager
+# See: https://nixos.org/download.html
+
+set -euo pipefail
+
+# Check if we're in test mode
+if [ "${TEST_MODE:-}" = "1" ]; then
+    echo "TEST: Installing Nix package manager..."
+    echo "TEST: Updating package lists..."
+    sleep 0.1
+    echo "TEST: Installing dependencies (curl, sudo, gnupg2, xz-utils)..."
+    sleep 0.1
+    echo "TEST: Downloading Nix installer from https://nixos.org/nix/install"
+    echo "TEST: Running installer with --daemon --yes flags..."
+    sleep 0.2
+    echo "TEST: Setting up Nix profile for login shells..."
+    echo "TEST: Creating /etc/profile.d/nix-path.sh"
+    sleep 0.1
+    echo "TEST: Creating Nix configuration directory /etc/nix"
+    echo "TEST: Writing nix.conf with experimental features enabled"
+    sleep 0.1
+    echo "TEST: Nix installation completed successfully!"
+    echo "TEST: Nix version: nix (Nix) 2.18.1"
+    echo "TEST: Available commands: nix, nix-build, nix-shell, nix-env"
+    exit 0
+fi
+
+echo "Installing Nix package manager..."
+
+# Check if Nix is already installed
+if command -v nix >/dev/null 2>&1; then
+    echo "Nix is already installed: $(nix --version)"
+    exit 0
+fi
+
+# Detect the operating system
+OS="$(uname -s)"
+
+case "$OS" in
+    Linux*)
+        echo "Installing Nix on Linux..."
+
+        # Update package lists and install dependencies
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends \
+                curl \
+                sudo \
+                gnupg2 \
+                xz-utils
+        elif command -v yum >/dev/null 2>&1; then
+            yum update -y
+            yum install -y curl sudo gnupg2 xz
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm curl sudo gnupg xz
+        else
+            echo "Warning: Unknown package manager, attempting to continue..."
+        fi
+        ;;
+    Darwin*)
+        echo "Installing Nix on macOS..."
+        # macOS typically has curl built-in, but we may need to install xz
+        if command -v brew >/dev/null 2>&1; then
+            brew install xz || true  # Don't fail if already installed
+        fi
+        ;;
+    *)
+        echo "ERROR: Unsupported operating system: $OS"
+        exit 1
+        ;;
+esac
+
+# Download and run the Nix installer
+echo "Downloading Nix installer..."
+curl -L https://nixos.org/nix/install | sh -s -- --daemon --yes
+
+# Set up Nix profile for login shells
+echo "Setting up Nix profile..."
+printf '%s\n' \
+  '# Nix profile (exported for login shells)' \
+  'if [ -d /nix/var/nix/profiles/default/bin ]; then' \
+  '  export PATH=/nix/var/nix/profiles/default/bin:$PATH' \
+  'fi' \
+  'if [ -d /root/.nix-profile/bin ]; then' \
+  '  export PATH=/root/.nix-profile/bin:$PATH' \
+  'fi' \
+  > /etc/profile.d/nix-path.sh \
+ && chmod +x /etc/profile.d/nix-path.sh
+
+# Create Nix configuration
+echo "Configuring Nix..."
+mkdir -p /etc/nix \
+ && cat <<EOF > /etc/nix/nix.conf
+experimental-features = flakes nix-command
+EOF
+
+echo "Nix installation completed successfully!"
+
+# Verify installation (source the profile first)
+if [ -f /etc/profile.d/nix-path.sh ]; then
+    source /etc/profile.d/nix-path.sh
+fi
+
+if command -v nix >/dev/null 2>&1; then
+    echo "Nix version: $(nix --version)"
+    echo "Available commands: nix, nix-build, nix-shell, nix-env"
+else
+    echo "Warning: Nix installation may require a shell restart to be available in PATH"
+fi

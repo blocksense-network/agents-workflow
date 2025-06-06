@@ -1,0 +1,102 @@
+# frozen_string_literal: true
+
+require_relative 'lib/extras_installer'
+
+# Helper method to check if we're in test mode
+def test_mode?
+  ENV['TEST_MODE'] == '1'
+end
+
+# Define available extras
+AVAILABLE_EXTRAS = %w[nix direnv cachix].freeze
+
+desc 'Install all requested extras from EXTRAS environment variable'
+task :install_extras do
+  extras_string = ENV['EXTRAS'] || (ENV['NIX'] == '1' ? 'nix' : '')
+
+  if extras_string.empty?
+    puts 'No extras specified in EXTRAS environment variable'
+    puts "Available extras: #{AVAILABLE_EXTRAS.join(', ')}"
+    puts "Example: EXTRAS='nix,direnv' rake install_extras"
+    next
+  end
+
+  # Parse and validate the requested components
+  installer = ExtrasInstaller.new(extras_string, test_mode: test_mode?)
+  requested_components = installer.install_all
+
+  if requested_components.empty?
+    puts 'No valid extras to install'
+    next
+  end
+
+  puts "Requested components: #{requested_components.join(' ')}"
+
+  # Use Rake's dependency system to install each component
+  # Dependencies are automatically handled by task dependencies
+  requested_components.each do |component|
+    task_name = component.to_sym
+    if Rake::Task.task_defined?(task_name)
+      puts "Invoking Rake task: #{component}"
+      Rake::Task[task_name].invoke
+    else
+      puts "Warning: No Rake task defined for component '#{component}'"
+      # Fallback to direct installation
+      installer.install_component(component)
+    end
+  end
+
+  puts ''
+  puts "Successfully processed all requested extras: #{requested_components.join(' ')}"
+end
+
+# Individual component tasks with proper dependencies
+desc 'Install Nix package manager'
+task :nix do
+  installer = ExtrasInstaller.new('nix', test_mode: test_mode?)
+  if installer.component_installed?('nix')
+    puts 'nix is already installed (marker found)'
+  else
+    installer.install_component('nix')
+  end
+end
+
+desc 'Install direnv (requires nix)'
+task direnv: :nix do
+  installer = ExtrasInstaller.new('direnv', test_mode: test_mode?)
+  if installer.component_installed?('direnv')
+    puts 'direnv is already installed (marker found)'
+  else
+    installer.install_component('direnv', nix_will_be_available: true)
+  end
+end
+
+desc 'Install cachix (requires nix)'
+task cachix: :nix do
+  installer = ExtrasInstaller.new('cachix', test_mode: test_mode?)
+  if installer.component_installed?('cachix')
+    puts 'cachix is already installed (marker found)'
+  else
+    installer.install_component('cachix', nix_will_be_available: true)
+  end
+end
+
+desc 'Clean installation markers'
+task :clean do
+  ExtrasInstaller.clean_markers
+end
+
+desc 'Show help information'
+task :help do
+  ExtrasInstaller.help
+  puts ''
+  puts 'Rake tasks:'
+  puts '  rake install_extras  # Install from EXTRAS environment variable'
+  puts '  rake nix             # Install only nix'
+  puts '  rake direnv          # Install direnv (and nix if needed)'
+  puts '  rake cachix          # Install cachix (and nix if needed)'
+  puts '  rake clean           # Clean installation markers'
+end
+
+# Make install_extras the default task
+task default: :install_extras
