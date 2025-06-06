@@ -20,14 +20,11 @@ When you a given a task description or developer instructions that
 just state "go", execute the shell command \`${GET_TASK_CMD}\` and
 follow the instructions provided in the output.
 
-Only when the task description or developer instructions are not
-"go", take a look at the WEBUI_TASK_INSTRUCTIONS.md file and honor
-all instructions provided there.
+When the task description or developer instructions are not "go",
+you should follow the given instructions while also adhering to the
+workflow described below.
 
-EOF
-
-cat > ../WEBUI_TASK_INSTRUCTIONS.md << EOF
-Before starting work, I'd like you to do the following:
+Before starting work, do the following:
 
 1) mkdir -p ".agents/tasks/\$(date -u +%Y)/\$(date -u +%m)"
 2) In this directory, create a file with a verbatim copy of the task
@@ -46,7 +43,10 @@ Before starting work on the follow-up task, take note of the current
 HEAD commit. I'd like this commit to be preserved. Don't squash it
 with other commits at the end of the task.
 
-In general, when you complete a task or a follow task, take a look
+I REPEAT: FOLLOW THE ABOVE WORKFLOW ONLY IF THE TASK DESCRIPTION OR
+DEVELOPER INSTRUCTIONS ARE NOT "go".
+
+In general, when you complete a task or a follow-up task, take a look
 at the changes introduced in this specific coding session and write
 a detailed summary of them in a single commit for each coding session.
 
