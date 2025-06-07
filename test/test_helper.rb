@@ -92,6 +92,8 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
         hg(repo, 'commit', '-m', 'initial', '-u', 'Tester <tester@example.com>')
         hgrc = File.join('.hg', 'hgrc')
         File.open(hgrc, 'a') do |f|
+          f.puts '[ui]'
+          f.puts 'username = Tester <tester@example.com>'
           f.puts '[paths]'
           f.puts "default = #{remote}"
         end
