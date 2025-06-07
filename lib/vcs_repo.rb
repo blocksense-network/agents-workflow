@@ -96,7 +96,7 @@ class VCSRepo
       when :git
         system("git push -u #{remote} #{branch_name}")
       when :hg
-        system("hg push --rev #{branch_name}")
+        system('hg', 'push', '--new-branch', '--rev', branch_name)
       when :bzr
         system('bzr push')
       when :fossil
@@ -472,7 +472,8 @@ class VCSRepo
         `git log --all -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
       when :hg
         revset = "reverse(grep('^Start-Agent-Branch:'))"
-        `hg log -r #{revset} --limit 1 --template '{node}\n'`.strip
+        out, = Open3.capture2('hg', 'log', '-r', revset, '--limit', '1', '--template', '{node}\n')
+        out.strip
       when :fossil
         branch = current_branch
         escaped = branch.gsub("'", "''")

@@ -1,0 +1,1 @@
+Uncomment all mercurial(hg) tests and make sure they pass.
