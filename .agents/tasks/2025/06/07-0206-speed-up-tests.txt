@@ -1,0 +1,2 @@
+the testing framework takes too much time to run right now.
+i think running the tests with all the binary types (ruby file, gem, gem library wrapper) is a bit redundant, as they are essentially testing the same code. there is value in smoke testing them because there might be issues around library paths and other packaging concerns, but i think if the gem and gem library wrapper work in some basic tests, then they are likely to work in all tests. let's make the test suite faster by executing the gem and the library wrapper in some minimal/reasonable set of tests.
