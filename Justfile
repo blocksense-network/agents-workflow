@@ -1,7 +1,7 @@
 # Run the test suite
 
 test:
-    ruby -Itest -e 'Dir["test/test_*.rb"].each { |f| require File.expand_path(f) }'
+    ruby -Itest test/run_tests_shell.rb
 
 # Lint the Ruby codebase
 lint:

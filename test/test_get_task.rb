@@ -49,6 +49,8 @@ module GetTaskCases
       status, = run_agent_task(repo, branch: 'feat', lines: ['outer task'], push_to_remote: true, tool: ab)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
+      # Switch to the agent task branch so discovery can find it
+      VCSRepo.new(repo).checkout_branch('feat')
       outer = Dir.mktmpdir('outer')
       FileUtils.mv(repo, File.join(outer, 'repo'))
       status2, output = run_get_task(outer, tool: gb)
@@ -69,10 +71,14 @@ module GetTaskCases
       status, = run_agent_task(repo_a, branch: 'feat', lines: ['task a'], push_to_remote: true, tool: ab)
       # first repo should be prepared successfully
       assert_equal 0, status.exitstatus
+      # Switch to the agent task branch so discovery can find it
+      VCSRepo.new(repo_a).checkout_branch('feat')
       repo_b, remote_b = setup_repo(self.class::VCS_TYPE)
       status, = run_agent_task(repo_b, branch: 'feat', lines: ['task b'], push_to_remote: true, tool: ab)
       # second repo should also be prepared successfully
       assert_equal 0, status.exitstatus
+      # Switch to the agent task branch so discovery can find it
+      VCSRepo.new(repo_b).checkout_branch('feat')
       outer = Dir.mktmpdir('outer')
       FileUtils.mv(repo_a, File.join(outer, 'a'))
       FileUtils.mv(repo_b, File.join(outer, 'b'))

@@ -6,8 +6,8 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Codex gets confused sometimes by the terminal output in its environment that
 # splits the lines in unexpected ways (Codex decides the file is truncated).
 
-# Conditionally set the autopush flag based on GITHUB_ACCESS_TOKEN availability
-if [ -n "${GITHUB_ACCESS_TOKEN}" ]; then
+# Conditionally set the autopush flag based on GITHUB_TOKEN availability
+if [ -n "${GITHUB_TOKEN}" ]; then
   GET_TASK_CMD="get-task --autopush"
 else
   GET_TASK_CMD="get-task"

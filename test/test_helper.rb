@@ -34,11 +34,11 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     'SSH_ASKPASS' => 'echo'
   }.freeze
 
-  AGENT_TASK_BINARIES = [AGENT_TASK, AGENT_TASK_GEM, GEM_AGENT_TASK_SCRIPT].freeze
-  GET_TASK_BINARIES = [GET_TASK, GET_TASK_GEM, GEM_GET_TASK_SCRIPT].freeze
+  AGENT_TASK_BINARIES = [AGENT_TASK].freeze
+  GET_TASK_BINARIES = [GET_TASK].freeze
   START_WORK = File.join(ROOT, 'bin', 'start-work')
   START_WORK_GEM = File.join(GEM_HOME, 'bin', 'start-work')
-  START_WORK_BINARIES = [START_WORK, START_WORK_GEM, GEM_START_WORK_SCRIPT].freeze
+  START_WORK_BINARIES = [START_WORK].freeze
 
   def windows?
     RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/

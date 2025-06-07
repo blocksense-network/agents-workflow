@@ -66,10 +66,10 @@ class AgentTasks
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
     if target_remote.start_with?('https://github.com/')
-      github_token = ENV.fetch('GITHUB_ACCESS_TOKEN', nil)
+      github_token = ENV.fetch('GITHUB_TOKEN', nil)
       unless github_token
         raise StandardError,
-              'Error: The Codex environment must be configured with a GITHUB_ACCESS_TOKEN, specified as a secret'
+              'Error: The Codex environment must be configured with a GITHUB_TOKEN, specified as a secret'
       end
 
       remote_url = target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
@@ -180,6 +180,7 @@ class AgentTasks
 
       details = git_details
       push_branch = details[:push_branch]
+      remote_url = details[:remote_url]
       message += <<~GIT_MESSAGE
 
         # Appendix (Using Git)
@@ -193,6 +194,7 @@ class AgentTasks
 
         Finally, push your commit with the following command:
 
+        git remote add target_remote "#{remote_url}"
         git push target_remote HEAD:#{push_branch}
       GIT_MESSAGE
     end

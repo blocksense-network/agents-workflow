@@ -1,118 +1,19 @@
-The VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands.
-When writing task files, use binary mode to avoid CRLF conversion on Windows.
+# Critical Architecture Notes
 
-# DevContainer Caching Strategy
+## VCS Abstraction
+- VCSRepo helper abstracts Git, Mercurial, Bazaar and Fossil commands
+- When writing task files, use binary mode to avoid CRLF conversion on Windows
 
-## Cache Synchronization Commands
-- `sync-cargo-caches`: Developer command to sync container caches with host system
-- Automatically runs on container start via postStartCommand
-- Can be run manually anytime to pick up new host packages
+## Test Architecture Requirements
+- Parent directory tests require repos to be on agent task branches (not main)
+- AgentTasks.new() constructor only recognizes repos on agent task branches
+- Tests must call `VCSRepo.new(repo).checkout_branch('feat')` after `run_agent_task()` calls
 
-## Persistent Storage Volumes
-- `agents-workflow-nix-store`: Persists Nix packages across container rebuilds
-- `agents-workflow-cargo-cache`: Caches Rust/Cargo dependencies and build artifacts
+## Token Usage
+- Uses GITHUB_TOKEN (not GITHUB_ACCESS_TOKEN) consistently across the codebase
 
-Benefits:
-- Faster package installation (no re-downloading)
-- Reduced bandwidth usage
-- Incremental sync - only new packages are copied
-- Manual control over when sync happens
-
-## Cache Sync Behavior
-- Nix substituters: Configured once at build time
-- Cargo cache: Synced at container start and on-demand
-- Efficient copying with COW/hard links when possible
-- Graceful fallback when host caches unavailable
-
-## API Key Management
-Environment variables are propagated from host to container:
-- OPENAI_API_KEY: Required for OpenAI Codex integration
-- GITHUB_TOKEN: For GitHub API access and Copilot authentication
-- Custom API keys can be added to containerEnv in devcontainer.json
-
-Security considerations:
-- Keys are not stored in container images
-- Environment-based propagation is secure and flexible
-- Keys are only available during container runtime
-
-## Nix Flakes Configuration
-- No channels configuration needed (removed .devcontainer/nix file)
-- Flakes provide deterministic package management
-- Experimental features enabled for full flake support
-
-## Performance Optimizations
-- Nix configured for multi-core builds (cores = 0, max-jobs = auto)
-- Cargo cache persisted to avoid re-downloading crates
-- Build tools pre-installed for native dependency compilation
-
-# Agent Task Target Remote Recording
-
-When agent-task is executed, the commit message now includes:
-- Start-Agent-Branch: {task branch} (renamed from start-agent-task for consistency)
-
-# EXTRAS Framework for Component Installation (Ruby Implementation)
-
-## Overview
-The EXTRAS framework provides a flexible way to install additional components during setup.
-It replaces the legacy NIX=1 environment variable with a more extensible Ruby-based system.
-The framework was rewritten from bash to Ruby to match existing codebase patterns.
-
-## Architecture
-The Ruby implementation is designed with clean separation of concerns:
-- ExtrasInstaller: Focused on component parsing, validation, and installation
-- Rake integration: Leverages Rake's built-in dependency system for proper dependency resolution
-- CLI interface: Provides command-line access following existing codebase patterns
-
-## Dependency Management
-IMPORTANT: Dependency resolution is handled by Rake's native task dependency system in Rakefile.extras.
-Individual Rake tasks (nix, direnv, cachix) declare their dependencies using Rake's task: syntax.
-This eliminates the need for custom dependency resolution logic in the Ruby code.
-
-## Usage
-Set the EXTRAS environment variable with component names separated by various delimiters:
-- EXTRAS="nix,direnv,cachix"    # Comma separated
-- EXTRAS="nix;direnv+cachix"    # Mixed separators (semicolon, plus)
-- EXTRAS="nix direnv cachix"    # Space separated
-- EXTRAS="nix|direnv"           # Pipe separated
-
-## Components
-- nix: Nix package manager (foundational component)
-- direnv: Directory-based environment management (requires nix)
-- cachix: Binary cache service for Nix (requires nix)
-
-## Ruby Implementation Details
-- ExtrasInstaller class handles parsing, validation, and individual component installation
-- ExtrasTask::CLI provides command-line interface following existing patterns
-- Rake tasks in Rakefile.extras handle dependency resolution automatically
-- Marker-based duplicate prevention using .install-markers/ directory
-- Test mode support with mock installations
-- Comprehensive error handling with custom exception classes
-- Legacy NIX=1 compatibility maintained
-
-## Files
-- bin/install-extras: Main Ruby implementation script
-- lib/extras_installer.rb: Core ExtrasInstaller class (refactored to eliminate redundant dependency logic)
-- lib/extras_task/cli.rb: CLI interface following AgentTask::CLI patterns
-- lib/extras_task.rb: Main module file
-- Rakefile.extras: Rake tasks with proper dependency declarations
-- test/test_extras_installer.rb: Comprehensive test suite with 25+ test cases
-- install/install-*: Individual component installation scripts (unchanged)
-- common-pre-setup: Updated to use Ruby framework
-
-## Testing
-- Run tests with `just test` or individual test files
-- All install scripts support TEST_MODE=1 for mock output
-- Use `./bin/install-extras --clean` to reset installation markers
-- Use `./bin/install-extras --help` for usage information
-
-## Key Refactoring Completion
-The bash-based extras framework has been completely removed and replaced with the Ruby implementation.
-All redundant dependency logic was eliminated by leveraging Rake's built-in dependency system.
-The ExtrasInstaller was refactored to remove COMPONENT_DEPENDENCIES and resolve_dependencies() method
-in favor of using Rake's native task dependency declarations in Rakefile.extras.
-All bash framework files have been removed from git and all references updated.
-The framework now exclusively uses `bin/install-extras` (Ruby implementation) with full backward compatibility.
-The ExtrasInstaller tests (25 tests, 40 assertions) pass completely, confirming the refactoring success.
-The Ruby framework maintains full backward compatibility while providing cleaner, more maintainable code.
-All references to the deprecated bash script have been removed from the codebase.
+## EXTRAS Framework
+- Ruby-based component installation system via `bin/install-extras`
+- Set EXTRAS="nix,direnv,cachix" with flexible delimiter parsing
+- Uses Rake tasks in Rakefile.extras for dependency resolution
 

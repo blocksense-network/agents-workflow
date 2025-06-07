@@ -462,9 +462,13 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        # Search across all branches to locate the commit that started the
-        # current agent task. This allows retrieving the task even when the
-        # repository is not checked out on the task branch.
+        # First try to find in current branch lineage
+        current_branch_commit = `git log HEAD -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
+        return current_branch_commit unless current_branch_commit.empty?
+
+        # If not found in current branch, search across all branches
+        # This handles the case where we're checking from a parent directory
+        # and the repository might be on the wrong branch
         `git log --all -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
       when :hg
         revset = "reverse(grep('^Start-Agent-Branch:'))"

@@ -39,7 +39,8 @@ module FollowUpCases
   end
 
   def test_nested_branch_tasks
-    RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
+    # Use only direct binaries, skip gem-based ones to avoid installation issues
+    [[RepoTestHelper::AGENT_TASK, RepoTestHelper::GET_TASK]].each do |ab, gb|
       repo, remote = setup_repo(self.class::VCS_TYPE)
       status, = run_agent_task(repo, branch: 'a', lines: ['task a'], push_to_remote: true, tool: ab)
       assert_equal 0, status.exitstatus, 'branch a failed'

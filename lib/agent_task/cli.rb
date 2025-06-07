@@ -16,12 +16,21 @@ module AgentTask
       begin
         # Get the current system first
         system_result = `nix eval --impure --raw --expr 'builtins.currentSystem' 2>/dev/null`.strip
-        if $?.success?
+        require 'English'
+        if $CHILD_STATUS.success?
           current_system = system_result
-          
+
           # Evaluate the devShells attribute for the current system
-          result = `nix eval --json --no-warn-dirty '#{file}#devShells.#{current_system}' --apply 'builtins.attrNames' 2>/dev/null`
-          if $?.success?
+          eval_cmd = [
+            'nix', 'eval', '--json', '--no-warn-dirty',
+            "#{file}#devShells.#{current_system}",
+            '--apply', 'builtins.attrNames'
+          ]
+
+          output_io = IO.popen(eval_cmd, 'r', err: File::NULL)
+          result = output_io.read
+          status = output_io.close
+          if status
             require 'json'
             return JSON.parse(result)
           end
@@ -29,30 +38,38 @@ module AgentTask
       rescue StandardError
         # Continue to fallback
       end
-      
-      # Fallback: try a simpler approach to get devShells structure
+
+      # Fallback: try to get all devShells regardless of system
       begin
-        result = `nix eval --json --no-warn-dirty '#{file}#devShells' 2>/dev/null`
-        if $?.success?
-          require 'json' 
-          devshells = JSON.parse(result)
-          # Extract shell names from the first system found
-          if devshells.is_a?(Hash) && !devshells.empty?
-            first_system = devshells.keys.first
-            system_shells = devshells[first_system]
-            return system_shells.keys if system_shells.is_a?(Hash)
-          end
+        nix_expr = 'devShells: let systems = builtins.attrNames devShells; ' \
+                   'in if systems == [] then [] ' \
+                   'else builtins.attrNames (devShells.${builtins.head systems})'
+        eval_cmd = [
+          'nix', 'eval', '--json', '--no-warn-dirty',
+          "#{file}#devShells",
+          '--apply', nix_expr
+        ]
+
+        output_io = IO.popen(eval_cmd, 'r', err: File::NULL)
+        result = output_io.read
+        status = output_io.close
+        if status
+          require 'json'
+          return JSON.parse(result)
         end
       rescue StandardError
         # Continue to final fallback
       end
-      
+
       # Final fallback to regex parsing for malformed flakes (e.g., in tests)
       content = File.read(file)
       content.scan(/devShells\.[^.]+\.([A-Za-z0-9._-]+)\s*=/).map { |match| match[0] }.uniq
     end
 
     def discover_repos
+      require_relative '../vcs_repo'
+      require_relative '../agent_tasks'
+
       repos = []
       begin
         repos << [nil, AgentTasks.new]
@@ -292,8 +309,10 @@ module AgentTask
         puts "Error: Could not find repository root from #{Dir.pwd}"
         exit 1
       elsif dir_messages.length == 1
+        # Single repo case: display without directory hints
         puts dir_messages[0][1]
       else
+        # Multiple repos case: display with directory hints
         output = dir_messages.map { |dir, msg| "In directory `#{dir}`:\n#{msg}" }.join("\n\n")
         puts output
       end
