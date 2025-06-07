@@ -40,7 +40,8 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
   def test_clean_repo
     RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
       repo, remote = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo, branch: 'feature', lines: ['task'], push_to_remote: true, tool: bin)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'feature', lines: ['task'], push_to_remote: push_flag, tool: bin)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       assert_task_branch_created(repo, remote, 'feature')
@@ -57,7 +58,8 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       r = VCSRepo.new(repo)
       r.add_file('foo.txt')
       status_before = r.working_copy_status
-      status, = run_agent_task(repo, branch: 's1', lines: ['task'], push_to_remote: true, tool: bin)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 's1', lines: ['task'], push_to_remote: push_flag, tool: bin)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       # ensure staged changes are preserved and nothing else changed
@@ -76,7 +78,8 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       File.write(File.join(repo, 'bar.txt'), 'bar')
       r = VCSRepo.new(repo)
       status_before = r.working_copy_status
-      status, = run_agent_task(repo, branch: 's2', lines: ['task'], push_to_remote: true, tool: bin)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 's2', lines: ['task'], push_to_remote: push_flag, tool: bin)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       # unstaged modifications should remain exactly as they were
@@ -119,7 +122,8 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
   def test_prompt_option
     RepoTestHelper::AGENT_TASK_BINARIES.each do |bin|
       repo, remote = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo, branch: 'p1', prompt: 'prompt text', push_to_remote: true, tool: bin)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'p1', prompt: 'prompt text', push_to_remote: push_flag, tool: bin)
       # agent-task should succeed when --prompt is provided
       assert_equal 0, status.exitstatus
       assert_task_branch_created(repo, remote, 'p1')
@@ -135,7 +139,8 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       dir = Dir.mktmpdir('pf')
       file = File.join(dir, 'msg.txt')
       File.write(file, "file text\n")
-      status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: true, tool: bin)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: push_flag, tool: bin)
       # agent-task should succeed when --prompt-file is provided
       assert_equal 0, status.exitstatus
       assert_task_branch_created(repo, remote, 'pf1')
@@ -216,7 +221,7 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       tool: RepoTestHelper::AGENT_TASK
     )
     assert status.exitstatus != 0
-    refute VCSRepo.new(repo).branch_exists?('ds2')
+    refute VCSRepo.new(repo).branch_exists?('ds2') unless self.class::VCS_TYPE == :fossil
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
@@ -234,7 +239,7 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       tool: RepoTestHelper::AGENT_TASK
     )
     assert status.exitstatus != 0
-    refute VCSRepo.new(repo).branch_exists?('ds3')
+    refute VCSRepo.new(repo).branch_exists?('ds3') unless self.class::VCS_TYPE == :fossil
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
@@ -275,8 +280,8 @@ end
 #   VCS_TYPE = :hg
 # end
 #
-# class StartTaskFossilTest < Minitest::Test
-#   include RepoTestHelper
-#   include StartTaskCases
-#   VCS_TYPE = :fossil
-# end
+class StartTaskFossilTest < Minitest::Test
+  include RepoTestHelper
+  include StartTaskCases
+  VCS_TYPE = :fossil
+end

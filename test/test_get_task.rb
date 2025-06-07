@@ -10,7 +10,8 @@ module GetTaskCases
   def test_get_task_after_start
     RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
       repo, remote = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo, branch: 'feat', lines: ['my task'], push_to_remote: true, tool: ab)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'feat', lines: ['my task'], push_to_remote: push_flag, tool: ab)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       VCSRepo.new(repo).checkout_branch('feat')
@@ -27,7 +28,8 @@ module GetTaskCases
   def test_get_task_on_work_branch
     RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
       repo, remote = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo, branch: 'feat', lines: ['follow task'], push_to_remote: true, tool: ab)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'feat', lines: ['follow task'], push_to_remote: push_flag, tool: ab)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       r = VCSRepo.new(repo)
@@ -46,7 +48,8 @@ module GetTaskCases
   def test_get_task_from_parent_directory
     RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
       repo, remote = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo, branch: 'feat', lines: ['outer task'], push_to_remote: true, tool: ab)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo, branch: 'feat', lines: ['outer task'], push_to_remote: push_flag, tool: ab)
       # agent-task should succeed
       assert_equal 0, status.exitstatus
       # Switch to the agent task branch so discovery can find it
@@ -68,13 +71,15 @@ module GetTaskCases
   def test_get_task_from_parent_directory_multiple_repos
     RepoTestHelper::AGENT_TASK_BINARIES.product(RepoTestHelper::GET_TASK_BINARIES).each do |ab, gb|
       repo_a, remote_a = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo_a, branch: 'feat', lines: ['task a'], push_to_remote: true, tool: ab)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo_a, branch: 'feat', lines: ['task a'], push_to_remote: push_flag, tool: ab)
       # first repo should be prepared successfully
       assert_equal 0, status.exitstatus
       # Switch to the agent task branch so discovery can find it
       VCSRepo.new(repo_a).checkout_branch('feat')
       repo_b, remote_b = setup_repo(self.class::VCS_TYPE)
-      status, = run_agent_task(repo_b, branch: 'feat', lines: ['task b'], push_to_remote: true, tool: ab)
+      push_flag = self.class::VCS_TYPE != :fossil
+      status, = run_agent_task(repo_b, branch: 'feat', lines: ['task b'], push_to_remote: push_flag, tool: ab)
       # second repo should also be prepared successfully
       assert_equal 0, status.exitstatus
       # Switch to the agent task branch so discovery can find it
@@ -110,8 +115,8 @@ end
 #   VCS_TYPE = :hg
 # end
 #
-# class GetTaskFossilTest < Minitest::Test
-#   include RepoTestHelper
-#   include GetTaskCases
-#   VCS_TYPE = :fossil
-# end
+class GetTaskFossilTest < Minitest::Test
+  include RepoTestHelper
+  include GetTaskCases
+  VCS_TYPE = :fossil
+end
