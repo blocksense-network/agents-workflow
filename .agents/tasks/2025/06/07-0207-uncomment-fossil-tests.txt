@@ -1,0 +1,1 @@
+Uncomment all fossil tests and make sure they pass.

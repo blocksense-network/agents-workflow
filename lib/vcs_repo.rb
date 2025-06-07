@@ -315,9 +315,11 @@ class VCSRepo
         if current_fossil_branch && !current_fossil_branch.empty? && current_fossil_branch.match?(/\A[a-zA-Z0-9._-]+\z/)
           escaped_branch = current_fossil_branch.gsub("'", "''")
           sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
-                "JOIN blob ON blob.rid=tagxref.rid WHERE tag.tagname='sym-#{escaped_branch}' " \
+                'JOIN event ON tagxref.rid=event.objid JOIN blob ON blob.rid=tagxref.rid ' \
+                "WHERE tag.tagname='sym-#{escaped_branch}' " \
+                "AND event.comment NOT LIKE 'Create new branch named%' " \
                 'ORDER BY tagxref.mtime ASC LIMIT 1'
-          commit_hash = `fossil sql "#{sql}"`.strip.gsub("'", '')
+          commit_hash = `fossil sql "#{sql}"`.strip.delete("'")
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to find first commit"
@@ -450,8 +452,14 @@ class VCSRepo
         message = `bzr log -r #{commit_hash} --show-ids 2>/dev/null | grep -A 1000 'message:' | tail -n +2`.strip
         $CHILD_STATUS.success? ? message : nil
       when :fossil
-        message = `fossil timeline -n 1 #{commit_hash} 2>/dev/null | grep -o 'comment:.*' | sed 's/comment://'`.strip
-        $CHILD_STATUS.success? ? message : nil
+        sql = <<~SQL
+          SELECT event.comment FROM event
+          JOIN blob ON event.objid = blob.rid
+          WHERE blob.uuid='#{commit_hash}' AND event.type='ci'
+          LIMIT 1
+        SQL
+        output = `fossil sql "#{sql.strip}" 2>/dev/null`
+        $CHILD_STATUS.success? ? output.strip.delete("'") : nil
       end
     end
   end
@@ -475,13 +483,12 @@ class VCSRepo
         out, = Open3.capture2('hg', 'log', '-r', revset, '--limit', '1', '--template', '{node}\n')
         out.strip
       when :fossil
-        branch = current_branch
-        escaped = branch.gsub("'", "''")
-        sql = 'SELECT blob.uuid FROM tag JOIN tagxref ON tag.tagid=tagxref.tagid ' \
-              'JOIN event ON tagxref.rid=event.objid JOIN blob ON event.objid=blob.rid ' \
-              "WHERE tag.tagname='sym-#{escaped}' AND event.type='ci' " \
-              "AND event.comment LIKE 'Start-Agent-Branch:%' ORDER BY tagxref.mtime DESC LIMIT 1"
-        `fossil sql \"#{sql}\"`.strip.delete("'")
+        sql = <<~SQL
+          SELECT blob.uuid FROM event JOIN blob ON event.objid=blob.rid
+          WHERE event.type='ci' AND event.comment LIKE 'Start-Agent-Branch:%'
+          ORDER BY event.mtime DESC LIMIT 1
+        SQL
+        `fossil sql "#{sql.strip}"`.strip.delete("'")
       else
         ''
       end
