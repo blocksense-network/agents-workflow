@@ -108,6 +108,23 @@ class VCSRepo
     end
   end
 
+  def force_push_current_branch(remote, branch)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        system('git', 'push', remote, "HEAD:#{branch}", '--force')
+      when :hg
+        system('hg', 'push', remote, '--force', '-b', branch)
+      when :bzr
+        system('bzr', 'push', remote, '--overwrite')
+      when :fossil
+        system('fossil', 'push', remote)
+      else
+        puts "Error: Unknown VCS type (#{@vcs_type}) to force push"
+      end
+    end
+  end
+
   def checkout_branch(branch_name)
     return unless branch_name && !branch_name.empty?
 
@@ -555,11 +572,13 @@ class VCSRepo
       when :bzr
         author_output = `bzr log -l 1 --show-ids | grep committer:`.strip
         unless author_output.empty?
-          current_email = `bzr whoami`.strip rescue ''
-          if current_email.empty?
-            if author_output =~ /committer:\s*(.+)/
-              system('bzr', 'whoami', $1.strip)
-            end
+          current_email = begin
+            `bzr whoami`.strip
+          rescue StandardError
+            ''
+          end
+          if current_email.empty? && (author_output =~ /committer:\s*(.+)/)
+            system('bzr', 'whoami', ::Regexp.last_match(1).strip)
           end
         end
         if target_remote_url
@@ -598,19 +617,23 @@ class VCSRepo
         end
       when :fossil
         author = `fossil sql 'SELECT user FROM event ORDER BY mtime DESC LIMIT 1'`.strip
-        unless author.empty? || author == 'root'
-          system('fossil', 'user', 'default', author.delete("'"))
-        end
+        system('fossil', 'user', 'default', author.delete("'")) unless author.empty? || author == 'root'
         if target_remote_url
-          current_remote = `fossil remote`.strip rescue ''
-          if current_remote.empty?
-            system('fossil', 'remote', 'add', 'target_remote', target_remote_url)
+          current_remote = begin
+            `fossil remote`.strip
+          rescue StandardError
+            ''
           end
+          system('fossil', 'remote', 'add', 'target_remote', target_remote_url) if current_remote.empty?
         end
         if autopush
           # Using autosync in fossil provides the desired behavior
           # (automatically push commits to the target remote)
-          system('fossil', 'set', 'autosync', 'on') rescue nil
+          begin
+            system('fossil', 'set', 'autosync', 'on')
+          rescue StandardError
+            nil
+          end
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to prepare work environment"

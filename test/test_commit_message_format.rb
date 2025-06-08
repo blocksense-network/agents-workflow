@@ -116,7 +116,7 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('token-test')
     agent_tasks = AgentTasks.new(repo)
 
-    message = agent_tasks.agent_prompt(autopush: true)
+    agent_tasks.agent_prompt(autopush: true)
 
     # Verify that work environment was automatically set up
     remotes = capture(repo, 'git', 'remote').strip.split("\n")
