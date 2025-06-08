@@ -84,7 +84,7 @@ class AgentTasks
     false
   end
 
-  def prepare_work_environment(autopush: false)
+  def setup_autopush
     # Extract target remote and branch from the task commit message
     first_commit_hash = @repo.latest_agent_branch_commit
     raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
@@ -104,11 +104,10 @@ class AgentTasks
     target_branch = branch_match[1].strip
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-    @repo.prepare_work_environment(target_remote, target_branch, autopush: autopush)
-    [target_remote, target_branch]
+    @repo.setup_autopush(target_remote, target_branch)
   end
 
-  def agent_prompt(autopush: false)
+  def agent_prompt
     task_file_contents = File.read(agent_task_file_in_current_branch)
     tasks = task_file_contents.split("\n--- FOLLOW UP TASK ---\n")
     if tasks.length == 1
@@ -173,11 +172,11 @@ class AgentTasks
       NIX_MESSAGE
     end
 
-    if autopush
-      # Automatically set up work environment
-      prepare_work_environment(autopush: autopush)
-    end
-
     message
+  end
+
+  def agent_prompt_with_autopush_setup(autopush: true)
+    setup_autopush if autopush
+    agent_prompt
   end
 end

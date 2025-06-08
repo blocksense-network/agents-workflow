@@ -264,7 +264,7 @@ module AgentTask
       end
 
       if repos.length == 1 && repos[0][0].nil?
-        puts repos[0][1].agent_prompt(autopush: options[:autopush])
+        puts repos[0][1].agent_prompt_with_autopush_setup(autopush: options[:autopush])
         return
       end
 
@@ -273,7 +273,7 @@ module AgentTask
         next if dir.nil?
 
         begin
-          msg = at.agent_prompt(autopush: options[:autopush])
+          msg = at.agent_prompt_with_autopush_setup(autopush: options[:autopush])
           dir_messages << [dir, msg] if msg && !msg.empty?
         rescue StandardError
           next
@@ -302,9 +302,6 @@ module AgentTask
 
       options = {}
       OptionParser.new do |opts|
-        opts.on('--autopush', 'Install a post-commit hook to push automatically') do
-          options[:autopush] = true
-        end
         opts.on('--task-description=DESC', 'Record the given task description') do |val|
           options[:task_description] = val
         end
@@ -320,7 +317,6 @@ module AgentTask
       end
 
       repos.to_h.each_value do |at|
-        initial_setup = !at.on_task_branch?
         if options[:task_description]
           if at.on_task_branch?
             at.append_task(options[:task_description])
@@ -332,8 +328,6 @@ module AgentTask
             at.record_initial_task(options[:task_description], options[:branch_name])
           end
         end
-        _, branch = at.prepare_work_environment(autopush: options[:autopush])
-        at.repo.force_push_current_branch('target_remote', branch) if options[:autopush] && initial_setup
       end
     rescue StandardError => e
       puts e.message

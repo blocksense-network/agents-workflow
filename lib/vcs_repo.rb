@@ -513,7 +513,7 @@ class VCSRepo
     end
   end
 
-  def prepare_work_environment(target_remote_url, target_branch = nil, autopush: false)
+  def setup_autopush(target_remote_url, target_branch)
     Dir.chdir(@root) do
       case @vcs_type
       when :git
@@ -521,14 +521,12 @@ class VCSRepo
         author_email = `git log -1 --pretty=format:%ae`.strip
         system('git', 'config', '--local', 'user.name', author_name) unless author_name.empty?
         system('git', 'config', '--local', 'user.email', author_email) unless author_email.empty?
-        if target_remote_url && !`git remote`.include?('target_remote')
+        if !`git remote`.include?('target_remote')
           system('git', 'remote', 'add', 'target_remote', target_remote_url)
         end
-        if autopush && target_branch
-          hook = File.join(@root, '.git', 'hooks', 'post-commit')
-          File.write(hook, "#!/bin/sh\ngit push target_remote HEAD:#{target_branch} --force\n")
-          File.chmod(0o755, hook)
-        end
+        hook = File.join(@root, '.git', 'hooks', 'post-commit')
+        File.write(hook, "#!/bin/sh\ngit push target_remote HEAD:#{target_branch} --force\n")
+        File.chmod(0o755, hook)
       when :hg
         author = `hg log -r . --template '{author}'`.strip
         unless author.empty?
@@ -543,31 +541,27 @@ class VCSRepo
             File.write(hgrc_path, hgrc_content)
           end
         end
-        if target_remote_url
-          hgrc_path = File.join(@root, '.hg', 'hgrc')
-          hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
-          unless hgrc_content.match(/^target_remote\s*=/m)
-            if hgrc_content.include?('[paths]')
-              hgrc_content.gsub!(/(\[paths\].*?)$/m, "\\1\ntarget_remote = #{target_remote_url}")
-            else
-              hgrc_content += "\n[paths]\ntarget_remote = #{target_remote_url}\n"
-            end
-            File.write(hgrc_path, hgrc_content)
-          end
-        end
-        if autopush && target_branch
-          hgrc_path = File.join(@root, '.hg', 'hgrc')
-          hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
-          hook_command = "hg push target_remote -b #{target_branch} 2>/dev/null || true"
-          if hgrc_content.include?('[hooks]')
-            unless hgrc_content.match(/^commit\s*=/m)
-              hgrc_content.gsub!(/(\[hooks\].*?)$/m, "\\1\ncommit = #{hook_command}")
-              File.write(hgrc_path, hgrc_content)
-            end
+        hgrc_path = File.join(@root, '.hg', 'hgrc')
+        hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
+        unless hgrc_content.match(/^target_remote\s*=/m)
+          if hgrc_content.include?('[paths]')
+            hgrc_content.gsub!(/(\[paths\].*?)$/m, "\\1\ntarget_remote = #{target_remote_url}")
           else
-            hgrc_content += "\n[hooks]\ncommit = #{hook_command}\n"
+            hgrc_content += "\n[paths]\ntarget_remote = #{target_remote_url}\n"
+          end
+          File.write(hgrc_path, hgrc_content)
+        end
+        hgrc_path = File.join(@root, '.hg', 'hgrc')
+        hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
+        hook_command = "hg push target_remote -b #{target_branch} 2>/dev/null || true"
+        if hgrc_content.include?('[hooks]')
+          unless hgrc_content.match(/^commit\s*=/m)
+            hgrc_content.gsub!(/(\[hooks\].*?)$/m, "\\1\ncommit = #{hook_command}")
             File.write(hgrc_path, hgrc_content)
           end
+        else
+          hgrc_content += "\n[hooks]\ncommit = #{hook_command}\n"
+          File.write(hgrc_path, hgrc_content)
         end
       when :bzr
         author_output = `bzr log -l 1 --show-ids | grep committer:`.strip
@@ -581,59 +575,51 @@ class VCSRepo
             system('bzr', 'whoami', ::Regexp.last_match(1).strip)
           end
         end
-        if target_remote_url
-          branch_conf_path = File.join(@root, '.bzr', 'branch', 'branch.conf')
-          if File.exist?(branch_conf_path)
-            conf_content = File.read(branch_conf_path)
-            unless conf_content.include?('push_location')
-              conf_content += "push_location = #{target_remote_url}\n"
-              File.write(branch_conf_path, conf_content)
-            end
-          else
-            FileUtils.mkdir_p(File.dirname(branch_conf_path))
-            File.write(branch_conf_path, "push_location = #{target_remote_url}\n")
+        branch_conf_path = File.join(@root, '.bzr', 'branch', 'branch.conf')
+        if File.exist?(branch_conf_path)
+          conf_content = File.read(branch_conf_path)
+          unless conf_content.include?('push_location')
+            conf_content += "push_location = #{target_remote_url}\n"
+            File.write(branch_conf_path, conf_content)
           end
+        else
+          FileUtils.mkdir_p(File.dirname(branch_conf_path))
+          File.write(branch_conf_path, "push_location = #{target_remote_url}\n")
         end
-        if autopush && target_branch
-          hooks_dir = File.join(@root, '.bzr', 'hooks')
-          FileUtils.mkdir_p(hooks_dir)
-          hook_file = File.join(hooks_dir, 'post_commit.py')
-          hook_content = <<~PYTHON
-            #!/usr/bin/env python
-            import subprocess
-            import sys
+        hooks_dir = File.join(@root, '.bzr', 'hooks')
+        FileUtils.mkdir_p(hooks_dir)
+        hook_file = File.join(hooks_dir, 'post_commit.py')
+        hook_content = <<~PYTHON
+          #!/usr/bin/env python
+          import subprocess
+          import sys
 
-            def post_commit(local, master, old_revno, old_revid, new_revno, new_revid):
-                try:
-                    subprocess.call(['bzr', 'push', '--quiet'],
-                                  cwd='#{@root}',
-                                  stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.DEVNULL)
-                except:
-                    pass
-          PYTHON
-          File.write(hook_file, hook_content)
-          File.chmod(0o755, hook_file)
-        end
+          def post_commit(local, master, old_revno, old_revid, new_revno, new_revid):
+              try:
+                  subprocess.call(['bzr', 'push', '--quiet'],
+                                cwd='#{@root}',
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+              except:
+                  pass
+        PYTHON
+        File.write(hook_file, hook_content)
+        File.chmod(0o755, hook_file)
       when :fossil
         author = `fossil sql 'SELECT user FROM event ORDER BY mtime DESC LIMIT 1'`.strip
         system('fossil', 'user', 'default', author.delete("'")) unless author.empty? || author == 'root'
-        if target_remote_url
-          current_remote = begin
-            `fossil remote`.strip
-          rescue StandardError
-            ''
-          end
-          system('fossil', 'remote', 'add', 'target_remote', target_remote_url) if current_remote.empty?
+        current_remote = begin
+          `fossil remote`.strip
+        rescue StandardError
+          ''
         end
-        if autopush
-          # Using autosync in fossil provides the desired behavior
-          # (automatically push commits to the target remote)
-          begin
-            system('fossil', 'set', 'autosync', 'on')
-          rescue StandardError
-            nil
-          end
+        system('fossil', 'remote', 'add', 'target_remote', target_remote_url) if current_remote.empty?
+        # Using autosync in fossil provides the desired behavior
+        # (automatically push commits to the target remote)
+        begin
+          system('fossil', 'set', 'autosync', 'on')
+        rescue StandardError
+          nil
         end
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to prepare work environment"

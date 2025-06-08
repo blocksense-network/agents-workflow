@@ -81,7 +81,7 @@ class TestCommitMessageFormat < Minitest::Test
     agent_tasks = AgentTasks.new(repo)
 
     # Autopush should automatically set up the work environment
-    message = agent_tasks.agent_prompt(autopush: true)
+    message = agent_tasks.agent_prompt_with_autopush_setup
     assert_includes message, 'extraction test task'
 
     # Verify that work environment was automatically set up
@@ -116,7 +116,7 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('token-test')
     agent_tasks = AgentTasks.new(repo)
 
-    agent_tasks.agent_prompt(autopush: true)
+    agent_tasks.agent_prompt_with_autopush_setup
 
     # Verify that work environment was automatically set up
     remotes = capture(repo, 'git', 'remote').strip.split("\n")
@@ -145,7 +145,7 @@ class TestCommitMessageFormat < Minitest::Test
     agent_tasks = AgentTasks.new(repo)
 
     error = assert_raises(StandardError) do
-      agent_tasks.agent_prompt(autopush: true)
+      agent_tasks.agent_prompt_with_autopush_setup
     end
     assert_includes error.message, 'You are not currently on a agent task branch'
   ensure
