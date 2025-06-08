@@ -160,7 +160,7 @@ class AgentTasks
       OFFLINE_MESSAGE
     end
 
-    if system('which nix > /dev/null 2>&1')
+    if system('which', 'nix', out: File::NULL, err: File::NULL)
       message += <<~NIX_MESSAGE
 
         # Appendix (Using Nix)

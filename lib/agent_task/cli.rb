@@ -52,7 +52,7 @@ module AgentTask
       # This handles all possible Nix syntax variations correctly
       begin
         # Get the current system first
-        system_result = `nix eval --impure --raw --expr 'builtins.currentSystem' 2>/dev/null`.strip
+        system_result = `nix eval --impure --raw --expr 'builtins.currentSystem' 2>#{File::NULL}`.strip
         require 'English'
         if $CHILD_STATUS.success?
           current_system = system_result
@@ -223,7 +223,7 @@ module AgentTask
           unless editor
             editors = %w[nano pico micro vim helix vi]
             editors.each do |ed|
-              if system("command -v #{ed} > /dev/null 2>&1")
+              if system('command', '-v', ed, out: File::NULL, err: File::NULL)
                 editor = ed
                 break
               end
