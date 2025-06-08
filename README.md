@@ -69,6 +69,8 @@ The primary goal of this workflow is to:
     - `--prompt-file=FILE` – read the task description from `FILE`.
     - `--devshell=NAME` (`-s`) – record the given Nix dev shell in the initial commit message.
 
+    The command also provides a `setup` subcommand that prints the versions of `codex` and `goose` available in the current `PATH`.
+
 2.  **Retrieving a Task (Coding Agent):**
 
     Once the developer has set up the task, they instruct the agent to
@@ -152,12 +154,28 @@ This will provide the `agent-task`, `get-task`, and `download-internet-resources
 
 To enable bash completion for `agent-task`, source the script `scripts/agent-task-completion.bash` in your shell profile.
 
+### Installing with Nix
+
+This repository also provides a Nix flake. The default package installs the `agent-task` binary with `codex` and `goose` available in its `PATH`. An additional `agent-utils` package bundles the `get-task` and `start-work` binaries.
+
+```bash
+nix run github:metacraft-labs/agents-workflow
+```
+
+Or install the utilities package:
+
+```bash
+nix profile install github:metacraft-labs/agents-workflow#agent-utils
+```
+
 ### What's included?
 
 The core components include:
 -   `codex-setup`: A script to initialize the workspace, download necessary internet resources, and run project-specific setup.
 -   `agent-task`: A script for developers to begin a new task, automatically creating a dedicated branch and storing the task description.
+-   `agent-task setup`: Prints the versions of `codex` and `goose` available in `PATH`.
 -   `get-task`: A script for the coding agent to retrieve its current task instructions.
+-   `start-work`: A helper that configures a freshly checked-out repository for development.
 -   `download-internet-resources`: A helper script that scans task descriptions for URLs and downloads them (or clones Git repositories) for offline access.
 
 ## Future Direction

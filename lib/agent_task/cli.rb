@@ -335,5 +335,21 @@ module AgentTask
       puts e.message
       exit 1
     end
+
+    def run_setup(_args = [])
+      require 'English'
+
+      codex_version = `codex --version 2>&1`
+      codex_version = $CHILD_STATUS.success? ? codex_version.strip : 'not found'
+
+      goose_version = `goose --version 2>&1`
+      goose_version = $CHILD_STATUS.success? ? goose_version.strip : 'not found'
+
+      puts "codex: #{codex_version}"
+      puts "goose: #{goose_version}"
+    rescue StandardError => e
+      puts e.message
+      exit 1
+    end
   end
 end
