@@ -278,7 +278,7 @@ class StartTaskHgTest < Minitest::Test
   include StartTaskCases
   VCS_TYPE = :hg
 end
-#
+
 class StartTaskFossilTest < Minitest::Test
   include RepoTestHelper
   include StartTaskCases

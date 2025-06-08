@@ -7,6 +7,10 @@ test:
 lint:
     rubocop
 
+# Auto-fix lint issues where possible
+lint-fix:
+    rubocop --autocorrect-all
+
 # Build and publish the gem
 publish-gem:
     gem build agent-task.gemspec && gem push agent-task-*.gem
