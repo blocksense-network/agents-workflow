@@ -84,7 +84,7 @@ class AgentTasks
     false
   end
 
-  def git_details
+  def prepare_work_environment(autopush: false)
     # Extract target remote and branch from the task commit message
     first_commit_hash = @repo.latest_agent_branch_commit
     raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
@@ -104,24 +104,7 @@ class AgentTasks
     target_branch = branch_match[1].strip
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-    { remote_url: target_remote, push_branch: target_branch }
-  end
-
-  def prepare_work_environment(autopush: false)
-    details = git_details
-    Dir.chdir(@repo.root) do
-      author_name = `git log -1 --pretty=format:%an`.strip
-      author_email = `git log -1 --pretty=format:%ae`.strip
-      system('git', 'config', '--local', 'user.name', author_name)
-      system('git', 'config', '--local', 'user.email', author_email)
-      system('git', 'remote', 'add', 'target_remote', details[:remote_url])
-      if autopush
-        hook = File.join(@repo.root, '.git', 'hooks', 'post-commit')
-        File.write(hook, "#!/bin/sh\ngit push target_remote HEAD:#{details[:push_branch]} --force\n")
-        File.chmod(0o755, hook)
-        system('git', 'push', 'target_remote', "HEAD:#{details[:push_branch]}", '--force')
-      end
-    end
+    @repo.prepare_work_environment(target_remote, target_branch, autopush: autopush)
   end
 
   def agent_prompt(autopush: false)
@@ -190,17 +173,8 @@ class AgentTasks
     end
 
     if autopush
-      message += <<~GIT_MESSAGE
-
-        # Appendix (Using Git)
-
-        Before starting work, execute the `start-work --autopush` command.
-
-        Once you complete your task, examine all the changes that you've made
-        and squash your work in a single commit.
-
-        Make sure that the commit message includes a summary of your changes.
-      GIT_MESSAGE
+      # Automatically set up work environment
+      prepare_work_environment(autopush: autopush)
     end
 
     message

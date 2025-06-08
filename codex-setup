@@ -2,17 +2,6 @@
 
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# BEWARE! The heredoc below is intentially using long lines, becuase otherwise
-# Codex gets confused sometimes by the terminal output in its environment that
-# splits the lines in unexpected ways (Codex decides the file is truncated).
-
-# Conditionally set the autopush flag based on GITHUB_TOKEN availability
-if [ -n "${GITHUB_TOKEN}" ]; then
-  GET_TASK_CMD="get-task --autopush"
-else
-  GET_TASK_CMD="get-task"
-fi
-
 # Configure ~/.netrc for Git hosting services
 NETRC_CONTENT=""
 if [ -n "${GITHUB_TOKEN}" ]; then
@@ -28,6 +17,9 @@ if [ -n "$NETRC_CONTENT" ]; then
   echo "Configuring ~/.netrc for git authentication"
   printf "%s" "$NETRC_CONTENT" > "$HOME/.netrc"
   chmod 600 "$HOME/.netrc"
+  GET_TASK_CMD="get-task --autopush"
+else
+  GET_TASK_CMD="get-task"
 fi
 
 cat > ../AGENTS.md << EOF
@@ -35,20 +27,18 @@ When you a given a task description or developer instructions that
 just state "go", execute the shell command \`${GET_TASK_CMD}\` under
 the repository root and follow the instructions provided in the output.
 
-When the task description or developer instructions are not "go",
-record them with the following command instead:
+When the task description or developer instructions are not "go", before
+you do anything else, record a precise copy of them with the following
+shell command:
 
-  start-work --branch-name <SHORT_NAME> --task-description "<message>" --autopush
+start-work --branch-name "<TASK_BRANCH_NAME>" --task-description "<message>"
 
-For follow-up tasks, use:
+TASK_BRANCH_NAME should be an appropriate short branch name that describes
+well the task description or developer instructions.
 
-  start-work --task-description "<message>" --autopush
-
-The command automatically stores the task description and prepares the
-repository for work.
-
-After finishing a task, examine your changes and squash them in a single
-commit that includes a summary of the work.
+I REPEAT: THE start-work COMMAND SHOULD BE EXECUTED ONLY IF THE TASK
+DESCRIPTION OR DEVELOPER INSTRUCTIONS ARE NOT "go" AND IT SHOULD BE
+EXECUTED IMMEDIATELY.
 
 EOF
 
