@@ -13,7 +13,22 @@ else
   GET_TASK_CMD="get-task"
 fi
 
-# TODO: Support GitLab and BitBucket
+# Configure ~/.netrc for Git hosting services
+NETRC_CONTENT=""
+if [ -n "${GITHUB_TOKEN}" ]; then
+  NETRC_CONTENT+=$'machine github.com\n  login x-access-token\n  password '${GITHUB_TOKEN}$'\n'
+fi
+if [ -n "${GITLAB_TOKEN}" ]; then
+  NETRC_CONTENT+=$'machine gitlab.com\n  login oauth2\n  password '${GITLAB_TOKEN}$'\n'
+fi
+if [ -n "${BITBUCKET_TOKEN}" ]; then
+  NETRC_CONTENT+=$'machine bitbucket.org\n  login x-token-auth\n  password '${BITBUCKET_TOKEN}$'\n'
+fi
+if [ -n "$NETRC_CONTENT" ]; then
+  echo "Configuring ~/.netrc for git authentication"
+  printf "%s" "$NETRC_CONTENT" > "$HOME/.netrc"
+  chmod 600 "$HOME/.netrc"
+fi
 
 cat > ../AGENTS.md << EOF
 When you a given a task description or developer instructions that

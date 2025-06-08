@@ -10,9 +10,13 @@ export OPENAI_API_KEY="your-openai-api-key"
 export OPENAI_ORG_ID="your-org-id"  # Optional
 ```
 
-### GitHub Integration
+### Git Hosting Integration
+Set tokens for any providers you intend to push to. The setup script will create
+a `~/.netrc` file from these values.
 ```bash
-export GITHUB_TOKEN="your-github-token"
+export GITHUB_TOKEN="your-github-token"    # Optional
+export GITLAB_TOKEN="your-gitlab-token"    # Optional
+export BITBUCKET_TOKEN="your-bitbucket-token"  # Optional
 ```
 
 ## Setting Environment Variables
@@ -22,6 +26,8 @@ Add to your `~/.bashrc`, `~/.zshrc`, or equivalent:
 ```bash
 export OPENAI_API_KEY="sk-..."
 export GITHUB_TOKEN="ghp_..."
+export GITLAB_TOKEN="glpat-..."
+export BITBUCKET_TOKEN="bbt_..."
 ```
 
 ### Windows
@@ -29,6 +35,8 @@ Using PowerShell:
 ```powershell
 $env:OPENAI_API_KEY = "sk-..."
 $env:GITHUB_TOKEN = "ghp_..."
+$env:GITLAB_TOKEN = "glpat-..."
+$env:BITBUCKET_TOKEN = "bbt_..."
 ```
 
 Or set permanently via System Properties > Environment Variables.
