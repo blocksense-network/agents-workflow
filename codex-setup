@@ -31,7 +31,7 @@ When the task description or developer instructions are not "go", before
 you do anything else, record a precise copy of them with the following
 shell command:
 
-start-work --branch-name "<TASK_BRANCH_NAME>" --task-description "<message>"
+start-work --autopush --branch-name "<TASK_BRANCH_NAME>" --task-description "<message>"
 
 TASK_BRANCH_NAME should be an appropriate short branch name that describes
 well the task description or developer instructions.

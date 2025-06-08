@@ -320,6 +320,7 @@ module AgentTask
       end
 
       repos.to_h.each_value do |at|
+        initial_setup = !at.on_task_branch?
         if options[:task_description]
           if at.on_task_branch?
             at.append_task(options[:task_description])
@@ -331,7 +332,8 @@ module AgentTask
             at.record_initial_task(options[:task_description], options[:branch_name])
           end
         end
-        at.prepare_work_environment(autopush: options[:autopush])
+        _, branch = at.prepare_work_environment(autopush: options[:autopush])
+        at.repo.force_push_current_branch('target_remote', branch) if options[:autopush] && initial_setup
       end
     rescue StandardError => e
       puts e.message

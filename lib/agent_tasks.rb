@@ -105,6 +105,7 @@ class AgentTasks
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
     @repo.prepare_work_environment(target_remote, target_branch, autopush: autopush)
+    [target_remote, target_branch]
   end
 
   def agent_prompt(autopush: false)
