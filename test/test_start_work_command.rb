@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'fileutils'
 require_relative 'test_helper'
 
-module StartWorkCases
+module StartWorkCases # rubocop:disable Metrics/ModuleLength
   def assert_work_setup(repo, remote_url)
     # remote should be added correctly
     assert_equal remote_url, capture(repo, 'git', 'remote', 'get-url', 'target_remote')
@@ -105,6 +105,46 @@ module StartWorkCases
       FileUtils.remove_entry(outer) if outer && File.exist?(outer)
       FileUtils.remove_entry(remote_a) if remote_a && File.exist?(remote_a)
       FileUtils.remove_entry(remote_b) if remote_b && File.exist?(remote_b)
+    end
+  end
+
+  def test_autopush_and_task_recording
+    RepoTestHelper::START_WORK_BINARIES.each do |sb|
+      repo, remote = setup_repo(self.class::VCS_TYPE)
+      status, = run_start_work(repo, tool: sb, autopush: true, task_description: 'task one', branch_name: 'feat')
+      # autopush setup should succeed
+      assert_equal 0, status.exitstatus
+      r = VCSRepo.new(repo)
+      head1 = r.tip_commit('HEAD')
+      remote_head = capture(remote, 'git', 'rev-parse', 'feat')
+      # initial commit should be pushed automatically
+      assert_equal head1, remote_head
+
+      File.write(File.join(repo, 'file.txt'), 'work')
+      git(repo, 'add', 'file.txt')
+      git(repo, 'commit', '-m', 'work commit')
+      head2 = r.tip_commit('HEAD')
+      remote_head2 = capture(remote, 'git', 'rev-parse', 'feat')
+      # work commit should also be autopushed
+      assert_equal head2, remote_head2
+
+      status2, = run_start_work(repo, tool: sb, task_description: 'task two')
+      # follow-up task should be recorded
+      assert_equal 0, status2.exitstatus
+      head3 = r.tip_commit('HEAD')
+      remote_head3 = capture(remote, 'git', 'rev-parse', 'feat')
+      # follow-up commit should be autopushed as well
+      assert_equal head3, remote_head3
+
+      tasks_dir = Dir[File.join(repo, '.agents', 'tasks', '*', '*')].first
+      file = Dir.children(tasks_dir).first
+      content = File.read(File.join(tasks_dir, file))
+      # both task descriptions should be present in the task file
+      assert_includes content, 'task one'
+      assert_includes content, 'task two'
+    ensure
+      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
     end
   end
 end

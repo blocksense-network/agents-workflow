@@ -188,11 +188,14 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     [status, output]
   end
 
-  def run_start_work(working_dir, tool: START_WORK)
+  def run_start_work(working_dir, tool: START_WORK, autopush: false, task_description: nil, branch_name: nil)
     output = nil
     status = nil
     Dir.chdir(working_dir) do
       cmd = windows? ? ['ruby', tool] : [tool]
+      cmd << '--autopush' if autopush
+      cmd << "--task-description=#{task_description}" if task_description
+      cmd << "--branch-name=#{branch_name}" if branch_name
       output = IO.popen(GEM_ENV, cmd, &:read)
       status = $CHILD_STATUS
     end

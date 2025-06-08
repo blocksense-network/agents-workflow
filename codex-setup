@@ -36,36 +36,19 @@ just state "go", execute the shell command \`${GET_TASK_CMD}\` under
 the repository root and follow the instructions provided in the output.
 
 When the task description or developer instructions are not "go",
-you should follow the given instructions while also adhering to the
-workflow described below.
+record them with the following command instead:
 
-Before starting work, do the following:
+  start-work --branch-name <SHORT_NAME> --task-description "<message>" --autopush
 
-1) mkdir -p ".agents/tasks/\$(date -u +%Y)/\$(date -u +%m)"
-2) In this directory, create a file with a verbatim copy of the task
-description or developer instructions. The file should be named exactly
-"\$(date -u +%d-%H%M)-\${TASK_BRANCH_NAME}.txt", where \$TASK_BRANCH_NAME
-is an appropriate short branch name that would describe well the task
-description or developer instructions.
+For follow-up tasks, use:
 
-When you are given follow-up task description/developer instructions,
-or a QA review, append a verbatim copy to the same task file. You can
-make sure the file is the same by inspecting its contents which should
-match the original message.
+  start-work --task-description "<message>" --autopush
 
-Use the separator "\\n--- FOLLOW UP TASK ---\\n" to indicate where the
-new content has been appended.
+The command automatically stores the task description and prepares the
+repository for work.
 
-Before starting work on the follow-up task, take note of the current
-HEAD commit. I'd like this commit to be preserved. Don't squash it
-with other commits at the end of the task.
-
-I REPEAT: FOLLOW THE ABOVE WORKFLOW ONLY IF THE TASK DESCRIPTION OR
-DEVELOPER INSTRUCTIONS ARE NOT "go".
-
-In general, when you complete a task or a follow-up task, take a look
-at the changes introduced in this specific coding session and write
-a detailed summary of them in a single commit for each coding session.
+After finishing a task, examine your changes and squash them in a single
+commit that includes a summary of the work.
 
 EOF
 

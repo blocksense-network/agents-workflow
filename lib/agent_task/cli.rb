@@ -204,36 +204,11 @@ module AgentTask
         task_content.gsub!("\r\n", "\n")
         abort('Aborted: empty task prompt.') if task_content.strip.empty?
 
+        tasks = AgentTasks.new(repo.root)
         if start_new_branch
-          now = Time.now.utc
-          year = now.year
-          month = format('%02d', now.month)
-          day = format('%02d', now.day)
-          hour = format('%02d', now.hour)
-          min = format('%02d', now.min)
-          filename = "#{day}-#{hour}#{min}-#{branch_name}"
-          tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
-          FileUtils.mkdir_p(tasks_dir)
-          task_file = File.join(tasks_dir, filename)
-
-          commit_msg = "Start-Agent-Branch: #{branch_name}"
-          target_remote = repo.default_remote_http_url
-          commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
-          commit_msg += "\nDev-Shell: #{options[:devshell]}" if options[:devshell]
-
-          File.binwrite(task_file, task_content)
-          repo.commit_file(task_file, commit_msg)
+          tasks.record_initial_task(task_content, branch_name, devshell: options[:devshell])
         else
-          start_commit = repo.latest_agent_branch_commit
-          abort('Error: Could not locate task start commit') unless start_commit
-          files = repo.files_in_commit(start_commit)
-          abort('Error: Task start commit should introduce exactly one file') unless files.length == 1
-          task_file = File.join(repo.root, files.first)
-          File.open(task_file, 'a') do |f|
-            f.write("\n--- FOLLOW UP TASK ---\n")
-            f.write(task_content)
-          end
-          repo.commit_file(task_file, 'Follow-up task')
+          tasks.append_task(task_content)
         end
 
         push = nil
@@ -321,8 +296,22 @@ module AgentTask
       exit 1
     end
 
-    def run_start_work(_args = [])
+    def run_start_work(args = [])
+      require 'optparse'
       require_relative '../agent_tasks'
+
+      options = {}
+      OptionParser.new do |opts|
+        opts.on('--autopush', 'Install a post-commit hook to push automatically') do
+          options[:autopush] = true
+        end
+        opts.on('--task-description=DESC', 'Record the given task description') do |val|
+          options[:task_description] = val
+        end
+        opts.on('--branch-name=NAME', 'Name to use for the task description file') do |val|
+          options[:branch_name] = val
+        end
+      end.parse!(args)
 
       repos = discover_repos
       if repos.empty?
@@ -330,7 +319,20 @@ module AgentTask
         exit 1
       end
 
-      repos.to_h.each_value(&:prepare_work_environment)
+      repos.to_h.each_value do |at|
+        if options[:task_description]
+          if at.on_task_branch?
+            at.append_task(options[:task_description])
+          else
+            unless options[:branch_name]
+              raise StandardError, 'Error: --branch-name is required when not on an agent branch'
+            end
+
+            at.record_initial_task(options[:task_description], options[:branch_name])
+          end
+        end
+        at.prepare_work_environment(autopush: options[:autopush])
+      end
     rescue StandardError => e
       puts e.message
       exit 1
