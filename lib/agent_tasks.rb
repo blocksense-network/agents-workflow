@@ -176,7 +176,7 @@ class AgentTasks
   end
 
   def agent_prompt_with_autopush_setup(autopush: true)
-    setup_autopush if autopush
+    setup_autopush if autopush && on_task_branch?
     agent_prompt
   end
 end

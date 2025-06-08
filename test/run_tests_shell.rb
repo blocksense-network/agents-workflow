@@ -56,6 +56,9 @@ class ShellTestRunner
 
       # Parse and display results
       parse_and_display_results(output, exit_code, success)
+
+      # Return the exit code to be used by the main script
+      exit_code
     ensure
       # Clean up temp files
       FileUtils.rm_f(test_script)
@@ -322,4 +325,5 @@ end
 
 # Run the shell-based test runner
 runner = ShellTestRunner.new(log_file, temp_output)
-runner.run
+exit_code = runner.run
+exit(exit_code)
