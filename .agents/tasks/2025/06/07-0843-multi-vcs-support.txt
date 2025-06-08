@@ -1,0 +1,5 @@
+In several places, we support only GitHub. (Do a case insensitive grep for GitHub).
+
+Try to extend the logic to add support for GitLab and BitBucket.
+
+Instead of using http auth directly supplied  in the URL, let’s set up a netrc file during the codex-setup phase which would allow us to authenticate in front of these services with regular URLs

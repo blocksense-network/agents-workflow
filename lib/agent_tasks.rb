@@ -65,19 +65,7 @@ class AgentTasks
     target_branch = branch_match[1].strip
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-    if target_remote.start_with?('https://github.com/')
-      github_token = ENV.fetch('GITHUB_TOKEN', nil)
-      unless github_token
-        raise StandardError,
-              'Error: The Codex environment must be configured with a GITHUB_TOKEN, specified as a secret'
-      end
-
-      remote_url = target_remote.sub('https://github.com/', "https://x-access-token:#{github_token}@github.com/")
-    else
-      remote_url = target_remote
-    end
-
-    { remote_url: remote_url, push_branch: target_branch }
+    { remote_url: target_remote, push_branch: target_branch }
   end
 
   def prepare_work_environment

@@ -10,7 +10,9 @@
 - Tests must call `VCSRepo.new(repo).checkout_branch('feat')` after `run_agent_task()` calls
 
 ## Token Usage
-- Uses GITHUB_TOKEN (not GITHUB_ACCESS_TOKEN) consistently across the codebase
+- Authentication for GitHub, GitLab and BitBucket is handled via `~/.netrc` which
+  is configured during `codex-setup` if the respective `*_TOKEN` environment
+  variables are present. The token is no longer injected in remote URLs.
 
 ## EXTRAS Framework
 - Ruby-based component installation system via `bin/install-extras`

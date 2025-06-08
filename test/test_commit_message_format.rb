@@ -80,31 +80,17 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('extract-test')
     agent_tasks = AgentTasks.new(repo)
 
-    # Save original token and set test token
-    original_token = ENV.fetch('GITHUB_TOKEN', nil)
-
-    begin
-      ENV['GITHUB_TOKEN'] = 'test_token_123'
-      # Test autopush message generation
-      message = agent_tasks.agent_prompt(autopush: true)
-
-      assert_includes message, 'extraction test task'
-      assert_includes message, 'git remote add target_remote "https://x-access-token:test_token_123@github.com/testuser/test-repo.git"'
-      assert_includes message, 'git push target_remote HEAD:extract-test'
-    ensure
-      # Restore original token
-      if original_token
-        ENV['GITHUB_TOKEN'] = original_token
-      else
-        ENV.delete('GITHUB_TOKEN')
-      end
-    end
+    # Autopush message generation should not embed credentials
+    message = agent_tasks.agent_prompt(autopush: true)
+    assert_includes message, 'extraction test task'
+    assert_includes message, 'git remote add target_remote "https://github.com/testuser/test-repo.git"'
+    assert_includes message, 'git push target_remote HEAD:extract-test'
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
-  def test_agent_tasks_autopush_requires_github_token
+  def test_agent_tasks_autopush_without_token
     repo, remote = setup_repo(:git)
 
     # Set up HTTPS remote
@@ -119,34 +105,12 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('token-test')
     agent_tasks = AgentTasks.new(repo)
 
-    # Save original token
-    original_token = ENV.fetch('GITHUB_TOKEN', nil)
-
-    begin
-      # Test with missing token
-      ENV.delete('GITHUB_TOKEN')
-      error = assert_raises(StandardError) do
-        agent_tasks.agent_prompt(autopush: true)
-      end
-      assert_includes error.message,
-                      'The Codex environment must be configured with a GITHUB_TOKEN, ' \
-                      'specified as a secret'
-
-      # Test with token present
-      ENV['GITHUB_TOKEN'] = 'test_token_123'
-      message = agent_tasks.agent_prompt(autopush: true)
-      assert_includes message, 'git remote add target_remote "https://x-access-token:test_token_123@github.com/testuser/test-repo.git"'
-      assert_includes message, 'git push target_remote HEAD:token-test'
-    ensure
-      # Restore original token
-      if original_token
-        ENV['GITHUB_TOKEN'] = original_token
-      else
-        ENV.delete('GITHUB_TOKEN')
-      end
-      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
-    end
+    message = agent_tasks.agent_prompt(autopush: true)
+    assert_includes message, 'git remote add target_remote "https://github.com/testuser/test-repo.git"'
+    assert_includes message, 'git push target_remote HEAD:token-test'
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
   def test_agent_tasks_autopush_errors_on_missing_commit_data
@@ -163,25 +127,12 @@ class TestCommitMessageFormat < Minitest::Test
 
     agent_tasks = AgentTasks.new(repo)
 
-    # Save original token and set test token
-    original_token = ENV.fetch('GITHUB_TOKEN', nil)
-    ENV['GITHUB_TOKEN'] = 'test_token_123'
-
-    begin
-      # Should raise error because commit doesn't have Target-Remote
-      error = assert_raises(StandardError) do
-        agent_tasks.agent_prompt(autopush: true)
-      end
-      assert_includes error.message, 'You are not currently on a agent task branch'
-    ensure
-      # Restore original token
-      if original_token
-        ENV['GITHUB_TOKEN'] = original_token
-      else
-        ENV.delete('GITHUB_TOKEN')
-      end
-      FileUtils.remove_entry(repo) if repo && File.exist?(repo)
-      FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+    error = assert_raises(StandardError) do
+      agent_tasks.agent_prompt(autopush: true)
     end
+    assert_includes error.message, 'You are not currently on a agent task branch'
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 end
