@@ -521,9 +521,7 @@ class VCSRepo
         author_email = `git log -1 --pretty=format:%ae`.strip
         system('git', 'config', '--local', 'user.name', author_name) unless author_name.empty?
         system('git', 'config', '--local', 'user.email', author_email) unless author_email.empty?
-        if !`git remote`.include?('target_remote')
-          system('git', 'remote', 'add', 'target_remote', target_remote_url)
-        end
+        system('git', 'remote', 'add', 'target_remote', target_remote_url) unless `git remote`.include?('target_remote')
         hook = File.join(@root, '.git', 'hooks', 'post-commit')
         File.write(hook, "#!/bin/sh\ngit push target_remote HEAD:#{target_branch} --force\n")
         File.chmod(0o755, hook)
