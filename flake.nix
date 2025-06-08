@@ -13,10 +13,23 @@
     packages = forAllSystems (
       system: let
         pkgs = import nixpkgs {inherit system;};
-      in {
-        agent-task = pkgs.writeShellScriptBin "agent-task" ''
-          exec ${pkgs.ruby}/bin/ruby ${./bin/agent-task} "$@"
+        agent-task-script = pkgs.writeShellScriptBin "agent-task" ''
+          PATH=${pkgs.lib.makeBinPath [ pkgs.ruby pkgs.codex pkgs.goose ]}:$PATH
+          exec ruby ${./bin/agent-task} "$@"
         '';
+        get-task = pkgs.writeShellScriptBin "get-task" ''
+          exec ${pkgs.ruby}/bin/ruby ${./bin/get-task} "$@"
+        '';
+        start-work = pkgs.writeShellScriptBin "start-work" ''
+          exec ${pkgs.ruby}/bin/ruby ${./bin/start-work} "$@"
+        '';
+        agent-utils = pkgs.symlinkJoin {
+          name = "agent-utils";
+          paths = [ get-task start-work ];
+        };
+      in {
+        agent-task = agent-task-script;
+        agent-utils = agent-utils;
       }
     );
 

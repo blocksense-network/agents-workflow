@@ -198,4 +198,15 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     end
     [status, output]
   end
+
+  def run_agent_task_setup(working_dir, tool: AGENT_TASK)
+    output = nil
+    status = nil
+    Dir.chdir(working_dir) do
+      cmd = windows? ? ['ruby', tool, 'setup'] : [tool, 'setup']
+      output = IO.popen(GEM_ENV, cmd, &:read)
+      status = $CHILD_STATUS
+    end
+    [status, output]
+  end
 end

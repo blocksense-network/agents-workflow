@@ -3,4 +3,9 @@
 
 require 'agent_task'
 
-AgentTask::CLI.start_task(ARGV)
+if ARGV.first == 'setup'
+  ARGV.shift
+  AgentTask::CLI.run_setup(ARGV)
+else
+  AgentTask::CLI.start_task(ARGV)
+end
