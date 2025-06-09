@@ -293,7 +293,7 @@ class VCSRepo
 
           # Start with the configured upstream branch. Some branches may track
           # themselves, so ignore the upstream if it points at the current commit.
-          upstream = `git rev-parse --abbrev-ref @{u} 2>#{File::NULL}`.strip
+          upstream = `git rev-parse --abbrev-ref @{u} 2>/dev/null`.strip
           if $CHILD_STATUS.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}",
                                                                   err: File::NULL, out: File::NULL)
             upstream_commit = `git rev-parse #{upstream}`.strip
@@ -414,7 +414,7 @@ class VCSRepo
       case @vcs_type
       when :git
         # Get the URL of the 'origin' remote
-        url = `git remote get-url origin 2>#{File::NULL}`.strip
+        url = `git remote get-url origin 2>/dev/null`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         # Convert SSH URL to HTTPS format
@@ -433,20 +433,20 @@ class VCSRepo
         end
       when :hg
         # Get the default remote URL for Mercurial
-        url = `hg paths default 2>#{File::NULL}`.strip
+        url = `hg paths default 2>/dev/null`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :bzr
         # Get the parent branch URL for Bazaar
-        url = `bzr config parent_location 2>#{File::NULL}`.strip
+        url = `bzr config parent_location 2>/dev/null`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :fossil
         # Fossil doesn't have a direct equivalent to Git remotes
         # Return the configured sync URL if available
-        url = `fossil remote 2>#{File::NULL} | head -n 1`.strip
+        url = `fossil remote 2>/dev/null | head -n 1`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
@@ -461,13 +461,13 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        message = `git log -1 --pretty=format:%B #{commit_hash} 2>#{File::NULL}`.strip
+        message = `git log -1 --pretty=format:%B #{commit_hash} 2>/dev/null`.strip
         $CHILD_STATUS.success? ? message : nil
       when :hg
-        message = `hg log -r #{commit_hash} --template "{desc}" 2>#{File::NULL}`.strip
+        message = `hg log -r #{commit_hash} --template "{desc}" 2>/dev/null`.strip
         $CHILD_STATUS.success? ? message : nil
       when :bzr
-        message = `bzr log -r #{commit_hash} --show-ids 2>#{File::NULL} | grep -A 1000 'message:' | tail -n +2`.strip
+        message = `bzr log -r #{commit_hash} --show-ids 2>/dev/null | grep -A 1000 'message:' | tail -n +2`.strip
         $CHILD_STATUS.success? ? message : nil
       when :fossil
         sql = <<~SQL
@@ -476,7 +476,7 @@ class VCSRepo
           WHERE blob.uuid='#{commit_hash}' AND event.type='ci'
           LIMIT 1
         SQL
-        output = `fossil sql "#{sql.strip}" 2>#{File::NULL}`
+        output = `fossil sql "#{sql.strip}" 2>/dev/null`
         $CHILD_STATUS.success? ? output.strip.delete("'") : nil
       end
     end
@@ -551,7 +551,7 @@ class VCSRepo
         end
         hgrc_path = File.join(@root, '.hg', 'hgrc')
         hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
-        hook_command = "hg push target_remote -b #{target_branch} 2>#{File::NULL} || true"
+        hook_command = "hg push target_remote -b #{target_branch} 2>/dev/null || true"
         if hgrc_content.include?('[hooks]')
           unless hgrc_content.match(/^commit\s*=/m)
             hgrc_content.gsub!(/(\[hooks\].*?)$/m, "\\1\ncommit = #{hook_command}")
