@@ -293,9 +293,10 @@ class VCSRepo
 
           # Start with the configured upstream branch. Some branches may track
           # themselves, so ignore the upstream if it points at the current commit.
-          upstream = `git rev-parse --abbrev-ref @{u} 2>#{File::NULL}`.strip
-          if $CHILD_STATUS.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}",
-                                                                  err: File::NULL, out: File::NULL)
+          upstream = IO.popen(['git', 'rev-parse', '--abbrev-ref', '@{u}'], err: File::NULL, &:read).strip
+          if $CHILD_STATUS.success? && !upstream.empty? &&
+             system('git', 'rev-parse', '--verify', '--quiet',
+                    "#{upstream}^{commit}", err: File::NULL, out: File::NULL)
             upstream_commit = `git rev-parse #{upstream}`.strip
             head_commit = `git rev-parse HEAD`.strip
             base_branch_ref = upstream unless upstream_commit == head_commit
@@ -414,7 +415,7 @@ class VCSRepo
       case @vcs_type
       when :git
         # Get the URL of the 'origin' remote
-        url = `git remote get-url origin 2>#{File::NULL}`.strip
+        url = IO.popen(%w[git remote get-url origin], err: File::NULL, &:read).strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         # Convert SSH URL to HTTPS format
@@ -433,20 +434,20 @@ class VCSRepo
         end
       when :hg
         # Get the default remote URL for Mercurial
-        url = `hg paths default 2>#{File::NULL}`.strip
+        url = IO.popen(%w[hg paths default], err: File::NULL, &:read).strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :bzr
         # Get the parent branch URL for Bazaar
-        url = `bzr config parent_location 2>#{File::NULL}`.strip
+        url = IO.popen(%w[bzr config parent_location], err: File::NULL, &:read).strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :fossil
         # Fossil doesn't have a direct equivalent to Git remotes
         # Return the configured sync URL if available
-        url = `fossil remote 2>#{File::NULL} | head -n 1`.strip
+        url = IO.popen(%w[fossil remote], err: File::NULL) { |io| io.gets.to_s }.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
@@ -461,14 +462,18 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        message = `git log -1 --pretty=format:%B #{commit_hash} 2>#{File::NULL}`.strip
+        message = IO.popen(['git', 'log', '-1', '--pretty=format:%B', commit_hash], err: File::NULL, &:read).strip
         $CHILD_STATUS.success? ? message : nil
       when :hg
-        message = `hg log -r #{commit_hash} --template "{desc}" 2>#{File::NULL}`.strip
+        message = IO.popen(['hg', 'log', '-r', commit_hash, '--template', '{desc}'], err: File::NULL, &:read).strip
         $CHILD_STATUS.success? ? message : nil
       when :bzr
-        message = `bzr log -r #{commit_hash} --show-ids 2>#{File::NULL} | grep -A 1000 'message:' | tail -n +2`.strip
-        $CHILD_STATUS.success? ? message : nil
+        full_log = IO.popen(['bzr', 'log', '-r', commit_hash, '--show-ids'], err: File::NULL, &:read)
+        if $CHILD_STATUS.success?
+          message_section = full_log.split("message:\n", 2)[1]
+          message = message_section ? message_section.strip : ''
+          message
+        end
       when :fossil
         sql = <<~SQL
           SELECT event.comment FROM event
@@ -476,7 +481,7 @@ class VCSRepo
           WHERE blob.uuid='#{commit_hash}' AND event.type='ci'
           LIMIT 1
         SQL
-        output = `fossil sql "#{sql.strip}" 2>#{File::NULL}`
+        output = IO.popen(['fossil', 'sql', sql.strip], err: File::NULL, &:read)
         $CHILD_STATUS.success? ? output.strip.delete("'") : nil
       end
     end
