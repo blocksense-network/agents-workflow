@@ -36,6 +36,8 @@
     "signatureHelp": true,
     "typeHierarchy": true
   },
+  "rdbg.saveBreakpoints": true,
+  "rdbg.enableDebugging": true,
   "files.associations": {
     "*.nix": "nix",
     "flake.nix": "nix",

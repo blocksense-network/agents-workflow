@@ -5,6 +5,12 @@ require 'rbconfig'
 require 'tmpdir'
 require_relative '../lib/vcs_repo'
 
+# Add debugging support when ENV variable is set
+if ENV['RUBY_DEBUG'] || ENV['DEBUG_TESTS']
+  require_relative '../lib/pry_debug'
+  puts "🔍 Debug mode enabled for tests"
+end
+
 module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ROOT = File.expand_path('..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
