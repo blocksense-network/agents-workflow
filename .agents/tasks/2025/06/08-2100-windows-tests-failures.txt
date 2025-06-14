@@ -58,3 +58,49 @@ The Windows CI failed with the following errors:
 error: Recipe `test` failed on line 4 with exit code 1
 
 Please make a best guess for what might be causing this and try to submit a PR that will fix the issues.
+--- FOLLOW UP TASK ---
+The windows CI failed with the following error:
+
+2025-06-08T21:17:47.6699210Z 🧪 Test Progress:
+2025-06-08T21:17:47.6699560Z    .
+2025-06-08T21:17:47.6699742Z 
+2025-06-08T21:17:47.6700019Z ❌ FAILING TESTS:
+2025-06-08T21:17:47.6700510Z 🔴 ==========================================================
+2025-06-08T21:17:47.6701413Z 💥 1. Failure: GetTaskGitTest#test_get_task_from_parent_directory_multiple_repos
+2025-06-08T21:17:47.6702291Z    📝 Expected: 0
+2025-06-08T21:17:47.6702865Z 💥 2. Failure: GetTaskGitTest#test_get_task_after_start
+2025-06-08T21:17:47.6703477Z    📝 Expected: 0
+2025-06-08T21:17:47.6704189Z 💥 3. Failure: GetTaskGitTest#test_get_task_from_parent_directory
+2025-06-08T21:17:47.6704953Z    📝 Expected: 0
+2025-06-08T21:17:47.6705325Z 💥 4. Failure: GetTaskGitTest#test_get_task_on_work_branch
+2025-06-08T21:17:47.6705699Z    📝 Expected: 0
+2025-06-08T21:17:47.6706029Z 💥 5. Failure: StartWorkGitTest#test_start_work_multiple_repos
+2025-06-08T21:17:47.6706423Z    📝 Expected: 0
+2025-06-08T21:17:47.6706800Z 💥 6. Failure: StartWorkGitTest#test_start_work_from_parent_directory
+2025-06-08T21:17:47.6707211Z    📝 Expected: 0
+2025-06-08T21:17:47.6707557Z 💥 7. Failure: StartWorkGitTest#test_start_work_task_recording
+2025-06-08T21:17:47.6707909Z    📝 Expected: 0
+2025-06-08T21:17:47.6708268Z 💥 8. Failure: BinarySmokeTest#test_all_binaries_start_and_get_task
+2025-06-08T21:17:47.6708657Z    📝 Expected: 0
+2025-06-08T21:17:47.6708986Z 💥 9. Failure: FollowUpGitTest#test_append_follow_up_tasks
+2025-06-08T21:17:47.6709394Z    📝 follow-up task failed.
+2025-06-08T21:17:47.6709939Z 💥 10. Failure: FollowUpGitTest#test_nested_branch_tasks
+2025-06-08T21:17:47.6710301Z    📝 task c missing.
+2025-06-08T21:17:47.6710758Z 🚨 11. Error: TestCommitMessageFormat#test_agent_tasks_extraction_with_remote_and_branch
+2025-06-08T21:17:47.6711314Z    📝 StandardError: You are not currently on a agent task branch
+2025-06-08T21:17:47.6711844Z 🚨 12. Error: TestCommitMessageFormat#test_agent_tasks_autopush_without_token
+2025-06-08T21:17:47.6712373Z    📝 StandardError: You are not currently on a agent task branch
+2025-06-08T21:17:47.6712760Z 🔴 ==========================================================
+
+2025-06-08T21:17:47.6712972Z ⚠️  12 test(s) failed.
+2025-06-08T21:17:47.6713125Z 
+2025-06-08T21:17:47.6713402Z 📊 Test Summary:
+2025-06-08T21:17:47.6713668Z   🏃 Total tests: 102
+2025-06-08T21:17:47.6713928Z   💥 Failures: 10
+2025-06-08T21:17:47.6714160Z   🚨 Errors: 2
+2025-06-08T21:17:47.6714408Z   ⏭️  Skips: 0
+2025-06-08T21:17:47.6714659Z   ⏱️  Duration: 165.14s
+2025-06-08T21:17:47.6714947Z   🚪 Exit code: 1
+--- FOLLOW UP TASK ---
+Please address any inline comments on the diff, as well as any additional instructions below.
+I think you can solve the issues by using system everywhere. I noticed that all tests currently using system and File::NULL are working.
