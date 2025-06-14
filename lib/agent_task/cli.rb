@@ -7,35 +7,10 @@
 #
 # `agent-task` (CLI.start_task) is used to record coding tasks that will be
 # developed by AI agents. It has two modes of operation:
+#
 # 1) Starting a new agent branch (you pass the branch name as argument to agent-task)
 # 2) Recording a new task in the current branch (it needs to be a agent branch already)
 
-#    - Creates a new agent task branch with a task description
-#    - Records task in timestamped file under .agents/tasks/
-#    - Supports multiple development shells via --dev-shell option
-#    - Pushes to remote repository when --push-to-remote is specified
-#    - Primary command for starting new agent tasks
-#
-# 2. get-task (CLI.run_get_task)
-#    - Retrieves and displays the current agent task prompt
-#    - When --autopush is specified: sets up git user config and autopush hooks
-#    - Handles multiple repositories from parent directories
-#    - Used by agents to get their current task and set up workspace
-#
-# 3. start-work (CLI.run_start_work)
-#    - Records new task descriptions in existing agent task branches
-#    - Can create initial tasks with --branch-name for new branches
-#    - Can append follow-up tasks to existing agent task branches
-#    - Focuses purely on task recording, no workspace setup
-#    - Used for task management and follow-up task tracking
-#
-# Additional binaries not in this module:
-# - download-internet-resources: Downloads URLs mentioned in task descriptions
-# - install-extras: Installs additional tools and dependencies
-#
-# Supporting Methods:
-# - devshell_names: Discovers available Nix development shells
-# - discover_repos: Finds all VCS repositories from current directory
 
 module AgentTask
   # CLI exposes the main binaries as callable methods so the functionality
