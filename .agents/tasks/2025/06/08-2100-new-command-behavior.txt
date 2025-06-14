@@ -1,0 +1,32 @@
+The `start-work` binary should gain some new command-line parameters: 
+
+1) `--autopush`: besides the current git configuration commands, it should install a
+post-commit hook that automatically force pushes the commit to the `target_remote`
+(the goal is the push the commit even when the push is not a fast-forward push). 
+
+The use of the new flag should be suggested in the GIT_MESSAGE inserted when `get-task`
+is launched with `--autopush`. The current instructions for executing git push at the
+end of the task can be removed now.
+
+2) `--task-description` and `--branch-name`. Specifying those should result in creating
+or modifying an existing task description file, by following similar logic to the
+`agent-task` command when not given a branch:
+
+If we are currently not on an agent branch, the command should create a task description
+file and commit it immediately just like `agent-task` does, but without creating a new
+branch or pushing it to the remote (the `--branch-name` argument will affect only the
+name of the task description file).
+
+if, we are already on an agent branch (e.g. `start-work` was already called and it
+created a commit with a `Start-Agent-Branch` tag in the commit message), append the
+new task description to the existing task file just like `agent-task` does when not
+given a branch name. The `--branch-name` parameter will be ignored in this situation.
+
+The use of `start-work` with the new flags will be suggested in the AGENTS.md file
+created by `codex-setup` instead of the current manual instructions.
+
+Make sure to refactor the code to not  introduce unnecessary code duplication between
+`agent-task` and `start-work`
+
+Please add tests for `start-work` that check that the described behavior works.
+Before two invocations of `start-work`, there might be multiple commits.

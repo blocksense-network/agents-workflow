@@ -2,6 +2,7 @@
 
 require 'English'
 require 'open3'
+require 'fileutils'
 
 # Custom exception classes for VCS operations
 class VCSError < StandardError; end
@@ -103,6 +104,23 @@ class VCSRepo
         system('fossil push')
       else
         puts "Error: Unknown VCS type (#{@vcs_type}) to push branch"
+      end
+    end
+  end
+
+  def force_push_current_branch(remote, branch)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        system('git', 'push', remote, "HEAD:#{branch}", '--force')
+      when :hg
+        system('hg', 'push', remote, '--force', '-b', branch)
+      when :bzr
+        system('bzr', 'push', remote, '--overwrite')
+      when :fossil
+        system('fossil', 'push', remote)
+      else
+        puts "Error: Unknown VCS type (#{@vcs_type}) to force push"
       end
     end
   end
@@ -275,7 +293,7 @@ class VCSRepo
 
           # Start with the configured upstream branch. Some branches may track
           # themselves, so ignore the upstream if it points at the current commit.
-          upstream = `git rev-parse --abbrev-ref @{u} 2>/dev/null`.strip
+          upstream = `git rev-parse --abbrev-ref @{u} 2>#{File::NULL}`.strip
           if $CHILD_STATUS.success? && !upstream.empty? && system("git rev-parse --verify --quiet #{upstream}^{commit}",
                                                                   err: File::NULL, out: File::NULL)
             upstream_commit = `git rev-parse #{upstream}`.strip
@@ -396,7 +414,7 @@ class VCSRepo
       case @vcs_type
       when :git
         # Get the URL of the 'origin' remote
-        url = `git remote get-url origin 2>/dev/null`.strip
+        url = `git remote get-url origin 2>#{File::NULL}`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         # Convert SSH URL to HTTPS format
@@ -415,20 +433,20 @@ class VCSRepo
         end
       when :hg
         # Get the default remote URL for Mercurial
-        url = `hg paths default 2>/dev/null`.strip
+        url = `hg paths default 2>#{File::NULL}`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :bzr
         # Get the parent branch URL for Bazaar
-        url = `bzr config parent_location 2>/dev/null`.strip
+        url = `bzr config parent_location 2>#{File::NULL}`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
       when :fossil
         # Fossil doesn't have a direct equivalent to Git remotes
         # Return the configured sync URL if available
-        url = `fossil remote 2>/dev/null | head -n 1`.strip
+        url = `fossil remote 2>#{File::NULL} | head -n 1`.strip
         return nil if !$CHILD_STATUS.success? || url.empty?
 
         url
@@ -443,13 +461,13 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        message = `git log -1 --pretty=format:%B #{commit_hash} 2>/dev/null`.strip
+        message = `git log -1 --pretty=format:%B #{commit_hash} 2>#{File::NULL}`.strip
         $CHILD_STATUS.success? ? message : nil
       when :hg
-        message = `hg log -r #{commit_hash} --template "{desc}" 2>/dev/null`.strip
+        message = `hg log -r #{commit_hash} --template "{desc}" 2>#{File::NULL}`.strip
         $CHILD_STATUS.success? ? message : nil
       when :bzr
-        message = `bzr log -r #{commit_hash} --show-ids 2>/dev/null | grep -A 1000 'message:' | tail -n +2`.strip
+        message = `bzr log -r #{commit_hash} --show-ids 2>#{File::NULL} | grep -A 1000 'message:' | tail -n +2`.strip
         $CHILD_STATUS.success? ? message : nil
       when :fossil
         sql = <<~SQL
@@ -458,7 +476,7 @@ class VCSRepo
           WHERE blob.uuid='#{commit_hash}' AND event.type='ci'
           LIMIT 1
         SQL
-        output = `fossil sql "#{sql.strip}" 2>/dev/null`
+        output = `fossil sql "#{sql.strip}" 2>#{File::NULL}`
         $CHILD_STATUS.success? ? output.strip.delete("'") : nil
       end
     end
@@ -470,14 +488,9 @@ class VCSRepo
     Dir.chdir(@root) do
       case @vcs_type
       when :git
-        # First try to find in current branch lineage
-        current_branch_commit = `git log HEAD -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
-        return current_branch_commit unless current_branch_commit.empty?
-
-        # If not found in current branch, search across all branches
-        # This handles the case where we're checking from a parent directory
-        # and the repository might be on the wrong branch
-        `git log --all -E --grep='^Start-Agent-Branch:' -n 1 --pretty=%H`.strip
+        # Search for Start-Agent-Branch commits in current branch lineage only
+        out, = Open3.capture2('git', 'log', 'HEAD', '-E', '--grep=^Start-Agent-Branch:', '-n', '1', '--pretty=%H')
+        out.strip
       when :hg
         revset = "reverse(grep('^Start-Agent-Branch:'))"
         out, = Open3.capture2('hg', 'log', '-r', revset, '--limit', '1', '--template', '{node}\n')
@@ -491,6 +504,118 @@ class VCSRepo
         `fossil sql "#{sql.strip}"`.strip.delete("'")
       else
         ''
+      end
+    end
+  end
+
+  def setup_autopush(target_remote_url, target_branch)
+    Dir.chdir(@root) do
+      case @vcs_type
+      when :git
+        author_name = `git log -1 --pretty=format:%an`.strip
+        author_email = `git log -1 --pretty=format:%ae`.strip
+        system('git', 'config', '--local', 'user.name', author_name) unless author_name.empty?
+        system('git', 'config', '--local', 'user.email', author_email) unless author_email.empty?
+        system('git', 'remote', 'add', 'target_remote', target_remote_url) unless `git remote`.include?('target_remote')
+        hook = File.join(@root, '.git', 'hooks', 'post-commit')
+        File.write(hook, "#!/bin/sh\ngit push target_remote HEAD:#{target_branch} --force\n")
+        File.chmod(0o755, hook)
+      when :hg
+        author = `hg log -r . --template '{author}'`.strip
+        unless author.empty?
+          hgrc_path = File.join(@root, '.hg', 'hgrc')
+          hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
+          unless hgrc_content.match(/^\[ui\].*?^username\s*=/m)
+            if hgrc_content.include?('[ui]')
+              hgrc_content.gsub!(/(\[ui\].*?)$/m, "\\1\nusername = #{author}")
+            else
+              hgrc_content += "\n[ui]\nusername = #{author}\n"
+            end
+            File.write(hgrc_path, hgrc_content)
+          end
+        end
+        hgrc_path = File.join(@root, '.hg', 'hgrc')
+        hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
+        unless hgrc_content.match(/^target_remote\s*=/m)
+          if hgrc_content.include?('[paths]')
+            hgrc_content.gsub!(/(\[paths\].*?)$/m, "\\1\ntarget_remote = #{target_remote_url}")
+          else
+            hgrc_content += "\n[paths]\ntarget_remote = #{target_remote_url}\n"
+          end
+          File.write(hgrc_path, hgrc_content)
+        end
+        hgrc_path = File.join(@root, '.hg', 'hgrc')
+        hgrc_content = File.exist?(hgrc_path) ? File.read(hgrc_path) : ''
+        hook_command = "hg push target_remote -b #{target_branch} 2>#{File::NULL} || true"
+        if hgrc_content.include?('[hooks]')
+          unless hgrc_content.match(/^commit\s*=/m)
+            hgrc_content.gsub!(/(\[hooks\].*?)$/m, "\\1\ncommit = #{hook_command}")
+            File.write(hgrc_path, hgrc_content)
+          end
+        else
+          hgrc_content += "\n[hooks]\ncommit = #{hook_command}\n"
+          File.write(hgrc_path, hgrc_content)
+        end
+      when :bzr
+        author_output = `bzr log -l 1 --show-ids | grep committer:`.strip
+        unless author_output.empty?
+          current_email = begin
+            `bzr whoami`.strip
+          rescue StandardError
+            ''
+          end
+          if current_email.empty? && (author_output =~ /committer:\s*(.+)/)
+            system('bzr', 'whoami', ::Regexp.last_match(1).strip)
+          end
+        end
+        branch_conf_path = File.join(@root, '.bzr', 'branch', 'branch.conf')
+        if File.exist?(branch_conf_path)
+          conf_content = File.read(branch_conf_path)
+          unless conf_content.include?('push_location')
+            conf_content += "push_location = #{target_remote_url}\n"
+            File.write(branch_conf_path, conf_content)
+          end
+        else
+          FileUtils.mkdir_p(File.dirname(branch_conf_path))
+          File.write(branch_conf_path, "push_location = #{target_remote_url}\n")
+        end
+        hooks_dir = File.join(@root, '.bzr', 'hooks')
+        FileUtils.mkdir_p(hooks_dir)
+        hook_file = File.join(hooks_dir, 'post_commit.py')
+        hook_content = <<~PYTHON
+          #!/usr/bin/env python
+          import subprocess
+          import sys
+
+          def post_commit(local, master, old_revno, old_revid, new_revno, new_revid):
+              try:
+                  subprocess.call(['bzr', 'push', '--quiet'],
+                                cwd='#{@root}',
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+              except:
+                  pass
+        PYTHON
+        File.write(hook_file, hook_content)
+        File.chmod(0o755, hook_file)
+      when :fossil
+        author = `fossil sql 'SELECT user FROM event ORDER BY mtime DESC LIMIT 1'`.strip
+        system('fossil', 'user', 'default', author.delete("'")) unless author.empty? || author == 'root'
+        current_remote = begin
+          `fossil remote`.strip
+        rescue StandardError
+          ''
+        end
+        system('fossil', 'remote', 'add', 'target_remote', target_remote_url) if current_remote.empty?
+        # Using autosync in fossil provides the desired behavior
+        # (automatically push commits to the target remote)
+        begin
+          system('fossil', 'set', 'autosync', 'on')
+        rescue StandardError
+          nil
+        end
+      else
+        puts "Error: Unknown VCS type (#{@vcs_type}) to prepare work environment"
       end
     end
   end

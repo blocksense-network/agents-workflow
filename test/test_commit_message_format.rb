@@ -80,11 +80,22 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('extract-test')
     agent_tasks = AgentTasks.new(repo)
 
-    # Autopush message generation should not embed credentials
-    message = agent_tasks.agent_prompt(autopush: true)
+    # Autopush should automatically set up the work environment
+    message = agent_tasks.agent_prompt_with_autopush_setup
     assert_includes message, 'extraction test task'
-    assert_includes message, 'git remote add target_remote "https://github.com/testuser/test-repo.git"'
-    assert_includes message, 'git push target_remote HEAD:extract-test'
+
+    # Verify that work environment was automatically set up
+    remotes = capture(repo, 'git', 'remote').strip.split("\n")
+    assert_includes remotes, 'target_remote'
+
+    # Verify target_remote points to correct URL
+    target_url = capture(repo, 'git', 'remote', 'get-url', 'target_remote').strip
+    assert_equal 'https://github.com/testuser/test-repo.git', target_url
+
+    # Verify that making a commit in the local repo would result in the
+    # commit appearing in the target repo as well due to the automatically
+    # installed post-commit hook
+    # TODO (implement this check)
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
@@ -105,9 +116,15 @@ class TestCommitMessageFormat < Minitest::Test
     vcs_repo.checkout_branch('token-test')
     agent_tasks = AgentTasks.new(repo)
 
-    message = agent_tasks.agent_prompt(autopush: true)
-    assert_includes message, 'git remote add target_remote "https://github.com/testuser/test-repo.git"'
-    assert_includes message, 'git push target_remote HEAD:token-test'
+    agent_tasks.agent_prompt_with_autopush_setup
+
+    # Verify that work environment was automatically set up
+    remotes = capture(repo, 'git', 'remote').strip.split("\n")
+    assert_includes remotes, 'target_remote'
+
+    # Verify target_remote points to correct URL
+    target_url = capture(repo, 'git', 'remote', 'get-url', 'target_remote').strip
+    assert_equal 'https://github.com/testuser/test-repo.git', target_url
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
@@ -128,7 +145,7 @@ class TestCommitMessageFormat < Minitest::Test
     agent_tasks = AgentTasks.new(repo)
 
     error = assert_raises(StandardError) do
-      agent_tasks.agent_prompt(autopush: true)
+      agent_tasks.agent_prompt_with_autopush_setup
     end
     assert_includes error.message, 'You are not currently on a agent task branch'
   ensure

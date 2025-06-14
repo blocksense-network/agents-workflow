@@ -1,5 +1,17 @@
 # frozen_string_literal: true
 
+# Command Line Interface Specification
+# ====================================
+#
+# This module implements the core functionality for all agent-workflow commands:
+#
+# `agent-task` (CLI.start_task) is used to record coding tasks that will be
+# developed by AI agents. It has two modes of operation:
+#
+# 1) Starting a new agent branch (you pass the branch name as argument to agent-task)
+# 2) Recording a new task in the current branch (it needs to be a agent branch already)
+
+
 module AgentTask
   # CLI exposes the main binaries as callable methods so the functionality
   # can be reused programmatically. The methods here mirror the behavior
@@ -15,7 +27,7 @@ module AgentTask
       # This handles all possible Nix syntax variations correctly
       begin
         # Get the current system first
-        system_result = `nix eval --impure --raw --expr 'builtins.currentSystem' 2>/dev/null`.strip
+        system_result = `nix eval --impure --raw --expr 'builtins.currentSystem' 2>#{File::NULL}`.strip
         require 'English'
         if $CHILD_STATUS.success?
           current_system = system_result
@@ -186,7 +198,7 @@ module AgentTask
           unless editor
             editors = %w[nano pico micro vim helix vi]
             editors.each do |ed|
-              if system("command -v #{ed} > /dev/null 2>&1")
+              if system('command', '-v', ed, out: File::NULL, err: File::NULL)
                 editor = ed
                 break
               end
@@ -204,36 +216,11 @@ module AgentTask
         task_content.gsub!("\r\n", "\n")
         abort('Aborted: empty task prompt.') if task_content.strip.empty?
 
+        tasks = AgentTasks.new(repo.root)
         if start_new_branch
-          now = Time.now.utc
-          year = now.year
-          month = format('%02d', now.month)
-          day = format('%02d', now.day)
-          hour = format('%02d', now.hour)
-          min = format('%02d', now.min)
-          filename = "#{day}-#{hour}#{min}-#{branch_name}"
-          tasks_dir = File.join(repo.root, '.agents', 'tasks', year.to_s, month)
-          FileUtils.mkdir_p(tasks_dir)
-          task_file = File.join(tasks_dir, filename)
-
-          commit_msg = "Start-Agent-Branch: #{branch_name}"
-          target_remote = repo.default_remote_http_url
-          commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
-          commit_msg += "\nDev-Shell: #{options[:devshell]}" if options[:devshell]
-
-          File.binwrite(task_file, task_content)
-          repo.commit_file(task_file, commit_msg)
+          tasks.record_initial_task(task_content, branch_name, devshell: options[:devshell])
         else
-          start_commit = repo.latest_agent_branch_commit
-          abort('Error: Could not locate task start commit') unless start_commit
-          files = repo.files_in_commit(start_commit)
-          abort('Error: Task start commit should introduce exactly one file') unless files.length == 1
-          task_file = File.join(repo.root, files.first)
-          File.open(task_file, 'a') do |f|
-            f.write("\n--- FOLLOW UP TASK ---\n")
-            f.write(task_content)
-          end
-          repo.commit_file(task_file, 'Follow-up task')
+          tasks.append_task(task_content)
         end
 
         push = nil
@@ -289,7 +276,7 @@ module AgentTask
       end
 
       if repos.length == 1 && repos[0][0].nil?
-        puts repos[0][1].agent_prompt(autopush: options[:autopush])
+        puts repos[0][1].agent_prompt_with_autopush_setup(autopush: options[:autopush])
         return
       end
 
@@ -298,7 +285,7 @@ module AgentTask
         next if dir.nil?
 
         begin
-          msg = at.agent_prompt(autopush: options[:autopush])
+          msg = at.agent_prompt_with_autopush_setup(autopush: options[:autopush])
           dir_messages << [dir, msg] if msg && !msg.empty?
         rescue StandardError
           next
@@ -321,8 +308,19 @@ module AgentTask
       exit 1
     end
 
-    def run_start_work(_args = [])
+    def run_start_work(args = [])
+      require 'optparse'
       require_relative '../agent_tasks'
+
+      options = {}
+      OptionParser.new do |opts|
+        opts.on('--task-description=DESC', 'Record the given task description') do |val|
+          options[:task_description] = val
+        end
+        opts.on('--branch-name=NAME', 'Name to use for the task description file') do |val|
+          options[:branch_name] = val
+        end
+      end.parse!(args)
 
       repos = discover_repos
       if repos.empty?
@@ -330,7 +328,19 @@ module AgentTask
         exit 1
       end
 
-      repos.to_h.each_value(&:prepare_work_environment)
+      repos.to_h.each_value do |at|
+        if options[:task_description]
+          if at.on_task_branch?
+            at.append_task(options[:task_description])
+          else
+            unless options[:branch_name]
+              raise StandardError, 'Error: --branch-name is required when not on an agent branch'
+            end
+
+            at.record_initial_task(options[:task_description], options[:branch_name])
+          end
+        end
+      end
     rescue StandardError => e
       puts e.message
       exit 1

@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "rdbg",
+      "name": "Debug Current Ruby File",
+      "request": "launch",
+      "script": "${file}",
+      "args": [],
+      "askParameters": false,
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "useBundler": false,
+      "rdbgPath": "ruby ${workspaceFolder}/scripts/rdbg-wrapper"
+    },
+    {
+      "type": "rdbg",
+      "name": "Debug Current Test File",
+      "request": "launch",
+      "script": "${file}",
+      "args": ["-I", "lib", "-I", "test"],
+      "askParameters": false,
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "useBundler": false,
+      "rdbgPath": "ruby ${workspaceFolder}/scripts/rdbg-wrapper"
+    },
+    {
+      "type": "rdbg",
+      "name": "Debug All Tests",
+      "request": "launch",
+      "script": "test/run_tests_shell.rb",
+      "args": ["-I", "lib", "-I", "test"],
+      "askParameters": false,
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "useBundler": false,
+      "rdbgPath": "ruby ${workspaceFolder}/scripts/rdbg-wrapper"
+    }
+  ]
+}

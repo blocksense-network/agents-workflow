@@ -2,17 +2,6 @@
 
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# BEWARE! The heredoc below is intentially using long lines, becuase otherwise
-# Codex gets confused sometimes by the terminal output in its environment that
-# splits the lines in unexpected ways (Codex decides the file is truncated).
-
-# Conditionally set the autopush flag based on GITHUB_TOKEN availability
-if [ -n "${GITHUB_TOKEN}" ]; then
-  GET_TASK_CMD="get-task --autopush"
-else
-  GET_TASK_CMD="get-task"
-fi
-
 # Configure ~/.netrc for Git hosting services
 NETRC_CONTENT=""
 if [ -n "${GITHUB_TOKEN}" ]; then
@@ -28,6 +17,9 @@ if [ -n "$NETRC_CONTENT" ]; then
   echo "Configuring ~/.netrc for git authentication"
   printf "%s" "$NETRC_CONTENT" > "$HOME/.netrc"
   chmod 600 "$HOME/.netrc"
+  GET_TASK_CMD="get-task --autopush"
+else
+  GET_TASK_CMD="get-task"
 fi
 
 cat > ../AGENTS.md << EOF
@@ -35,37 +27,18 @@ When you a given a task description or developer instructions that
 just state "go", execute the shell command \`${GET_TASK_CMD}\` under
 the repository root and follow the instructions provided in the output.
 
-When the task description or developer instructions are not "go",
-you should follow the given instructions while also adhering to the
-workflow described below.
+When the task description or developer instructions are not "go", before
+you do anything else, record a precise copy of them with the following
+shell command:
 
-Before starting work, do the following:
+start-work --branch-name "<TASK_BRANCH_NAME>" --task-description "<message>"
 
-1) mkdir -p ".agents/tasks/\$(date -u +%Y)/\$(date -u +%m)"
-2) In this directory, create a file with a verbatim copy of the task
-description or developer instructions. The file should be named exactly
-"\$(date -u +%d-%H%M)-\${TASK_BRANCH_NAME}.txt", where \$TASK_BRANCH_NAME
-is an appropriate short branch name that would describe well the task
-description or developer instructions.
+TASK_BRANCH_NAME should be an appropriate short branch name that describes
+well the task description or developer instructions.
 
-When you are given follow-up task description/developer instructions,
-or a QA review, append a verbatim copy to the same task file. You can
-make sure the file is the same by inspecting its contents which should
-match the original message.
-
-Use the separator "\\n--- FOLLOW UP TASK ---\\n" to indicate where the
-new content has been appended.
-
-Before starting work on the follow-up task, take note of the current
-HEAD commit. I'd like this commit to be preserved. Don't squash it
-with other commits at the end of the task.
-
-I REPEAT: FOLLOW THE ABOVE WORKFLOW ONLY IF THE TASK DESCRIPTION OR
-DEVELOPER INSTRUCTIONS ARE NOT "go".
-
-In general, when you complete a task or a follow-up task, take a look
-at the changes introduced in this specific coding session and write
-a detailed summary of them in a single commit for each coding session.
+I REPEAT: THE start-work COMMAND SHOULD BE EXECUTED ONLY IF THE TASK
+DESCRIPTION OR DEVELOPER INSTRUCTIONS ARE NOT "go" AND IT SHOULD BE
+EXECUTED IMMEDIATELY.
 
 EOF
 

@@ -5,6 +5,12 @@ require 'rbconfig'
 require 'tmpdir'
 require_relative '../lib/vcs_repo'
 
+# Add debugging support when ENV variable is set
+if ENV['RUBY_DEBUG'] || ENV['DEBUG_TESTS']
+  require_relative '../lib/pry_debug'
+  puts '🔍 Debug mode enabled for tests'
+end
+
 module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ROOT = File.expand_path('..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
@@ -188,11 +194,13 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     [status, output]
   end
 
-  def run_start_work(working_dir, tool: START_WORK)
+  def run_start_work(working_dir, tool: START_WORK, task_description: nil, branch_name: nil)
     output = nil
     status = nil
     Dir.chdir(working_dir) do
       cmd = windows? ? ['ruby', tool] : [tool]
+      cmd << "--task-description=#{task_description}" if task_description
+      cmd << "--branch-name=#{branch_name}" if branch_name
       output = IO.popen(GEM_ENV, cmd, &:read)
       status = $CHILD_STATUS
     end

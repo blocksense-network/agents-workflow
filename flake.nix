@@ -50,6 +50,9 @@
           pkgs.ruby
           pkgs.bundler
           pkgs.rubocop
+          pkgs.git
+          pkgs.fossil
+          pkgs.mercurial
         ];
       };
     });

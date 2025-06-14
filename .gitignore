@@ -1,3 +1,7 @@
 .direnv/
+
 .install-markers/
 test/logs/
+
+# Debugger temp files
+.rdbgrc.breakpoints

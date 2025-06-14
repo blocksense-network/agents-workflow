@@ -28,7 +28,46 @@ class AgentTasks
     File.join(@repo.root, files_in_commit.first)
   end
 
-  def on_task_branch?; end
+  def on_task_branch?
+    !!@repo.latest_agent_branch_commit && !@repo.latest_agent_branch_commit.empty?
+  end
+
+  def record_initial_task(task_content, branch_name, devshell: nil)
+    now = Time.now.utc
+    year = now.year
+    month = format('%02d', now.month)
+    day = format('%02d', now.day)
+    hour = format('%02d', now.hour)
+    min = format('%02d', now.min)
+
+    tasks_dir = File.join(@repo.root, '.agents', 'tasks', year.to_s, month)
+    FileUtils.mkdir_p(tasks_dir)
+    filename = "#{day}-#{hour}#{min}-#{branch_name}"
+    task_file = File.join(tasks_dir, filename)
+
+    commit_msg = "Start-Agent-Branch: #{branch_name}"
+    target_remote = @repo.default_remote_http_url
+    commit_msg += "\nTarget-Remote: #{target_remote}" if target_remote
+    commit_msg += "\nDev-Shell: #{devshell}" if devshell
+
+    File.binwrite(task_file, task_content)
+    @repo.commit_file(task_file, commit_msg)
+  end
+
+  def append_task(task_content)
+    start_commit = @repo.latest_agent_branch_commit
+    raise StandardError, 'Error: Could not locate task start commit' unless start_commit
+
+    files = @repo.files_in_commit(start_commit)
+    raise StandardError, 'Error: Task start commit should introduce exactly one file' unless files.length == 1
+
+    task_file = File.join(@repo.root, files.first)
+    File.open(task_file, 'a') do |f|
+      f.write("\n--- FOLLOW UP TASK ---\n")
+      f.write(task_content)
+    end
+    @repo.commit_file(task_file, 'Follow-up task')
+  end
 
   def online?
     # Use Google's connectivity check service - a lightweight endpoint designed for connectivity testing
@@ -45,7 +84,7 @@ class AgentTasks
     false
   end
 
-  def git_details
+  def setup_autopush
     # Extract target remote and branch from the task commit message
     first_commit_hash = @repo.latest_agent_branch_commit
     raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
@@ -65,21 +104,10 @@ class AgentTasks
     target_branch = branch_match[1].strip
     raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
 
-    { remote_url: target_remote, push_branch: target_branch }
+    @repo.setup_autopush(target_remote, target_branch)
   end
 
-  def prepare_work_environment
-    details = git_details
-    Dir.chdir(@repo.root) do
-      author_name = `git log -1 --pretty=format:%an`.strip
-      author_email = `git log -1 --pretty=format:%ae`.strip
-      system('git', 'config', '--local', 'user.name', author_name)
-      system('git', 'config', '--local', 'user.email', author_email)
-      system('git', 'remote', 'add', 'target_remote', details[:remote_url])
-    end
-  end
-
-  def agent_prompt(autopush: false)
+  def agent_prompt
     task_file_contents = File.read(agent_task_file_in_current_branch)
     tasks = task_file_contents.split("\n--- FOLLOW UP TASK ---\n")
     if tasks.length == 1
@@ -132,7 +160,7 @@ class AgentTasks
       OFFLINE_MESSAGE
     end
 
-    if system('which nix > /dev/null 2>&1')
+    if system('which', 'nix', out: File::NULL, err: File::NULL)
       message += <<~NIX_MESSAGE
 
         # Appendix (Using Nix)
@@ -144,49 +172,11 @@ class AgentTasks
       NIX_MESSAGE
     end
 
-    if autopush
-      # Extract target remote and branch from the task commit message
-      first_commit_hash = @repo.latest_agent_branch_commit
-      raise StandardError, 'Error: Could not find first commit in current branch' unless first_commit_hash
-
-      commit_msg = @repo.commit_message(first_commit_hash)
-      raise StandardError, 'Error: Could not retrieve commit message from first commit' unless commit_msg
-
-      # Extract Target-Remote from commit message
-      remote_match = commit_msg.match(/^Target-Remote:\s*(.+?)$/m)
-      raise StandardError, 'Error: Target-Remote not found in commit message' unless remote_match
-
-      target_remote = remote_match[1].strip
-      raise StandardError, 'Error: Target-Remote is empty in commit message' if target_remote.empty?
-
-      # Extract branch name from Start-Agent-Branch line
-      branch_match = commit_msg.match(/^Start-Agent-Branch:\s*(.+?)$/m)
-      raise StandardError, 'Error: Start-Agent-Branch not found in commit message' unless branch_match
-
-      target_branch = branch_match[1].strip
-      raise StandardError, 'Error: Start-Agent-Branch is empty in commit message' if target_branch.empty?
-
-      details = git_details
-      push_branch = details[:push_branch]
-      remote_url = details[:remote_url]
-      message += <<~GIT_MESSAGE
-
-        # Appendix (Using Git)
-
-        Before starting work, execute the `start-work` command.
-
-        Once you complete your task, examine all the changes that you've made
-        and squash your work in a single commit.
-
-        Make sure that the commit message includes a summary of your changes.
-
-        Finally, push your commit with the following command:
-
-        git remote add target_remote "#{remote_url}"
-        git push target_remote HEAD:#{push_branch}
-      GIT_MESSAGE
-    end
-
     message
+  end
+
+  def agent_prompt_with_autopush_setup(autopush: true)
+    setup_autopush if autopush && on_task_branch?
+    agent_prompt
   end
 end
