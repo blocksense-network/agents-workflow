@@ -84,6 +84,19 @@ The primary goal of this workflow is to:
     The `get-task` script will print the task description for the agent,
     along with instructions for accessing the downloaded internet resources
     and working with the git history.
+    It also supports a `--get-setup-env` option which prints only the
+    environment variable assignments gathered from `@agents-setup` lines.
+
+### Workflow Commands
+
+Task descriptions may include lines beginning with `/name`. When `get-task`
+is executed these lines are replaced with the output of a matching program in
+`.agents/workflows/name` (or the contents of `.agents/workflows/name.txt`).
+Lines starting with `@agents-setup` in either the task file or the workflow
+output are stripped from the final message and interpreted as environment
+variable assignments. These variables can be listed with `get-task --get-setup-env`
+and are automatically exported by the `*-setup` scripts before executing the
+project-specific setup steps.
 
 ## Supported Agent Systems
 
