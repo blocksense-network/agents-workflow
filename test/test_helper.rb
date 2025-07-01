@@ -183,11 +183,12 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   end
   # rubocop:enable Metrics/ParameterLists
 
-  def run_get_task(working_dir, tool: GET_TASK)
+  def run_get_task(working_dir, tool: GET_TASK, args: [])
     output = nil
     status = nil
     Dir.chdir(working_dir) do
       cmd = windows? ? ['ruby', tool] : [tool]
+      cmd.concat(args)
       output = IO.popen(GEM_ENV, cmd, &:read)
       status = $CHILD_STATUS
     end

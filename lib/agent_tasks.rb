@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'vcs_repo'
+require_relative 'workflow_commands'
 require 'fileutils'
 require 'net/http'
 require 'uri'
@@ -107,9 +108,19 @@ class AgentTasks
     @repo.setup_autopush(target_remote, target_branch)
   end
 
+  def task_text_and_env
+    file_contents = File.read(agent_task_file_in_current_branch)
+    WorkflowCommands.process(file_contents, @repo.root)
+  end
+
+  def agent_setup_env
+    _, env = task_text_and_env
+    env
+  end
+
   def agent_prompt
-    task_file_contents = File.read(agent_task_file_in_current_branch)
-    tasks = task_file_contents.split("\n--- FOLLOW UP TASK ---\n")
+    text, = task_text_and_env
+    tasks = text.split("\n--- FOLLOW UP TASK ---\n")
     if tasks.length == 1
       message = tasks[0]
     else

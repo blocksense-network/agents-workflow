@@ -71,6 +71,18 @@ The primary goal of this workflow is to:
 
     The command also provides a `setup` subcommand that prints the versions of `codex` and `goose` available in the current `PATH`.
 
+3.  **Workflow Commands**
+
+    Task descriptions may contain lines starting with `/` followed by a program
+    name and optional arguments. These "workflow commands" are resolved against
+    executables or `.txt` files placed in `.agents/workflows`. When `get-task`
+    runs, each command is executed and its output replaces the command line in
+    the final message. Any lines of the form `@agents-setup VAR=value` in either
+    the task description or the workflow output are stripped and collected. The
+    aggregated environment can be printed with `get-task --get-setup-env` and is
+    automatically applied by the provided `*-setup` scripts before they invoke
+    project specific setup hooks.
+
 2.  **Retrieving a Task (Coding Agent):**
 
     Once the developer has set up the task, they instruct the agent to
@@ -104,6 +116,11 @@ Each agent system has a dedicated setup script (e.g., `codex-setup`, `jules-setu
 3. `.agents/common-post-setup` runs last for finalization tasks (if it exists)
 
 This architecture allows you to share common setup logic across all agent systems while customizing setup for specific agents when needed.
+
+Before calling the repository specific setup scripts, each `*-setup` helper
+loads environment variables collected from the task description using `get-task
+--get-setup-env`. This allows workflow commands to configure the environment for
+your own setup hooks.
 
 ## Usage by Agent System
 

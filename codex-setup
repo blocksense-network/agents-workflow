@@ -45,6 +45,11 @@ EXECUTED IMMEDIATELY.
 EOF
 
 bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
+if command -v get-task >/dev/null; then
+  while IFS= read -r line; do
+    export "$line"
+  done < <(get-task --get-setup-env)
+fi
 
 if [ -f .agents/codex-setup ]; then
   .agents/codex-setup

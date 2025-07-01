@@ -3,6 +3,11 @@
 AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
+if command -v get-task >/dev/null; then
+  while IFS= read -r line; do
+    export "$line"
+  done < <(get-task --get-setup-env)
+fi
 
 # We want to run
 if [ -f .agents/open-hands-setup ]; then

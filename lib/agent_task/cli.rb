@@ -11,7 +11,6 @@
 # 1) Starting a new agent branch (you pass the branch name as argument to agent-task)
 # 2) Recording a new task in the current branch (it needs to be a agent branch already)
 
-
 module AgentTask
   # CLI exposes the main binaries as callable methods so the functionality
   # can be reused programmatically. The methods here mirror the behavior
@@ -122,6 +121,7 @@ module AgentTask
       require 'optparse'
       require_relative '../vcs_repo'
       require_relative '../agent_tasks'
+      require_relative '../workflow_commands'
 
       options = {}
       OptionParser.new do |opts|
@@ -206,15 +206,30 @@ module AgentTask
             editor ||= 'nano'
           end
 
-          abort('Error: Failed to open the editor.') unless system("#{editor} #{tempfile.path}")
-          task_content = File.read(tempfile.path)
-          task_content.sub!("\n#{EDITOR_HINT}", '')
-          task_content.sub!(EDITOR_HINT, '')
+          loop do
+            abort('Error: Failed to open the editor.') unless system("#{editor} #{tempfile.path}")
+            task_content = File.read(tempfile.path)
+            task_content.sub!("\n#{EDITOR_HINT}", '')
+            task_content.sub!(EDITOR_HINT, '')
+            task_content.gsub!("\r\n", "\n")
+            abort('Aborted: empty task prompt.') if task_content.strip.empty?
+            errors = WorkflowCommands.validate(task_content, repo.root)
+            break if errors.empty?
+
+            stdout.puts errors.join("\n")
+            stdout.puts 'Press any key to continue or Ctrl+C to abort.'
+            stdin.gets
+          end
         else
           task_content = prompt_content
+          task_content.gsub!("\r\n", "\n")
+          abort('Aborted: empty task prompt.') if task_content.strip.empty?
+          errors = WorkflowCommands.validate(task_content, repo.root)
+          unless errors.empty?
+            stdout.puts errors.join("\n")
+            exit 1
+          end
         end
-        task_content.gsub!("\r\n", "\n")
-        abort('Aborted: empty task prompt.') if task_content.strip.empty?
 
         tasks = AgentTasks.new(repo.root)
         if start_new_branch
@@ -267,12 +282,26 @@ module AgentTask
         opts.on('--autopush', 'Tells the agent to automatically push its changes') do
           options[:autopush] = true
         end
+        opts.on('--get-setup-env', 'Print setup environment variables only') do
+          options[:get_env] = true
+        end
       end.parse!(args)
 
       repos = discover_repos
       if repos.empty?
         puts "Error: Could not find repository root from #{Dir.pwd}"
         exit 1
+      end
+
+      if options[:get_env]
+        env = {}
+        repos.each_value do |at|
+          env.merge!(at.agent_setup_env)
+        rescue StandardError
+          next
+        end
+        puts env.map { |k, v| "#{k}=#{v}" }.join("\n")
+        return
       end
 
       if repos.length == 1 && repos[0][0].nil?
