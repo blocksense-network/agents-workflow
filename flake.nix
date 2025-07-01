@@ -70,6 +70,8 @@
           pkgs.git
           pkgs.fossil
           pkgs.mercurial
+          pkgs.zfs
+          pkgs.btrfs-progs
 
           # AI Coding Assistants (latest versions from nixpkgs-unstable)
           pkgs.goose-cli # Goose AI coding assistant

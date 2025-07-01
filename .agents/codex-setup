@@ -8,6 +8,8 @@ apt-get install -y --no-install-recommends \
   fossil \
   mercurial \
   just \
-  ruby-full
+  ruby-full \
+  zfsutils-linux \
+  btrfs-progs
 
 sudo gem install rubocop

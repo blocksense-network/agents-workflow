@@ -11,7 +11,6 @@
 # 1) Starting a new agent branch (you pass the branch name as argument to agent-task)
 # 2) Recording a new task in the current branch (it needs to be a agent branch already)
 
-
 module AgentTask
   # CLI exposes the main binaries as callable methods so the functionality
   # can be reused programmatically. The methods here mirror the behavior

@@ -1,0 +1,3 @@
+Carry out the first step of the plan in docs/fs-snapshots-workflow.md
+
+If you find out that you miss any software, add it to .agents/codex-setup and the nix flake. Make sure that the flake can be loaded by running any command under nix develop (you'll have to install Nix first)
