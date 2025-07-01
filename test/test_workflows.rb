@@ -24,7 +24,12 @@ class WorkflowTest < Minitest::Test
     assert_includes output, 'hello', 'workflow output missing'
     refute_includes output, '@agents-setup', 'setup directive should not appear'
 
-    cmd = [RepoTestHelper::GET_TASK, '--get-setup-env']
+    cmd = if windows?
+            ['ruby', RepoTestHelper::GET_TASK, '--get-setup-env']
+          else
+            [RepoTestHelper::GET_TASK, '--get-setup-env']
+          end
+
     env_output = IO.popen(cmd, chdir: repo, &:read)
     status2 = $CHILD_STATUS
     assert_equal 0, status2.exitstatus, 'get-task --get-setup-env failed'
