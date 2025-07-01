@@ -36,11 +36,13 @@ start-work --branch-name "<TASK_BRANCH_NAME>" --task-description "<message>"
 <TASK_BRANCH_NAME> should be an appropriate short branch name that describes
 well the task description or developer instructions. "<message>" should be
 a verbatim copy of the task description or developer instructions (including
-new line characters and other punctuation).
+new line characters and other punctuation). When running the shell commands,
+make sure to escape any characters that may cause issues, such as quotes,
+backslashes, and dollar signs.
 
 I REPEAT: THE start-work COMMAND SHOULD BE EXECUTED ONLY IF THE TASK
 DESCRIPTION OR DEVELOPER INSTRUCTIONS ARE NOT "go" AND IT SHOULD BE
-EXECUTED IMMEDIATELY.
+EXECUTED IMMEDIATELY UNDER THE REPOSITORY ROOT.
 
 EOF
 
