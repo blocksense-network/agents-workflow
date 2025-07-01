@@ -107,21 +107,81 @@ class AgentTasks
     @repo.setup_autopush(target_remote, target_branch)
   end
 
-  def agent_prompt
+  def process_workflows(text)
+    require 'shellwords'
+    require 'open3'
+
+    env_vars = {}
+    diagnostics = []
+    output_lines = []
+
+    text.each_line do |line|
+      stripped = line.chomp
+      if stripped.start_with?('/')
+        tokens = Shellwords.split(stripped[1..])
+        cmd = tokens.shift
+        wf_dir = File.join(@repo.root, '.agents', 'workflows')
+        script = File.join(wf_dir, cmd)
+        txt = "#{script}.txt"
+        if File.exist?(script)
+          unless File.executable?(script)
+            begin
+              File.chmod(0o755, script)
+            rescue StandardError
+              diagnostics << "Workflow command '#{cmd}' not executable"
+              next
+            end
+          end
+          stdout_str, stderr_str, status = Open3.capture3(script, *tokens)
+          diagnostics << "$ #{cmd} #{tokens.join(' ')}\n#{stderr_str}" unless status.success?
+          stdout_str.each_line { |l| handle_workflow_line(l.chomp, env_vars, diagnostics, output_lines) }
+        elsif File.exist?(txt)
+          File.read(txt).each_line { |l| handle_workflow_line(l.chomp, env_vars, diagnostics, output_lines) }
+        else
+          diagnostics << "Unknown workflow command '/#{cmd}'"
+        end
+      else
+        handle_workflow_line(stripped, env_vars, diagnostics, output_lines)
+      end
+    end
+
+    [output_lines.join("\n"), env_vars, diagnostics]
+  end
+
+  def handle_workflow_line(line, env_vars, diagnostics, output_lines)
+    if line =~ /^@agents-setup\s+(.*)$/
+      Shellwords.split(Regexp.last_match(1)).each do |pair|
+        var, val = pair.split('=', 2)
+        if env_vars.key?(var) && env_vars[var] != val
+          diagnostics << "Conflicting assignment for #{var}"
+        else
+          env_vars[var] = val
+        end
+      end
+    else
+      output_lines << line
+    end
+  end
+
+  def agent_prompt_with_env
     task_file_contents = File.read(agent_task_file_in_current_branch)
     tasks = task_file_contents.split("\n--- FOLLOW UP TASK ---\n")
-    if tasks.length == 1
-      message = tasks[0]
-    else
-      message = ''
-      tasks.each_with_index do |task_text, index|
-        message += if index.zero?
-                     "You were given the following task:\n#{task_text}\n"
-                   elsif index == tasks.length - 1
-                     "Your current task is:\n#{task_text}\n"
-                   else
-                     "You were given a follow-up task:\n#{task_text}\n"
-                   end
+    message = ''
+    env = {}
+    tasks.each_with_index do |task_text, index|
+      text, vars, = process_workflows(task_text)
+      env.merge!(vars)
+      if tasks.length == 1
+        message = text
+      else
+        prefix = if index.zero?
+                   "You were given the following task:\n"
+                 elsif index == tasks.length - 1
+                   "Your current task is:\n"
+                 else
+                   "You were given a follow-up task:\n"
+                 end
+        message += "#{prefix}#{text}\n"
       end
     end
 
@@ -172,7 +232,12 @@ class AgentTasks
       NIX_MESSAGE
     end
 
-    message
+    [message, env]
+  end
+
+  def agent_prompt
+    msg, = agent_prompt_with_env
+    msg
   end
 
   def agent_prompt_with_autopush_setup(autopush: true)

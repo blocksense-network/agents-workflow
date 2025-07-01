@@ -10,8 +10,6 @@
 #
 # 1) Starting a new agent branch (you pass the branch name as argument to agent-task)
 # 2) Recording a new task in the current branch (it needs to be a agent branch already)
-
-
 module AgentTask
   # CLI exposes the main binaries as callable methods so the functionality
   # can be reused programmatically. The methods here mirror the behavior
@@ -267,6 +265,9 @@ module AgentTask
         opts.on('--autopush', 'Tells the agent to automatically push its changes') do
           options[:autopush] = true
         end
+        opts.on('--get-setup-env', 'Print ENV vars from @agents-setup directives') do
+          options[:get_setup_env] = true
+        end
       end.parse!(args)
 
       repos = discover_repos
@@ -276,7 +277,13 @@ module AgentTask
       end
 
       if repos.length == 1 && repos[0][0].nil?
-        puts repos[0][1].agent_prompt_with_autopush_setup(autopush: options[:autopush])
+        at = repos[0][1]
+        if options[:get_setup_env]
+          _, env = at.agent_prompt_with_env
+          env.each { |k, v| puts "#{k}=#{v}" }
+        else
+          puts at.agent_prompt_with_autopush_setup(autopush: options[:autopush])
+        end
         return
       end
 
@@ -285,8 +292,13 @@ module AgentTask
         next if dir.nil?
 
         begin
-          msg = at.agent_prompt_with_autopush_setup(autopush: options[:autopush])
-          dir_messages << [dir, msg] if msg && !msg.empty?
+          if options[:get_setup_env]
+            _, env = at.agent_prompt_with_env
+            dir_messages << [dir, env.map { |k, v| "#{k}=#{v}" }.join("\n")]
+          else
+            msg = at.agent_prompt_with_autopush_setup(autopush: options[:autopush])
+            dir_messages << [dir, msg] if msg && !msg.empty?
+          end
         rescue StandardError
           next
         end
@@ -296,10 +308,8 @@ module AgentTask
         puts "Error: Could not find repository root from #{Dir.pwd}"
         exit 1
       elsif dir_messages.length == 1
-        # Single repo case: display without directory hints
         puts dir_messages[0][1]
       else
-        # Multiple repos case: display with directory hints
         output = dir_messages.map { |dir, msg| "In directory `#{dir}`:\n#{msg}" }.join("\n\n")
         puts output
       end
