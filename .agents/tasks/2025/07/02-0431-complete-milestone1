@@ -1,0 +1,1 @@
+You've made some progress reaching the milestone described in docs/fs-snapshots/milestone_1.md, part of the larger development plan described in docs/fs-snapshots/overview.md (read this document first). Try to finish the job. If you encounter any missing software, add it to .agents/codex-setup and the nix flake at the root of the repo.
