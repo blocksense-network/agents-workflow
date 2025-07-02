@@ -165,6 +165,8 @@ class WorkflowAdditionalTest < Minitest::Test
   end
 
   def test_setup_script_receives_env_vars
+    skip "Codex setup tests are intended for Linux cloud environments" if windows?
+
     repo, remote = setup_repo(:git)
     create_workflow(repo, 'envgen', <<~SH)
       #!/bin/sh
