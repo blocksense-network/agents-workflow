@@ -41,3 +41,6 @@ If the task description is directly supplied on the command line with `--prompt`
 * Add tests for all of the described functionality. Make sure to test the happy path for shell scripts and ruby programs as workflow commands, as well as with txt files. Make sure to have tests for the correct production of error massages in all possible modes (interactive, --prompt, --prompt-file). Make sure to add test cases for all possible diagnostic message conditions.
 
 * Add a test case that setups a new temp repo that features setup scripts in its `.agents` directory. Simulate running scripts such as `agents-workflow/codex-setup`, `agents-workflow/jules-setup`, etc, when the CWD is set to the temp repository and verify that env vars provided with @agents-setup directives in the task description will be properly loaded and forwarded to the setup scripts from the temp repo. Please note that the `agents-workflow` repo will be moved as a result of calling the setup script, so invoke the setup command with a fresh local clone of the agents-workflow repo for each test or suppress the moving logic for most tests (keep at least one test that enables the logic though).
+
+--- FOLLOW UP TASK ---
+Please implement all test cases described near the end of .agents/tasks/2025/07/01-1348-workflows. Think of any additional test cases that would cover all of the described functionality.
