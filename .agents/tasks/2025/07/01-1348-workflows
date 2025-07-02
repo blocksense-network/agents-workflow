@@ -55,3 +55,8 @@ Let's improve the test cases for the workflows feature:
 
 --- FOLLOW UP TASK ---
 In the tests folder, use indented heredoc strings instead of single-line strings with "\n" characters in order to make the code easier to read.
+
+--- FOLLOW UP TASK ---
+Helpers like   are now defined in multiple places. Refactor the code to use a single definition (probably a regular global function). There are similar helpers for Linux and macOS. They should all be in a single place.
+--- FOLLOW UP TASK ---
+Helpers like `windows?`  are now defined in multiple places. Refactor the code to use a single definition (probably a regular global function). There are similar helpers for Linux and macOS. They should all be in a single place.
