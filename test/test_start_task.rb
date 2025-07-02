@@ -138,7 +138,9 @@ module StartTaskCases # rubocop:disable Metrics/ModuleLength
       repo, remote = setup_repo(self.class::VCS_TYPE)
       dir = Dir.mktmpdir('pf')
       file = File.join(dir, 'msg.txt')
-      File.write(file, "file text\n")
+      File.write(file, <<~TEXT)
+        file text
+      TEXT
       push_flag = self.class::VCS_TYPE != :fossil
       status, = run_agent_task(repo, branch: 'pf1', prompt_file: file, push_to_remote: push_flag, tool: bin)
       # agent-task should succeed when --prompt-file is provided
