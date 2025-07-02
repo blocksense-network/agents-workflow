@@ -135,6 +135,20 @@ variable assignments for the `*-setup` scripts described below.
 @agent-setup DEV_SHELL=csharp TESTED_COMPONENTS+=backend,db
 ```
 
+A directive may either assign a value (`VAR=value`) or append entries to a
+comma‑separated set using the `VAR+=val1,val2` syntax. When multiple directives
+affect the same variable, the following rules apply:
+
+1. Conflicting direct assignments (different values for the same variable)
+   result in an error.
+2. A direct assignment can be combined with one or more appends. The final value
+   contains the assigned value plus all appended entries, regardless of their
+   order.
+3. One or more append operations without a direct assignment simply combine
+   their entries.
+
+Duplicate directives or values are ignored.
+
 ## Supported Agent Systems
 
 This workflow supports setup for multiple AI coding agent systems:
