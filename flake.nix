@@ -60,6 +60,7 @@
         inherit system;
         config.allowUnfree = true; # Allow unfree packages like claude-code
       };
+      isLinux = pkgs.stdenv.isLinux;
     in {
       default = pkgs.mkShell {
         buildInputs = [
@@ -70,14 +71,16 @@
           pkgs.git
           pkgs.fossil
           pkgs.mercurial
-          pkgs.zfs
-          pkgs.btrfs-progs
 
           # AI Coding Assistants (latest versions from nixpkgs-unstable)
           pkgs.goose-cli # Goose AI coding assistant
           pkgs.claude-code # Claude Code - agentic coding tool
           pkgs.gemini-cli # Gemini CLI
           codex.packages.${system}.codex-rs # OpenAI Codex CLI (native Rust implementation)
+        ] ++ pkgs.lib.optionals isLinux [
+          # Linux-only filesystem utilities for snapshot functionality
+          pkgs.zfs # ZFS utilities for copy-on-write snapshots
+          pkgs.btrfs-progs # Btrfs utilities for subvolume snapshots
         ];
 
         shellHook = ''
