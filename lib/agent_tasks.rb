@@ -145,17 +145,32 @@ class AgentTasks
       end
     end
 
-    [output_lines.join("\n"), env_vars, diagnostics]
+    final_env = {}
+    env_vars.each do |var, info|
+      values = []
+      values.concat(info[:direct].split(',').map(&:strip)) if info[:direct]
+      values.concat(info[:append])
+      final_env[var] = values.uniq.join(',')
+    end
+
+    [output_lines.join("\n"), final_env, diagnostics]
   end
 
   def handle_workflow_line(line, env_vars, diagnostics, output_lines)
     if line =~ /^@agents-setup\s+(.*)$/
       Shellwords.split(Regexp.last_match(1)).each do |pair|
-        var, val = pair.split('=', 2)
-        if env_vars.key?(var) && env_vars[var] != val
-          diagnostics << "Conflicting assignment for #{var}"
+        op = pair.include?('+=') ? '+=' : '='
+        var, val = pair.split(op, 2)
+        env_vars[var] ||= { direct: nil, append: [] }
+        entry = env_vars[var]
+        if op == '='
+          if entry[:direct] && entry[:direct] != val
+            diagnostics << "Conflicting assignment for #{var}"
+          else
+            entry[:direct] = val
+          end
         else
-          env_vars[var] = val
+          entry[:append].concat(val.split(','))
         end
       end
     else
@@ -170,7 +185,9 @@ class AgentTasks
     env = {}
     tasks.each_with_index do |task_text, index|
       text, vars, = process_workflows(task_text)
-      env.merge!(vars)
+      env.merge!(vars) do |_k, old_v, new_v|
+        (old_v.split(',') + new_v.split(',')).uniq.join(',')
+      end
       if tasks.length == 1
         message = text
       else
