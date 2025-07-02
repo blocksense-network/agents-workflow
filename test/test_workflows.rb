@@ -13,13 +13,25 @@ class WorkflowTest < Minitest::Test
     wf_dir = File.join(repo, '.agents', 'workflows')
     FileUtils.mkdir_p(wf_dir)
     hello = File.join(wf_dir, 'hello')
-    File.write(hello, "#!/bin/sh\necho hello\necho '@agents-setup FOO=bar'")
+    File.write(hello, <<~SH)
+      #!/bin/sh
+      echo hello
+      echo '@agents-setup FOO=bar'
+    SH
     FileUtils.chmod(0o755, hello)
     bye = File.join(wf_dir, 'bye')
-    File.write(bye, "#!/bin/sh\necho bye")
+    File.write(bye, <<~SH)
+      #!/bin/sh
+      echo bye
+    SH
     FileUtils.chmod(0o755, bye)
 
-    prompt = "/hello   \nThis task uses two workflows.\n/bye   \n@agents-setup BAZ=1"
+    prompt = <<~PROMPT
+      /hello
+      This task uses two workflows.
+      /bye
+      @agents-setup BAZ=1
+    PROMPT
     status, = run_agent_task(repo, branch: 'feat', prompt: prompt, push_to_remote: false)
     # agent-task should succeed when workflows run
     assert_equal 0, status.exitstatus
@@ -72,7 +84,10 @@ class WorkflowAdditionalTest < Minitest::Test
       puts '@agents-setup RUBY_FLAG=1'
     RUBY
 
-    prompt = "This task demonstrates a ruby workflow.\n/ruby_wf   "
+    prompt = <<~PROMPT
+      This task demonstrates a ruby workflow.
+      /ruby_wf
+    PROMPT
     status, = run_agent_task(repo, branch: 'feat', prompt: prompt, push_to_remote: false)
     # agent-task should succeed with ruby workflow
     assert_equal 0, status.exitstatus
@@ -104,7 +119,10 @@ class WorkflowAdditionalTest < Minitest::Test
     FileUtils.mkdir_p(dir)
     File.write(File.join(dir, 'info.txt'), 'hello from txt')
 
-    prompt = "/info\nSome additional details about the task."
+    prompt = <<~PROMPT
+      /info
+      Some additional details about the task.
+    PROMPT
     status, = run_agent_task(repo, branch: 'feat', prompt: prompt, push_to_remote: false)
     # agent-task should succeed with txt workflow
     assert_equal 0, status.exitstatus
@@ -120,9 +138,17 @@ class WorkflowAdditionalTest < Minitest::Test
 
   def test_workflow_with_arguments
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'echo_args', "#!/bin/sh\necho $1 $2")
+    create_workflow(repo, 'echo_args', <<~SH)
+      #!/bin/sh
+      echo $1 $2
+    SH
 
-    prompt = "Before running commands.\n/echo_args foo \"bar baz\"\n/echo_args qux quux   \nAfter commands."
+    prompt = <<~PROMPT
+      Before running commands.
+      /echo_args foo "bar baz"
+      /echo_args qux quux
+      After commands.
+    PROMPT
     status, = run_agent_task(repo, branch: 'feat', prompt: prompt, push_to_remote: false)
     # agent-task should succeed when passing arguments twice
     assert_equal 0, status.exitstatus
@@ -140,15 +166,25 @@ class WorkflowAdditionalTest < Minitest::Test
 
   def test_setup_script_receives_env_vars
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'envgen', "#!/bin/sh\necho '@agents-setup FOO=BAR'")
+    create_workflow(repo, 'envgen', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup FOO=BAR'
+    SH
 
     agents_dir = File.join(repo, '.agents')
     FileUtils.mkdir_p(agents_dir)
     result_file = File.join(repo, 'setup_result')
-    File.write(File.join(agents_dir, 'codex-setup'), "#!/bin/sh\necho $FOO > #{result_file}\n")
+    File.write(File.join(agents_dir, 'codex-setup'), <<~SH)
+      #!/bin/sh
+      echo $FOO > #{result_file}
+    SH
     File.chmod(0o755, File.join(agents_dir, 'codex-setup'))
 
-    prompt = "Prepare env.\n/envgen\nDone."
+    prompt = <<~PROMPT
+      Prepare env.
+      /envgen
+      Done.
+    PROMPT
     status, = run_agent_task(repo, branch: 'feat', prompt: prompt, push_to_remote: false)
     # agent-task should succeed before running setup
     assert_equal 0, status.exitstatus
@@ -159,9 +195,15 @@ class WorkflowAdditionalTest < Minitest::Test
     FileUtils.cp_r(File.join(RepoTestHelper::ROOT, '.'), clone)
 
     stub_dir = Dir.mktmpdir('stubs')
-    File.write(File.join(stub_dir, 'sudo'), "#!/bin/sh\nexit 0\n")
+    File.write(File.join(stub_dir, 'sudo'), <<~SH)
+      #!/bin/sh
+      exit 0
+    SH
     File.chmod(0o755, File.join(stub_dir, 'sudo'))
-    File.write(File.join(stub_dir, 'mv'), "#!/bin/sh\nexit 0\n")
+    File.write(File.join(stub_dir, 'mv'), <<~SH)
+      #!/bin/sh
+      exit 0
+    SH
     File.chmod(0o755, File.join(stub_dir, 'mv'))
 
     path_env = ENV.fetch('PATH', nil)
@@ -194,7 +236,10 @@ class WorkflowDiagnosticsTest < Minitest::Test
   def test_unknown_workflow_command
     repo, remote = setup_repo(:git)
     at = AgentTasks.new(repo)
-    _, _, diagnostics = at.process_workflows("/missing\nTrailing text")
+    _, _, diagnostics = at.process_workflows(<<~PROMPT)
+      /missing
+      Trailing text
+    PROMPT
     # should report missing workflow command
     assert_includes diagnostics, "Unknown workflow command '/missing'"
   ensure
@@ -204,10 +249,19 @@ class WorkflowDiagnosticsTest < Minitest::Test
 
   def test_conflicting_env_assignments
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'a', "#!/bin/sh\necho '@agents-setup VAR=1'")
-    create_workflow(repo, 'b', "#!/bin/sh\necho '@agents-setup VAR=2'")
+    create_workflow(repo, 'a', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR=1'
+    SH
+    create_workflow(repo, 'b', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR=2'
+    SH
     at = AgentTasks.new(repo)
-    _, _, diagnostics = at.process_workflows("/a\n/b")
+    _, _, diagnostics = at.process_workflows(<<~PROMPT)
+      /a
+      /b
+    PROMPT
     # should detect conflicting variable assignments
     assert_includes diagnostics, 'Conflicting assignment for VAR'
   ensure
@@ -217,21 +271,40 @@ class WorkflowDiagnosticsTest < Minitest::Test
 
   def test_assignment_with_appends
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'set', "#!/bin/sh\necho '@agents-setup VAR=base'")
-    create_workflow(repo, 'add', "#!/bin/sh\necho '@agents-setup VAR+=extra'")
+    create_workflow(repo, 'set', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR=base'
+    SH
+    create_workflow(repo, 'add', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR+=extra'
+    SH
     at = AgentTasks.new(repo)
-    _, env1, diagnostics1 = at.process_workflows("/set\n/add")
+    _, env1, diagnostics1 = at.process_workflows(<<~PROMPT)
+      /set
+      /add
+    PROMPT
     # direct assignment followed by append should combine values
     assert_empty diagnostics1
     assert_equal 'base,extra', env1['VAR']
 
-    _, env2, diagnostics2 = at.process_workflows("/add\n/set")
+    _, env2, diagnostics2 = at.process_workflows(<<~PROMPT)
+      /add
+      /set
+    PROMPT
     # append before assignment should yield the same result
     assert_empty diagnostics2
     assert_equal 'base,extra', env2['VAR']
 
-    create_workflow(repo, 'set_dup', "#!/bin/sh\necho '@agents-setup VAR=base'")
-    _, env3, diagnostics3 = at.process_workflows("/set\n/set_dup\n/add")
+    create_workflow(repo, 'set_dup', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR=base'
+    SH
+    _, env3, diagnostics3 = at.process_workflows(<<~PROMPT)
+      /set
+      /set_dup
+      /add
+    PROMPT
     # duplicate direct assignment should not cause diagnostics
     assert_empty diagnostics3
     assert_equal 'base,extra', env3['VAR']
@@ -242,15 +315,27 @@ class WorkflowDiagnosticsTest < Minitest::Test
 
   def test_append_only_combines_values
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'add1', "#!/bin/sh\necho '@agents-setup VAR+=one'")
-    create_workflow(repo, 'add2', "#!/bin/sh\necho '@agents-setup VAR+=two'")
+    create_workflow(repo, 'add1', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR+=one'
+    SH
+    create_workflow(repo, 'add2', <<~SH)
+      #!/bin/sh
+      echo '@agents-setup VAR+=two'
+    SH
     at = AgentTasks.new(repo)
-    _, env1, diagnostics1 = at.process_workflows("/add1\n/add2")
+    _, env1, diagnostics1 = at.process_workflows(<<~PROMPT)
+      /add1
+      /add2
+    PROMPT
     # multiple append directives should accumulate
     assert_empty diagnostics1
     assert_equal 'one,two', env1['VAR']
 
-    _, env2, diagnostics2 = at.process_workflows("/add1\n/add1")
+    _, env2, diagnostics2 = at.process_workflows(<<~PROMPT)
+      /add1
+      /add1
+    PROMPT
     # duplicate append values should be deduplicated
     assert_empty diagnostics2
     assert_equal 'one', env2['VAR']
@@ -261,9 +346,16 @@ class WorkflowDiagnosticsTest < Minitest::Test
 
   def test_workflow_command_failure_reports_stderr
     repo, remote = setup_repo(:git)
-    create_workflow(repo, 'fail', "#!/bin/sh\necho boom >&2\nexit 1")
+    create_workflow(repo, 'fail', <<~SH)
+      #!/bin/sh
+      echo boom >&2
+      exit 1
+    SH
     at = AgentTasks.new(repo)
-    _, _, diagnostics = at.process_workflows("Some text\n/fail   ")
+    _, _, diagnostics = at.process_workflows(<<~PROMPT)
+      Some text
+      /fail
+    PROMPT
     # stderr from failed command should appear in diagnostics
     assert(diagnostics.any? { |l| l.start_with?('$ fail') && l.include?('boom') })
   ensure

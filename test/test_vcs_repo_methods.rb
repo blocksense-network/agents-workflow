@@ -51,7 +51,10 @@ class TestVCSRepoMethods < Minitest::Test
     vcs_repo = VCSRepo.new(repo)
 
     # Create a commit with a specific message
-    test_message = "Test commit message\nWith multiple lines"
+    test_message = <<~MSG.chomp
+      Test commit message
+      With multiple lines
+    MSG
     test_file = File.join(repo, 'test.txt')
     File.write(test_file, 'test content')
 
