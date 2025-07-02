@@ -52,3 +52,6 @@ Let's improve the test cases for the workflows feature:
 2) I'd like some of tests to involve more then one workflow commands.
 3) I'd like some of the task descriptions to be longer, where the workflow command appears as a first line, as a last line (with or without a trailing whitespace), in the middle of the text, with trailing whitespace on the line, etc.
 4) I'd like to see some workflow commands accepting parameters. Make sure some of the parameters are strings that contain spaces.
+
+--- FOLLOW UP TASK ---
+In the tests folder, use indented heredoc strings instead of single-line strings with "\n" characters in order to make the code easier to read.
