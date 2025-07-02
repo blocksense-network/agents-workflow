@@ -3,6 +3,7 @@
 require 'English'
 require 'rbconfig'
 require 'tmpdir'
+require_relative '../lib/platform_helpers'
 require_relative '../lib/vcs_repo'
 
 # Add debugging support when ENV variable is set
@@ -49,10 +50,6 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   ALL_AGENT_TASK_BINARIES = [AGENT_TASK, AGENT_TASK_GEM, GEM_AGENT_TASK_SCRIPT].freeze
   ALL_GET_TASK_BINARIES = [GET_TASK, GET_TASK_GEM, GEM_GET_TASK_SCRIPT].freeze
   ALL_START_WORK_BINARIES = [START_WORK, START_WORK_GEM, GEM_START_WORK_SCRIPT].freeze
-
-  def windows?
-    RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
-  end
 
   def git(repo, *args)
     cmd = ['git', *args]
