@@ -44,3 +44,11 @@ If the task description is directly supplied on the command line with `--prompt`
 
 --- FOLLOW UP TASK ---
 Please implement all test cases described near the end of .agents/tasks/2025/07/01-1348-workflows. Think of any additional test cases that would cover all of the described functionality.
+
+--- FOLLOW UP TASK ---
+Let's improve the test cases for the workflows feature:
+
+1) There is no need to have multiple test files. You can combine them into one, but don't delete any test.
+2) I'd like some of tests to involve more then one workflow commands.
+3) I'd like some of the task descriptions to be longer, where the workflow command appears as a first line, as a last line (with or without a trailing whitespace), in the middle of the text, with trailing whitespace on the line, etc.
+4) I'd like to see some workflow commands accepting parameters. Make sure some of the parameters are strings that contain spaces.
