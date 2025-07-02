@@ -215,6 +215,50 @@ class WorkflowDiagnosticsTest < Minitest::Test
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)
   end
 
+  def test_assignment_with_appends
+    repo, remote = setup_repo(:git)
+    create_workflow(repo, 'set', "#!/bin/sh\necho '@agents-setup VAR=base'")
+    create_workflow(repo, 'add', "#!/bin/sh\necho '@agents-setup VAR+=extra'")
+    at = AgentTasks.new(repo)
+    _, env1, diagnostics1 = at.process_workflows("/set\n/add")
+    # direct assignment followed by append should combine values
+    assert_empty diagnostics1
+    assert_equal 'base,extra', env1['VAR']
+
+    _, env2, diagnostics2 = at.process_workflows("/add\n/set")
+    # append before assignment should yield the same result
+    assert_empty diagnostics2
+    assert_equal 'base,extra', env2['VAR']
+
+    create_workflow(repo, 'set_dup', "#!/bin/sh\necho '@agents-setup VAR=base'")
+    _, env3, diagnostics3 = at.process_workflows("/set\n/set_dup\n/add")
+    # duplicate direct assignment should not cause diagnostics
+    assert_empty diagnostics3
+    assert_equal 'base,extra', env3['VAR']
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
+  def test_append_only_combines_values
+    repo, remote = setup_repo(:git)
+    create_workflow(repo, 'add1', "#!/bin/sh\necho '@agents-setup VAR+=one'")
+    create_workflow(repo, 'add2', "#!/bin/sh\necho '@agents-setup VAR+=two'")
+    at = AgentTasks.new(repo)
+    _, env1, diagnostics1 = at.process_workflows("/add1\n/add2")
+    # multiple append directives should accumulate
+    assert_empty diagnostics1
+    assert_equal 'one,two', env1['VAR']
+
+    _, env2, diagnostics2 = at.process_workflows("/add1\n/add1")
+    # duplicate append values should be deduplicated
+    assert_empty diagnostics2
+    assert_equal 'one', env2['VAR']
+  ensure
+    FileUtils.remove_entry(repo) if repo && File.exist?(repo)
+    FileUtils.remove_entry(remote) if remote && File.exist?(remote)
+  end
+
   def test_workflow_command_failure_reports_stderr
     repo, remote = setup_repo(:git)
     create_workflow(repo, 'fail', "#!/bin/sh\necho boom >&2\nexit 1")
