@@ -1,44 +1,68 @@
 ## Overview
 
-This repository provides an opinionated workflow designed to
-enhance the performace of teams working with coding agents,
-such as OpenAI Codex, Claude Code, Google Jules, GitHub Copilot,
-Goose, OpenHands and others.
+This repository provides a highly-opinionated workflow for working
+with cloud and local coding agents, such as Claude Code, Codex, GitHub
+Copilot, Jules, Gemini, Goose, OpenHands and others.
 
-The workflow standardizes how tasks are defined, and tracked,
-leveraging your VCS (e.g. git) as the primary driving interface.
+## Goals
 
-## Purpose
+The workflow adheres to the following principles, which are implemened
+both when workign with local agents and when working with remote agents:
 
-The primary goal of this workflow is to:
+1.  **The developer provides a coding task through a convenient command-line interface**
 
-1.  **Use git as the primary interface for driving Codex:**
+3.  **The agent works in a secure sandbox environment, without asking for confirmation when using tools**
 
-    Provides a convenient way to assign tasks to Codex right
-    from your command-line.
+4.  **The agent presents a complete patch/PR once it reaches a stage where all tests and linters are green**
 
-2.  **Maintain a transparent history:**
+5.  **It's easy to start multiple tasks in parallel from the current state of your working tree**
 
-    All task descriptions are committed to Git, creating an
-    auditable trail and a knowledge base demonstrating how
-    tasks are approached and solved.
+6.  **All tasks are recorded as commits/files in the history of the project**
 
-    This allows team members to learn from each other's practices
-    and makes `git blame` an effective tool for understanding the
-    intention behind all code. The workflow injects instructions
-    that teach the agents how to leverage this.
+Pushing to git becomes the primary interface for starting cloud agents.
+All other interactions with the web UIs of the agents are automated.
 
-3.  **Deal with the current limitations around internet connectivity:**
+Committing all task descriptions in git creates an auditable trail and
+a knowledge base demonstrating how tasks are approached and solved.
 
-    By pre-fetching internet resources mentioned in the task
-    descriptions, agents such as Codex are more successful at
-    dealing with problems that require information that is not
-    part of the codebase.
+This allows team members to learn from each other's practices and makes
+`git blame` an effective tool for understanding the intention behind all
+code. The workflow injects instructions that teach the agents how to
+leverage this.
 
-4.  **Simplify the agents workspace setup:**
+Local agents are started is devcontainers with rich support for different
+interaction patterns:
 
-    The `.agents/codex-setup` script is stored in your repository,
-    simplifying the maintainance of the workspace.
+- Start one Editor/IDE instance per task to observe the work of the agent
+  and review the final
+
+- Push to a designated branch automatically or create a PR.
+
+## Other Practical Benefits
+
+* Local agents can leverage ZFS and Btrfs snapshots to provide the best
+  possible agent-start up time. The agent takes advantage of incremental
+  compilation when building the project and its test suite.
+
+* The same start-up time and incremental compilations are possible when
+  you dispatch the coding tasks to a cluster of self-managed machines in
+  an office environment or a private cloud.
+
+* The workflow smooths out the differences between different agent tools
+  and cloud environments. Everything can be handled through shared config
+  and user interfaces.
+
+  The behavior of the cloud agents is modified through prompt engineering
+  and automation to implement new workflows such as automatically creating
+  PRs, automatically pushing to specific branches, etc.
+
+* The workflow provides a helpful framework for automatically downloading
+  relevant internet resources before coding tasks start for agents that
+  need to operate offline.
+
+* The workflow provides a framework for working in big monorepos that speeds
+  up agent start-up times (both locally and it the cloud) and helps with
+  managing the context of the agent in such repositories.
 
 ## Using the Workflow
 
@@ -89,14 +113,27 @@ The primary goal of this workflow is to:
 
 ### Workflow Commands
 
-Task descriptions may include lines beginning with `/name`. When `get-task`
-is executed these lines are replaced with the output of a matching program in
-`.agents/workflows/name` (or the contents of `.agents/workflows/name.txt`).
+Task descriptions may include lines beginning with `/` (e.g. `/front-end-task`).
+
+When `get-task` is executed, these lines are replaced with the output of a
+matching programs or text files in the `.agents/workflows` folder of your
+repository.
+
+In other words, in the example above, `get-task` will look either for an
+executable stored in `.agents/workflows/front-end-task` or for a text file
+located at `.agents/workflows/front-end-task.txt` (the contents of this file
+will take the place of the workflow command in the task description, like a
+macro in a programming language).
+
+Executables are typically used when the workflow command has parameters.
+
 Lines starting with `@agents-setup` in either the task file or the workflow
 output are stripped from the final message and interpreted as environment
-variable assignments. These variables can be listed with `get-task --get-setup-env`
-and are automatically exported by the `*-setup` scripts before executing the
-project-specific setup steps.
+variable assignments for the `*-setup` scripts described below.
+
+```shell
+@agent-setup DEV_SHELL=csharp TESTED_COMPONENTS+=backend,db
+```
 
 ## Supported Agent Systems
 
