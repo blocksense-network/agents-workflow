@@ -14,6 +14,9 @@ class TestSnapshotProvider < Minitest::Test
     provider = Snapshot.provider_for(repo)
     # provider should be some Snapshot::Provider subclass
     assert_kind_of Snapshot::Provider, provider
+
+    # On non-Linux systems, should fall back to CopyProvider
+    assert_kind_of Snapshot::CopyProvider, provider if macos? || windows?
   ensure
     FileUtils.remove_entry(repo) if repo && File.exist?(repo)
     FileUtils.remove_entry(remote) if remote && File.exist?(remote)

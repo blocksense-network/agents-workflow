@@ -10,6 +10,8 @@ class TestOverlayProvider < Minitest::Test
   include RepoTestHelper
 
   def test_overlay_provider_detection
+    skip 'OverlayFS tests only run on Linux' unless linux?
+
     repo, remote = setup_repo(:git)
     Snapshot::ZfsProvider.stub(:available?, false) do
       Snapshot::BtrfsProvider.stub(:available?, false) do
@@ -24,6 +26,7 @@ class TestOverlayProvider < Minitest::Test
   end
 
   def test_create_and_cleanup_workspace
+    skip 'OverlayFS tests only run on Linux' unless linux?
     skip 'OverlayFS not available' unless Snapshot::OverlayFsProvider.available?('.')
 
     repo, remote = setup_repo(:git)

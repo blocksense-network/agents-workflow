@@ -6,6 +6,9 @@ module Snapshot
   # ZFS snapshot implementation
   class ZfsProvider < Provider
     def self.available?(path)
+      # ZFS is only available on Linux in this implementation
+      return false unless RUBY_PLATFORM.include?('linux')
+
       system('which', 'zfs', out: File::NULL, err: File::NULL) &&
         fs_type(path) == 'zfs'
     end

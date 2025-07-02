@@ -4,7 +4,12 @@ module Snapshot
   # OverlayFS snapshot using a temporary overlay mount
   class OverlayFsProvider < Provider
     def self.available?(_path)
-      File.read('/proc/filesystems').include?('overlay')
+      # OverlayFS is only available on Linux
+      return false unless RUBY_PLATFORM.include?('linux')
+
+      # Check if /proc/filesystems exists and contains overlay
+      File.exist?('/proc/filesystems') &&
+        File.read('/proc/filesystems').include?('overlay')
     end
 
     def create_workspace(dest)

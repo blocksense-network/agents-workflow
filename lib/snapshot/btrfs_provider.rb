@@ -6,6 +6,9 @@ module Snapshot
   # Btrfs subvolume snapshot implementation
   class BtrfsProvider < Provider
     def self.available?(path)
+      # Btrfs is only available on Linux in this implementation
+      return false unless RUBY_PLATFORM.include?('linux')
+
       system('which', 'btrfs', out: File::NULL, err: File::NULL) &&
         fs_type(path) == 'btrfs'
     end
