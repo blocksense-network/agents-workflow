@@ -106,10 +106,10 @@ class AgentTasks
 
     @repo.setup_autopush(target_remote, target_branch)
   end
-
   def process_workflows(text)
     require 'shellwords'
     require 'open3'
+    require 'rbconfig'
 
     env_vars = {}
     diagnostics = []
@@ -132,7 +132,7 @@ class AgentTasks
               next
             end
           end
-          stdout_str, stderr_str, status = Open3.capture3(script, *tokens)
+          stdout_str, stderr_str, status = execute_script(script, tokens)
           diagnostics << "$ #{cmd} #{tokens.join(' ')}\n#{stderr_str}" unless status.success?
           stdout_str.each_line { |l| handle_workflow_line(l.chomp, env_vars, diagnostics, output_lines) }
         elsif File.exist?(txt)
@@ -256,9 +256,92 @@ class AgentTasks
     msg, = agent_prompt_with_env
     msg
   end
-
   def agent_prompt_with_autopush_setup(autopush: true)
     setup_autopush if autopush && on_task_branch?
     agent_prompt
+  end
+
+  private
+
+  def windows?
+    RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+  end
+  def execute_script(script_path, args)
+    require 'open3'
+    
+    if windows?
+      # On Windows, handle different file extensions and try to use appropriate interpreters
+      ext = File.extname(script_path).downcase
+      
+      case ext
+      when '.bat', '.cmd'
+        return Open3.capture3('cmd', '/c', script_path, *args)
+      when '.rb'
+        return Open3.capture3('ruby', script_path, *args)
+      when '.py'
+        return Open3.capture3('python', script_path, *args)
+      when '.js'
+        return Open3.capture3('node', script_path, *args)
+      when '.ps1'
+        return Open3.capture3('powershell', '-ExecutionPolicy', 'Bypass', '-File', script_path, *args)
+      else
+        # For extensionless files or shell scripts, check if bash is available
+        if bash_available?
+          # Use bash directly for shell scripts
+          return Open3.capture3('bash', script_path, *args)
+        else
+          # Fallback: check shebang and try to extract interpreter
+          if File.exist?(script_path) && File.size(script_path) > 0
+            first_line = File.open(script_path, 'r') { |f| f.readline.chomp } rescue ''
+            
+            if first_line.start_with?('#!')
+              interpreter = extract_interpreter_from_shebang(first_line)
+              return Open3.capture3(interpreter, script_path, *args)
+            else
+              return ['', "Cannot execute script on Windows without bash: #{script_path}", OpenStruct.new(success?: false, exitstatus: 1)]
+            end
+          else
+            return ['', "Script file not found or empty: #{script_path}", OpenStruct.new(success?: false, exitstatus: 1)]
+          end
+        end
+      end
+    else
+      # On Unix systems, execute normally
+      return Open3.capture3(script_path, *args)
+    end
+  end
+
+  def bash_available?
+    @bash_available ||= system('bash --version > NUL 2>&1') if windows?
+    @bash_available || !windows?
+  end
+
+  def extract_interpreter_from_shebang(shebang)
+    # Extract interpreter from shebang line
+    full_line = shebang.sub(/^#!/, '').strip
+    
+    case full_line
+    when /^\/usr\/bin\/env\s+(.+)/
+      $1.split.first  # Handle cases like "/usr/bin/env ruby" or "/usr/bin/env python3"
+    when /\/bin\/sh$/, /\/usr\/bin\/sh$/
+      bash_available? ? 'bash' : 'sh'
+    when /\/bin\/bash$/, /\/usr\/bin\/bash$/
+      bash_available? ? 'bash' : 'sh'
+    when /ruby/
+      'ruby'
+    when /python/
+      'python'
+    when /node/
+      'node'
+    else
+      # Try to get just the basename
+      basename = File.basename(full_line.split.first)
+      case basename
+      when 'sh', 'bash'
+        bash_available? ? 'bash' : 'sh'
+      else
+        basename
+      end
+    end
   end
 end
