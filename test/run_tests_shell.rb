@@ -101,7 +101,11 @@ class ShellTestRunner
       Minitest.reporter = VerboseProgressReporter.new
 
       # Load all test files
-      Dir["test_*.rb"].sort.each do |test_file|
+      test_files = []
+      test_files.concat(Dir["test_*.rb"].sort)
+      test_files.concat(Dir["snapshot/test_*.rb"].sort)
+
+      test_files.each do |test_file|
         puts "Loading: \#{File.basename(test_file)}"
         require File.expand_path(test_file)
       end

@@ -54,6 +54,14 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
     RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
   end
 
+  def linux?
+    RbConfig::CONFIG['host_os'] =~ /linux/
+  end
+
+  def macos?
+    RbConfig::CONFIG['host_os'] =~ /darwin/
+  end
+
   def git(repo, *args)
     cmd = ['git', *args]
     env = {
