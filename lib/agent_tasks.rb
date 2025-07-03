@@ -263,8 +263,7 @@ class AgentTasks
 
   def agent_prompt_with_autopush_setup(autopush: true)
     setup_autopush if autopush && on_task_branch?
-    agent_prompt
-  end
+    agent_prompt  end
 
   private
 
@@ -318,8 +317,7 @@ class AgentTasks
   end
 
   def bash_available?
-    @bash_available ||= system('bash --version > NUL 2>&1') if windows?
-    @bash_available || !windows?
+    @bash_available ||= !windows? || system('bash --version > NUL 2>&1')
   end
 
   def extract_interpreter_from_shebang(shebang)

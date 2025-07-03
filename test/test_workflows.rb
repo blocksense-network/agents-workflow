@@ -4,6 +4,7 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require_relative 'test_helper'
+require_relative '../lib/agent_tasks'
 
 class WorkflowTest < Minitest::Test
   include RepoTestHelper
