@@ -63,7 +63,7 @@ module ProviderCoreTestBehavior
 
     # Test with invalid destination
     invalid_dest = '/root/invalid_provider_test'
-    assert_raises(RuntimeError, Errno::EACCES) do
+    assert_raises(RuntimeError, Errno::EACCES, Errno::EROFS) do
       provider.create_workspace(invalid_dest)
     end
 

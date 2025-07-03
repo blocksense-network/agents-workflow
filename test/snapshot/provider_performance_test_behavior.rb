@@ -42,8 +42,9 @@ module ProviderPerformanceTestBehavior
     provider = create_test_provider
     return skip provider_skip_reason if provider_skip_reason
 
-    workspaces = []
+    workspace_results = {}
     threads = []
+    mutex = Mutex.new
 
     begin
       # Create multiple workspaces concurrently
@@ -51,12 +52,14 @@ module ProviderPerformanceTestBehavior
       concurrent_count.times do |i|
         threads << Thread.new do
           workspace_dir = create_workspace_destination("concurrent_#{i}")
-          workspaces << workspace_dir
           result_path = provider.create_workspace(workspace_dir)
 
           # Simulate some work
           sleep(0.1)
           File.write(File.join(result_path, "thread_#{i}.txt"), "thread #{i} content")
+
+          # Thread-safe storage of results
+          mutex.synchronize { workspace_results[i] = workspace_dir }
         end
       end
 
@@ -64,7 +67,9 @@ module ProviderPerformanceTestBehavior
       threads.each(&:join)
 
       # Verify all workspaces were created successfully
-      workspaces.each_with_index do |ws, i|
+      concurrent_count.times do |i|
+        ws = workspace_results[i]
+        assert ws, "Workspace #{i} should be recorded"
         assert File.exist?(File.join(ws, 'README.md')),
                "Concurrent workspace #{i} should contain README.md"
         assert File.exist?(File.join(ws, "thread_#{i}.txt")),
@@ -72,7 +77,7 @@ module ProviderPerformanceTestBehavior
       end
     ensure
       # Cleanup all workspaces
-      workspaces.each do |ws|
+      workspace_results.each_value do |ws|
         begin
           provider.cleanup_workspace(ws) if File.exist?(ws)
         rescue StandardError => e

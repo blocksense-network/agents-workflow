@@ -245,7 +245,7 @@ class TestCopyProvider < Minitest::Test
 
     # Test with invalid destination permissions
     invalid_dest = '/root/invalid_copy_test'
-    assert_raises(Errno::EACCES, RuntimeError) do
+    assert_raises(Errno::EACCES, RuntimeError, Errno::EROFS) do
       provider.create_workspace(invalid_dest)
     end
 
