@@ -306,20 +306,23 @@ class TestCopyProvider < Minitest::Test
     File.write(File.join(repo, 'shared_file.txt'), 'shared content')
 
     provider = Snapshot::CopyProvider.new(repo)
-    workspaces = []
+    workspace_results = {}
     threads = []
+    mutex = Mutex.new
 
     begin
       # Create multiple workspaces concurrently
       5.times do |i|
         threads << Thread.new do
           workspace_dir = Dir.mktmpdir("concurrent_copy_#{i}")
-          workspaces << workspace_dir
           result_path = provider.create_workspace(workspace_dir)
 
           # Each thread modifies its own workspace
           File.write(File.join(result_path, "thread_#{i}.txt"), "thread #{i} content")
           sleep(0.1) # Simulate some work
+
+          # Thread-safe storage of results
+          mutex.synchronize { workspace_results[i] = workspace_dir }
         end
       end
 
@@ -327,21 +330,23 @@ class TestCopyProvider < Minitest::Test
       threads.each(&:join)
 
       # Verify all workspaces were created successfully and independently
-      workspaces.each_with_index do |ws, i|
-        assert File.exist?(File.join(ws, 'README.md'))
-        assert File.exist?(File.join(ws, 'shared_file.txt'))
-        assert File.exist?(File.join(ws, "thread_#{i}.txt"))
+      5.times do |i|
+        ws = workspace_results[i]
+        assert ws, "Workspace #{i} should be recorded"
+        assert File.exist?(File.join(ws, 'README.md')), "Workspace #{i} should contain README.md"
+        assert File.exist?(File.join(ws, 'shared_file.txt')), "Workspace #{i} should contain shared_file.txt"
+        assert File.exist?(File.join(ws, "thread_#{i}.txt")), "Workspace #{i} should contain thread_#{i}.txt"
 
         # Verify other threads' files don't exist
         (0...5).each do |j|
           next if j == i
 
-          refute File.exist?(File.join(ws, "thread_#{j}.txt"))
+          refute File.exist?(File.join(ws, "thread_#{j}.txt")), "Workspace #{i} should not contain thread_#{j}.txt"
         end
       end
     ensure
       # Cleanup all workspaces
-      workspaces.each do |ws|
+      workspace_results.each_value do |ws|
         provider.cleanup_workspace(ws) if File.exist?(ws)
       end
       FileUtils.remove_entry(repo) if repo && File.exist?(repo)
