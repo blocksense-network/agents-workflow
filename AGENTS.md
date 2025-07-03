@@ -6,9 +6,10 @@
 
 ## 🧪 Testing Tips
 
-- **Fix individual tests first**: `ruby -Itest test/test_file.rb -n test_method_name`
-- **Parent directory tests**: Require repos to be on agent task branches (not main)
-- **Full logs**: Available in `test/logs/` (path shown after test runs)
+When the test suite fails and you want to test potential fixes, try running only the affected
+tests firsts:
+
+`ruby -Itest test/test_file.rb -n test_method_name`
 
 ## Keeping notes
 

@@ -61,6 +61,24 @@ class TestCopyProvider < Minitest::Test
     false # Copy provider doesn't support CoW
   end
 
+  def create_workspace_destination(suffix = nil)
+    base_name = suffix ? "copy_workspace_#{suffix}" : 'copy_workspace'
+    Dir.mktmpdir(base_name)
+  end
+
+  def cleanup_test_workspace(workspace_dir)
+    FileUtils.rm_rf(workspace_dir) if workspace_dir && File.exist?(workspace_dir)
+  end
+
+  def test_repo_content
+    'test repo content'
+  end
+
+  def verify_cleanup_behavior(workspace_dir, _result_path)
+    # For copy provider, cleanup should completely remove the workspace
+    refute File.exist?(workspace_dir), 'Workspace directory should not exist after cleanup'
+  end
+
   public
 
   # === Provider-specific tests ===

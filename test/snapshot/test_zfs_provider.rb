@@ -7,11 +7,13 @@ require_relative '../test_helper'
 require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
 require_relative 'provider_loop_device_test_behavior'
+require_relative 'filesystem_space_utils'
 require_relative '../../lib/snapshot/provider'
 
 # Comprehensive tests for ZFS provider combining generic and specific tests
 class TestZfsProvider < Minitest::Test
   include RepoTestHelper
+  include FilesystemSpaceUtils
   include ProviderSharedBehavior
   include ProviderQuotaTestBehavior
   include ProviderLoopDeviceTestBehavior
@@ -69,7 +71,7 @@ class TestZfsProvider < Minitest::Test
   end
 
   def measure_space_usage
-    pool_used_space
+    zfs_pool_used_space(@pool_name)
   end
 
   def expected_max_space_usage
@@ -189,13 +191,13 @@ class TestZfsProvider < Minitest::Test
 
     begin
       # Measure space before snapshot
-      space_before = pool_used_space
+      space_before = zfs_pool_used_space(@pool_name)
 
       # Create workspace
       provider.create_workspace(workspace_dir)
 
       # Measure space after snapshot (should be minimal due to CoW)
-      space_after = pool_used_space
+      space_after = zfs_pool_used_space(@pool_name)
       space_used = space_after - space_before
 
       # Snapshot should use minimal space (less than 1MB for metadata)
@@ -248,22 +250,5 @@ class TestZfsProvider < Minitest::Test
       return name if path.start_with?(mountpoint)
     end
     nil
-  end
-
-  def pool_used_space
-    output = `zpool list -H -o used #{@pool_name} 2>/dev/null`.strip
-    return 0 if output.empty?
-
-    # Convert output to bytes (handles K, M, G suffixes)
-    case output
-    when /(\d+(?:\.\d+)?)K/
-      (::Regexp.last_match(1).to_f * 1024).to_i
-    when /(\d+(?:\.\d+)?)M/
-      (::Regexp.last_match(1).to_f * 1024 * 1024).to_i
-    when /(\d+(?:\.\d+)?)G/
-      (::Regexp.last_match(1).to_f * 1024 * 1024 * 1024).to_i
-    else
-      output.to_i
-    end
   end
 end

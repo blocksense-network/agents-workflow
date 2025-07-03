@@ -9,12 +9,14 @@ require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
 require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
+require_relative 'filesystem_space_utils'
 require_relative '../../lib/snapshot/provider'
 
 # Comprehensive tests for Btrfs provider combining generic and specific tests
 class TestBtrfsProvider < Minitest::Test
   include RepoTestHelper
   include FilesystemTestHelper
+  include FilesystemSpaceUtils
   include ProviderSharedBehavior
   include ProviderQuotaTestBehavior
   include ProviderLoopDeviceTestBehavior
@@ -73,7 +75,7 @@ class TestBtrfsProvider < Minitest::Test
   end
 
   def measure_space_usage
-    filesystem_used_space
+    btrfs_filesystem_used_space(@mount_point)
   end
 
   def expected_max_space_usage
@@ -230,13 +232,13 @@ class TestBtrfsProvider < Minitest::Test
 
     begin
       # Measure space before snapshot
-      space_before = filesystem_used_space
+      space_before = btrfs_filesystem_used_space(@mount_point)
 
       # Create workspace
       provider.create_workspace(workspace_dir)
 
       # Measure space after snapshot (should be minimal due to CoW)
-      space_after = filesystem_used_space
+      space_after = btrfs_filesystem_used_space(@mount_point)
       space_used = space_after - space_before
 
       # Snapshot should use minimal space (less than 512KB for metadata)
@@ -334,27 +336,5 @@ class TestBtrfsProvider < Minitest::Test
     output = `btrfs subvolume show #{path} 2>/dev/null`
     match = output.match(/Subvolume ID:\s+(\d+)/)
     match ? match[1] : nil
-  end
-
-  def filesystem_used_space
-    output = `btrfs filesystem usage #{@mount_point} 2>/dev/null`
-    match = output.match(/Used:\s+(\d+(?:\.\d+)?)\s*(\w+)/)
-    return 0 unless match
-
-    value = match[1].to_f
-    unit = match[2].upcase
-
-    case unit
-    when 'B', 'BYTES'
-      value.to_i
-    when 'K', 'KB', 'KIB'
-      (value * 1024).to_i
-    when 'M', 'MB', 'MIB'
-      (value * 1024 * 1024).to_i
-    when 'G', 'GB', 'GIB'
-      (value * 1024 * 1024 * 1024).to_i
-    else
-      value.to_i
-    end
   end
 end
