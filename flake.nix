@@ -29,7 +29,7 @@
             pkgs.gemini-cli
             codex.packages.${system}.codex-rs
           ]}:$PATH
-          exec ruby ${./bin/agent-task} "$@"
+          exec ruby -I ${./lib} ${./bin/agent-task} "$@"
         '';
         get-task = pkgs.writeShellScriptBin "get-task" ''
           exec ${pkgs.ruby}/bin/ruby ${./bin/get-task} "$@"

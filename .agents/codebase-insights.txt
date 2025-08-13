@@ -19,3 +19,8 @@
 - Set EXTRAS="nix,direnv,cachix" with flexible delimiter parsing
 - Uses Rake tasks in Rakefile.extras for dependency resolution
 
+## Nix Packaging
+- `nix run` uses a wrapper that now adds the project's `lib` directory to the Ruby load
+  path. Executables should `require` files via the load path rather than relative paths
+  so they work when copied into the Nix store.
+
