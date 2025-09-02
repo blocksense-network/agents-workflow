@@ -23,6 +23,7 @@ exclude = [
   "^https://docs.opencode.dev/.*",
   "/en/docs/.*",
   "^https://www.electronjs.org/.*",
+  "^https://lwn.net/.*",
 ]
 
 # Be lenient with intermittent CDN/SSL issues
