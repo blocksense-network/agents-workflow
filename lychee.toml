@@ -24,6 +24,7 @@ exclude = [
   "/en/docs/.*",
   "^https://www.electronjs.org/.*",
   "^https://lwn.net/.*",
+  "^https://news.ycombinator.com/.*",
 ]
 
 # Be lenient with intermittent CDN/SSL issues
