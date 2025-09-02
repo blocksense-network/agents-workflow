@@ -1,0 +1,81 @@
+## AgentFS Control Messages — Delivery and Wire Contract
+
+### Overview
+
+AgentFS exposes a small control plane to manage snapshots and branches on a mounted filesystem volume. The CLI (`aw agent fs ...`) and other tools communicate with the running user‑space filesystem server (adapter) using OS‑specific transports, but the payloads and semantics are shared.
+
+### Operations
+
+- snapshot.create — create a new snapshot (optional name)
+- snapshot.list — list existing snapshots
+- branch.create — create a writable branch from a snapshot (optional name)
+- branch.bind — bind the current (or specified) process to a branch view
+
+All ops carry a `version` field. Current value: `"1"`.
+
+### Schemas
+
+- Request JSON Schema: `specs/Public/Schemas/agentfs-control.request.schema.json`
+- Response JSON Schema: `specs/Public/Schemas/agentfs-control.response.schema.json`
+
+Adapters and clients MUST validate messages against these schemas. For high‑performance paths, compact structs may be used, but they MUST remain semantically equivalent to the JSON schema and include a version field.
+
+### Error Mapping
+
+- Success responses follow the op‑specific response schema.
+- Errors return `{ "error": string, "code": integer? }`:
+  - Windows: adapter maps internal status to NTSTATUS and also returns an error JSON in the output buffer when applicable.
+  - FUSE/FSKit: adapter returns `-errno`; any JSON body is optional, but recommended for diagnostics.
+
+### Transports by Platform
+
+#### Windows (WinFsp)
+
+- Transport: `DeviceIoControl` on the mounted volume handle, handled by WinFsp `FSP_FILE_SYSTEM_INTERFACE::Control`.
+- Requirements (per winfsp.h `Control` docs):
+  - IOCTL code uses a DeviceType with bit `0x8000` set and `METHOD_BUFFERED`.
+  - Input/Output buffers are small and copied via the FSD.
+- Client steps:
+  1. `HANDLE h = CreateFileW(L"\\\\.\\X:", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, ...)`.
+  2. Build request JSON, e.g. `{ "version":"1", "op":"snapshot.create", "name":"clean" }`.
+  3. `DeviceIoControl(h, IOCTL_AGENTFS_SNAPSHOT_CREATE, inBuf, inLen, outBuf, outLen, &bytes, NULL)`.
+- Server behavior:
+  - Parse request, call `FsCore::{snapshot_create|snapshot_list|branch_create_from_snapshot|bind_process_to_branch}`.
+  - Write a response JSON per schema; map errors to NTSTATUS on return.
+
+#### Linux/macOS (FUSE)
+
+- Transport: `ioctl` on a special control file inside the mount, e.g. `<MOUNT>/.agentfs/control`.
+- Client steps:
+  1. `int fd = open("<MOUNT>/.agentfs/control", O_RDWR)`.
+  2. Issue `ioctl(fd, AGENTFS_IOCTL_CMD, &buffer)` where buffer contains request JSON.
+  3. On success, read response JSON from the same buffer; `ioctl` returns `0`. Errors return `-errno`.
+- Server behavior:
+  - Implement libfuse `.ioctl` for the control file only; ignore for other inodes.
+  - Validate requests against schema, call `FsCore` methods, and copy response JSON to user buffer.
+
+#### macOS (FSKit)
+
+- Preferred transport: XPC to the FS extension. Define a narrow XPC interface that carries the same JSON request/response as the schemas above.
+- Fallback: the control file approach identical to FUSE (`<MOUNT>/.agentfs/control`).
+- Server behavior:
+  - XPC endpoint parses request, calls `FsCore`, and returns a response JSON.
+
+### Security and Access Control
+
+- Restrict control plane access to trusted principals:
+  - Windows: inspect caller token in the Control handler.
+  - FUSE: set strict permissions on `.agentfs` (e.g. root:root, 0700) or validate UID/GID at the adapter.
+  - FSKit: enforce entitlement and XPC validation; deny untrusted senders.
+- Validate string sizes and enforce reasonable limits on names and counts.
+
+### Versioning
+
+- Requests include `version`. Servers MUST reject unsupported versions with an error.
+- New ops or fields SHOULD be additive; when incompatible changes are required, bump `version`.
+
+### Notes for Adapter Implementers
+
+- WinFsp: `Control` requires METHOD_BUFFERED and a `0x8000` DeviceType; see `reference_projects/winfsp/inc/winfsp/winfsp.h` for details. Keep responses small.
+- FUSE: consult `reference_projects/libfuse/example/ioctl.c` for a pattern; ensure the handler only applies to the control file inode.
+- FSKit: model XPC after `FSKitSample` structure; route through the extension’s process, not the app UI.

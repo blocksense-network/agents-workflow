@@ -965,6 +965,13 @@ ARGUMENTS:
   TASK_ID                    Remote task ID to monitor
 ```
 
+- Filesystem (AgentFS) snapshot/branch utilities:
+  - `aw agent fs snapshot create [--name <NAME>] --mount <MOUNT>` — Create an AgentFS snapshot on a mounted volume. Translates to platform control: WinFsp DeviceIoControl, FUSE ioctl to `.agentfs/control`, or FSKit XPC.
+  - `aw agent fs snapshot list --mount <MOUNT>` — List snapshots on the volume.
+  - `aw agent fs branch create --from <SNAPSHOT_ID> [--name <NAME>] --mount <MOUNT>` — Create a writable branch from a snapshot.
+  - `aw agent fs branch bind --branch <BRANCH_ID> --mount <MOUNT> [--pid <PID>]` — Bind the current (or specified) process to the branch view.
+  - `aw agent fs branch exec --branch <BRANCH_ID> --mount <MOUNT> -- <COMMAND> [ARGS...]` — Bind then exec a command within the branch context.
+
 ### Subcommand Implementation Strategy
 
 The `aw` executable lazily requires Ruby modules on demand based on the entered subcommand to minimize startup time (e.g., dispatch parses argv, then `require 'aw/subcommands/tasks'` only when `task` is invoked).
