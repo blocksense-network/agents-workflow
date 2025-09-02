@@ -118,6 +118,21 @@
             files = "\\.md$";
           };
         };
+        # Ensure all hook entries (language = "system") have their executables available
+        # when running in CI or via `nix flake check` (outside the dev shell).
+        tools = {
+          # Commands invoked by hooks or scripts they call
+          prettier = pkgs.nodePackages.prettier;
+          rubocop = pkgs.rubocop;
+          shfmt = pkgs.shfmt;
+          taplo = pkgs.taplo;
+          lychee = pkgs.lychee;
+          markdownlint-cli2 = pkgs.nodePackages.markdownlint-cli2;
+          cspell = pkgs.nodePackages.cspell;
+          just = pkgs.just; # for the lint-specs hook
+          rg = pkgs.ripgrep; # used by check-merge-conflict
+          mmdc = pkgs.nodePackages."@mermaid-js/mermaid-cli"; # used by md-mermaid-check via just lint-specs
+        };
       };
     in {
       pre-commit-check = preCommit;
