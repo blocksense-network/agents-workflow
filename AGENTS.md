@@ -11,15 +11,6 @@ tests firsts:
 
 `ruby -Itest test/test_file.rb -n test_method_name`
 
-## Keeping notes
-
-In the `.agents/codebase-insights.txt` file, we try to maintain useful tips that may help
-you in your development tasks. When you discover something important or surprising about
-the codebase, add a remark in a comment near the relevant code or in the codebase-insights
-file. ALWAYS remove older remarks if they are no longer true.
-
-You can consult this file before starting your coding tasks.
-
 ## Code quality guidelines
 
 - ALWAYS strive to achieve high code quality.
