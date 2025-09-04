@@ -328,6 +328,26 @@ flowchart TD
   W --> NN
 ```
 
+--- START TODO BLOCK ---
+There are few things that seem off in the flow chart above. I think it doesn't describe precisely some of the existing implementation details in the Ruby modules and it doesn't capture precisely my intentions for the new CLI design (described in this spec). Here are some points to address:
+
+1) When I start a task on a remote server, the server will return me a task identifier that I can use for polling the task status or for obtaining real-time updates through SSE.
+
+2) There will be a command `aw agent follow-remote-task` that is similar in spirit to `aw agent follow-cloud-task`, but turning the remote server SSE events into terminal output. This will allow me to launch the TUI for see live updates to the task. Just like with cloud tasks, remote tasks are still written to the local SQLite database and the user would see them in his history of tasks in all UI (in the TUI, the WebUI, the GUI, etc).
+
+All in all, I think the paths for cloud tasks and remote tasks will be quite similar in the flow chart and won't be as distant as they appear now.
+
+3) When a branch name is provided an we are already on a task branch, this still creates a new branch (this is like a feature branch starting a certain commit in another feature branch). This doesn't seem to be reflected in the flow chart correctly.
+
+4) The "Schedule completio notification" step is a bit confusing perhaps. This is not exactly scheduling - it's just about passing the correct parameters to the spawned sub-processes. I guess this can be described as scheduling, but I think we can use a less ambigious term.
+
+5) It's not clear what the dual monitoring choice represents. The `aw agent follow-...` commands are launched automatically and unconditionally. The TUI is not launched automatically. We can add a new `--follow` option to `aw tast` that will attach to the TUI, launch the GUI or WebUI (according to the `ui` option) and then focus on live tracking the newly created task.
+
+6) The "runtime selection" step looks very out of place. In reality it happens much earlier - immediately after the "Record agent spawn in SQLite" step.
+
+7) What happens after clicking on notification is out of scope for this flow chart. It's already described in the "Handling AW URL Scheme.md" document, so these steps can be removed from the flow chart here.
+--- END TODO BLOCK ---
+
 Behavior:
 
 **Remote vs Local Execution:**
