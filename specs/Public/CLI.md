@@ -16,8 +16,26 @@ The AW CLI will be implemented in Rust using the Ratatui library for the TUI com
 
 This architecture ensures maximum reusability - the core functionality can be used by different front-ends (TUI, WebUI, other CLIs) while maintaining consistent behavior and state management.
 
-TODO: Document that the CLI parsing, help screens and shell autocompletions
-will be done through the Clap rust crate and its companion crates.
+#### CLI Parsing and User Experience
+
+The CLI parsing, help screens, and shell autocompletions are implemented using the **Clap** Rust crate and its companion crates:
+
+- **clap**: Core command-line argument parser with derive macros for type-safe CLI definitions
+- **clap_complete**: Generates shell completion scripts for bash, zsh, fish, and PowerShell
+- **clap_mangen**: Generates man pages from CLI definitions
+- **clap-verbosity-flag**: Standardized verbose/quiet flag handling
+
+All CLI commands use Clap's derive API for type-safe argument parsing, ensuring compile-time validation of CLI structure and automatic generation of help text, usage examples, and shell completions.
+
+The implementation follows these patterns:
+
+- Commands are defined as structs with `#[derive(Parser)]`
+- Subcommands use `#[command(subcommand)]` for nested command hierarchies
+- Global flags use `#[arg(global = true)]`
+- Custom validation uses `#[arg(value_parser)]`
+- Help text includes examples and detailed descriptions
+
+Shell completions are automatically generated and can be installed via `aw completion <shell>`.
 
 ### Primary Goals
 
@@ -67,8 +85,8 @@ OPTIONS:
   --prompt-file <FILE>               Read task prompt from FILE
   --repo <PATH|URL>                  Target repository path or URL
   --branch <NAME>                    Branch name for the task
-  --agent <TYPE>[@VERSION]           Agent type and optional version
-  --instances <N>                    Number of agent instances
+  --agent <TYPE>[@VERSION]           Agent type and optional version (can be specified multiple times)
+  --instances <N>                    Number of agent instances (applies to the last --agent parameter)
   --runtime <local|devcontainer|vm|nosandbox>
                                      Runtime environment
   --devcontainer-path <PATH>         Path to devcontainer configuration
@@ -79,42 +97,90 @@ OPTIONS:
   --browser-profile <NAME>           Browser profile to use
   --chatgpt-username <NAME>          ChatGPT username for Codex
   --codex-workspace <WORKSPACE>      Codex workspace identifier
-  --workspace <NAME>                 Named workspace
+  --workspace <NAME>                 Named workspace (cloud agents)
   --fleet <NAME>                     Fleet configuration name
   --yes                              Skip interactive prompts
   --push-to-remote <BOOL>            Automatically push to remote
   --devshell <NAME>                  Development shell name
+  --notifications <yes|no>          Enable/disable OS notifications on task completion (default: yes)
 ```
 
-TODO:
-document that the --agent flag can be supplied more than once. This would
-start a multiple agent working in parallel in isolated FS branches (see the
-FS Snapshots docs). Supplying `--agent` multiple times is intended for
-launching different agent types. The `--instances` param applies to the last
-`--agent` parameter. If `--instances` is supplied before the first `--agent`
-parameter, it applies to the first parameter. When `--instances` is
-specified without an `--agent` parameter, the default agent is used.
+#### Multiple Agent Support
 
-TODO:
-Document that the user can supply the agent value `cloud-codex`, `cloud-copilot`, `cloud-cursor` and `cloud-jules`. When such an agent is chosen, a new configuration option called `--workspace` determines the cloud workspace where the agent is going to work. For each of the providers, we also have a more specific option, such as `codex-workspace`, `jules-workspace`, etc which can override the lower-precedence `--workspace` option if the particular agent type is chosen. These options can be supplied on the command-line, but a more typical usage is to set them in the local project configuration stored in git.
-When a cloud agent is chosen, depending on whether the provided cloud
-service offers launching agent jobs through an API or a CLI interface, we
-may either use these provided options or use browser automation to start the
-agent job. Currently, all cloud agents require the use of browser
-automation. Update `aw task` behavior specification and flow chart with the
-above details in mind.
+The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
+
+**Usage Patterns:**
+
+- `--agent claude --agent codex`: Launches both Claude and Codex agents in parallel
+- `--agent openhands --instances 3`: Launches 3 instances of OpenHands agent
+- `--agent claude --instances 2 --agent codex`: Launches 2 Claude instances and 1 Codex instance
+
+**Instance Parameter Behavior:**
+
+- `--instances` applies to the last `--agent` parameter specified
+- If `--instances` is supplied before any `--agent` parameter, it applies to the first agent
+- When `--instances` is specified without `--agent`, it applies to the default agent
+- Each agent type gets its own isolated filesystem branch for parallel execution
+
+This enables sophisticated workflows where different AI agents can collaborate on the same task, each bringing their unique strengths to different aspects of the work.
+
+#### Cloud Agent Support
+
+The following cloud agent types are supported: `cloud-codex`, `cloud-copilot`, `cloud-cursor`, and `cloud-jules`. These agents run on external cloud platforms, typically configured and operated through a web interface.
+
+**Cloud Agent Types:**
+
+- `cloud-codex`: OpenAI Codex running on ChatGPT platform
+- `cloud-copilot`: GitHub Copilot with cloud execution
+- `cloud-cursor`: Anthropic Claude via Cursor IDE cloud
+- `cloud-jules`: Google Jules
+
+**Workspace Configuration:**
+
+- `--workspace <NAME>`: Specifies the cloud workspace where the agent will work (generic option)
+- Provider-specific options with higher precedence:
+  - `--codex-workspace <WORKSPACE>`: Overrides `--workspace` for cloud-codex
+  - `--copilot-workspace <WORKSPACE>`: Overrides `--workspace` for cloud-copilot
+  - `--cursor-workspace <WORKSPACE>`: Overrides `--workspace` for cloud-cursor
+  - `--jules-workspace <WORKSPACE>`: Overrides `--workspace` for cloud-jules
+
+**Launch Methods:**
+
+- **API-based**: When the cloud service provides programmatic job launching APIs
+- **CLI-based**: When the cloud service offers command-line tools for job submission
+- **Browser Automation**: Currently required for all cloud agents due to lack of support for the above
+
+**Browser Automation Integration:**
+All cloud agents currently require browser automation for:
+
+- Authentication and session management
+- Workspace selection and navigation
+- Job submission and monitoring
+- Result retrieval and download
+
+**Configuration Storage:**
+While these options can be supplied on the command line, typical usage involves setting them in local project configuration:
+
+```bash
+# Set cloud workspace for current project
+aw config set codex-workspace "workspace-name-used-at-codex"
+aw config set workspace "workspace-name-used-everywhere-else"
+```
 
 Behavior overview:
 
 - Local vs Remote: With a configured/provided `remote-server`, AW calls the server's REST API to create/manage the task. Otherwise, AW runs locally.
 - Third‑party clouds: Some agents can run on external clouds (e.g., Google Jules, OpenAI Cloud Codex). In such cases, flags like `--instances`, `--browser-*`, or `--codex-workspace` apply only when supported by the selected agent/platform. AW surfaces capabilities via discovery and validates flags accordingly.
-- Sandbox/runtime: Local runs honor `--runtime`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `nosandbox` (policy‑gated, direct host process execution). See [Sandbox Profiles](Sandbox%20Profiles.md) and [FS Snapshots/FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Sandbox/runtime: Local runs honor `--runtime`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `nosandbox` (policy‑gated, direct host process execution). See [Sandbox Profiles](Sandbox%20Profiles.md) and [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
 - Target branch: `--target-branch` specifies the branch where agent results should be delivered/pushed (used with `--delivery branch` or `--delivery pr` modes).
 
 #### Preserved `agent-task` Behaviors
 
-TODO: provide links to the ruby modules that define the preserved behavior
-described below.
+The `aw task` command preserves and extends the core functionality of the existing `agent-task` command. The preserved behavior is implemented in the following Ruby modules:
+
+- **CLI Implementation**: [`lib/agent_task/cli.rb`](../../lib/agent_task/cli.rb) - Core CLI functionality and command processing
+- **VCS Operations**: [`lib/vcs_repo.rb`](../../lib/vcs_repo.rb) - Repository detection, branch management, and VCS integration
+- **Task Management**: [`lib/agent_task.rb`](../../lib/agent_task.rb) - Main module coordinating task operations
 
 The `aw task` command preserves and extends the core functionality of the existing `agent-task` command:
 
@@ -211,9 +277,46 @@ flowchart TD
   EE -->|yes| FF[Cleanup: delete failed branch]
   EE -->|no| GG[Task created successfully]
 
+  GG --> III{notifications enabled?}
+  III -->|yes| JJJ[Schedule completion notification]
+  III -->|no| KKK[Skip notification setup]
+
+  JJJ --> MMM[Record agent spawn in SQLite]
+  KKK --> MMM
+
+  MMM --> NNN[Launch thin wrapper: aw agent record]
+  NNN --> OOO{local or cloud agent?}
+
+  OOO -->|local| PPP[Execute agent with asciinema recording]
+  OOO -->|cloud| QQQ[Launch browser automation]
+
+  PPP --> RRR[Monitor process completion]
+  QQQ --> SSS[Monitor browser automation]
+
+  SSS --> TTT{dual monitoring?}
+  TTT -->|yes| UUU[Launch TUI for cloud progress]
+  TTT -->|no| VVV[Browser-only monitoring]
+
+  UUU --> WWW[aw agent follow-cloud-task]
+  VVV --> WWW
+
+  RRR --> XXX[Task completion detected]
+  WWW --> XXX
+
+  XXX --> YYY{notifications enabled?}
+  YYY -->|yes| ZZZ[Emit OS notification with agents-workflow:// link]
+  YYY -->|no| BBB[Skip notification]
+
+  ZZZ --> CCC[Check WebUI server status]
+  BBB --> CCC
+
+  CCC -->|running| DDD[Open task results page]
+  CCC -->|not running| EEE[Auto-launch WebUI server]
+  EEE --> DDD
+
   E --> HH[Run agent + record session]
   F --> HH
-  GG --> II[runtime selection]
+  DDD --> II[runtime selection]
   II -->|devcontainer| JJ[Devcontainer mount snapshot workspace]
   II -->|local| KK[Process sandbox profile]
   II -->|nosandbox| LL[Host process policy gated]
@@ -287,30 +390,76 @@ Behavior:
 - CLI supports `--draft` to persist editable drafts
 - `aw task start <draft-id>` to submit saved drafts
 
-TODO:
-In the behavior description and the flow chart above, clarify the following:
-When agents are spawned, this is recorded in the local SQLite
-database. The `aw task` command returns 0 upon a successful agent
-launch and a non-zero code in case of various failures. Provide a
-table here of the possible non-zero codes. Add a new `notifications` option
-(defaults to "yes") which controls whether an OS-level notification will be
-emitted when the task completes. Local agents are executed by a thin wrapper
-process that records their console session with asciinema and detects when
-the agent work is complete. For cloud agents, we use browser automation
-to monitor and capture the output of the cloud agent in a similar way. Even
-when I launch a cloud agent, I can launch the TUI interface to monitor the
-progress of the cloud agent. When the task is finally complete. The thin
-wrapper process delivers the notification. The notifacatio messages includes
-a custom `agents-workflow://` link to the task result page. Clicking on this
-link is handled by a program that checks whether the AW WebUI server is
-already running and launches it in case it's not running. In then opens the
-task result page in the WebUI. The task details have been recorded in the
-local SQLite database by the wrapper program and they are now served by the
-WebUI server. The recording wrapper is started with the command `aw agent
-record`. The cloud monitoring is handled with commands like `aw agent
-follow-cloud-task` which translates the live browser stream into a suitable terminal
-output. The `aw agent follow-cloud-task` command is then recorded just like
-any other local agent with `aw agent record`.
+#### Exit Codes
+
+The `aw task` command returns the following exit codes:
+
+| Exit Code | Description              | Example Causes                                  |
+| --------- | ------------------------ | ----------------------------------------------- |
+| 0         | Success                  | Agent launched successfully, task recorded      |
+| 1         | General error            | Invalid arguments, repository not found         |
+| 2         | Repository error         | VCS operation failed, branch creation failed    |
+| 3         | Agent launch error       | Agent binary not found, runtime unavailable     |
+| 4         | Authentication error     | Cloud agent auth failed, API key invalid        |
+| 5         | Network error            | Remote server unreachable, connection timeout   |
+| 6         | Resource error           | Insufficient disk space, memory limits exceeded |
+| 7         | Validation error         | Invalid branch name, unsupported agent type     |
+| 8         | Configuration error      | Missing required config, invalid workspace      |
+| 9         | Browser automation error | Browser unavailable, automation script failure  |
+
+#### Notifications System
+
+The `--notifications` option (default: "yes") controls whether OS-level notifications are emitted when tasks complete. Notifications include:
+
+- **Custom URL Scheme**: `agents-workflow://task/<task-id>` links that open the task results page
+- **Platform Integration**: Uses native notification systems (notify-send on Linux, Notification Center on macOS, Action Center on Windows)
+- **Rich Content**: Includes task summary, completion status, and quick actions
+
+#### Agent Execution Architecture
+
+When agents are spawned, the execution follows this detailed process:
+
+##### Local Agent Execution
+
+1. **SQLite Recording**: Agent spawn details are immediately recorded in the local SQLite database with session metadata
+2. **Thin Wrapper Process**: Local agents are executed via `aw agent record` command that:
+   - Wraps the agent process with session recording
+   - Uses asciinema to capture terminal output and timing
+   - Monitors process lifecycle and detects completion
+   - Records all console interactions and outputs
+3. **Completion Detection**: The wrapper detects when agent work is complete through:
+   - Process exit codes
+   - Agent-specific completion signals
+4. **Result Storage**: All outputs, logs, and artifacts are stored in the SQLite database
+
+##### Cloud Agent Execution
+
+1. **Browser Automation Launch**: Cloud agents are launched using browser automation that:
+   - Handles authentication and session management
+   - Navigates to the appropriate cloud platform
+   - Submits the task with proper parameters
+   - Monitors execution progress in real-time
+2. **Dual Monitoring**: Cloud agents support both:
+   - **Browser Stream Monitoring**: `aw agent follow-cloud-task` translates live browser output to terminal display
+   - **TUI Integration**: Launch `aw tui` interface to monitor cloud agent progress alongside local activities
+3. **Unified Recording**: Cloud monitoring processes are recorded using the same `aw agent record` mechanism as local agents
+
+##### Notification and Result Delivery
+
+When tasks complete:
+
+1. **Wrapper Notification**: The thin wrapper process emits OS notifications with:
+   - Task completion status
+   - Custom `agents-workflow://` links to results
+   - Platform-specific notification actions
+
+2. **WebUI Integration**: Clicking notification links:
+   - Checks if AW WebUI server is running
+   - Auto-launches WebUI server if needed
+   - Opens the specific task results page
+   - Displays all recorded session data from SQLite
+
+3. **Cross-Platform Support**: The notification system works across all supported platforms with appropriate fallbacks for systems without native notification support.
 
 #### 3) Sessions
 
@@ -762,6 +911,36 @@ ARGUMENTS:
   ARGS                        Arguments for the command
 ```
 
+```
+aw agent record [OPTIONS] [--] <AGENT_COMMAND> [ARGS...]
+
+DESCRIPTION: Thin wrapper process that records agent execution with asciinema
+             and monitors completion for both local and cloud agents.
+
+OPTIONS:
+  --task-id <ID>             Task ID for recording association
+  --output-dir <PATH>        Directory for asciinema recordings
+
+ARGUMENTS:
+  AGENT_COMMAND              Agent command to execute and record
+  ARGS                       Arguments for the agent command
+```
+
+```
+aw agent follow-cloud-task [OPTIONS] <TASK_ID>
+
+DESCRIPTION: Monitor cloud agent execution by translating live browser output
+             to terminal display. Enables TUI monitoring of cloud agents.
+
+OPTIONS:
+  --browser-profile <NAME>   Browser profile for monitoring
+  --refresh-interval <SEC>   Output refresh interval (default: 5)
+  --output-format <text|json> Output format for monitoring data
+
+ARGUMENTS:
+  TASK_ID                    Cloud task ID to monitor
+```
+
 ### Subcommand Implementation Strategy
 
 The `aw` executable lazily requires Ruby modules on demand based on the entered subcommand to minimize startup time (e.g., dispatch parses argv, then `require 'aw/subcommands/tasks'` only when `task` is invoked).
@@ -860,9 +1039,11 @@ aw serve rest --local --port 8081
 aw webui --local --port 8080 --rest http://127.0.0.1:8081
 ```
 
-### Exit Codes
+### General Exit Codes
 
 - 0 success; non-zero on validation, environment, or network errors (with descriptive stderr messages).
+
+For detailed exit codes specific to the `aw task` command, see the [Exit Codes](#exit-codes) section above.
 
 ### Security Notes
 

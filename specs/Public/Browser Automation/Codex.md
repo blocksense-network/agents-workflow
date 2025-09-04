@@ -2,11 +2,11 @@
 
 ### Purpose
 
-Automate the Codex WebUI to initiate a coding session for a repository/branch using a shared agent browser profile. This is the first automation built on the Agent Browser Profiles convention.
+Automate the Codex WebUI to initiate coding sessions for both local and cloud agent workflows using shared agent browser profiles. This automation supports the `cloud-codex` agent type and serves as the foundation for cloud agent browser automation integration.
 
 ### Behavior (happy path)
 
-1. Determine ChatGPT username: accept optional `--chatgpt-username` (see `docs/cli-spec.md`).
+1. Determine ChatGPT username: accept optional `--chatgpt-username` (see CLI.md).
 2. Discover profiles: list agent browser profiles whose `loginExpectations.origins` include `https://chatgpt.com`.
 3. Filter by username: if `--chatgpt-username` is provided, restrict to profiles whose `loginExpectations.username` matches.
 4. Select or create profile:
@@ -16,9 +16,10 @@ Automate the Codex WebUI to initiate a coding session for a repository/branch us
 6. Launch Playwright with a persistent context in headless mode.
 7. If the expected login is not present, relaunch in visible mode to let the user authenticate, then continue.
 8. Navigate to Codex, select workspace and branch, enter the task description, and press "Code":
-   - Workspace comes from `--codex-workspace` or `config: codex-workspace` (see `docs/configuration.md`).
+   - Workspace comes from `--codex-workspace` or `config: codex-workspace` (see Configuration.md).
    - Branch comes from the `aw task --branch` value.
-9. Record success.
+9. For cloud agents: integrate with `aw agent record` for session monitoring and `aw agent follow-cloud-task` for real-time progress tracking.
+10. Record success and trigger completion notifications if enabled.
 
 If the automation code fails to execute due to potential changes in the Codex WebUI. Report detailed diagnostic information for the user (e.g. which UI element you were trying to locate; Which selectors were used and what happened - the expected element was not found, more than one element was found, etc).
 
