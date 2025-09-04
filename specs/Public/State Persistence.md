@@ -68,10 +68,10 @@ CREATE TABLE IF NOT EXISTS agents (
   UNIQUE(name, version)
 );
 
--- Runtime definitions (devcontainer, local, unsandboxed, etc.)
+-- Runtime definitions (devcontainer, local, nosandbox, etc.)
 CREATE TABLE IF NOT EXISTS runtimes (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  type         TEXT NOT NULL,                  -- devcontainer|local|unsandboxed
+  type         TEXT NOT NULL,                  -- devcontainer|local|nosandbox
   devcontainer_path TEXT,                      -- when type=devcontainer
   metadata     TEXT                            -- JSON string
 );

@@ -104,7 +104,7 @@ tini
 tmpfs
 triager
 ttyrec
-Unsandboxed
+nosandbox
 upperdir
 Userspace
 venv

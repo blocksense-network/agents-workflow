@@ -6,6 +6,16 @@ The AW CLI (`aw`) unifies local and remote workflows for launching and managing 
 
 The CLI honors the layered configuration model in [Configuration](Configuration.md) (system, user, project, project-user, env, CLI flags). Flags map from config keys using the `--a-b-c` convention and env var prefix `AGENTS_WORKFLOW_`.
 
+#### Implementation Approach
+
+The AW CLI will be implemented in Rust using the Ratatui library for the TUI components. All core functionality will be developed as reusable Rust crate(s) with a clean separation of concerns:
+
+- **Core crates**: Implement the business logic, configuration management, REST API client, local state management, and all operational functionality
+- **TUI crate**: Provides a thin UI layer on top of the core crates using Ratatui for terminal interface components
+- **CLI crate**: Command-line interface that can operate in both interactive (TUI) and non-interactive modes
+
+This architecture ensures maximum reusability - the core functionality can be used by different front-ends (TUI, WebUI, other CLIs) while maintaining consistent behavior and state management.
+
 ### Primary Goals
 
 - One tool for both the TUI dashboard and automation-ready commands
@@ -13,7 +23,7 @@ The CLI honors the layered configuration model in [Configuration](Configuration.
   - Local state mode (SQLite only)
   - Remote REST service mode (on-prem/private cloud), aligned with `docs/rest-service.md`
   - Terminal multiplexers: tmux, zellij, screen
-  - Devcontainers and local runtimes (including unsandboxed, policy-gated)
+  - Devcontainers and local runtimes (including nosandbox, policy-gated)
   - IDE integrations (VS Code, Cursor, Windsurf) and terminal-based agents
 
 ### Modes of Operation
@@ -22,7 +32,7 @@ The CLI honors the layered configuration model in [Configuration](Configuration.
 - **TUI vs WebUI:** `aw` can start either a terminal dashboard (TUI) or open the WebUI. The UIs present the same concepts (tasks, sessions, logs, time‑travel) with different affordances. See [TUI PRD](TUI%20PRD.md) and [WebUI PRD](WebUI%20PRD.md).
 - **Orthogonal choices:** UI (TUI/WebUI) and execution location (local/remote) are orthogonal. Any combination is possible; e.g., run the TUI against a remote REST service or use the WebUI locally.
 - **Fleets combine local and remote:** [Multi-OS testing fleets](Multi-OS%20Testing.md) can mix local and remote agents. For example, a local Linux container leader may have remote followers (e.g., a Windows VM on a server). The `aw` client and server may need to orchestrate together the connectivity between all the machines in the fleet.
-- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (container, VM, bwrap/firejail, or unsandboxed per policy). See [Sandbox Profiles](Sandbox%20Profiles.md) and configuration mapping below.
+- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (container, VM, bwrap/firejail, or nosandbox per policy). See [Sandbox Profiles](Sandbox%20Profiles.md) and configuration mapping below.
 
 ### Global Behavior and Flags
 
@@ -48,47 +58,191 @@ Naming consistency: the config key controlling UI selection is `ui`, not `ui.def
 
 #### 2) Tasks
 
-- `aw task [create] [--prompt <TEXT> | --prompt-file <FILE>] [--repo <PATH|URL>] [--branch <NAME>] [--agent <TYPE>[@VERSION]] [--instances <N>] [--runtime <devcontainer|local|unsandboxed>] [--devcontainer-path <PATH>] [--labels k=v ...] [--delivery <pr|branch|patch>] [--target-branch <NAME>] [--browser-automation <true|false>] [--browser-profile <NAME>] [--chatgpt-username <NAME>] [--codex-workspace <WORKSPACE>] [--workspace <NAME>] [--fleet <NAME>] [--yes]`
+- `aw task [--prompt <TEXT> | --prompt-file <FILE>] [--repo <PATH|URL>] [--branch <NAME>] [--agent <TYPE>[@VERSION]] [--instances <N>] [--runtime <devcontainer|local|nosandbox>] [--devcontainer-path <PATH>] [--labels k=v ...] [--delivery <pr|branch|patch>] [--target-branch <NAME>] [--browser-automation <true|false>] [--browser-profile <NAME>] [--chatgpt-username <NAME>] [--codex-workspace <WORKSPACE>] [--workspace <NAME>] [--fleet <NAME>] [--yes] [--push-to-remote <BOOL>] [--devshell <NAME>]`
 
 Behavior overview:
 
-- Local vs Remote: With a configured/provided `remote-server`, AW calls the server’s REST API to create/manage the task. Otherwise, AW runs locally.
+- Local vs Remote: With a configured/provided `remote-server`, AW calls the server's REST API to create/manage the task. Otherwise, AW runs locally.
 - Third‑party clouds: Some agents can run on external clouds (e.g., Google Jules, OpenAI Cloud Codex). In such cases, flags like `--instances`, `--browser-*`, or `--codex-workspace` apply only when supported by the selected agent/platform. AW surfaces capabilities via discovery and validates flags accordingly.
-- Sandbox/runtime: Local runs honor `--runtime`: `devcontainer` (default when available), `local` (process sandbox/profile), or `unsandboxed` (policy‑gated). See [Sandbox Profiles](Sandbox%20Profiles.md) and [FS Snapshots/FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Sandbox/runtime: Local runs honor `--runtime`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `nosandbox` (policy‑gated, direct host process execution). See [Sandbox Profiles](Sandbox%20Profiles.md) and [FS Snapshots/FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Target branch: `--target-branch` specifies the branch where agent results should be delivered/pushed (used with `--delivery branch` or `--delivery pr` modes).
+
+#### Preserved `agent-task` Behaviors
+
+The `aw task` command preserves and extends the core functionality of the existing `agent-task` command:
+
+**Branch and Task Management:**
+
+- **Branch Creation**: When `--branch <NAME>` is provided, creates a new VCS branch for the task (supports Git, Mercurial, Bazaar, Fossil)
+- **Branch Validation**: Validates branch names using VCS-specific rules
+- **Task Recording**: Records initial tasks and follow-up tasks in structured task files under `.agents/tasks/`
+- **Task File Format**: Uses timestamped files in `YYYY/MM/DD-HHMM-branch-name` format
+- **Follow-up Tasks**: Supports appending additional tasks to existing branches
+
+**Editor and Input Handling:**
+
+- **Editor Discovery**: Uses `$EDITOR` environment variable with intelligent fallback chain (nano, pico, micro, vim, helix, vi)
+- **Prompt Sources**: Supports `--prompt` for direct text, `--prompt-file` for file input, or interactive editor session
+- **Editor Hints**: Provides helpful template text when launching editor for task input
+- **Empty Task Validation**: Prevents creation of empty tasks with clear error messages
+
+**VCS Integration:**
+
+- **Repository Detection**: Auto-discovers VCS repository root by walking parent directories
+- **Multi-VCS Support**: Full support for Git, Mercurial, Bazaar, and Fossil repositories
+- **Commit Message Format**: Uses standardized "Start-Agent-Branch: branch-name" format with metadata
+- **Remote URL Detection**: Automatically detects and records target remote URLs for push operations
+- **Branch Cleanup**: Properly cleans up failed branch creation attempts
+
+**Push and Remote Operations:**
+
+- **Interactive Push**: Prompts user for remote push confirmation (unless `--push-to-remote` is specified)
+- **Non-Interactive Mode**: `--push-to-remote <BOOL>` flag for automated workflows
+- **Force Push Support**: Configures force-push hooks for continuous agent development
+- **Remote URL Conversion**: Converts SSH URLs to HTTPS format for authentication
+
+**Development Environment:**
+
+- **DevShell Recording**: `--devshell <NAME>` records development shell names from flake.nix
+- **Flake Integration**: Parses Nix flake files to discover available development shells
+- **DevShell Validation**: Validates devshell names against flake.nix configuration
+
+**Error Handling and UX:**
+
+- **Descriptive Errors**: Provides clear, actionable error messages for all failure scenarios
+- **Repository Validation**: Validates repository state and VCS type detection
+- **Branch Name Validation**: Enforces VCS-specific branch naming rules
+- **Cleanup on Failure**: Ensures proper cleanup of partial operations
 
 Flow (high‑level):
 
 ```mermaid
 flowchart TD
-  A[aw task ...] --> B{remote-server?}
-  B -->|yes| C[REST POST /tasks]
+  A[aw task ...] --> B{remote-server configured?}
+  B -->|yes| C[REST POST /tasks to remote server]
   C --> D{agent runs where?}
   D -->|server| E[Provision runtime and snapshot]
-  D -->|third party| F[Call provider API capability gated flags]
-  B -->|no| G{runtime}
-  G -->|devcontainer| H[Devcontainer mount snapshot workspace]
-  G -->|local| I[Process sandbox profile]
-  G -->|unsandboxed| J[Host process policy gated]
-  H --> K[Run agent + record session]
-  I --> K
+  D -->|third party| F[Call provider API with capability-gated flags]
+  B -->|no| G[Local execution: detect repository and VCS]
+
+  G --> H{branch name provided?}
+  H -->|yes| I[Validate branch name]
+  H -->|no| J[Use current branch]
+
+  I --> K{on agent branch?}
   J --> K
+  K -->|yes| L[Append to existing task file]
+  K -->|no| M[Create new branch]
+
+  M --> N{devshell specified?}
+  N -->|yes| O[Validate devshell against flake.nix]
+  N -->|no| P[Skip devshell validation]
+
+  O --> Q[Record devshell in commit metadata]
+  P --> Q
+
+  L --> R{input source?}
+  Q --> R
+
+  R -->|prompt flag| S[Use --prompt text]
+  R -->|prompt-file flag| T[Read --prompt-file content]
+  R -->|no input flags| U[Launch editor with hints]
+
+  S --> V[Validate task content not empty]
+  T --> V
+  U --> V
+
+  V -->|empty| W[Error: abort task creation]
+  V -->|valid| X[Create/update task file in .agents/tasks/]
+
+  X --> Y[Commit changes with metadata]
+  Y --> Z{--yes flag or --push-to-remote true?}
+  Z -->|yes| AA[Push to remote automatically]
+  Z -->|no| BB{interactive prompt: Push to remote?}
+  BB -->|yes| AA
+  BB -->|no| CC[Skip push]
+
+  AA --> EE{any errors?}
+  EE -->|yes| FF[Cleanup: delete failed branch]
+  EE -->|no| GG[Task created successfully]
+
+  E --> HH[Run agent + record session]
+  F --> HH
+  GG --> II[runtime selection]
+  II -->|devcontainer| JJ[Devcontainer mount snapshot workspace]
+  II -->|local| KK[Process sandbox profile]
+  II -->|nosandbox| LL[Host process policy gated]
+  JJ --> MM[Run agent + record session]
+  KK --> MM
+  LL --> MM
+
+  FF --> NN[Exit with error]
+  W --> NN
 ```
 
 Behavior:
 
+**Remote vs Local Execution:**
+
 - With a configured/provided `remote-server`, calls the server’s REST API to create and manage the task.
-- Otherwise, AW chooses the snapshot strategy automatically based on the host that executes the task (repo filesystem/VM image): prefer ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto` when supported). In multi‑OS fleets, snapshots are taken on the leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md).
-- Persists session/task state in the local SQLite database; see `docs/state-persistence.md`.
-- Fleet resolution: when `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name. Implementations may run members sequentially or in parallel depending on runtime limits.
-- When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped.
-- Codex integration: if `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`.
-- Branch autocompletion uses standard git protocol:
-  - Local mode: `git for-each-ref` on the repo; cached with debounce.
-  - REST mode: server uses `git ls-remote`/refs against admin-configured URL to populate its cache; CLI/Web query capability endpoints for suggestions.
+- For local execution, detects repository root and VCS type (Git, Mercurial, Bazaar, Fossil) by walking parent directories.
 
-Draft flow (TUI/Web parity):
+**Branch and Task Management:**
 
-- CLI supports `--draft` to persist an editable draft; `aw task start <draft-id>` to submit.
+- When `--branch <NAME>` is provided, validates branch name and creates new VCS branch
+- When on existing agent branch, appends to task file as follow-up task
+- Creates task files in `.agents/tasks/YYYY/MM/DD-HHMM-branch-name` format
+- Uses standardized commit messages: "Start-Agent-Branch: branch-name" with metadata
+
+**Input Handling:**
+
+- `--prompt`: Uses provided text directly
+- `--prompt-file`: Reads content from specified file
+- No input flags: Launches editor ($EDITOR with fallback chain: nano, pico, micro, vim, helix, vi)
+- Validates task content is not empty
+- Provides helpful editor hints for task creation
+
+**Development Environment Integration:**
+
+- `--devshell <NAME>`: Records development shell name in commit metadata
+- Validates devshell exists in flake.nix when specified
+- Parses Nix flake files to discover available development shells
+
+**Push and Remote Operations:**
+
+- `--yes` or `--push-to-remote true`: Pushes automatically without prompting
+- Interactive mode: Prompts user for push confirmation
+- Converts SSH URLs to HTTPS format for authentication
+- Supports force-push for agent workflow updates
+
+**Error Handling and Cleanup:**
+
+- Validates repository state and VCS type detection
+- Enforces VCS-specific branch naming rules
+- Provides descriptive error messages for all failure scenarios
+- Cleans up failed branch creation (deletes branch on errors)
+- Ensures proper cleanup of partial operations
+
+**Runtime and Execution:**
+
+- AW chooses snapshot strategy automatically: ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`)
+- Supports devcontainer, local sandbox, and nosandbox runtimes
+- In multi-OS fleets, snapshots taken on leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md)
+- Persists session/task state in local SQLite database
+
+**Advanced Features:**
+
+- Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name. Implementations may run members sequentially or in parallel depending on runtime limits
+- Browser automation: When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped
+- Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`
+- Branch autocompletion: Uses standard git protocol for suggestions:
+  - Local mode: `git for-each-ref` on the repo; cached with debounce
+  - REST mode: server uses `git ls-remote`/refs against admin-configured URL to populate its cache; CLI/Web query capability endpoints for suggestions
+
+**Draft Support (TUI/Web Parity):**
+
+- CLI supports `--draft` to persist editable drafts
+- `aw task start <draft-id>` to submit saved drafts
 
 #### 3) Sessions
 
@@ -245,8 +399,9 @@ Mirrors `docs/configuration.md` including provenance, precedence, and Windows be
 #### 10) Agent Utilities (`aw agent ...`)
 
 - Subcommands used only in agent dev environments live under `aw agent ...`. This keeps end‑user command space clean while still scriptable for agents.
-- `aw agent get-task` — Helper used by terminal‑style agents to fetch the next task payload (prompt, repo, settings) from the local state or configured REST service and print it as JSON. Honors the same `--remote-server` and `--repo` resolution as `aw task`.
-- `aw agent start-work` — Helper to mark the current task as started (transition status, open logs) and emit initial SessionMoment metadata so timeline recording aligns with agent startup. Prints the session id.
+- `aw agent get-task [--autopush] [--repo <PATH>]` — Prints the current task prompt for agents. When `--autopush` is specified, automatically configures VCS hooks to push changes on each commit (this is where autopush configuration actually happens, not during `aw task` creation). Auto-discovers repository root and supports multi-repo scenarios.
+- `aw agent get-setup-env [--repo <PATH>]` — Extracts and prints environment variables from @agents-setup directives in the current task file(s). Processes all tasks (initial task + follow-up tasks) on the current agent branch, parsing @agents-setup directives to extract environment variables. Supports both `VAR=value` and `VAR+=value` syntax for setting and appending values. Merges environment variables from multiple tasks, with append operations combining values. Outputs in `KEY=VALUE` format, one per line. In multi-repo scenarios, auto-discovers all repositories in subdirectories and prefixes each repository's output with "In directory `dirname`:" followed by the environment variables. Requires being on an agent branch with a valid task file.
+- `aw agent start-work [--task-description <DESC>] [--branch-name <NAME>] [--repo <PATH>]` — Records a task description and optionally creates a new branch. When on an existing agent branch, appends the description as a follow-up task. When not on an agent branch, requires `--branch-name` and creates a new agent branch with the initial task.
 - `aw agent followers list` — List configured follower hosts and tags (diagnostics; same data as `GET /api/v1/followers` when in REST mode).
 - `aw agent followers sync-fence [--timeout <sec>] [--tag <k=v>]... [--host <name>]... [--all]` — Perform a synchronization fence ensuring followers match the leader snapshot before execution; emits per‑host status.
 - `aw agent run-everywhere [--tag <k=v>]... [--host <name>]... [--all] [--] <command> [args...]` — Invoke run‑everywhere on selected followers.
@@ -282,7 +437,7 @@ Devcontainers:
 ### Runtime and Workspace Behavior
 
 - Snapshot selection priority: ZFS → Btrfs → OverlayFS → copy (`cp --reflink=auto` when available), per `docs/fs-snapshots/overview.md`.
-- Unsandboxed local runs require explicit `--runtime unsandboxed` and may be disabled by admin policy.
+- Nosandbox local runs require explicit `--runtime nosandbox` and may be disabled by admin policy.
 - Delivery modes: PR, Branch push, Patch artifact (as in REST spec).
 
 ### IDE and Terminal Agent Integration
@@ -355,4 +510,4 @@ aw webui --local --port 8080 --rest http://127.0.0.1:8081
 
 ### Security Notes
 
-- Honors admin-enforced config. Secrets never printed. Unsandboxed runtime gated and requires explicit opt-in.
+- Honors admin-enforced config. Secrets never printed. `nosandbox` runtime gated and requires explicit opt-in.

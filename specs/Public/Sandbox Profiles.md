@@ -4,6 +4,8 @@ status: Early-Draft, Needs-Expansion
 
 Sandbox profiles define how local executions are isolated. They are orthogonal to UI and to local/remote mode. The profile is resolved from config or flags and determines the runner that hosts the agent and its per‑task workspace.
 
+See [Agents Workflow Sandboxing Strategies](Sanboxing/Agents%20Workflow%20Sandboxing%20Strategies.md) for cross‑platform requirements and design principles that apply to all sandboxing approaches.
+
 Why sandboxes (threats and safety):
 
 - Accidental breakage of the host (e.g., `rm -rf /`, package manager changes, daemon starts).
@@ -21,16 +23,9 @@ Profile types (predefined):
 
 - container: OCI container (Docker/Podman). Options include image, user/uid, mounts, network, seccomp/apparmor.
 - vm: Lightweight Linux VM (Lima/Colima, Apple Virtualization.framework, WSL2/Hyper‑V). Options include image, resources, networking.
-- bwrap: Userspace namespace sandbox via `bubblewrap` (Linux); optional seccomp, bind rules.
+- local: Local process sandbox using OS namespaces and primitives (Linux: user namespaces, cgroups v2, seccomp with dynamic file access control). See [Local Sandboxing on Linux](Sanboxing/Local%20Sandboxing%20on%20Linux.md) for detailed Linux implementation. Cross-platform support via equivalent isolation primitives.
 - firejail: Linux Firejail profile with caps/seccomp filters.
-- nsjail: Linux `nsjail` with mount and cgroup limits.
-- unsandboxed: Run directly on host (policy‑gated, for already isolated environments like dedicated VMs).
-
-OS guidance (non‑exhaustive):
-
-- Linux: prefer `container` (Docker/Podman). For host‑native, consider `bwrap`, `firejail`, or `nsjail` with OverlayFS for CoW.
-- macOS: prefer `vm` (Lima/Colima) to get Linux CoW filesystems; run containers inside. macOS process sandboxes are not sufficient for our needs.
-- Windows: prefer `vm` (WSL2/Hyper‑V) or `container` via Docker Desktop. Windows Sandbox/WDAG are out‑of‑scope for now.
+- nosandbox: Run directly on host (policy‑gated, for already isolated environments like dedicated VMs).
 
 Configuration:
 
