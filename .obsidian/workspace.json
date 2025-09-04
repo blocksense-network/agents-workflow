@@ -14,7 +14,7 @@
               "type": "markdown",
               "state": {
                 "file": "specs/Public/CLI.md",
-                "mode": "source",
+                "mode": "preview",
                 "source": false,
                 "backlinks": true,
                 "backlinkOpts": {
@@ -204,6 +204,8 @@
   },
   "active": "01bf72509d2b5652",
   "lastOpenFiles": [
+    "specs/Public/Configuration.md",
+    "specs/Public/CLI.md",
     "specs/Public/Sanboxing/Local Sandboxing on Linux.md",
     "lychee.toml",
     "specs/Research/Restricting Guest Internet Access to a Whitelist of Websites.md",
@@ -218,14 +220,12 @@
     "docs/AI Development Guide.md",
     "specs/Public/State Persistence.md",
     "docs/Product One Pager.md",
-    "specs/Public/CLI.md",
     "specs/Research/MicroVM Research.md",
     "specs/Public/Nix Devcontainer/Devcontainer Design.md",
     "specs/AGENTS.md",
     "specs/Research/Can SSH work over HTTPS.md",
     "specs/Public/AGENTS.md",
     "scripts/md-mermaid-validate.sh",
-    "specs/Public/Configuration.md",
     "specs/Public/3rd-Party Agents/3rd-Party Agent Description Template.md",
     "specs/Public/Nix Devcontainer/Devcontainer User Setup.md",
     "specs/Public/Nix Devcontainer/Devcontainer Test Suite.md",
