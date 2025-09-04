@@ -1,6 +1,7 @@
 # EXTRAS Framework
 
-A flexible system for installing additional development tools and components during environment setup.
+A flexible system for installing additional development tools and components
+during environment setup.
 
 ## Quick Start
 
@@ -27,10 +28,13 @@ EXTRAS="nix;direnv+cachix" bash common-pre-setup
 
 ## Features
 
-- **Flexible separators**: Use comma (`,`), semicolon (`;`), plus (`+`), pipe (`|`), or space
-- **Dependency resolution**: Components are installed in the correct order automatically
+- **Flexible separators**: Use comma (`,`), semicolon (`;`), plus (`+`), pipe
+  (`|`), or space
+- **Dependency resolution**: Components are installed in the correct order
+  automatically
 - **Duplicate prevention**: Each component is installed only once
-- **Legacy compatibility**: `NIX=1` is still supported for backward compatibility
+- **Legacy compatibility**: `NIX=1` is still supported for backward
+  compatibility
 - **Mock testing**: All install scripts use mock output for safe testing
 
 ## Advanced Usage
@@ -75,4 +79,6 @@ Run the test suite to validate the framework:
 just test
 ```
 
-The Ruby test suite includes comprehensive tests for the ExtrasInstaller class and CLI functionality. All install scripts use mock output, so no actual software is installed during testing.
+The Ruby test suite includes comprehensive tests for the ExtrasInstaller class
+and CLI functionality. All install scripts use mock output, so no actual
+software is installed during testing.

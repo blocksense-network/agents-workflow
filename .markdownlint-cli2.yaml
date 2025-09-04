@@ -3,10 +3,22 @@ globs:
 
 # markdownlint rule configuration
 config:
-  # Long lines are common in specs; wrap is editor responsibility
-  MD013: false
+  # Enforce 80-column width for better readability and consistency
+  MD013:
+    line_length: 80
+    heading_line_length: 80
+    code_block_line_length: 80
+    code_blocks: true
+    tables: true
+    headings: true
+    strict: false
+    stern: false
   # Do not require first line to be H1 (many spec files start with notes)
   MD041: false
+  # Allow bare URLs in research documents (commonly used in technical specs)
+  MD034: false
+  # Allow missing space after hash in atx headings (legacy content may have this)
+  MD018: false
   # Allow occasional inline HTML used for complex formatting
   MD033: false
   # Allow multiple H1s in documents designed as top-level outlines

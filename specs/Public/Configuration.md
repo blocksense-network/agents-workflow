@@ -2,13 +2,19 @@
 
 ### Overview
 
-- `aw config` subcommand with Git-like interface for reading and updating configuration.
+- `aw config` subcommand with Git-like interface for reading and updating
+  configuration.
 - Schema validation on both config file loading and CLI-based modification.
-- Precedence for `~/.config` over `%APPDATA%` on Windows only when both are present.
-- Motivation and support for tracking the origin of each configuration value, with use cases such as: debug-level log reporting, enforced setting explanation, and editor pre-fill mes
+- Precedence for `~/.config` over `%APPDATA%` on Windows only when both
+  are present.
+- Motivation and support for tracking the origin of each configuration
+  value, with use cases such as: debug-level log reporting, enforced setting
+  explanation, and editor pre-fill mes
   sages.
 
-Layered configuration supports system, user, project, and project-user scopes. Values can also be supplied via environment variables and CLI flags. See [CLI](CLI.md) for flag mappings.
+Layered configuration supports system, user, project, and project-user
+scopes. Values can also be supplied via environment variables and CLI
+flags. See [CLI](CLI.md) for flag mappings.
 
 ### Locations (by scope)
 
@@ -17,17 +23,25 @@ Layered configuration supports system, user, project, and project-user scopes. V
   - macOS: `/Library/Application Support/agents-workflow/config.toml`
   - Windows: `%ProgramData%/Agents-Workflow/config.toml`
 - User:
-  - Linux: `$XDG_CONFIG_HOME/agents-workflow/config.toml` or `$HOME/.config/agents-workflow/config.toml`
+  - Linux: `$XDG_CONFIG_HOME/agents-workflow/config.toml` or
+    `$HOME/.config/agents-workflow/config.toml`
   - macOS: `$HOME/Library/Application Support/agents-workflow/config.toml`
-  - Windows: `%APPDATA%/Agents-Workflow/config.toml` (precedence is given to `~/.config` when both exist as noted below)
+  - Windows: `%APPDATA%/Agents-Workflow/config.toml` (precedence is given to
+    `~/.config` when both exist as noted below)
 - Project: `<repo>/.agents/config.toml`
-- Project‑user: `<repo>/.agents/config.user.toml` (ignored by VCS; add to `.gitignore`)
+- Project‑user: `<repo>/.agents/config.user.toml` (ignored by VCS; add to
+  `.gitignore`)
 
-Paths are illustrative; the CLI prints the exact search order in `aw config --explain` and logs them at debug level.
+Paths are illustrative; the CLI prints the exact search order in `aw config
+--explain` and logs them at debug level.
 
 ### Admin‑enforced values
 
-Enterprise deployments may enforce specific keys at the System scope. Enforced values are read‑only to lower scopes. The CLI surfaces enforcement in `aw config get --explain <key>` output and prevents writes with a clear error. See the initial rationale in [Configuration](../Initial%20Developer%20Input/Configuration.md).
+Enterprise deployments may enforce specific keys at the System
+scope. Enforced values are read‑only to lower scopes. The CLI
+surfaces enforcement in `aw config get --explain <key>` output and
+prevents writes with a clear error. See the initial rationale in
+[Configuration](../Initial%20Developer%20Input/Configuration.md).
 
 Use a single key `ui` (not `ui.default`) to control the default UI.
 
@@ -35,49 +49,73 @@ Use a single key `ui` (not `ui.default`) to control the default UI.
 
 To keep things mechanical and predictable:
 
-- TOML sections correspond to subcommand groups (e.g., `[repo]` for `aw repo ...`).
-- CLI option keys preserve dashes in TOML (e.g., `default-mode`, `task-runner`). The name of the options should be chosen to read well both on the command-line and inside a configuration file.
-- There are options that are available only within configuration files (e.g. `[[fleet]]` as described below).
-- JSON and environment variables replace dashes with underscores. ENV vars keep the `AGENTS_WORKFLOW_` prefix.
+- TOML sections correspond to subcommand groups (e.g., `[repo]` for `aw
+repo ...`).
+- CLI option keys preserve dashes in TOML (e.g., `default-mode`,
+  `task-runner`). The name of the options should be chosen to read well both
+  on the command-line and inside a configuration file.
+- There are options that are available only within configuration files
+  (e.g. `[[fleet]]` as described below).
+- JSON and environment variables replace dashes with underscores. ENV vars
+  keep the `AGENTS_WORKFLOW_` prefix.
 
 Examples:
 
-- Flag `--remote-server` ↔ TOML `remote-server` ↔ ENV `AGENTS_WORKFLOW_REMOTE_SERVER`
-- Per-server URLs are defined under `[[server]]` entries; `remote-server` may refer to a server `name` or be a raw URL.
-- WebUI-only: key `service-base-url` selects the REST base URL used by the browser client when the WebUI is hosted persistently at a fixed origin.
-- Flag `--task-runner` ↔ TOML `repo.task-runner` ↔ ENV `AGENTS_WORKFLOW_REPO_TASK_RUNNER`
+- Flag `--remote-server` ↔ TOML `remote-server` ↔ ENV
+  `AGENTS_WORKFLOW_REMOTE_SERVER`
+- Per-server URLs are defined under `[[server]]` entries; `remote-server`
+  may refer to a server `name` or be a raw URL.
+- WebUI-only: key `service-base-url` selects the REST base URL used by the
+  browser client when the WebUI is hosted persistently at a fixed origin.
+- Flag `--task-runner` ↔ TOML `repo.task-runner` ↔ ENV
+  `AGENTS_WORKFLOW_REPO_TASK_RUNNER`
 
 ### Keys
 
-- `ui`: string — default UI to launch with bare `aw` (values: `"tui"` | `"webui"`).
+- `ui`: string — default UI to launch with bare `aw` (values: `"tui"` |
+  `"webui"`).
 - `browser-automation`: `boolean` — enable/disable site automation.
 - browser-profile: string — preferred agent browser profile name.
-- chatgpt-username: string — optional default ChatGPT username used for profile discovery.
-- codex-workspace: string — default Codex workspace to select before pressing "Code".
-- remote-server: string — either a known server `name` (from `[[server]]`) or a raw URL. If set, AW uses REST; otherwise it uses local SQLite state.
+- chatgpt-username: string — optional default ChatGPT username used for
+  profile discovery.
+- codex-workspace: string — default Codex workspace to select before pressing
+  "Code".
+- remote-server: string — either a known server `name` (from `[[server]]`)
+  or a raw URL. If set, AW uses REST; otherwise it uses local SQLite state.
 
 ### Behavior
 
-- CLI flags override environment, which override project-user, project, user, then system scope.
-- On Windows, `~/.config` takes precedence over `%APPDATA%` only when both are present.
+- CLI flags override environment, which override project-user, project,
+  user, then system scope.
+- On Windows, `~/.config` takes precedence over `%APPDATA%` only when both
+  are present.
 - The CLI can read, write, and explain config values via `aw config`.
-- Backend selection: if `remote-server` is set (by flag/env/config), AW uses the REST API; otherwise it uses the local SQLite database.
-- Repo detection: when `--repo` is not specified, AW walks parent directories to find a VCS root among supported systems; commands requiring a repo fail with a clear error when none is found.
+- Backend selection: if `remote-server` is set (by flag/env/config), AW uses
+  the REST API; otherwise it uses the local SQLite database.
+- Repo detection: when `--repo` is not specified, AW walks parent directories
+  to find a VCS root among supported systems; commands requiring a repo fail
+  with a clear error when none is found.
 
 ### Validation
 
-- The configuration file format is TOML, validated against a single holistic JSON Schema:
+- The configuration file format is TOML, validated against a single holistic
+  JSON Schema:
   - Schema: `specs/schemas/config.schema.json` (draft 2020-12)
-  - Method: parse TOML → convert to a JSON data model → validate against the schema
-  - Editors: tools like Taplo can use the JSON Schema to provide completions and diagnostics
+  - Method: parse TOML → convert to a JSON data model → validate against
+    the schema
+  - Editors: tools like Taplo can use the JSON Schema to provide completions
+    and diagnostics
 
-- DRY definitions: the schema uses `$defs` for shared `enums` and shapes reused across the CLI (e.g., `Mode`, `Multiplexer`, `Vcs`, `DevEnv`, `TaskRunner`, `AgentName`, `SupportedAgents`).
+- DRY definitions: the schema uses `$defs` for shared `enums` and shapes reused
+  across the CLI (e.g., `Mode`, `Multiplexer`, `Vcs`, `DevEnv`, `TaskRunner`,
+  `AgentName`, `SupportedAgents`).
 
 Tools in the dev shell:
 
 - `taplo` (taplo-cli): TOML validation with JSON Schema mapping
 - `ajv` (ajv-cli): JSON Schema `validator` for JSON instances
-- `docson` (via shell function): local schema viewer using `npx` (no global install)
+- `docson` (via shell function): local schema viewer using `npx` (no global
+  install)
 
 Examples (use Just targets inside the Nix dev shell):
 
@@ -92,7 +130,8 @@ just conf-schema-taplo-check
 just conf-schema-docs
 ```
 
-Tip: from the host without entering the shell explicitly, you can run any target via:
+Tip: from the host without entering the shell explicitly, you can run any
+target via:
 
 ```bash
 nix develop --command just conf-schema-validate
@@ -100,10 +139,12 @@ nix develop --command just conf-schema-validate
 
 ### Servers, Fleets, and Sandboxes
 
-AW supports declaring remote servers, fleets (multi-environment presets), and sandbox profiles.
+AW supports declaring remote servers, fleets (multi-environment presets),
+and sandbox profiles.
 
 ```toml
-remote-server = "office-1"  # optional; can be a name from [[server]] or a raw URL
+remote-server = "office-1"  # optional; can be a name from [[server]] or a
+raw URL
 
 [[server]]
 name = "office-1"
@@ -120,7 +161,8 @@ url  = "https://aw.office-2.corp/api"
 name = "default"  # chosen when no other fleet is provided
 
   [[fleet.member]]
-  type = "container"   # refers to a sandbox profile by name (see [[sandbox]] below)
+  type = "container"   # refers to a sandbox profile by name (see [[sandbox]]
+  below)
   profile = "container"
 
   [[fleet.member]]
@@ -141,7 +183,8 @@ type = "container"      # predefined types with their own options
 
 Flags and mapping:
 
-- `--remote-server <NAME|URL>` selects a server (overrides `remote-server` in config).
+- `--remote-server <NAME|URL>` selects a server (overrides `remote-server`
+  in config).
 - `--fleet <NAME>` selects a fleet; default is the fleet named `default`.
 - Bare `aw` uses `ui` to decide between TUI and WebUI (defaults to `tui`).
 
@@ -154,8 +197,7 @@ terminal-multiplexer = "tmux"
 
 editor = "nvim"
 
-service-base-url = "https://aw.office-1.corp/api"  # WebUI fetch base; browser calls this URL
-
+service-base-url = "https://aw.office-1.corp/api"  # WebUI fetch base;browser calls this URL
 # Browser automation (no subcommand section; single keys match CLI flags)
 browser-automation = true
 browser-profile = "work-codex"
@@ -177,8 +219,10 @@ supported-agents = "all" # or ["codex","claude","cursor"]
 
 Notes:
 
-- `supportedAgents` accepts "all" or an explicit array of agent names; the CLI may normalize this value internally.
-- `devenv` accepts values like `nix`, `spack`, `bazel`, `none`/`no`, or `custom`.
+- `supportedAgents` accepts "all" or an explicit array of agent names;
+  the CLI may normalize this value internally.
+- `devenv` accepts values like `nix`, `spack`, `bazel`, `none`/`no`, or
+  `custom`.
 
 ENV examples:
 

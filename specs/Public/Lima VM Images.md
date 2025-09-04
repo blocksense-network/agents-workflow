@@ -2,7 +2,9 @@
 
 ## Summary
 
-Define Lima VM image variants for agents-workflow multi-OS testing on macOS. All variants use Nix for agents-workflow components to ensure consistency across image types.
+Define Lima VM image variants for agents-workflow multi-OS testing on macOS.
+All variants use Nix for agents-workflow components to ensure consistency
+across image types.
 
 ## VM Image Variants
 
@@ -10,15 +12,19 @@ Define Lima VM image variants for agents-workflow multi-OS testing on macOS. All
 
 - **Base**: Alpine Linux (minimal footprint)
 - **Purpose**: Nix-first development environment
-- **Package management**: Nix for all development tools and agents-workflow components
+- **Package management**: Nix for all development tools and agents-workflow
+  components
 - **Target users**: Developers preferring declarative, reproducible environments
 
 ### Ubuntu LTS
 
 - **Base**: Ubuntu 22.04/24.04 LTS
 - **Purpose**: Maximum compatibility and familiar tooling
-- **Package management**: APT for system packages, Nix for agents-workflow components, wide range of pre-installed package managers and language version managers for quick set up specific dependencies.
-- **Target users**: General development teams wanting conventional Linux environment
+- **Package management**: APT for system packages, Nix for agents-workflow
+  components, wide range of pre-installed package managers and language version
+  managers for quick set up specific dependencies.
+- **Target users**: General development teams wanting conventional Linux
+  environment
 
 ## Common Requirements
 
