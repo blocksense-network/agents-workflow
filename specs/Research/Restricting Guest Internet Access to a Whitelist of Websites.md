@@ -1,5 +1,3 @@
-# Restricting Guest Internet Access to a Whitelist of Websites
-
 Controlling a guest’s network so it can **only access a specific whitelist of websites** is crucial for security. The goal is to allow the guest to reach only approved domains (and ports) and **nothing else**. This must be done under the constraint of **no root privileges on the host**. Below we discuss the challenges and multiple approaches – from user-space networking tricks to proxies and DNS controls – to enforce a whitelist-only policy for guest internet access.
 
 ## Challenges in Whitelisting Network Access (Without Root)

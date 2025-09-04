@@ -1,5 +1,3 @@
-# Supervisor Process for Dynamic File Access Control
-
 ## Overview
 
 In a sandboxed execution environment, a **supervisor process** monitors file system operations of an untrusted "guest" process (the sandboxed code). The supervisor enforces a dynamic allow-list of file paths. Initially, the guest can only access a minimal set of safe files. As the guest tries to open new files, the supervisor intercepts those attempts and decides whether to allow them. Some file accesses are **auto-approved** based on predefined rules, while others pause the guest and require **human approval** before proceeding. This ensures tight security while still granting the guest any necessary file access on a case-by-case basis.

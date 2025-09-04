@@ -16,6 +16,9 @@ The AW CLI will be implemented in Rust using the Ratatui library for the TUI com
 
 This architecture ensures maximum reusability - the core functionality can be used by different front-ends (TUI, WebUI, other CLIs) while maintaining consistent behavior and state management.
 
+TODO: Document that the CLI parsing, help screens and shell autocompletions
+will be done through the Clap rust crate and its companion crates.
+
 ### Primary Goals
 
 - One tool for both the TUI dashboard and automation-ready commands
@@ -32,11 +35,9 @@ This architecture ensures maximum reusability - the core functionality can be us
 - **TUI vs WebUI:** `aw` can start either a terminal dashboard (TUI) or open the WebUI. The UIs present the same concepts (tasks, sessions, logs, time‑travel) with different affordances. See [TUI PRD](TUI%20PRD.md) and [WebUI PRD](WebUI%20PRD.md).
 - **Orthogonal choices:** UI (TUI/WebUI) and execution location (local/remote) are orthogonal. Any combination is possible; e.g., run the TUI against a remote REST service or use the WebUI locally.
 - **Fleets combine local and remote:** [Multi-OS testing fleets](Multi-OS%20Testing.md) can mix local and remote agents. For example, a local Linux container leader may have remote followers (e.g., a Windows VM on a server). The `aw` client and server may need to orchestrate together the connectivity between all the machines in the fleet.
-- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (container, VM, bwrap/firejail, or nosandbox per policy). See [Sandbox Profiles](Sandbox%20Profiles.md) and configuration mapping below.
+- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (local, container, VM, or nosandbox per policy). See [Sandbox Profiles](Sandbox%20Profiles.md) and configuration mapping below.
 
 ### Global Behavior and Flags
-
-Naming consistency: the config key controlling UI selection is `ui`, not `ui.default`.
 
 - `aw` (no args): Launches the default UI (TUI by default). Config key `ui` controls TUI vs WebUI; built‑in default is `tui`.
 - Common global flags (apply to all subcommands unless noted):
@@ -68,7 +69,7 @@ OPTIONS:
   --branch <NAME>                    Branch name for the task
   --agent <TYPE>[@VERSION]           Agent type and optional version
   --instances <N>                    Number of agent instances
-  --runtime <devcontainer|local|nosandbox>
+  --runtime <local|devcontainer|vm|nosandbox>
                                      Runtime environment
   --devcontainer-path <PATH>         Path to devcontainer configuration
   --labels k=v ...                   Key-value labels for the task
@@ -85,6 +86,24 @@ OPTIONS:
   --devshell <NAME>                  Development shell name
 ```
 
+TODO:
+document that the --agent flag can be supplied more than once. This would
+start a multiple agent working in parallel in isolated FS branches (see the
+FS Snapshots docs). Supplying `--agent` multiple times is intended for
+launching different agent types. The `--instances` param applies to the last
+`--agent` parameter. If `--instances` is supplied before the first `--agent`
+parameter, it applies to the first parameter. When `--instances` is
+specified without an `--agent` parameter, the default agent is used.
+
+TODO:
+Document that the user can supply the agent value `cloud-codex`, `cloud-copilot`, `cloud-cursor` and `cloud-jules`. When such an agent is chosen, a new configuration option called `--workspace` determines the cloud workspace where the agent is going to work. For each of the providers, we also have a more specific option, such as `codex-workspace`, `jules-workspace`, etc which can override the lower-precedence `--workspace` option if the particular agent type is chosen. These options can be supplied on the command-line, but a more typical usage is to set them in the local project configuration stored in git.
+When a cloud agent is chosen, depending on whether the provided cloud
+service offers launching agent jobs through an API or a CLI interface, we
+may either use these provided options or use browser automation to start the
+agent job. Currently, all cloud agents require the use of browser
+automation. Update `aw task` behavior specification and flow chart with the
+above details in mind.
+
 Behavior overview:
 
 - Local vs Remote: With a configured/provided `remote-server`, AW calls the server's REST API to create/manage the task. Otherwise, AW runs locally.
@@ -93,6 +112,9 @@ Behavior overview:
 - Target branch: `--target-branch` specifies the branch where agent results should be delivered/pushed (used with `--delivery branch` or `--delivery pr` modes).
 
 #### Preserved `agent-task` Behaviors
+
+TODO: provide links to the ruby modules that define the preserved behavior
+described below.
 
 The `aw task` command preserves and extends the core functionality of the existing `agent-task` command:
 
@@ -123,8 +145,6 @@ The `aw task` command preserves and extends the core functionality of the existi
 
 - **Interactive Push**: Prompts user for remote push confirmation (unless `--push-to-remote` is specified)
 - **Non-Interactive Mode**: `--push-to-remote <BOOL>` flag for automated workflows
-- **Force Push Support**: Configures force-push hooks for continuous agent development
-- **Remote URL Conversion**: Converts SSH URLs to HTTPS format for authentication
 
 **Development Environment:**
 
@@ -237,8 +257,6 @@ Behavior:
 
 - `--yes` or `--push-to-remote true`: Pushes automatically without prompting
 - Interactive mode: Prompts user for push confirmation
-- Converts SSH URLs to HTTPS format for authentication
-- Supports force-push for agent workflow updates
 
 **Error Handling and Cleanup:**
 
@@ -257,7 +275,7 @@ Behavior:
 
 **Advanced Features:**
 
-- Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name. Implementations may run members sequentially or in parallel depending on runtime limits
+- Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name.
 - Browser automation: When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped
 - Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`
 - Branch autocompletion: Uses standard git protocol for suggestions:
@@ -268,6 +286,31 @@ Behavior:
 
 - CLI supports `--draft` to persist editable drafts
 - `aw task start <draft-id>` to submit saved drafts
+
+TODO:
+In the behavior description and the flow chart above, clarify the following:
+When agents are spawned, this is recorded in the local SQLite
+database. The `aw task` command returns 0 upon a successful agent
+launch and a non-zero code in case of various failures. Provide a
+table here of the possible non-zero codes. Add a new `notifications` option
+(defaults to "yes") which controls whether an OS-level notification will be
+emitted when the task completes. Local agents are executed by a thin wrapper
+process that records their console session with asciinema and detects when
+the agent work is complete. For cloud agents, we use browser automation
+to monitor and capture the output of the cloud agent in a similar way. Even
+when I launch a cloud agent, I can launch the TUI interface to monitor the
+progress of the cloud agent. When the task is finally complete. The thin
+wrapper process delivers the notification. The notifacatio messages includes
+a custom `agents-workflow://` link to the task result page. Clicking on this
+link is handled by a program that checks whether the AW WebUI server is
+already running and launches it in case it's not running. In then opens the
+task result page in the WebUI. The task details have been recorded in the
+local SQLite database by the wrapper program and they are now served by the
+WebUI server. The recording wrapper is started with the command `aw agent
+record`. The cloud monitoring is handled with commands like `aw agent
+follow-cloud-task` which translates the live browser stream into a suitable terminal
+output. The `aw agent follow-cloud-task` command is then recorded just like
+any other local agent with `aw agent record`.
 
 #### 3) Sessions
 
