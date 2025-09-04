@@ -58,7 +58,32 @@ Naming consistency: the config key controlling UI selection is `ui`, not `ui.def
 
 #### 2) Tasks
 
-- `aw task [--prompt <TEXT> | --prompt-file <FILE>] [--repo <PATH|URL>] [--branch <NAME>] [--agent <TYPE>[@VERSION]] [--instances <N>] [--runtime <devcontainer|local|nosandbox>] [--devcontainer-path <PATH>] [--labels k=v ...] [--delivery <pr|branch|patch>] [--target-branch <NAME>] [--browser-automation <true|false>] [--browser-profile <NAME>] [--chatgpt-username <NAME>] [--codex-workspace <WORKSPACE>] [--workspace <NAME>] [--fleet <NAME>] [--yes] [--push-to-remote <BOOL>] [--devshell <NAME>]`
+```
+aw task [OPTIONS]
+
+OPTIONS:
+  --prompt <TEXT>                    Use TEXT as the task prompt
+  --prompt-file <FILE>               Read task prompt from FILE
+  --repo <PATH|URL>                  Target repository path or URL
+  --branch <NAME>                    Branch name for the task
+  --agent <TYPE>[@VERSION]           Agent type and optional version
+  --instances <N>                    Number of agent instances
+  --runtime <devcontainer|local|nosandbox>
+                                     Runtime environment
+  --devcontainer-path <PATH>         Path to devcontainer configuration
+  --labels k=v ...                   Key-value labels for the task
+  --delivery <pr|branch|patch>       Delivery method for results
+  --target-branch <NAME>             Target branch for delivery
+  --browser-automation <true|false>  Enable/disable browser automation
+  --browser-profile <NAME>           Browser profile to use
+  --chatgpt-username <NAME>          ChatGPT username for Codex
+  --codex-workspace <WORKSPACE>      Codex workspace identifier
+  --workspace <NAME>                 Named workspace
+  --fleet <NAME>                     Fleet configuration name
+  --yes                              Skip interactive prompts
+  --push-to-remote <BOOL>            Automatically push to remote
+  --devshell <NAME>                  Development shell name
+```
 
 Behavior overview:
 
@@ -246,15 +271,60 @@ Behavior:
 
 #### 3) Sessions
 
-- `aw session list [--status <...>] [--workspace <...>] [--repo <...>] [--remote-server <NAME|URL>]`
-- `aw session attach <SESSION_ID>`
-- `aw session run <SESSION_ID> process [args]`: Launch a process (e.g. VS Code, Debugger, etc) inside the session namespace, so you can inspect the state of the filesystem, the running processes, etc).
-- `aw session logs <SESSION_ID> [-f] [--tail <N>]`
-- `aw session events <SESSION_ID> [-f]`
-- `aw session stop <SESSION_ID>`
-- `aw session pause <SESSION_ID>`
-- `aw session resume <SESSION_ID>`
-- `aw session cancel <SESSION_ID>`
+```
+aw session list [OPTIONS]
+
+OPTIONS:
+  --status <...>              Filter by session status
+  --workspace <...>           Filter by workspace
+  --repo <...>                Filter by repository
+  --remote-server <NAME|URL>  Target remote server
+```
+
+```
+aw session attach <SESSION_ID>
+```
+
+```
+aw session run <SESSION_ID> <PROCESS> [ARGS...]
+
+DESCRIPTION: Launch a process (e.g. VS Code, Debugger, etc) inside the session namespace,
+             so you can inspect the state of the filesystem, the running processes, etc.
+
+PROCESS: Process to launch inside session (e.g., vscode, debugger)
+ARGS:    Arguments to pass to the process
+```
+
+```
+aw session logs <SESSION_ID> [OPTIONS]
+
+OPTIONS:
+  -f                         Follow log output
+  --tail <N>                 Show last N lines
+```
+
+```
+aw session events <SESSION_ID> [OPTIONS]
+
+OPTIONS:
+  -f                         Follow events
+```
+
+```
+aw session stop <SESSION_ID>
+```
+
+```
+aw session pause <SESSION_ID>
+```
+
+```
+aw session resume <SESSION_ID>
+```
+
+```
+aw session cancel <SESSION_ID>
+```
 
 Behavior:
 
@@ -268,14 +338,48 @@ Remote sessions:
 
 #### 5) Repositories and Projects
 
-- `aw repo list` (local: from recent usage; rest: from server workspaces).
-- `aw repo add <PATH|URL>` (local only by default)
-- `aw repo remove <PATH|URL>` (local; protected confirm)
-- `aw workspace list` (rest mode)
+```
+aw repo list
+```
+
+Local: from recent usage; REST: from server workspaces.
+
+```
+aw repo add <PATH|URL>
+```
+
+Local only by default.
+
+```
+aw repo remove <PATH|URL>
+```
+
+Local; protected confirm.
+
+```
+aw workspace list
+```
+
+REST mode only.
 
 #### 5a) Repo Init & Instructions
 
-- `aw repo init [--vcs <git|hg|bzr|fossil>] [--devenv <no|none|nix|spack|bazel|custom>] [--devcontainer <yes|no>] [--direnv <yes|no>] [--task-runner <just|make|...>] [--supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>] [project-description]`
+```
+aw repo init [OPTIONS] [PROJECT-DESCRIPTION]
+
+OPTIONS:
+  --vcs <git|hg|bzr|fossil>                Version control system (default: git)
+  --devenv <no|none|nix|spack|bazel|custom>
+                                           Development environment type (default: nix)
+  --devcontainer <yes|no>                  Enable devcontainer (default: yes)
+  --direnv <yes|no>                        Enable direnv (default: yes)
+  --task-runner <just|make|...>            Task runner tool (default: just)
+  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+                                           Supported agent types (default: all)
+
+ARGUMENTS:
+  PROJECT-DESCRIPTION                      Description of the project
+```
 
 Behavior and defaults:
 
@@ -304,7 +408,13 @@ aw repo init --task-runner just --devenv nix --devcontainer yes --direnv yes "CL
 aw repo init --vcs hg --devenv none --devcontainer no --direnv no  # no dev env scaffolding
 ```
 
-- `aw repo instructions create [--supported-agents <...>]`
+```
+aw repo instructions create [OPTIONS]
+
+OPTIONS:
+  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+                     Supported agent types (default: all)
+```
 
 Behavior:
 
@@ -314,7 +424,18 @@ Output and exit codes:
 
 - Mirrors `repo init` keys where applicable; adds `reviewFindings` list in `--json` mode.
 
-- `aw repo instructions link [--supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>] [source-file] [--force] [--dry-run]`
+```
+aw repo instructions link [OPTIONS] [SOURCE-FILE]
+
+OPTIONS:
+  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+                     Supported agent types (default: all)
+  --force             Force overwrite existing symlinks
+  --dry-run           Show what would be done without making changes
+
+ARGUMENTS:
+  SOURCE-FILE        Source instruction file (default: AGENTS.md)
+```
 
 Behavior:
 
@@ -337,7 +458,13 @@ Notes:
 
 - In `repo init` and `repo instructions create`, this symlink step is executed automatically after `AGENTS.md` exists.
 
-- `aw repo check [--supported-agents <...>]`
+```
+aw repo check [OPTIONS]
+
+OPTIONS:
+  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+                     Supported agent types (default: all)
+```
 
 Behavior:
 
@@ -350,7 +477,13 @@ Output and exit codes:
 
 - Human‑readable summary with per‑check status; `--json` emits a structured report: `{ instructions: { ok, missing:[], extra:[] }, devcontainer: { ok, health: { passed, details } }, devenv: { ok, details } }`. Non‑zero exit if any critical check fails.
 
-- `aw health [--supported-agents <...>]`
+```
+aw health [OPTIONS]
+
+OPTIONS:
+  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+                     Supported agent types (default: all)
+```
 
 Behavior:
 
@@ -362,49 +495,229 @@ Output and exit codes:
 
 #### 6) Runtimes, Agents, Hosts (capabilities)
 
-- `aw agents list`
-- `aw runtimes list`
-- `aw hosts list`
+```
+aw agents list
+```
+
+```
+aw runtimes list
+```
+
+```
+aw hosts list
+```
 
 REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes`, `/api/v1/hosts`.
 
 #### 7) Config (Git-like)
 
-- `aw config get <key> [--scope <system|user|project|project-user>] [--explain]`
-- `aw config set <key> <value> [--scope ...] [--enforced]` (system scope only can be enforced)
-- `aw config list [--scope ...] [--show-origin]`
-- `aw config unset <key> [--scope ...]`
+```
+aw config get <KEY> [OPTIONS]
+
+ARGUMENTS:
+  KEY                          Configuration key to retrieve
+
+OPTIONS:
+  --scope <system|user|project|project-user>
+                               Configuration scope (default: all scopes)
+  --explain                    Show detailed explanation of the key
+```
+
+```
+aw config set <KEY> <VALUE> [OPTIONS]
+
+ARGUMENTS:
+  KEY                          Configuration key to set
+  VALUE                        Value to set
+
+OPTIONS:
+  --scope <system|user|project|project-user>
+                               Configuration scope
+  --enforced                   Enforce this setting (system scope only)
+```
+
+```
+aw config list [OPTIONS]
+
+OPTIONS:
+  --scope <system|user|project|project-user>
+                              Configuration scope to list
+  --show-origin               Show where each setting comes from
+```
+
+```
+aw config unset <KEY> [OPTIONS]
+
+ARGUMENTS:
+  KEY                         Configuration key to remove
+
+OPTIONS:
+  --scope <system|user|project|project-user>
+                              Configuration scope
+```
 
 Mirrors `docs/configuration.md` including provenance, precedence, and Windows behavior.
 
 #### 8) Service and WebUI (local developer convenience)
 
-- `aw serve [--bind (default=0.0.0.0)] [--port <P>] [--db <URL|PATH>]`
-  - Starts the REST service.
-- `aw webui [--bind (default=127.0.0.1)] [--port <P>] [--rest <URL>]`
-  - Serves the WebUI for local use; in `--local` it binds to `127.0.0.1` and hides admin features.
+```
+aw serve [OPTIONS]
+
+OPTIONS:
+  --bind <ADDRESS>            Bind address (default: 0.0.0.0)
+  --port <P>                  Port to listen on
+  --db <URL|PATH>             Database URL or path
+```
+
+```
+aw webui [OPTIONS]
+
+OPTIONS:
+  --bind <ADDRESS>            Bind address (default: 127.0.0.1)
+  --port <P>                  Port to serve WebUI on
+  --rest <URL>                REST service URL to connect to
+```
 
 #### 9) Connectivity (Overlay/Relay)
 
-- `aw connect keys [--provider netbird|tailscale|auto] [--tag <name>]...` — Request session connectivity credentials.
-- `aw connect handshake --session <id> [--hosts <list>] [--timeout <sec>]` — Initiate and wait for follower acks; prints per‑host status.
-- Relay utilities (fallback):
-  - `aw relay tail --session <id> --host <name> [--stream stdout|stderr|status]`
-  - `aw relay send --session <id> --host <name> --control <json>`
-  - `aw relay socks5 --session <id> --bind 127.0.0.1:1080` — Start a local SOCKS5 relay for this session (client‑hosted rendezvous).
+```
+aw connect keys [OPTIONS]
 
-- `aw doctor` — Environment diagnostics (snapshot providers, multiplexer availability, docker/devcontainer, git).
-- `aw completion [bash|zsh|fish|pwsh]` — Shell completions.
+DESCRIPTION: Request session connectivity credentials.
+
+OPTIONS:
+  --provider <netbird|tailscale|auto>
+                           Connectivity provider
+  --tag <name>              Tag for the connection
+```
+
+```
+aw connect handshake --session <ID> [OPTIONS]
+
+DESCRIPTION: Initiate and wait for follower acks; prints per-host status.
+
+OPTIONS:
+  --hosts <list>            List of hosts to handshake with
+  --timeout <sec>           Timeout in seconds
+```
+
+```
+aw relay tail --session <ID> --host <NAME> [OPTIONS]
+
+DESCRIPTION: Relay utilities (fallback).
+
+OPTIONS:
+  --stream <stdout|stderr|status>
+                           Stream to tail (default: stdout)
+```
+
+```
+aw relay send --session <ID> --host <NAME> --control <JSON>
+```
+
+Relay utilities (fallback).
+
+```
+aw relay socks5 --session <ID> --bind <ADDRESS:PORT>
+```
+
+Start a local SOCKS5 relay for this session (client-hosted rendezvous).
+
+```
+aw doctor
+```
+
+Environment diagnostics (snapshot providers, multiplexer availability, docker/devcontainer, git).
+
+```
+aw completion [SHELL]
+
+DESCRIPTION: Shell completions.
+
+ARGUMENTS:
+  SHELL                       Shell type (bash|zsh|fish|pwsh)
+```
 
 #### 10) Agent Utilities (`aw agent ...`)
 
 - Subcommands used only in agent dev environments live under `aw agent ...`. This keeps end‑user command space clean while still scriptable for agents.
-- `aw agent get-task [--autopush] [--repo <PATH>]` — Prints the current task prompt for agents. When `--autopush` is specified, automatically configures VCS hooks to push changes on each commit (this is where autopush configuration actually happens, not during `aw task` creation). Auto-discovers repository root and supports multi-repo scenarios.
-- `aw agent get-setup-env [--repo <PATH>]` — Extracts and prints environment variables from @agents-setup directives in the current task file(s). Processes all tasks (initial task + follow-up tasks) on the current agent branch, parsing @agents-setup directives to extract environment variables. Supports both `VAR=value` and `VAR+=value` syntax for setting and appending values. Merges environment variables from multiple tasks, with append operations combining values. Outputs in `KEY=VALUE` format, one per line. In multi-repo scenarios, auto-discovers all repositories in subdirectories and prefixes each repository's output with "In directory `dirname`:" followed by the environment variables. Requires being on an agent branch with a valid task file.
-- `aw agent start-work [--task-description <DESC>] [--branch-name <NAME>] [--repo <PATH>]` — Records a task description and optionally creates a new branch. When on an existing agent branch, appends the description as a follow-up task. When not on an agent branch, requires `--branch-name` and creates a new agent branch with the initial task.
-- `aw agent followers list` — List configured follower hosts and tags (diagnostics; same data as `GET /api/v1/followers` when in REST mode).
-- `aw agent followers sync-fence [--timeout <sec>] [--tag <k=v>]... [--host <name>]... [--all]` — Perform a synchronization fence ensuring followers match the leader snapshot before execution; emits per‑host status.
-- `aw agent run-everywhere [--tag <k=v>]... [--host <name>]... [--all] [--] <command> [args...]` — Invoke run‑everywhere on selected followers.
+
+```
+aw agent get-task [OPTIONS]
+
+DESCRIPTION: Prints the current task prompt for agents. When --autopush is specified,
+             automatically configures VCS hooks to push changes on each commit
+             Auto-discovers repository root and supports multi-repo scenarios.
+
+OPTIONS:
+  --autopush                  Configure VCS hooks for automatic pushing
+  --repo <PATH>               Repository path
+```
+
+```
+aw agent get-setup-env [OPTIONS]
+
+DESCRIPTION: Extracts and prints environment variables from @agents-setup directives
+             in the current task file(s). Processes all tasks (initial task + follow-up tasks)
+             on the current agent branch, parsing @agents-setup directives to extract
+             environment variables. Supports both VAR=value and VAR+=value syntax for
+             setting and appending values. Merges environment variables from multiple tasks,
+             with append operations combining values. Outputs in KEY=VALUE format, one per line.
+             In multi-repo scenarios, auto-discovers all repositories in subdirectories and
+             prefixes each repository's output with "In directory dirname:" followed by the
+             environment variables. Requires being on an agent branch with a valid task file.
+
+OPTIONS:
+  --repo <PATH>               Repository path
+```
+
+```
+aw agent start-work [OPTIONS]
+
+DESCRIPTION: Records a task description and optionally creates a new branch.
+             When on an existing agent branch, appends the description as a follow-up task.
+             When not on an agent branch, requires --branch-name and creates a new agent
+             branch with the initial task.
+
+OPTIONS:
+  --task-description <DESC>   Task description
+  --branch-name <NAME>        Branch name to create
+  --repo <PATH>               Repository path
+```
+
+```
+aw agent followers list
+```
+
+List configured follower hosts and tags (diagnostics; same data as GET /api/v1/followers when in REST mode).
+
+```
+aw agent followers sync-fence [OPTIONS]
+
+DESCRIPTION: Perform a synchronization fence ensuring followers match the leader snapshot
+             before execution; emits per-host status.
+
+OPTIONS:
+  --timeout <sec>             Timeout in seconds
+  --tag <k=v>                 Tag filter
+  --host <name>               Host filter
+  --all                       Apply to all followers
+```
+
+```
+aw agent run-everywhere [OPTIONS] [--] <COMMAND> [ARGS...]
+
+DESCRIPTION: Invoke run-everywhere on selected followers.
+
+OPTIONS:
+  --tag <k=v>                 Tag filter
+  --host <name>               Host filter
+  --all                       Apply to all followers
+
+ARGUMENTS:
+  COMMAND                     Command to run on followers
+  ARGS                        Arguments for the command
+```
 
 ### Subcommand Implementation Strategy
 

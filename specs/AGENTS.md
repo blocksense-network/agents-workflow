@@ -21,3 +21,49 @@ Some of the markdown files have standardized Obsidian headers indicating their c
 - Before committing any change to the `specs/` folder, run `just lint-specs` from the project root. This performs Markdown linting, link checking, spell checking, prose/style linting, and Mermaid diagram validation.
 
 If the pre-commit hook blocks your commit, run `just lint-specs`, address the reported issues, and commit again.
+
+## CLI Documentation Guidelines
+
+### Command Parameter Formatting
+
+When documenting CLI commands with multiple parameters, use the following format to improve readability in Git PRs and general maintainability:
+
+**Good Format:**
+
+```
+aw command [OPTIONS] [ARGUMENTS]
+
+OPTIONS:
+  --option1 <value>           Description of option1
+  --option2                   Description of option2
+  --long-option-name <type>   Description of long option
+
+ARGUMENTS:
+  ARGUMENT1                   Description of required argument
+  [ARGUMENT2]                 Description of optional argument
+```
+
+**Bad Format (hard to review in PRs):**
+
+```
+- `aw command [--option1 <value>] [--option2] [--long-option-name <type>] [argument1] [argument2]`
+```
+
+**Benefits of the good format:**
+
+- Each parameter appears on its own line, making diffs cleaner in PRs
+- Easier to spot additions, removals, or changes to individual parameters
+- Better alignment and readability
+- Consistent with standard help screen formatting
+- Easier to maintain and update parameter descriptions
+
+**When to use this format:**
+
+- Commands with 3+ parameters
+- Complex commands where parameter descriptions are important
+- Any command where the single-line format becomes unwieldy
+
+**When single-line format is acceptable:**
+
+- Simple commands with 1-2 parameters
+- Commands where brevity is more important than detailed formatting
