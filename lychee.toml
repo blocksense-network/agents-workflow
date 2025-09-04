@@ -18,6 +18,7 @@ exclude = [
   "^https://man7.org/.*",
   "^https://openai.com/.*",
   "^https://unix.stackexchange.com/.*",
+  "^https://stackoverflow.com/.*",
 ]
 
 # Be lenient with intermittent CDN/SSL issues

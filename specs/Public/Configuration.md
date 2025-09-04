@@ -8,7 +8,7 @@
 - Motivation and support for tracking the origin of each configuration value, with use cases such as: debug-level log reporting, enforced setting explanation, and editor pre-fill mes
   sages.
 
-Layered configuration supports system, user, project, and project-user scopes. Values can also be supplied via environment variables and CLI flags. See [CLI](CLI.md) for flag mappings.
+Layered configuration supports system, user, repo, and repo-user scopes. Values can also be supplied via environment variables and CLI flags. See [CLI](CLI.md) for flag mappings.
 
 ### Locations (by scope)
 
@@ -20,14 +20,14 @@ Layered configuration supports system, user, project, and project-user scopes. V
   - Linux: `$XDG_CONFIG_HOME/agents-workflow/config.toml` or `$HOME/.config/agents-workflow/config.toml`
   - macOS: `$HOME/Library/Application Support/agents-workflow/config.toml`
   - Windows: `%APPDATA%/Agents-Workflow/config.toml` (precedence is given to `~/.config` when both exist as noted below)
-- Project: `<repo>/.agents/config.toml`
-- Project‑user: `<repo>/.agents/config.user.toml` (ignored by VCS; add to `.gitignore`)
+- Repo: `<repo>/.agents/config.toml`
+- Repo‑user: `<repo>/.agents/config.user.toml` (ignored by VCS; add to `.gitignore`)
 
 Paths are illustrative; the CLI prints the exact search order in `aw config --explain` and logs them at debug level.
 
 ### Admin‑enforced values
 
-Enterprise deployments may enforce specific keys at the System scope. Enforced values are read‑only to lower scopes. The CLI surfaces enforcement in `aw config get --explain <key>` output and prevents writes with a clear error. See the initial rationale in [Configuration](../Initial%20Developer%20Input/Configuration.md).
+Enterprise deployments may enforce specific keys at the System scope. Enforced values are read‑only to lower scopes. The CLI surfaces enforcement in `aw config <key> --explain` output and prevents writes with a clear error. See the initial rationale in [Configuration](../Initial%20Developer%20Input/Configuration.md).
 
 Use a single key `ui` (not `ui.default`) to control the default UI.
 
@@ -58,7 +58,7 @@ Examples:
 
 ### Behavior
 
-- CLI flags override environment, which override project-user, project, user, then system scope.
+- CLI flags override environment, which override repo-user, repo, user, then system scope.
 - On Windows, `~/.config` takes precedence over `%APPDATA%` only when both are present.
 - The CLI can read, write, and explain config values via `aw config`.
 - Backend selection: if `remote-server` is set (by flag/env/config), AW uses the REST API; otherwise it uses the local SQLite database.

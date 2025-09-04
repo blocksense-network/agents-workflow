@@ -4,7 +4,7 @@
 
 The AW CLI (`aw`) unifies local and remote workflows for launching and managing agent coding sessions. Running `aw` with no subcommands starts the TUI dashboard. Subcommands provide scriptable operations for task/session lifecycle, configuration, repository management, and developer ergonomics.
 
-The CLI honors the layered configuration model in [Configuration](Configuration.md) (system, user, project, project-user, env, CLI flags). Flags map from config keys using the `--a-b-c` convention and env var prefix `AGENTS_WORKFLOW_`.
+The CLI honors the layered configuration model in [Configuration](Configuration.md) (system, user, repo, repo-user, env, CLI flags). Flags map from config keys using the `--a-b-c` convention and env var prefix `AGENTS_WORKFLOW_`.
 
 #### Implementation Approach
 
@@ -163,8 +163,8 @@ While these options can be supplied on the command line, typical usage involves 
 
 ```bash
 # Set cloud workspace for current project
-aw config set codex-workspace "workspace-name-used-at-codex"
-aw config set workspace "workspace-name-used-everywhere-else"
+aw config codex-workspace "workspace-name-used-at-codex"
+aw config workspace "workspace-name-used-everywhere-else"
 ```
 
 Behavior overview:
@@ -704,48 +704,50 @@ REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes`, `/api/v1/hosts`.
 #### 7) Config (Git-like)
 
 ```
-aw config get <KEY> [OPTIONS]
+aw config [OPTIONS] [KEY [VALUE]]
 
 ARGUMENTS:
-  KEY                          Configuration key to retrieve
+  KEY                          Configuration key to get or set (optional)
+  VALUE                        Value to set for the key (optional)
 
 OPTIONS:
-  --scope <system|user|project|project-user>
-                               Configuration scope (default: all scopes)
-  --explain                    Show detailed explanation of the key
+  --system                    Target system-wide configuration
+  --user                      Target user-level configuration (default)
+  --repo                      Target repository/project-level configuration
+  --repo-user                 Target repository user-specific configuration
+  --show-origin               Show where each setting comes from (when listing)
+  --explain                   Show detailed explanation of the key (when getting)
+  --delete                    Delete the specified configuration key
+  --enforced                  Enforce this setting (system scope only, when setting)
 ```
 
-```
-aw config set <KEY> <VALUE> [OPTIONS]
+**Usage Patterns:**
 
-ARGUMENTS:
-  KEY                          Configuration key to set
-  VALUE                        Value to set
+- `aw config` - List all configuration settings
+- `aw config <KEY>` - Get the value of a configuration key
+- `aw config <KEY> <VALUE>` - Set a configuration key to a value
+- `aw config <KEY> --delete` - Delete a configuration key
 
-OPTIONS:
-  --scope <system|user|project|project-user>
-                               Configuration scope
-  --enforced                   Enforce this setting (system scope only)
-```
+**Examples:**
 
-```
-aw config list [OPTIONS]
+```bash
+# List all configuration
+aw config
 
-OPTIONS:
-  --scope <system|user|project|project-user>
-                              Configuration scope to list
-  --show-origin               Show where each setting comes from
-```
+# Get a specific setting
+aw config ui.theme
 
-```
-aw config unset <KEY> [OPTIONS]
+# Set a configuration value
+aw config ui.theme dark
 
-ARGUMENTS:
-  KEY                         Configuration key to remove
+# Delete a configuration key
+aw config codex-workspace --delete
 
-OPTIONS:
-  --scope <system|user|project|project-user>
-                              Configuration scope
+# Show configuration with origins
+aw config --show-origin
+
+# Set with specific scope
+aw config --user ui.theme dark
 ```
 
 Mirrors `docs/configuration.md` including provenance, precedence, and Windows behavior.

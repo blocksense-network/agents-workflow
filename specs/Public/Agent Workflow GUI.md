@@ -7,22 +7,26 @@ The Agent Workflow GUI (AW GUI) is a cross-platform Electron application that pr
 ## Core Responsibilities
 
 ### WebUI Process Management
+
 - Launches and monitors the `aw webui` process
 - Handles process lifecycle (start, restart, shutdown)
 - Manages port conflicts and service discovery
 - Provides graceful error handling for WebUI failures
 
 ### Window Management
+
 - **Single Window Mode**: Embeds WebUI in a single Electron window with native window controls
 - **Multiple Window Mode**: Opens separate windows for different tasks/sessions
 - Window state persistence and restoration
 
 ### Custom URL Scheme Handler
+
 - Registers `agents-workflow://` protocol on installation
 - Routes incoming URLs to appropriate WebUI pages
 - Handles URL scheme conflicts and fallbacks
 
 ### Native OS Integration
+
 - System tray presence with quick actions
 - Native OS notifications for task completion
 - Global keyboard shortcuts for common operations
@@ -37,6 +41,7 @@ The GUI application bundles the complete AW CLI toolchain, making all `aw` comma
 ### Packaging Strategy
 
 #### Distribution Methods
+
 - **Standalone Installers**: Platform-specific installers that bundle both GUI and CLI
 - **Package Manager Integration**: System packages that install both components
 - **Portable Bundles**: Self-contained applications with embedded CLI tools
@@ -51,6 +56,7 @@ The bundled CLI tools are made available through multiple mechanisms:
    - Package managers create symlinks in standard bin directories
 
 2. **Embedded Execution**
+
    ```bash
    # GUI provides wrapper scripts that execute bundled CLI
    # Example: /Applications/AW GUI.app/Contents/Resources/cli/aw
@@ -65,16 +71,19 @@ The bundled CLI tools are made available through multiple mechanisms:
 #### Cross-Platform PATH Setup
 
 **Windows:**
+
 - Installer adds `%PROGRAMFILES%\AW GUI\resources\cli` to system PATH
 - Registry entries for command completion
 - MSI integration for Add/Remove Programs
 
 **macOS:**
+
 - App bundle contains CLI in `Contents/Resources/cli/`
 - Optional symlink creation in `/usr/local/bin/` (with user permission)
 - Launch Services integration for command discovery
 
 **Linux:**
+
 - Package installs CLI tools to `/usr/bin/` or `/usr/local/bin/`
 - .desktop file integration for GUI launcher
 - MIME type associations for URL scheme
@@ -91,11 +100,13 @@ When CLI tools are invoked from the command line, they:
 ### Development and Testing
 
 #### Development Workflow
+
 - GUI and CLI developed as separate but coordinated components
 - Shared build system ensures version alignment
 - Integration tests verify CLI-GUI interoperability
 
 #### Standalone vs Bundled Modes
+
 - **Standalone CLI**: Full functionality without GUI dependency
 - **Bundled CLI**: Optimized for GUI integration with enhanced features
 - **Detection Logic**: Automatic mode detection based on installation context
@@ -107,18 +118,21 @@ The GUI integrates with the layered configuration system defined in `Configurati
 ## Platform-Specific Implementation
 
 ### Windows
+
 - MSI installer with CLI PATH integration
 - Registry-based URL scheme registration
 - Taskbar jump lists and badges
 - Windows notification integration
 
 ### macOS
+
 - .app bundle with embedded CLI tools
 - Launch Services URL scheme registration
 - Dock integration and badges
 - macOS notification center
 
 ### Linux
+
 - Native package formats (.deb, .rpm, AppImage)
 - .desktop file integration
 - System tray support
@@ -134,11 +148,13 @@ The GUI integrates with the layered configuration system defined in `Configurati
 ## Installation and Updates
 
 ### Installation Options
+
 - **GUI-Only**: Install GUI with bundled CLI (recommended for most users)
 - **CLI-Only**: Standalone CLI tools without GUI
 - **Full Suite**: Both GUI and standalone CLI for advanced users
 
 ### Update Mechanism
+
 - GUI handles its own updates via Electron's auto-updater
 - Bundled CLI updated as part of GUI releases
 - Standalone CLI updated separately via package managers
@@ -146,11 +162,13 @@ The GUI integrates with the layered configuration system defined in `Configurati
 ## Error Handling
 
 ### Process Management
+
 - Automatic WebUI process restart on failure
 - Clear error messages for missing CLI dependencies
 - Fallback modes when WebUI is unreachable
 
 ### User Guidance
+
 - Installation troubleshooting guides
 - Configuration validation with helpful error messages
 - Links to documentation for common issues

@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS fs_snapshots (
 
 -- Key/value subsystem for small, fast lookups (scoped configuration, caches)
 CREATE TABLE IF NOT EXISTS kv (
-  scope        TEXT NOT NULL,                  -- user|project|repo|runtime|...
+  scope        TEXT NOT NULL,                  -- user|repo|repo-user|system|...
   k            TEXT NOT NULL,
   v            TEXT,
   PRIMARY KEY (scope, k)

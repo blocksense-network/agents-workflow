@@ -172,19 +172,19 @@ All URLs should be purely declarative; don’t embed secrets. Reject unknown hos
 
 ```mermaid
 flowchart TD
-  A[User clicks agents-workflow://...] --> B{OS deep-link}
-  B -->|Windows Reg or MSIX| C[aw-handler.exe]
-  B -->|macOS CFBundleURLTypes| D[AW Handler.app]
-  B -->|Linux x-scheme-handler| E[/usr/local/bin/aw-handler]
+  A[User clicks URL] --> B{OS handles link}
+  B -->|Windows| C[aw-handler.exe]
+  B -->|macOS| D[AW Handler.app]
+  B -->|Linux| E[aw-handler]
 
-  C & D & E --> F[Parse & validate URL]
-  F --> G{Is AW WebUI server running?}
-  G -->|No| H[Start WebUI server]
-  H --> I[Check local SQLite for task]
+  C & D & E --> F[Parse URL]
+  F --> G{WebUI running?}
+  G -->|No| H[Start WebUI]
+  H --> I[Check task]
   G -->|Yes| I
-  I -->|Found| J[Build http://127.0.0.1:8787/tasks/<id>]
-  I -->|Missing| K[Graceful error page]
-  J --> L[Open in default browser]
+  I -->|Found| J[Open task page]
+  I -->|Missing| K[Show error]
+  J --> L[Browser opens]
 ```
 
 ### Launching the default browser
