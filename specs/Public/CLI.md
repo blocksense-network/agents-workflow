@@ -382,7 +382,7 @@ The `aw task` command returns the following exit codes:
 | 7         | Validation error         | Invalid branch name, unsupported agent type     |
 | 8         | Configuration error      | Missing required config, invalid workspace      |
 | 9         | Browser automation error | Browser unavailable, automation script failure  |
-| 10        | Interactive required      | `--non-interactive` used but user input needed  |
+| 10        | Interactive required     | `--non-interactive` used but user input needed  |
 
 #### Notifications System
 
