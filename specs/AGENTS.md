@@ -2,9 +2,9 @@
 
 - Use descriptive node IDs (e.g., `are_we_inside_repo`) instead of single letters.
 - Quote labels with spaces/parentheses: `["Label (with details)"]`.
-- Quote decision nodes that include punctuation: `{ "Question?" }`.
+- Quote decision nodes that include punctuation: `{"Question?"}`.
 - Terminal nodes must have no outgoing edges; name them clearly (e.g., `done`, `exit_error`).
-- Close code fences correctly: start with ```mermaid and end with ``` on its own line.
+- Close code fences correctly: use proper markdown code fence syntax.
 
 # Agents Workflow Specs
 
