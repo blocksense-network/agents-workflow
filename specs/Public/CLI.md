@@ -232,124 +232,144 @@ Flow (high‑level):
 
 ```mermaid
 flowchart TD
-  A["Start: aw task invoked"] --> B{Inside VCS repository?}
+  start_aw_task["Start: aw task invoked"] --> are_we_inside_repo{Inside VCS repository?}
 
-  B -->|Yes| C{create-task-files enabled?}
-  B -->|No| D{--repo or --workspace provided?}
+  are_we_inside_repo -->|Yes| are_task_files_enabled{create-task-files enabled?}
+  are_we_inside_repo -->|No| are_repo_or_workspace_provided{--repo or --workspace provided?}
 
-  D -->|Yes| E["Resolve repository/workspace target"]
-  D -->|No| F{--non-interactive?}
-  F -->|Yes| G["Exit (code 10): interactive selection required"]
-  F -->|No| H["Prompt user to select repo/workspace and target branch"]
+  are_repo_or_workspace_provided -->|Yes| resolve_target["Resolve repository/workspace target"]
+  are_repo_or_workspace_provided -->|No| are_we_in_non_interactive_mode{--non-interactive?}
+  are_we_in_non_interactive_mode -->|Yes| exit_interactive_required["Exit (code 10): interactive selection required"]
+  are_we_in_non_interactive_mode -->|No| prompt_select_target["Prompt user to select repo/workspace and target branch"]
 
-  E --> I{Target is local repository?}
-  H --> I
-  I -->|Yes| J["Change directory to selected repo"]
-  I -->|No| K["Plan server-side task (branch created server-side); receive task ID"]
+  resolve_target --> is_target_local_repository{Target is local repository?}
+  prompt_select_target --> is_target_local_repository
+  is_target_local_repository -->|Yes| chdir_to_repo["Change directory to selected repo"]
+  is_target_local_repository -->|No| plan_server_side_task["Plan server-side task (branch created server-side); receive task ID"]
 
-  J --> C
-  K --> L{--follow flag?}
-  L -->|Yes| M["Launch UI; focus on new remote task"]
-  L -->|No| N["Return task ID and exit"]
+  chdir_to_repo --> are_task_files_enabled
+  plan_server_side_task --> is_follow_flag_set{--follow flag?}
+  is_follow_flag_set -->|Yes| launch_ui_focus_remote_task["Launch UI; focus on new remote task"]
+  is_follow_flag_set -->|No| return_task_id_exit["Return task ID and exit"]
 
-  C -->|Yes| O["Create local task branch (validate or feature-branch from current)"]
-  C -->|No| P["Skip local branch and task file creation"]
+  are_task_files_enabled -->|Yes| create_local_branch["Create local task branch (validate or feature-branch from current)"]
+  are_task_files_enabled -->|No| skip_local_branch_and_task_files["Skip local branch and task file creation"]
 
-  O --> Q["Collect task input (prompt, prompt-file, or editor)"]
-  P --> Q
+  create_local_branch --> collect_task_input["Collect task input (prompt, prompt-file, or editor)"]
+  skip_local_branch_and_task_files --> collect_task_input
 
-  Q --> R{Task content empty?}
-  R -->|Yes| S["Exit with error"]
-  R -->|No| T["Record task file (.agents/tasks) when enabled"]
+  collect_task_input --> is_task_content_empty{Task content empty?}
+  is_task_content_empty -->|Yes| exit_error["Exit with error"]
+  is_task_content_empty -->|No| record_task_file["Record task file (.agents/tasks) when enabled"]
 
-  T --> U["Commit with metadata"]
-  U --> V{"Push to remote now? (--yes/--push-to-remote)"}
-  V -->|Yes| W["Push branch"]
-  V -->|No| X["Skip push"]
+  record_task_file --> commit_with_metadata["Commit with metadata"]
+  commit_with_metadata --> should_push_now{"Push to remote now? (--yes/--push-to-remote)"}
+  should_push_now -->|Yes| push_branch["Push branch"]
+  should_push_now -->|No| skip_push["Skip push"]
 
-  W --> Y["Proceed to execution"]
-  X --> Y
+  push_branch --> proceed_to_execution["Proceed to execution"]
+  skip_push --> proceed_to_execution
 
-  Y --> Z{remote-server configured?}
-  Z -->|Yes| ZA["Send task to server; receive task ID"]
-  Z -->|No| ZB["Local or cloud execution"]
+  proceed_to_execution --> is_remote_server_configured{remote-server configured?}
+  is_remote_server_configured -->|Yes| send_task_to_server_receive_task_id["Send task to server; receive task ID"]
+  is_remote_server_configured -->|No| local_or_cloud_execution["Local or cloud execution"]
 
-  ZA --> ZH
-  ZB --> ZC{runtime}
-  ZC -->|devcontainer| ZD["Run in devcontainer"]
-  ZC -->|local| ZE["Run with sandbox profile"]
-  ZC -->|nosandbox| ZF["Run without sandbox"]
+  send_task_to_server_receive_task_id --> are_notifications_enabled
+  local_or_cloud_execution --> which_runtime{runtime}
+  which_runtime -->|devcontainer| runtime_devcontainer["Run in devcontainer"]
+  which_runtime -->|local| runtime_local["Run with sandbox profile"]
+  which_runtime -->|nosandbox| runtime_nosandbox["Run without sandbox"]
 
-  ZD --> ZH
-  ZE --> ZH
-  ZF --> ZH
+  runtime_devcontainer --> are_notifications_enabled
+  runtime_local --> are_notifications_enabled
+  runtime_nosandbox --> are_notifications_enabled
 
-  ZH --> ZI{notifications enabled?}
-  ZI -->|Yes| ZJ["Configure notification parameters for subprocesses"]
-  ZI -->|No| ZK["Skip notification parameters"]
+  are_notifications_enabled{notifications enabled?} -->|Yes| configure_notification_parameters["Configure notification parameters for subprocesses"]
+  are_notifications_enabled -->|No| skip_notification_parameters["Skip notification parameters"]
 
-  ZJ --> ZL["Launch aw agent record/follow as applicable"]
-  ZK --> ZL
+  configure_notification_parameters --> launch_record_follow["Launch aw agent record/follow as applicable"]
+  skip_notification_parameters --> launch_record_follow
 
-  ZL --> ZM["Monitor execution until completion"]
-  ZM --> ZN["Emit OS notification if enabled"]
-  ZN --> ZO["Done"]
+  launch_record_follow --> monitor_until_completion["Monitor execution until completion"]
+  monitor_until_completion --> emit_notification_if_enabled["Emit OS notification if enabled"]
+  emit_notification_if_enabled --> done["Done"]
 
-  S --> ZP["Exit"]
-  G --> ZP
-  N --> ZP
+  exit_error --> done
+  exit_interactive_required --> done
+  return_task_id_exit --> done
 ```
 
 Behavior:
 
 **Remote vs Local Execution:**
 
-- With a configured/provided `remote-server`, calls the server’s REST API to create and manage the task. Server returns a task identifier for polling task status or obtaining real-time updates through SSE.
-- For local execution, detects repository root and VCS type (Git, Mercurial, Bazaar, Fossil) by walking parent directories.
+- With a configured/provided `remote-server`, the CLI calls the server’s REST API to create the task. The server creates (or schedules) the task, performs branch creation server‑side when required, and returns a `taskId` immediately. The `taskId` MUST be usable for both polling and SSE streaming. If `--follow` is set, the CLI SHALL attach live monitoring (UI selection via the `ui` config) to this `taskId`.
+- For local execution, the CLI MUST detect the repository root and VCS type (Git, Mercurial, Bazaar, Fossil) by walking parent directories from the current working directory.
 
 **Branch and Task Management:**
 
-- When `--branch <NAME>` is provided, validates branch name and creates new VCS branch
-- When on existing agent branch and `--branch` is provided, creates a new branch from current (feature branching)
-- When on existing agent branch without `--branch`, appends to task file as follow-up task
-- Creates task files in `.agents/tasks/YYYY/MM/DD-HHMM-branch-name` format
-- Uses standardized commit messages: "Start-Agent-Branch: branch-name" with metadata
+- Branch name validation: `NAME` MUST match the regex `^[A-Za-z0-9._-]+$` (common subset across supported VCS). Invalid names SHALL cause a validation error and abort.
+- Primary branches: If not creating a new branch (no `--branch` given), the CLI MUST refuse to run on primary branches named `main`, `master`, `trunk`, or `default`.
+- Feature branching: If currently on an agent task branch and `--branch <NAME>` is provided, the CLI MUST create a new branch from the current HEAD (feature‑branching from an agent branch).
+- Follow‑up tasks: If currently on an agent task branch and `--branch` is NOT provided, the CLI MUST append a follow‑up task to the existing task file.
+- Task file path (when task files are enabled): `.agents/tasks/YYYY/MM/DD-HHMM-<branch>` (UTC time, zero‑padded month/day/hour/minute). The file MUST be created if this is the initial task for the branch; follow‑ups MUST append to the same file separated by the delimiter line `--- FOLLOW UP TASK ---`.
+- Initial commit message (first task commit on a branch) MUST include the following lines:
+  - `Start-Agent-Branch: <branch>`
+  - `Target-Remote: <url>` (only when a default remote URL is discoverable)
+  - `Dev-Shell: <name>` (only when `--devshell` is provided)
 
 **Input Handling:**
 
-- `--prompt`: Uses provided text directly
-- `--prompt-file`: Reads content from specified file
-- No input flags: Launches editor ($EDITOR with fallback chain: nano, pico, micro, vim, helix, vi)
-- Validates task content is not empty
-- Provides helpful editor hints for task creation
+- `--prompt <TEXT>`: The CLI MUST use `<TEXT>` verbatim as the task content.
+- `--prompt-file <FILE>`: The CLI MUST read the entire file contents as task content. If the file cannot be read, the command MUST abort with an error that includes the underlying reason.
+- Interactive editor (no input flags):
+  - Editor resolution order MUST be: `$EDITOR` env var if set; otherwise the first available in PATH among: `nano`, `pico`, `micro`, `vim`, `helix`, `vi`. If none are present, default to `nano`.
+  - The CLI MUST create a temporary file containing a single leading blank line followed by the exact template below, then launch the editor on that file:
+
+```
+# Please write your task prompt above.
+# Enter an empty prompt to abort the task creation process.
+# Feel free to leave this comment in the file. It will be ignored.
+```
+
+- Upon editor exit, the CLI MUST strip both the template block and any single leading blank line from the file, normalize `CRLF` to `LF`, and use the remaining content as the task.
+- Empty content: If, after processing, the task content is empty or consists only of whitespace, the CLI MUST abort with an "empty task" error without making changes.
 
 **Development Environment Integration:**
 
-- `--devshell <NAME>`: Records development shell name in commit metadata
-- Validates devshell exists in flake.nix when specified
-- Parses Nix flake files to discover available development shells
-- `--create-task-files <yes|no>`: When "no", skips creation of local task files and branch for cloud/remote workflows
+- `--devshell <NAME>`: When provided, the CLI MUST validate that `flake.nix` exists at the repository root and that `<NAME>` is an existing `devShell` for the current system. On failure, it MUST abort with an error. When successful, the `Dev-Shell: <name>` line MUST be included in the initial commit message for the task.
+- devShell discovery: The CLI SHOULD resolve the current system and list devShells under `devShells.<system>`; if unavailable, it MAY fall back to enumerating any system’s devShells.
+- `--create-task-files <yes|no>`: When `no`, the CLI MUST skip local branch and task file creation entirely and proceed with cloud/remote automation paths (server‑side branch creation). When `yes` (default), the CLI MUST perform local branch and task file creation as specified.
 
 **Push and Remote Operations:**
 
-- `--yes` or `--push-to-remote true`: Pushes automatically without prompting
-- Interactive mode: Prompts user for push confirmation
+- Automatic push: If `--push-to-remote true` is provided, or `--yes` is set, the CLI MUST push the newly created branch to the default remote without prompting.
+- Interactive prompt: If neither `--push-to-remote` nor `--yes` is set, the CLI MUST prompt exactly:
+
+```
+Push to default remote? [Y/n]:
+```
+
+- An empty response MUST be treated as `Y`.
+- Any response whose first character (case‑insensitive) is `y` MUST be treated as Yes; otherwise No.
+- Non‑interactive push behavior: When `--non-interactive` is set and neither `--push-to-remote` nor `--yes` is given, the CLI MUST abort with a non‑interactive error (exit code 10) indicating that `--push-to-remote` is required.
 
 **Error Handling and Cleanup:**
 
-- Validates repository state and VCS type detection
-- Enforces VCS-specific branch naming rules
-- Provides descriptive error messages for all failure scenarios
-- Cleans up failed branch creation (deletes branch on errors)
-- Ensures proper cleanup of partial operations
+- Repository detection failures MUST abort with a descriptive error including the path from which discovery began.
+- VCS type MUST be detected; unknown VCS SHALL abort.
+- Branch name validation MUST use the regex above; violations SHALL abort with a descriptive error.
+- Primary branch protection MUST be enforced as specified.
+- On errors after creating a new branch locally but before successful completion, the CLI MUST switch back to the original branch and delete the newly created branch (Git: `git branch -D <name>`, Fossil: close branch).
+- All fatal errors MUST be emitted on stderr with actionable messages.
 
 **Runtime and Execution:**
 
-- AW chooses snapshot strategy automatically: ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`)
-- Supports devcontainer, local sandbox, and nosandbox runtimes
-- In multi-OS fleets, snapshots taken on leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md)
-- Persists session/task state in local SQLite database
-- When outside a repo and targeting remote/cloud, branch creation and task recording happen on the server/cloud side; CLI returns task ID
+- Snapshot strategy (local): Prefer ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`).
+- Runtimes: `devcontainer`, `local` (sandbox profile), `nosandbox` (policy‑gated).
+- Multi‑OS fleets: Snapshots are taken on the leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md).
+- State: The CLI MUST persist session/task state in the local SQLite database.
+- Outside a repo (remote/cloud targeting): Branch creation and task recording MUST occur server/cloud‑side; the CLI MUST return/display the `taskId`.
 
 **Advanced Features:**
 
@@ -363,8 +383,15 @@ Behavior:
 
 **Draft Support (TUI/Web Parity):**
 
-- CLI supports `--draft` to persist editable drafts
-- `aw task start <draft-id>` to submit saved drafts
+- `--draft` MUST persist an editable draft without launching execution.
+- `aw task start <draft-id>` MUST submit the saved draft for execution using all currently resolved settings.
+
+**Non‑Interactive Mode:**
+
+- When `--non-interactive` is set:
+  - Any operation that would require interactive selection (e.g., selecting repo/workspace/branch while outside a repo without `--repo`/`--workspace`) MUST abort with exit code 10.
+  - Any interactive confirmation (e.g., push prompt) MUST abort with exit code 10 unless the corresponding flag (`--push-to-remote` or `--yes`) is provided.
+  - Editor launch is disallowed; the user MUST provide `--prompt` or `--prompt-file`. Otherwise, exit code 10.
 
 #### Exit Codes
 

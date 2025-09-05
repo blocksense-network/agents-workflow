@@ -41,6 +41,7 @@
     "Checkpointing",
     "ccache",
     "cgroupfs",
+    "chdir",
     "choco",
     "chowning",
     "cntlm",
