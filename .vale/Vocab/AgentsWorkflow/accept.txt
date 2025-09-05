@@ -38,3 +38,14 @@ RDONLY
 ADDFD
 TOCTOU
 MAGICLINKS
+reusability
+clap_complete
+clap_mangen
+APIs
+Ratatui
+unpackaged
+HKCU
+MSIX
+shellapi
+SHOWNORMAL
+updateable

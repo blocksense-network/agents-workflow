@@ -64,6 +64,7 @@ Shell completions are automatically generated and can be installed via `aw compl
   - `--workspace <NAME>`: Named workspace (only valid on servers that support workspaces). Errors if unsupported by the selected server.
   - `--multiplexer <tmux|zellij|screen>`: Which multiplexer to use for when launching a TUI session
   - `--json`: Emit machine-readable JSON
+  - `--non-interactive`: Fail instead of prompting when user input is required
   - `--quiet`: Reduce output
   - `--log-level <debug|info|warn|error>`
   - `--no-color`
@@ -88,7 +89,7 @@ OPTIONS:
   --agent <TYPE>[@VERSION]           Agent type and optional version (can be specified multiple times)
   --instances <N>                    Number of agent instances (applies to the last --agent parameter)
   --runtime <local|devcontainer|vm|nosandbox>
-                                     Runtime environment
+                                      Runtime environment
   --devcontainer-path <PATH>         Path to devcontainer configuration
   --labels k=v ...                   Key-value labels for the task
   --delivery <pr|branch|patch>       Delivery method for results
@@ -102,7 +103,9 @@ OPTIONS:
   --yes                              Skip interactive prompts
   --push-to-remote <BOOL>            Automatically push to remote
   --devshell <NAME>                  Development shell name
+  --create-task-files <yes|no>       Control creation of local task files (default: yes)
   --notifications <yes|no>          Enable/disable OS notifications on task completion (default: yes)
+  --follow                           Launch TUI/WebUI (according to `ui` config) and focus on monitoring the newly created task
 ```
 
 #### Multiple Agent Support
@@ -229,136 +232,86 @@ Flow (high‑level):
 
 ```mermaid
 flowchart TD
-  A[aw task ...] --> B{remote-server configured?}
-  B -->|yes| C[REST POST /tasks to remote server]
-  C --> D{agent runs where?}
-  D -->|server| E[Provision runtime and snapshot]
-  D -->|third party| F[Call provider API with capability-gated flags]
-  B -->|no| G[Local execution: detect repository and VCS]
+  A["Start: aw task invoked"] --> B{Inside VCS repository?}
 
-  G --> H{branch name provided?}
-  H -->|yes| I[Validate branch name]
-  H -->|no| J[Use current branch]
+  B -->|Yes| C{create-task-files enabled?}
+  B -->|No| D{--repo or --workspace provided?}
 
-  I --> K{on agent branch?}
-  J --> K
-  K -->|yes| L[Append to existing task file]
-  K -->|no| M[Create new branch]
+  D -->|Yes| E["Resolve repository/workspace target"]
+  D -->|No| F{--non-interactive?}
+  F -->|Yes| G["Exit (code 10): interactive selection required"]
+  F -->|No| H["Prompt user to select repo/workspace and target branch"]
 
-  M --> N{devshell specified?}
-  N -->|yes| O[Validate devshell against flake.nix]
-  N -->|no| P[Skip devshell validation]
+  E --> I{Target is local repository?}
+  H --> I
+  I -->|Yes| J["Change directory to selected repo"]
+  I -->|No| K["Plan server-side task (branch created server-side); receive task ID"]
 
-  O --> Q[Record devshell in commit metadata]
+  J --> C
+  K --> L{--follow flag?}
+  L -->|Yes| M["Launch UI; focus on new remote task"]
+  L -->|No| N["Return task ID and exit"]
+
+  C -->|Yes| O["Create local task branch (validate or feature-branch from current)"]
+  C -->|No| P["Skip local branch and task file creation"]
+
+  O --> Q["Collect task input (prompt, prompt-file, or editor)"]
   P --> Q
 
-  L --> R{input source?}
-  Q --> R
+  Q --> R{Task content empty?}
+  R -->|Yes| S["Exit with error"]
+  R -->|No| T["Record task file (.agents/tasks) when enabled"]
 
-  R -->|prompt flag| S[Use --prompt text]
-  R -->|prompt-file flag| T[Read --prompt-file content]
-  R -->|no input flags| U[Launch editor with hints]
+  T --> U["Commit with metadata"]
+  U --> V{"Push to remote now? (--yes/--push-to-remote)"}
+  V -->|Yes| W["Push branch"]
+  V -->|No| X["Skip push"]
 
-  S --> V[Validate task content not empty]
-  T --> V
-  U --> V
+  W --> Y["Proceed to execution"]
+  X --> Y
 
-  V -->|empty| W[Error: abort task creation]
-  V -->|valid| X[Create/update task file in .agents/tasks/]
+  Y --> Z{remote-server configured?}
+  Z -->|Yes| ZA["Send task to server; receive task ID"]
+  Z -->|No| ZB["Local or cloud execution"]
 
-  X --> Y[Commit changes with metadata]
-  Y --> Z{--yes flag or --push-to-remote true?}
-  Z -->|yes| AA[Push to remote automatically]
-  Z -->|no| BB{interactive prompt: Push to remote?}
-  BB -->|yes| AA
-  BB -->|no| CC[Skip push]
+  ZA --> ZH
+  ZB --> ZC{runtime}
+  ZC -->|devcontainer| ZD["Run in devcontainer"]
+  ZC -->|local| ZE["Run with sandbox profile"]
+  ZC -->|nosandbox| ZF["Run without sandbox"]
 
-  AA --> EE{any errors?}
-  EE -->|yes| FF[Cleanup: delete failed branch]
-  EE -->|no| GG[Task created successfully]
+  ZD --> ZH
+  ZE --> ZH
+  ZF --> ZH
 
-  GG --> III{notifications enabled?}
-  III -->|yes| JJJ[Schedule completion notification]
-  III -->|no| KKK[Skip notification setup]
+  ZH --> ZI{notifications enabled?}
+  ZI -->|Yes| ZJ["Configure notification parameters for subprocesses"]
+  ZI -->|No| ZK["Skip notification parameters"]
 
-  JJJ --> MMM[Record agent spawn in SQLite]
-  KKK --> MMM
+  ZJ --> ZL["Launch aw agent record/follow as applicable"]
+  ZK --> ZL
 
-  MMM --> NNN[Launch thin wrapper: aw agent record]
-  NNN --> OOO{local or cloud agent?}
+  ZL --> ZM["Monitor execution until completion"]
+  ZM --> ZN["Emit OS notification if enabled"]
+  ZN --> ZO["Done"]
 
-  OOO -->|local| PPP[Execute agent with asciinema recording]
-  OOO -->|cloud| QQQ[Launch browser automation]
-
-  PPP --> RRR[Monitor process completion]
-  QQQ --> SSS[Monitor browser automation]
-
-  SSS --> TTT{dual monitoring?}
-  TTT -->|yes| UUU[Launch TUI for cloud progress]
-  TTT -->|no| VVV[Browser-only monitoring]
-
-  UUU --> WWW[aw agent follow-cloud-task]
-  VVV --> WWW
-
-  RRR --> XXX[Task completion detected]
-  WWW --> XXX
-
-  XXX --> YYY{notifications enabled?}
-  YYY -->|yes| ZZZ[Emit OS notification with agents-workflow:// link]
-  YYY -->|no| BBB[Skip notification]
-
-  ZZZ --> CCC[Check WebUI server status]
-  BBB --> CCC
-
-  CCC -->|running| DDD[Open task results page]
-  CCC -->|not running| EEE[Auto-launch WebUI server]
-  EEE --> DDD
-
-  E --> HH[Run agent + record session]
-  F --> HH
-  DDD --> II[runtime selection]
-  II -->|devcontainer| JJ[Devcontainer mount snapshot workspace]
-  II -->|local| KK[Process sandbox profile]
-  II -->|nosandbox| LL[Host process policy gated]
-  JJ --> MM[Run agent + record session]
-  KK --> MM
-  LL --> MM
-
-  FF --> NN[Exit with error]
-  W --> NN
+  S --> ZP["Exit"]
+  G --> ZP
+  N --> ZP
 ```
-
---- START TODO BLOCK ---
-There are few things that seem off in the flow chart above. I think it doesn't describe precisely some of the existing implementation details in the Ruby modules and it doesn't capture precisely my intentions for the new CLI design (described in this spec). Here are some points to address:
-
-1) When I start a task on a remote server, the server will return me a task identifier that I can use for polling the task status or for obtaining real-time updates through SSE.
-
-2) There will be a command `aw agent follow-remote-task` that is similar in spirit to `aw agent follow-cloud-task`, but turning the remote server SSE events into terminal output. This will allow me to launch the TUI for see live updates to the task. Just like with cloud tasks, remote tasks are still written to the local SQLite database and the user would see them in his history of tasks in all UI (in the TUI, the WebUI, the GUI, etc).
-
-All in all, I think the paths for cloud tasks and remote tasks will be quite similar in the flow chart and won't be as distant as they appear now.
-
-3) When a branch name is provided an we are already on a task branch, this still creates a new branch (this is like a feature branch starting a certain commit in another feature branch). This doesn't seem to be reflected in the flow chart correctly.
-
-4) The "Schedule completio notification" step is a bit confusing perhaps. This is not exactly scheduling - it's just about passing the correct parameters to the spawned sub-processes. I guess this can be described as scheduling, but I think we can use a less ambigious term.
-
-5) It's not clear what the dual monitoring choice represents. The `aw agent follow-...` commands are launched automatically and unconditionally. The TUI is not launched automatically. We can add a new `--follow` option to `aw tast` that will attach to the TUI, launch the GUI or WebUI (according to the `ui` option) and then focus on live tracking the newly created task.
-
-6) The "runtime selection" step looks very out of place. In reality it happens much earlier - immediately after the "Record agent spawn in SQLite" step.
-
-7) What happens after clicking on notification is out of scope for this flow chart. It's already described in the "Handling AW URL Scheme.md" document, so these steps can be removed from the flow chart here.
---- END TODO BLOCK ---
 
 Behavior:
 
 **Remote vs Local Execution:**
 
-- With a configured/provided `remote-server`, calls the server’s REST API to create and manage the task.
+- With a configured/provided `remote-server`, calls the server’s REST API to create and manage the task. Server returns a task identifier for polling task status or obtaining real-time updates through SSE.
 - For local execution, detects repository root and VCS type (Git, Mercurial, Bazaar, Fossil) by walking parent directories.
 
 **Branch and Task Management:**
 
 - When `--branch <NAME>` is provided, validates branch name and creates new VCS branch
-- When on existing agent branch, appends to task file as follow-up task
+- When on existing agent branch and `--branch` is provided, creates a new branch from current (feature branching)
+- When on existing agent branch without `--branch`, appends to task file as follow-up task
 - Creates task files in `.agents/tasks/YYYY/MM/DD-HHMM-branch-name` format
 - Uses standardized commit messages: "Start-Agent-Branch: branch-name" with metadata
 
@@ -375,6 +328,7 @@ Behavior:
 - `--devshell <NAME>`: Records development shell name in commit metadata
 - Validates devshell exists in flake.nix when specified
 - Parses Nix flake files to discover available development shells
+- `--create-task-files <yes|no>`: When "no", skips creation of local task files and branch for cloud/remote workflows
 
 **Push and Remote Operations:**
 
@@ -395,11 +349,13 @@ Behavior:
 - Supports devcontainer, local sandbox, and nosandbox runtimes
 - In multi-OS fleets, snapshots taken on leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md)
 - Persists session/task state in local SQLite database
+- When outside a repo and targeting remote/cloud, branch creation and task recording happen on the server/cloud side; CLI returns task ID
 
 **Advanced Features:**
 
 - Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name.
 - Browser automation: When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped
+- Browser automation modes: with local branch/task file creation (default) or server/cloud-only mode when `--create-task-files no`
 - Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`
 - Branch autocompletion: Uses standard git protocol for suggestions:
   - Local mode: `git for-each-ref` on the repo; cached with debounce
@@ -426,6 +382,7 @@ The `aw task` command returns the following exit codes:
 | 7         | Validation error         | Invalid branch name, unsupported agent type     |
 | 8         | Configuration error      | Missing required config, invalid workspace      |
 | 9         | Browser automation error | Browser unavailable, automation script failure  |
+| 10        | Interactive required      | `--non-interactive` used but user input needed  |
 
 #### Notifications System
 
@@ -860,11 +817,13 @@ ARGUMENTS:
 aw agent get-task [OPTIONS]
 
 DESCRIPTION: Prints the current task prompt for agents. When --autopush is specified,
-             automatically configures VCS hooks to push changes on each commit
+             automatically configures VCS hooks to push changes on each commit.
              Auto-discovers repository root and supports multi-repo scenarios.
 
 OPTIONS:
   --autopush                  Configure VCS hooks for automatic pushing
+  --agent <TYPE>              Agent kind (for prompt inspection context)
+  --model <MODEL>             Model kind (for prompt inspection context)
   --repo <PATH>               Repository path
 ```
 
@@ -952,7 +911,7 @@ ARGUMENTS:
 aw agent follow-cloud-task [OPTIONS] <TASK_ID>
 
 DESCRIPTION: Monitor cloud agent execution by translating live browser output
-             to terminal display. Enables TUI monitoring of cloud agents.
+              to terminal display. Enables TUI monitoring of cloud agents.
 
 OPTIONS:
   --browser-profile <NAME>   Browser profile for monitoring
@@ -961,6 +920,22 @@ OPTIONS:
 
 ARGUMENTS:
   TASK_ID                    Cloud task ID to monitor
+```
+
+```
+aw agent follow-remote-task [OPTIONS] <TASK_ID>
+
+DESCRIPTION: Monitor remote task execution by connecting to server SSE events
+              and translating them into terminal output. Enables real-time monitoring
+              of tasks running on remote AW servers.
+
+OPTIONS:
+  --remote-server <NAME|URL>  Remote server to connect to (uses configured server if not specified)
+  --output-format <text|json> Output format for monitoring data (default: text)
+  --retry-interval <SEC>     Interval between reconnection attempts (default: 5)
+
+ARGUMENTS:
+  TASK_ID                    Remote task ID to monitor
 ```
 
 ### Subcommand Implementation Strategy
