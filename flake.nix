@@ -189,6 +189,8 @@
       default = pkgs.mkShell {
         buildInputs = [
           pkgs.just
+          pkgs.python3
+          pkgs.python3Packages.pexpect
           pkgs.ruby
           pkgs.bundler
           pkgs.rubocop

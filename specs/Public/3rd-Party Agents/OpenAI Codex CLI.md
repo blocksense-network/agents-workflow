@@ -44,42 +44,20 @@ Codex CLI can be started with a specific task prompt in several ways:
    codex --sandbox workspace-write "Modify these files safely"
    ```
 
-### Built-in support for checkpoints
+### Checkpointing (point-in-time restore of chat + filesystem)
 
-Limited checkpoint support through Git integration. The checkpoints cover **file system state only**.
+There is no evidence of an official checkpointing feature in the Codex CLI that restores both chat and filesystem to a specific moment. Some materials reference applying diffs, but this is not equivalent to AW’s checkpointing requirement.
 
-**Checkpoint Management:**
+- Scope: No official checkpoints. Diff application is not a full checkpoint/restore.
+- Restore: N/A. Applying a diff is not a full restore, and requires manual Git management.
 
-- **Git apply functionality**: `codex apply` can apply the latest diff produced by the agent as a `git apply` to the working tree
-- **Git repository requirement**: By default requires running in a Git repository (can be bypassed with `--skip-git-repo-check`)
-- **Diff-based checkpoints**: Changes are tracked as diffs that can be applied later
+### Session continuation (conversation resume)
 
-**Checkpoint Coverage:**
+No built‑in persistent conversational sessions are documented. Each CLI invocation is independent.
 
-- **Chat content**: NOT preserved - no conversation history is maintained
-- **File system state**: Changes are tracked as Git diffs that can be applied
-- **Tool execution history**: NOT preserved - no session continuity
+### Where are chat sessions stored?
 
-**Restoring from Specific Moments:**
-
-- **No session restoration**: Codex CLI does not support resuming conversations or sessions
-- **Git diff application**: Use `codex apply` to apply the last generated diff to the working tree
-- **No granular restoration**: Cannot restore to a specific chat message or prompt position
-- **File system restoration**: Can apply Git diffs to restore file changes, but requires manual Git management
-
-**Session Storage:**
-
-- **No persistent sessions**: No built-in session management or storage
-- **Git-based checkpoints**: File changes are tracked as diffs but not automatically saved
-- **Manual recovery**: Requires using `codex apply` to restore changes
-
-**Limitations:**
-
-- No conversation persistence between CLI invocations
-- No automatic session resumption capabilities
-- Checkpointing requires Git repository and manual diff application
-- No integrated session history or conversation restoration
-- File system restoration depends on Git diff availability
+N/A — no persistent session format is documented.
 
 ### How is the use of MCP servers configured?
 
@@ -151,3 +129,8 @@ Codex CLI uses OpenAI authentication with the following precise storage location
 - **OpenAI API dependency**: Requires active OpenAI API access and is subject to rate limits
 - **Limited session management**: Less sophisticated session resumption compared to other agents
 - **Configuration complexity**: Advanced configuration requires understanding of TOML structure
+
+## Findings — Session File Experiments (2025-09-10)
+
+- Tooling: `specs/Research/Tools/SessionFileExperiments/codex.py` documents lack of persistent sessions and demonstrates diff-centric workflows.
+- Recommendation: For Time Travel, rely on external session recording and filesystem snapshots; Codex execution remains stateless per invocation.

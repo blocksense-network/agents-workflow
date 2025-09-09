@@ -44,42 +44,23 @@ Gemini CLI can be started with a specific task prompt in several ways:
    gemini --checkpointing --prompt "Implement feature X"
    ```
 
-### Built-in support for checkpoints
+### Checkpointing (point-in-time restore of chat + filesystem)
 
-Yes, Gemini CLI supports checkpoints for file edits. The checkpoints cover **file system state only**.
+Gemini CLI documents an official checkpointing feature to snapshot and restore state around tool execution. Enable with `--checkpointing` (or configure in settings); an experimental ACP mode (`--experimental-acp`) is also referenced in some materials.
 
-**Checkpoint Management:**
+- Scope: Filesystem snapshots (via a shadow history area) and conversation context associated with the checkpoint event; used to re‑propose the same tool call on restore.
+- Enable: `--checkpointing` flag or settings. Some docs reference ACP for advanced behavior.
+- Restore: Use `/restore <checkpoint>` to revert project files to the snapshot and restore the associated conversation context for that point. Intended for point‑in‑time recovery before an operation proceeds.
+- Storage: Shadow git/history under user config dir (platform‑specific; e.g., under `~/.config`/`~/.local/share`). Exact paths may vary by platform/build; consult current `gemini-cli` docs.
+- Notes: Behavior and flags are evolving; verify against the installed version’s `--help` and official docs.
 
-- **Checkpointing flag**: Use `--checkpointing` or `-c` to enable checkpointing of file edits
-- **Automatic saving**: File modifications are automatically checkpointed during the session
-- **Recovery capability**: Checkpointed edits can be recovered if the session is interrupted
-- **Experimental ACP mode**: `--experimental-acp` starts the agent in ACP (Advanced Checkpointing Protocol) mode
+### Session continuation (conversation resume)
 
-**Checkpoint Coverage:**
+Separate from checkpoints, Gemini CLI materials describe saving and resuming chat state (e.g., via `/chat save` and `/chat resume`). This does not restore filesystem state by itself.
 
-- **Chat content**: NOT preserved - no conversation history is maintained between sessions
-- **File system state**: File modifications are tracked and can be recovered
-- **Tool execution history**: NOT preserved - no session continuity for conversation
-
-**Restoring from Specific Moments:**
-
-- **No session restoration**: Gemini CLI does not support resuming conversations or sessions
-- **File recovery**: Checkpointed file edits can be recovered, but only within the current session
-- **No granular restoration**: Cannot restore to a specific chat message or prompt position
-- **File system restoration**: Can recover file edits made during the current session if interrupted
-
-**Session Storage:**
-
-- **No persistent sessions**: Sessions are not saved between CLI invocations
-- **Temporary checkpoints**: File edits are checkpointed only during active sessions
-- **Recovery scope**: Limited to recovering from interruptions within the same session
-
-**Limitations:**
-
-- No conversation persistence between sessions
-- No ability to resume interrupted conversations
-- Checkpointing is limited to file system changes only
-- No session history or conversation restoration capabilities
+- Save/resume: `/chat save <tag>` then `/chat resume <tag>`
+- Scope: Conversation history only; does not rewind files
+- Storage paths: Platform‑specific under the gemini config directory
 
 ### How is the use of MCP servers configured?
 
@@ -160,3 +141,16 @@ Gemini CLI uses Google's authentication system for credentials with the followin
 - **Rate limiting**: Subject to Google's API rate limits and quotas
 - **Checkpoint stability**: Checkpointing feature may have stability issues in complex scenarios
 - **MCP compatibility**: MCP server compatibility may vary
+
+## Findings — Session File Experiments (2025-09-10)
+
+- Tooling: `specs/Research/Tools/SessionFileExperiments/gemini.py` runs a minimal session (pexpect‑only) and attempts `--checkpointing`.
+- Storage (observed on this machine): No new files were created under `~/.config/gemini*` or `~/.local/share/gemini*` during a short run. It is possible the installed version only persists checkpoints when edits occur or when a restore point is explicitly created.
+- Recommendation: Run with `--checkpointing` in a repo and approve an edit tool so a file actually changes; then inspect recent files under likely roots (`~/.config/gemini-cli`, `~/.local/share/gemini`, project `.git` or shadow history). Use `list_recent.py` to surface recent writes.
+
+How to produce session/checkpoint files (recommended procedure):
+- Start in a writable project directory.
+- Run: `gemini --checkpointing --approval-mode yolo`
+- Prompt: "Create a file named `experiment.tmp` with one line, then append another line and print the file."
+- Wait for edits to complete; then run `/stop`.
+- Inspect recent files under `~/.config/gemini-cli` and `~/.local/share/gemini` and in the project’s VCS metadata for shadow history. Use `specs/Research/Tools/SessionFileExperiments/list_recent.py`.

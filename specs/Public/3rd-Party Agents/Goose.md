@@ -38,45 +38,32 @@ Goose can be started with a specific task prompt in several ways:
    goose run --system "You are a senior Ruby developer" -t "Refactor this legacy code"
    ```
 
-### Built-in support for checkpoints
+### Checkpointing (point-in-time restore of chat + filesystem)
 
-Yes, Goose supports checkpoints through its session management system. The checkpoints cover **both chat content and file system state**.
+No official checkpointing mechanism was found in Goose docs that restores both chat and filesystem to a specific moment in time. Documentation emphasizes sessions and recipes/extensions; file‑system snapshots or rollbacks are not documented as a built‑in feature.
 
-**Session Management:**
+- Scope: No documented file snapshots. Checkpointing not supported as defined by AW.
+- Restore semantics: N/A. Use external VCS or your own tooling for file rollback.
 
-- **Session creation**: Sessions are automatically created when running commands
-- **Resume capability**: Use `goose session --resume` to continue from where you left off
-- **Named sessions**: Use `--name <NAME>` to create and resume identifiable sessions
-- **Path-based sessions**: Use `--path <PATH>` to specify session location
-- **Session export**: `goose session export` can export sessions to Markdown format
-- **Session listing**: `goose session list` shows all available sessions
-- **Session removal**: `goose session remove` can delete specific sessions
+### Session continuation (conversation resume)
 
-**Checkpoint Coverage:**
+Goose documents sessions that primarily track conversation and basic context. These enable resuming work but are distinct from filesystem checkpoints.
 
-- **Chat content**: Full conversation history and context is preserved and restored
-- **File system state**: Context about the working directory and project is maintained
-- **Tool execution history**: Preserved within the session data
+- **Session creation**: Sessions may be created automatically when running commands
+- **Resume capability**: `goose session --resume` to continue the most recent session
+- **Named sessions**: `--name <NAME>` to create/resume identifiable sessions
+- **Path-based sessions**: `--path <PATH>` to scope session location
+- **Export/list/remove**: `goose session export|list|remove`
 
-**Restoring from Specific Moments:**
+### Where are chat sessions stored?
 
-- **By session name**: Use `goose session --resume --name <session_name>` to restore a named session
-- **By session path**: Use `goose session --resume --path <path>` to restore a path-specific session
-- **By last session**: Use `goose session --resume` to restore the most recent session
-- **No granular restoration**: Cannot restore to a specific chat message or prompt position within a session
-- **File system restoration**: Maintains working directory context but does not restore file snapshots
+- Location (typical): `~/.local/share/goose/sessions/`
+- Format: Internal Goose representation; export to Markdown supported
+- Persistence: Sessions persist across Goose restarts
 
-**Session Storage:**
+### What is the format of the persistent chat sessions?
 
-- **Location**: `~/.local/share/goose/sessions/`
-- **Format**: Internal Goose format (can be exported to Markdown)
-- **Persistence**: Sessions persist across Goose restarts
-
-**Limitations:**
-
-- No file system snapshots - only maintains working directory context
-- No ability to rollback file changes made during a session
-- Session restoration maintains conversation and directory context but not file states
+- Internal format not specified in help; export produces Markdown. Trimming sessions manually is not documented; use built‑in export if needed.
 
 ### How is the use of MCP servers configured?
 
@@ -142,3 +129,15 @@ Goose stores credentials and configuration in the following precise locations:
 - **Extension stability**: Custom extensions may have varying levels of stability
 - **Resource usage**: Sessions and extensions can consume significant system resources
 - **Network dependency**: Requires internet access for AI provider communication
+
+## Findings — Session File Experiments (2025-09-10)
+
+- Tooling: `specs/Research/Tools/SessionFileExperiments/goose.py` executes a short `goose session` flow (pexpect‑only).
+- Storage (observed): `~/.local/share/goose/sessions/` with files named by timestamp, e.g. `20250625_135230.jsonl`, `20250625_141115.jsonl`.
+- Format (observed): JSONL. Header line includes `{ working_dir, description, message_count, total_tokens, ... }`. Subsequent lines alternate `role: "user"|"assistant"` entries; tool use is encoded as `content` parts with `type: "toolRequest"`/`"toolResponse"`, including `developer__shell` and `developer__text_editor` calls. Timestamps are epoch seconds in a `created` field.
+- Resume: After producing a short session, `goose session --resume` continues the last session. No built‑in filesystem checkpointing observed.
+
+Trim test (this machine):
+- Source: `~/.local/share/goose/sessions/20250625_141115.jsonl` (169 lines)
+- Backup: `.bak-YYYYMMDD-HHMMSS`
+- Output: `.trimmed` (84 lines)

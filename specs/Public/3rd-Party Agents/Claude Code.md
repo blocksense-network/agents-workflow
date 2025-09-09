@@ -42,35 +42,38 @@ Claude Code can be started with a specific task prompt in several ways:
    claude --model sonnet "Refactor this legacy code"
    ```
 
-### Built-in support for checkpoints
+### Checkpointing (point-in-time restore of chat + filesystem)
 
-Yes, Claude Code supports checkpoints through its conversation/session management. The checkpoints cover **chat content only**.
+Claude Code does not provide an official checkpointing mechanism that restores both chat and filesystem state to a specific moment in time. There is no built‑in facility to create file‑system snapshots or to roll back workspace changes via a checkpoint identifier.
 
-**Session Management:**
+- Scope: Chat only (see Session continuation below). No filesystem restore.
+- Granularity: N/A (no checkpoints for files). No per‑step file snapshots.
+- Restore semantics: N/A for filesystem. Conversation can be resumed, but not rewound to an arbitrary message boundary.
+
+### Session continuation (conversation resume)
+
+Claude Code supports resuming conversations across sessions. This is distinct from checkpointing and does not restore filesystem state.
 
 - **Session resumption**: Use `--resume [sessionId]` to continue from a previous conversation
 - **Continue mode**: `--continue` resumes the most recent conversation
 - **Session IDs**: Each conversation has a unique session ID for targeted resumption via `--session-id <uuid>`
 - **Automatic session tracking**: Conversations are automatically saved and can be resumed
+- **Granularity**: No official support to resume at an arbitrary message/tool step inside a session
 
-**Checkpoint Coverage:**
+### Where are chat sessions stored?
 
-- **Chat content**: Full conversation history and context is preserved and restored
-- **File system state**: NOT restored - only the conversation state is maintained
-- **Tool execution history**: Preserved within the conversation transcript
+- Claude Code writes conversation transcripts to per‑project storage; hook inputs expose an absolute `transcript_path` pointing to a JSONL transcript file (example shape: `~/.claude/projects/<project-id>/<session-id>.jsonl`). Exact locations may vary by OS and configuration.
+- `<project-id>`: An internal identifier that maps to the current project context (often derived from the working directory or internal project registry). It is not user‑set; infer it empirically by starting a short session and inspecting the parent directory of `transcript_path`.
 
-**Restoring from Specific Moments:**
+Empirical steps to determine `<project-id>` and validate trimming:
 
-- **By session ID**: Use `--resume <sessionId>` to restore to the end of a specific session
-- **By recent session**: Use `--continue` to restore the most recent session
-- **No granular restoration**: Cannot restore to a specific chat message or prompt position within a session
-- **File system restoration**: No mechanism to restore file system to a previous state
+- Start a minimal session in this repo (e.g., ask Claude to list repo files) and enable `--debug` to surface paths in logs.
+- Add a simple `PostToolUse` hook that prints its input JSON to a temp file to capture `transcript_path`.
+- Inspect the path to extract `<project-id>` and `<session-id>`. Back up the transcript, trim a trailing message block, and resume to observe behavior.
 
-**Limitations:**
+### What is the format of the persistent chat sessions?
 
-- Checkpoints preserve conversation flow but do not include file system snapshots
-- No ability to rollback file changes made during a session
-- Session restoration maintains conversation context but not workspace state
+- Conversation history is persisted as line‑delimited JSON (JSONL) transcripts. While it is technically possible to trim transcripts, there is no documented, supported procedure to manually edit transcripts for partial restores; prefer built‑in resume options.
 
 ### How is the use of MCP servers configured?
 
@@ -215,3 +218,24 @@ The configuration system supports hierarchical settings (global → local → co
 - **Rate limiting**: Subject to Anthropic's API rate limits
 - **MCP compatibility**: Not all MCP servers may be fully compatible
 - **Platform limitations**: Some features (like Claude Desktop import) are platform-specific
+
+## Findings — Session File Experiments (2025-09-10)
+
+- Tooling: `specs/Research/Tools/SessionFileExperiments/claude.py` runs a minimal session (pexpect‑only) and sets up a temporary `PostToolUse` hook. It also includes a filesystem fallback to discover transcripts without relying on hooks.
+- Transcript paths (observed): JSONL transcripts under `~/.claude/projects/<project-id>/<session-id>.jsonl`. On this machine and repo, the `<project-id>` resolved to:
+  - `~/.claude/projects/-home-zahary-blocksense-agents-workflow-specs/<UUID>.jsonl`
+- Minimal JSONL structure (observed): one JSON object per line; fields include `type` ("user"|"assistant"|"summary"), `sessionId`, `uuid`, `timestamp`, `cwd`, `version`, and a `message` object with `role`, `content` (array of parts), and optional `usage`. API errors appear as assistant entries with `isApiErrorMessage=true` and text like "Credit balance is too low".
+- Hook capture: `PostToolUse` hooks fire after a successful tool step. If authentication/permissions prevent tools from running, the fallback locates the latest transcript for the current working directory and proceeds.
+- Trimming: `trim_jsonl_midpoint()` safely trims sufficiently long transcripts after creating a timestamped backup. If a transcript is too short (<4 lines), the script skips trimming and advises letting the session run longer.
+- Resume: After trimming, `claude --resume` continues from the truncated conversation (chat‑only). Filesystem state is not restored.
+
+Trim test (this machine):
+- Source: `~/.claude/projects/-home-zahary-blocksense-agents-workflow-specs/95d9929f-a314-472f-89d8-135f9d1c4ffc.jsonl`
+- Backup: same path with `.bak-YYYYMMDD-HHMMSS`
+- Output: same path with `.trimmed` (keeps first half of lines)
+
+Reproduce locally:
+
+- Ensure `tmux` and Python `pexpect` are installed; run from repo root:
+  - `python3 specs/Research/Tools/SessionFileExperiments/claude.py`
+- If hooks don’t capture `transcript_path`, the script reports the latest transcript discovered under `~/.claude/projects/<sanitized-cwd>/` and makes a backup before attempting a trim.

@@ -50,43 +50,31 @@ OpenCode can be started with a specific task prompt in several ways:
    opencode --agent my-custom-agent "Implement feature X"
    ```
 
-### Built-in support for checkpoints
+### Checkpointing (point-in-time restore of chat + filesystem)
 
-Yes, OpenCode supports session-based checkpoints. The checkpoints cover **both chat content and file system state**.
+No official checkpointing mechanism is documented for OpenCode that restores both chat and filesystem state to a specific moment in time.
 
-**Session Management:**
+- Scope: No file‑system snapshotting documented.
+- Restore: N/A. Use external VCS or custom workflows if rollback is required.
+
+### Session continuation (conversation resume)
+
+OpenCode materials reference sessions and exports, which concern conversation state rather than workspace snapshots.
 
 - **Session continuation**: `--continue` resumes the last session
 - **Session ID resumption**: `--session <id>` resumes a specific session by ID
 - **Session export**: `opencode export [sessionID]` exports session data as JSON
-- **Session sharing**: `--share` flag for sharing sessions
+- **Session sharing**: `--share` for sharing sessions
 - **Automatic session tracking**: Sessions are automatically saved with unique IDs
 
-**Checkpoint Coverage:**
+### Where are chat sessions stored?
 
-- **Chat content**: Full conversation history and context is preserved and restored
-- **File system state**: Working directory and project context is maintained
-- **Tool execution history**: Preserved within the session data
+- Export format: JSON via `opencode export`
+- Persistence: Sessions persist across restarts; storage directory is platform‑specific under the app’s config data directory
 
-**Restoring from Specific Moments:**
+### What is the format of the persistent chat sessions?
 
-- **By session ID**: Use `--session <sessionId>` to restore a specific session
-- **By last session**: Use `--continue` to restore the most recent session
-- **No granular restoration**: Cannot restore to a specific chat message or prompt position within a session
-- **File system restoration**: Maintains working directory context but does not restore file snapshots
-
-**Session Storage:**
-
-- **Format**: JSON export format available via `opencode export`
-- **Persistence**: Sessions persist across OpenCode restarts
-- **Sharing**: Sessions can be shared using the `--share` flag
-
-**Limitations:**
-
-- No file system snapshots - only maintains working directory context
-- No ability to rollback file changes made during a session
-- Session restoration maintains conversation and directory context but not file states
-- No ability to restore to specific points within a conversation
+- Exported JSON structure; trimming to a specific point is not documented. Prefer built‑in export and resume semantics.
 
 ### How is the use of MCP servers configured?
 
@@ -170,3 +158,15 @@ OpenCode uses a provider-based authentication system with the following precise 
 - **Network dependency**: Requires internet access for AI provider communication
 - **TUI limitations**: Terminal user interface may have limitations on some systems
 - **Agent customization**: Custom agent creation and management features are still evolving
+
+## Findings — Session File Experiments (2025-09-10)
+
+- Tooling: `specs/Research/Tools/SessionFileExperiments/opencode.py` runs a minimal interactive session (pexpect‑only).
+- Storage (observed): No sessions persisted yet on this machine; `opencode export` reports "No sessions found". Logs present under `~/.local/share/opencode/log/` with per‑run logs like `2025-09-09T233616.log`.
+- Export: Use `opencode export [sessionID]` to export session JSON when sessions exist. Back up and trim mid‑array with `trim_json_array_midpoint()` when experimenting.
+
+How to produce session files (recommended procedure):
+- Start: `opencode --prompt "Create a file 'experiment.tmp' with one line, then print it."`
+- Follow-up: "Append a second line and show the file again."
+- After activity, run: `opencode export` (or `opencode export <sessionID>`) to write JSON to stdout; save it to a file.
+- Then back up and trim mid‑array using `trim_json_array_midpoint()`.

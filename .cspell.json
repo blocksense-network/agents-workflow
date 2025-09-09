@@ -322,6 +322,8 @@
     "tracee",
     "triager",
     "ttyrec",
+    "pexpect",
+    "usize",
     "tunables",
     "unmapping",
     "Unsandboxed",
