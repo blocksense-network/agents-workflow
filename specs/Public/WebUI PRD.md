@@ -22,7 +22,7 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 ### User Roles
 
 - Admin: Manage tenants, runners, policies.
-- Operator: Create/monitor sessions, manage queues, stop/pause/resume.
+- Operator: Create/monitor sessions, manage queues, pause/resume.
 - Viewer: Read-only access to sessions and logs.
 
 ### Key Use Cases
@@ -128,9 +128,9 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 
 - List devcontainers and local runtime templates; show available resources.
 
-#### Hosts
+#### Runners
 
-- Show registered execution hosts, snapshot capabilities (zfs/btrfs/overlay/copy), capacity, and health.
+- Show registered execution runner hosts, snapshot capabilities (zfs/btrfs/overlay/copy), capacity, and health.
 
 #### Settings
 
@@ -145,6 +145,8 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 
 - Call `POST /api/v1/sessions/{id}/open/ide` and display returned commands.
 - Provide copy-to-clipboard and "Try locally" hints.
+
+TODO: This has to be re-thinked. How does it work in [Local Mode](./Local%20Mode.md)? How does it work with a [Remote Server](./Remote%20Mode.md)? VS Code and Cursor have remote mode, accessible over the web, but we need to create a secure tunnel for this.
 
 ### Empty States and Errors
 

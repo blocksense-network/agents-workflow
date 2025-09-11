@@ -138,6 +138,7 @@ Goose stores credentials and configuration in the following precise locations:
 - Resume: After producing a short session, `goose session --resume` continues the last session. No built‑in filesystem checkpointing observed.
 
 Trim test (this machine):
+
 - Source: `~/.local/share/goose/sessions/20250625_141115.jsonl` (169 lines)
 - Backup: `.bak-YYYYMMDD-HHMMSS`
 - Output: `.trimmed` (84 lines)

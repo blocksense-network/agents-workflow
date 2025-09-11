@@ -40,5 +40,7 @@ Validate cache persistence and correctness for supported package managers and to
 
 ### Automation
 
-- Provide `aw doctor --caches` to print configured mounts and sizes.
+- Provide `aw health --caches` to print configured mounts and sizes.
 - CI jobs per package manager with synthetic sample projects.
+
+TODO: Prepare an implementation plan for the Devcontainer functionality described in this directory

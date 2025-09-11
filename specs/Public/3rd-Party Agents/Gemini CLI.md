@@ -149,6 +149,7 @@ Gemini CLI uses Google's authentication system for credentials with the followin
 - Recommendation: Run with `--checkpointing` in a repo and approve an edit tool so a file actually changes; then inspect recent files under likely roots (`~/.config/gemini-cli`, `~/.local/share/gemini`, project `.git` or shadow history). Use `list_recent.py` to surface recent writes.
 
 How to produce session/checkpoint files (recommended procedure):
+
 - Start in a writable project directory.
 - Run: `gemini --checkpointing --approval-mode yolo`
 - Prompt: "Create a file named `experiment.tmp` with one line, then append another line and print the file."

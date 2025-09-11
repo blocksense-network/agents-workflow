@@ -24,6 +24,13 @@ For each file in the `spec/Public` folder, there will be a corresponding file in
 
 Some of the markdown files have standardized Obsidian headers indicating their current review status. Avoid modifying files with status "Reviewed" or "Final" unless explicitly asked.
 
+## Planning the implementation and tracking progress
+
+- Even though, we haven't started implementing the spec yet, we may start defining implementation plans that will break down the work in tasks and milestones.
+- Each task and milestone should have a well defined success criteria that can be tested will fully automated tests.
+- When a task is complete, the implementation plan should be updated with an implementation status section featuring references to key files that can serve as a good starting point for someone who would like to study the implementation.
+- When a task proves difficult to compete according to the plan, NEVER deviate significantly from the original goal. Instead, use the task status section to report what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. Always provide a very detailed context in the status reports for observed problems as they may be shared with AI agents who are not familiar with our project.
+
 ## Specs Maintenance
 
 - Before committing any change to the `specs/` folder, run `just lint-specs` from the project root. This performs Markdown linting, link checking, spell checking, prose/style linting, and Mermaid diagram validation.

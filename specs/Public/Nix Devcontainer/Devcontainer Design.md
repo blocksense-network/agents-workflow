@@ -116,7 +116,7 @@ Each agent’s exact mapping is captured in `docs/agents/<tool>.md` and validate
 
 - User/UID: set `remoteUser` to a non‑root user matching host UID to simplify shared cache permissions.
 - Entrypoint: minimal init (tini), run `common-pre-setup`, source project hooks if present `.agents/*-setup`, then `common-post-setup`.
-- Health: ship `aw doctor` checks for snapshot providers, Nix, caches, gh/ssh/auth readiness.
+- Health: ship `aw health` checks for snapshot providers, Nix, caches, gh/ssh/auth readiness.
 - Security: secrets via env or forwarded sockets; config mounts read‑only; no tokens written to image layers.
 
 ### Testing and CI

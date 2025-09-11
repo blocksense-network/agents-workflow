@@ -302,3 +302,7 @@ curl -X POST "$BASE/api/v1/tasks" \
     "agent": {"type": "openhands"}
   }'
 ```
+
+TODO: This spec was based on a very old version of the CLI.md document. Review the latest version of CLI.md, assume the information there is correct and re-think this document from the ground up.
+
+TODO: Create an implementation plan for the REST Service crate. The plan should include a mock implementation that we can use to test the CLI in a more isolated way.

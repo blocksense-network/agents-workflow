@@ -471,3 +471,5 @@ Binding `\/var\/run\/docker.sock` into the sandbox hands the sandboxed process *
 - **Bypass your gating logic:** all sensitive operations are performed by the **daemon outside the sandbox**; your in‑sandbox seccomp/fanotify policies do not apply to the daemon’s actions.
 
 **Safer alternatives:** run **rootless containers** (Podman or Docker‑rootless) _inside_ the sandbox; or use a **policy‑enforced remote builder** with strict authentication and no privileged flags.
+
+TODO: Prepare an implementation plan for developing the local sandboxing funtionality on Linux

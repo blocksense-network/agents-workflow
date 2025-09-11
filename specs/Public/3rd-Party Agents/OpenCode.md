@@ -166,6 +166,7 @@ OpenCode uses a provider-based authentication system with the following precise 
 - Export: Use `opencode export [sessionID]` to export session JSON when sessions exist. Back up and trim mid‑array with `trim_json_array_midpoint()` when experimenting.
 
 How to produce session files (recommended procedure):
+
 - Start: `opencode --prompt "Create a file 'experiment.tmp' with one line, then print it."`
 - Follow-up: "Append a second line and show the file again."
 - After activity, run: `opencode export` (or `opencode export <sessionID>`) to write JSON to stdout; save it to a file.

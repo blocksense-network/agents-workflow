@@ -52,5 +52,5 @@
 
 ### Observability
 
-- Expose cache directories and sizes via `aw doctor`.
+- Expose cache directories and sizes via `aw health`.
 - Emit basic metrics (hits/misses) where tools provide them (cargo, sccache).

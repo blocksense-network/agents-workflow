@@ -77,13 +77,16 @@ The initial implementation will focus on supporting regular FsSnapshot on copy-o
 
 ### Syncing Terminal Time to Filesystem State
 
-- **Shell Integration (default)**:
-  - zsh: `preexec`/`precmd` hooks to emit SessionMoments and trigger FsSnapshots.
-  - bash: `trap DEBUG` + `PROMPT_COMMAND` pair to delimit commands.
-  - fish: `fish_preexec`/`fish_postexec` equivalents.
-- **Runtime Integration**: The runner emits session timeline events (SSE) at milestones; the snapshot manager aligns nearest FsSnapshot ≤ timestamp.
+- **Runtime Integration**: The agent runner executes a hook that creates the snapshot in between chat messages, agent thinking streams and tool executions.
+- **Advanced (future)**: eBPF capture of PTY I/O and/or FS mutations
 - **Multi‑OS Sync Fence**: When multi‑OS testing is enabled, each execution cycle performs `fs_snapshot_and_sync` on the leader (create FsSnapshot, then fence Mutagen sessions to followers) before invoking `run-everywhere`. See `docs/multi-os-testing.md`.
-- **Advanced (future)**: eBPF capture of PTY I/O and/or FS mutations; rr-based post‑facto reconstruction of session recordings; out of scope for v1 but compatible with this model.
+
+### Restarting the agent from a SessionMoment
+
+TODO: Document that this depends on our ability to restore the internal state of the agent software at the precise SessionMoment.
+To achieve this, we leverage the support for session checkpoints or session resuming that some agents provide. See the markdown files in "3rd-Party Agents" folder for mode info. We apply complicated agent-specific logic to trim the recorded session to approximately the SessionMoment and then we inject the new prompts of the user. We don't modify the original software session files in the file system - Instead, we mount the trimmed files only in the file system view of the agent in the local sandbox mode or we copy the trimmed session files to the devcontainer or the VM.
+
+TODO: Once this is documented prepare an implementation plan for this feature.
 
 ### REST API Extensions
 
@@ -132,13 +135,9 @@ The initial implementation will focus on supporting regular FsSnapshot on copy-o
 - SSE additions on `/sessions/{id}/events`
   - New event types: `timeline.sessionMoment`, `timeline.fsSnapshot.created`, `timeline.sessionBranch.created`.
 
-### CLI Additions
+### CLI Commands
 
-- `aw timeline list <SESSION_ID>` — Show SessionMoments and FsSnapshots.
-- `aw timeline fs-snapshot add <SESSION_ID> [--ts <sec>] [--label <str>]` — Create manual FsSnapshot.
-- `aw timeline moment add <SESSION_ID> [--ts <sec>] [--label <str>]` — Create manual SessionMoment.
-- `aw timeline seek <SESSION_ID> (--ts <sec> | --fs-snapshot <ID>) [--open-ide]` — Mount read‑only view; optionally open IDE.
-- `aw timeline session-branch <SESSION_ID> (--ts <sec> | --fs-snapshot <ID>) --name <branch-name> [--message <chat>]` — Start a new SessionBranch from that point.
+See the `aw agent fs` [commands](./CLI.md).
 
 ### WebUI UX
 
@@ -194,7 +193,5 @@ The initial implementation will focus on supporting regular FsSnapshot on copy-o
 ### Open Issues and Future Work
 
 - eBPF PTY and FS hooks for automatic, runner‑independent capture.
-- rr‑based post‑facto reconstruction of session recordings and fine‑grained FsSnapshots.
-- IPBT integration for advanced session timeline browsing on ttyrec recordings.
 - FSKit backend maturation on macOS for robust overlay SessionBranching without kexts.
 - Windows containers integration to provide stronger per‑session isolation when SessionBranching.

@@ -230,6 +230,7 @@ The configuration system supports hierarchical settings (global → local → co
 - Resume: After trimming, `claude --resume` continues from the truncated conversation (chat‑only). Filesystem state is not restored.
 
 Trim test (this machine):
+
 - Source: `~/.claude/projects/-home-zahary-blocksense-agents-workflow-specs/95d9929f-a314-472f-89d8-135f9d1c4ffc.jsonl`
 - Backup: same path with `.bak-YYYYMMDD-HHMMSS`
 - Output: same path with `.trimmed` (keeps first half of lines)

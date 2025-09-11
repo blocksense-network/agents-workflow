@@ -11,8 +11,7 @@ The CLI honors the layered configuration model in [Configuration](Configuration.
 The AW CLI will be implemented in Rust using the Ratatui library for the TUI components. All core functionality will be developed as reusable Rust crate(s) with a clean separation of concerns:
 
 - **Core crates**: Implement the business logic, configuration management, REST API client, local state management, and all operational functionality
-- **TUI crate**: Provides a thin UI layer on top of the core crates using Ratatui for terminal interface components
-- **CLI crate**: Command-line interface that can operate in both interactive (TUI) and non-interactive modes
+- **CLI/TUI crate**: Provides a thin UI layer on top of the core crates using Ratatui for terminal interface components.
 
 This architecture ensures maximum reusability - the core functionality can be used by different front-ends (TUI, WebUI, other CLIs) while maintaining consistent behavior and state management.
 
@@ -25,15 +24,10 @@ The CLI parsing, help screens, and shell autocompletions are implemented using t
 - **clap_mangen**: Generates man pages from CLI definitions
 - **clap-verbosity-flag**: Standardized verbose/quiet flag handling
 
-All CLI commands use Clap's derive API for type-safe argument parsing, ensuring compile-time validation of CLI structure and automatic generation of help text, usage examples, and shell completions.
+All CLI commands use Clap's derive API for type-safe argument parsing, ensuring compile-time validation of CLI structure and automatic generation of help text, usage examples, and shell completions. Help text includes examples and detailed descriptions.
 
-The implementation follows these patterns:
-
-- Commands are defined as structs with `#[derive(Parser)]`
-- Subcommands use `#[command(subcommand)]` for nested command hierarchies
-- Global flags use `#[arg(global = true)]`
-- Custom validation uses `#[arg(value_parser)]`
-- Help text includes examples and detailed descriptions
+See the clap guide: [How to use clap](../Research/How%20to%20use%20clap.md).
+TODO: Make sure that the help text for all commands and parameters is fully specified in this document (in the section of each respective command).
 
 Shell completions are automatically generated and can be installed via `aw completion <shell>`.
 
@@ -57,17 +51,17 @@ Shell completions are automatically generated and can be installed via `aw compl
 
 ### Global Behavior and Flags
 
-- `aw` (no args): Launches the default UI (TUI by default). Config key `ui` controls TUI vs WebUI; built‑in default is `tui`.
+- `aw` (no args): Launches the default UI (TUI by default). Config key `ui` controls whether this is TUI or WebUI; built‑in default is `tui`.
 - Common global flags (apply to all subcommands unless noted):
-  - `--remote-server <NAME|URL>`: If provided, use the REST API at this server (by name lookup in config or raw URL). Otherwise use local SQLite state.
+  - `--remote-server <NAME|URL>`: If provided, use the REST API at this server (by name lookup in config or raw URL). Otherwise run in local mode.
   - `--repo <PATH|URL>`: Target repository (filesystem path in local runs; git URL may be used by some servers). If omitted, AW auto-detects a VCS root by walking parent directories and checking all supported VCS.
   - `--workspace <NAME>`: Named workspace (only valid on servers that support workspaces). Errors if unsupported by the selected server.
-  - `--multiplexer <tmux|zellij|screen>`: Which multiplexer to use for when launching a TUI session
-  - `--json`: Emit machine-readable JSON
-  - `--non-interactive`: Fail instead of prompting when user input is required
+  - `--multiplexer <tmux|zellij|screen>`: Which multiplexer to use for when launching a TUI session.
+  - `--json`: Emit machine-readable JSON.
+  - `--non-interactive`: Fail instead of prompting when user input is required.
   - `--quiet`: Reduce output
-  - `--log-level <debug|info|warn|error>`
-  - `--no-color`
+  - `--log-level <debug|info|warn|error>`: Defaults to `info` in release builds and `debug` in debug builds.
+  - `--no-color`: Automatically enabled when not running inside a TTY. Otherwise, enabled by default.
 
 ### Subcommands
 
@@ -79,7 +73,9 @@ Shell completions are automatically generated and can be installed via `aw compl
 #### 2) Tasks
 
 ```
-aw task [OPTIONS]
+aw task [OPTIONS] [BRANCH_NAME]
+
+TODO: [BRANCH_NAME] is optional. Is there a clearer notation for this?
 
 OPTIONS:
   --prompt <TEXT>                    Use TEXT as the task prompt
@@ -108,6 +104,10 @@ OPTIONS:
   --follow                           Launch TUI/WebUI (according to `ui` config) and focus on monitoring the newly created task
 ```
 
+TODO: Rename --runtime to --sandbox and use `disabled` instead of `nosandbox`.
+TODO: Rename --devcontainer-path to --devcontainer. Allow both a container tag name and a path
+TODO: Rename --devshell to --dev-shell
+
 #### Multiple Agent Support
 
 The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
@@ -128,6 +128,8 @@ The `--agent` flag can be supplied more than once to launch multiple agents work
 This enables sophisticated workflows where different AI agents can collaborate on the same task, each bringing their unique strengths to different aspects of the work.
 
 #### Cloud Agent Support
+
+TODO: set up a separate planning gile for this and reference it here.
 
 The following cloud agent types are supported: `cloud-codex`, `cloud-copilot`, `cloud-cursor`, and `cloud-jules`. These agents run on external cloud platforms, typically configured and operated through a web interface.
 
@@ -185,8 +187,6 @@ The `aw task` command preserves and extends the core functionality of the existi
 - **VCS Operations**: [`lib/vcs_repo.rb`](../../lib/vcs_repo.rb) - Repository detection, branch management, and VCS integration
 - **Task Management**: [`lib/agent_task.rb`](../../lib/agent_task.rb) - Main module coordinating task operations
 
-The `aw task` command preserves and extends the core functionality of the existing `agent-task` command:
-
 **Branch and Task Management:**
 
 - **Branch Creation**: When `--branch <NAME>` is provided, creates a new VCS branch for the task (supports Git, Mercurial, Bazaar, Fossil)
@@ -200,6 +200,7 @@ The `aw task` command preserves and extends the core functionality of the existi
 - **Editor Discovery**: Uses `$EDITOR` environment variable with intelligent fallback chain (nano, pico, micro, vim, helix, vi)
 - **Prompt Sources**: Supports `--prompt` for direct text, `--prompt-file` for file input, or interactive editor session
 - **Editor Hints**: Provides helpful template text when launching editor for task input
+TODO: Specify precisely what will be included in the inserted commented out message. As explained elsewhere in this spec, the content is dynamic to some extent, so specify in the detail the precise algorithm for generating it.
 - **Empty Task Validation**: Prevents creation of empty tasks with clear error messages
 
 **VCS Integration:**
@@ -303,7 +304,7 @@ Behavior:
 
 **Remote vs Local Execution:**
 
-- With a configured/provided `remote-server`, the CLI calls the server’s REST API to create the task. The server creates (or schedules) the task, performs branch creation server‑side when required, and returns a `taskId` immediately. The `taskId` MUST be usable for both polling and SSE streaming. If `--follow` is set, the CLI SHALL attach live monitoring (UI selection via the `ui` config) to this `taskId`.
+- With a configured/provided `remote-server`, the CLI calls the server’s REST API to create the task. The server creates (or schedules) the task, performs branch creation server‑side when required, and returns a `taskId` immediately. The `taskId` MUST be usable for both polling and SSE streaming. If `--follow` is set, the CLI SHALL attach live monitoring to this `taskId` (WebUI or TUI is selected depending on the `ui` config value).
 - For local execution, the CLI MUST detect the repository root and VCS type (Git, Mercurial, Bazaar, Fossil) by walking parent directories from the current working directory.
 
 **Branch and Task Management:**
@@ -317,6 +318,8 @@ Behavior:
   - `Start-Agent-Branch: <branch>`
   - `Target-Remote: <url>` (only when a default remote URL is discoverable)
   - `Dev-Shell: <name>` (only when `--devshell` is provided)
+
+- `--create-task-files <yes|no>`: When `no`, the CLI MUST skip local branch and task file creation entirely and proceed with cloud/remote automation paths (server‑side branch creation). When `yes` (default), the CLI MUST perform local branch and task file creation as specified.
 
 **Input Handling:**
 
@@ -339,7 +342,6 @@ Behavior:
 
 - `--devshell <NAME>`: When provided, the CLI MUST validate that `flake.nix` exists at the repository root and that `<NAME>` is an existing `devShell` for the current system. On failure, it MUST abort with an error. When successful, the `Dev-Shell: <name>` line MUST be included in the initial commit message for the task.
 - devShell discovery: The CLI SHOULD resolve the current system and list devShells under `devShells.<system>`; if unavailable, it MAY fall back to enumerating any system’s devShells.
-- `--create-task-files <yes|no>`: When `no`, the CLI MUST skip local branch and task file creation entirely and proceed with cloud/remote automation paths (server‑side branch creation). When `yes` (default), the CLI MUST perform local branch and task file creation as specified.
 
 **Push and Remote Operations:**
 
@@ -357,7 +359,7 @@ Push to default remote? [Y/n]:
 **Error Handling and Cleanup:**
 
 - Repository detection failures MUST abort with a descriptive error including the path from which discovery began.
-- VCS type MUST be detected; unknown VCS SHALL abort.
+- VCS type MUST be detected; unknown VCS SHALL abort. TODO: this contradicts the flow chart and the flow chart is correct here
 - Branch name validation MUST use the regex above; violations SHALL abort with a descriptive error.
 - Primary branch protection MUST be enforced as specified.
 - On errors after creating a new branch locally but before successful completion, the CLI MUST switch back to the original branch and delete the newly created branch (Git: `git branch -D <name>`, Fossil: close branch).
@@ -376,15 +378,10 @@ Push to default remote? [Y/n]:
 - Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name.
 - Browser automation: When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped
 - Browser automation modes: with local branch/task file creation (default) or server/cloud-only mode when `--create-task-files no`
-- Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`
+- Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per `docs/browser-automation/codex.md`, optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch` (TODO: fix the browser automation refenrece; the path was changed and this should be a proper markdown link)
 - Branch autocompletion: Uses standard git protocol for suggestions:
   - Local mode: `git for-each-ref` on the repo; cached with debounce
   - REST mode: server uses `git ls-remote`/refs against admin-configured URL to populate its cache; CLI/Web query capability endpoints for suggestions
-
-**Draft Support (TUI/Web Parity):**
-
-- `--draft` MUST persist an editable draft without launching execution.
-- `aw task start <draft-id>` MUST submit the saved draft for execution using all currently resolved settings.
 
 **Non‑Interactive Mode:**
 
@@ -437,7 +434,7 @@ When agents are spawned, the execution follows this detailed process:
 4. **Result Storage**: All outputs, logs, and artifacts are stored in the SQLite database
 
 ##### Cloud Agent Execution
-
+TODO: Create a separate plan file for developing the browser automation and the cloud integration
 1. **Browser Automation Launch**: Cloud agents are launched using browser automation that:
    - Handles authentication and session management
    - Navigates to the appropriate cloud platform
@@ -465,6 +462,8 @@ When tasks complete:
 
 3. **Cross-Platform Support**: The notification system works across all supported platforms with appropriate fallbacks for systems without native notification support.
 
+TODO: don't repeat content from other spec files. Just link to them.
+
 #### 3) Sessions
 
 ```
@@ -477,8 +476,12 @@ OPTIONS:
   --remote-server <NAME|URL>  Target remote server
 ```
 
+TODO: Specify that the SESSION_ID is the branch name. If there are two sessions with the same branch name in different repos, use `<repo>/<branch_name>` as the session ID. If there is still a duplication, use `<repo>/<branch_name>.N`. The list should include repo name and creation time. The list should be sorted by creation time (most recent session are printed at the top).
+
 ```
 aw session attach <SESSION_ID>
+
+DESCRIPTION: Attaches to the terminal multiplexer started for this session.
 ```
 
 ```
@@ -500,32 +503,25 @@ OPTIONS:
 ```
 
 ```
-aw session events <SESSION_ID> [OPTIONS]
-
-OPTIONS:
-  -f                         Follow events
-```
-
-```
-aw session stop <SESSION_ID>
-```
-
-```
 aw session pause <SESSION_ID>
 ```
 
 ```
-aw session resume <SESSION_ID>
+aw session resume <SESSION_ID> [PROMPT]
 ```
+
+TODO: specify that the prompt is optional. When not provided, the session is resumed with the prompt "Please continue"
+
 
 ```
 aw session cancel <SESSION_ID>
 ```
 
+TODO: document that the default SESSION_ID for all commands is the most recently launched session.
+
 Behavior:
 
 - Local mode reads session records from the state database; `logs -f` tails the agent log.
-- REST mode proxies to the service and uses SSE for `events -f`.
 
 Remote sessions:
 
@@ -556,7 +552,12 @@ Local; protected confirm.
 aw workspace list
 ```
 
-REST mode only.
+TODO: Are workspace properly defined anywhere in the spec?
+      A workspace is just a named collection of repositories
+
+When the `codex-cloud` agent is specified with `--agent`, the list returns the workspaces defined in the Codex Cloud service.
+
+TODO: Add a command for creating a workspace (Typically, this is done by placing a number of repos in a directory and specifying this directory in the workspace creation command, but the user can also just list multiple directories)
 
 #### 5a) Repo Init & Instructions
 
@@ -565,14 +566,17 @@ aw repo init [OPTIONS] [PROJECT-DESCRIPTION]
 
 OPTIONS:
   --vcs <git|hg|bzr|fossil>                Version control system (default: git)
-  --devenv <no|none|nix|spack|bazel|custom>
-                                           Development environment type (default: nix)
-  --devcontainer <yes|no>                  Enable devcontainer (default: yes)
+  --devenv <nix|nix-shell|devbox|devenv|spack|mise|flox|guix|conda|bazel|buck2|pants|please|brioche|custom|none>
+                                           Specifies how the development environment will be managed (default: nix)
+  --pin-toolchains <yes|no>                Relevant only when devenv is set to 'none'.
+                                           Enables lighter language-specific toolchain pinning.
   --direnv <yes|no>                        Enable direnv (default: yes)
+  --devcontainer <yes|no>                  Enable devcontainer (default: yes)
   --task-runner <just|make|...>            Task runner tool (default: just)
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
                                            Supported agent types (default: all)
-
+  --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
+                                           in `.agents/dynamic-instructions.md` (default: yes)
 ARGUMENTS:
   PROJECT-DESCRIPTION                      Description of the project
 ```
@@ -587,6 +591,14 @@ Behavior and defaults:
 - Post-initialization linking: After `AGENTS.md` exists, create symlinks for all supported agents so their instruction files resolve to `AGENTS.md` (same behavior as `aw repo instructions link --supported-agents=<...>`). Relative symlinks; add to VCS.
 - Dev environment scaffolding: Based on flags, scaffold devcontainer, direnv, and the development environment (e.g., Nix flake) using the agent flow. `--devenv no|none` skips dev env scaffolding.
 - VCS: Initializes the selected VCS if the directory is not yet a repository; for existing repos, proceeds without reinitializing.
+- When `nix` and `just` are enabled, uses the `set shell := ["./scripts/nix-env.sh", "-c"]` trick that is used by the agents-workflow repository.
+- The `dynamic-instructions(\.md|\.txt)?` file is processed like a task description file and it may include [workflow commands](./Workflows.md). The result of processing the file is written to AGENTS.md and then symlinks are created in the usual way for all supported agent types. This is typically done in the nix flake devShell shellHook or the .envrc file. It uses the shebang `#!/usr/bin/env aw agent instructions` which makes it easy to implement minor edit modes in editors such as vim and emacs. When dynamic instructions are used, the created instruction file links are added to the VCS ignore files.
+
+TODO: document the `aw agent instructions` command.
+
+The whole repo initialization is performed as a agentic task. the `aw repo` tool combines automated steps with prompt engineering in order to allow the agent to perform the task in the most appropriate way, according to specifics of the user project.
+
+TODO: specify the precise algorithms and prompts that will be used.
 
 Editor behavior:
 
@@ -600,7 +612,7 @@ Output and exit codes:
 Examples:
 
 ```bash
-aw repo init --task-runner just --devenv nix --devcontainer yes --direnv yes "CLI tool for repo automation"
+aw repo init --task-runner just --deps nix --devcontainer yes --direnv yes "CLI tool for repo automation"
 aw repo init --vcs hg --devenv none --devcontainer no --direnv no  # no dev env scaffolding
 ```
 
@@ -608,13 +620,15 @@ aw repo init --vcs hg --devenv none --devcontainer no --direnv no  # no dev env 
 aw repo instructions create [OPTIONS]
 
 OPTIONS:
+  --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
+                                           in `.agents/dynamic-instructions.md` (default: yes)
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
-                     Supported agent types (default: all)
+                                           Supported agent types (default: all)
 ```
 
 Behavior:
 
-- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates `AGENTS.md` with task‑runner specific instructions and then creates agent instruction symlinks as in `instructions link`.
+- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates `dynamic-instructions.md` or `AGENTS.md` with task‑runner specific instructions and then creates agent instruction symlinks for the specified supported agents.
 
 Output and exit codes:
 
@@ -642,10 +656,6 @@ Behavior:
   - Existing different symlink or regular file → require `--force` or skip with a warning.
 - Always create parent directories as needed. After creating symlinks, add them to VCS (`git add -f` or tool‑equivalent) when the repo is cleanly detected.
 
-Reference behavior (informative):
-
-- Matches the reference Ruby script provided in the spec (relative symlinks, agent sets, dry‑run).
-
 JSON output and exit codes:
 
 - `--json` emits `{ repoRoot, source, agents:[], created: N, skipped: N, gitAdded: N }`. Non‑zero exit when preconditions fail (no repo, missing source, unknown agents).
@@ -667,6 +677,7 @@ Behavior:
 - Validates repository state against configuration and best practices:
   - Instruction files: verify that `AGENTS.md` (or chosen source) exists and that symlinks for the configured `supported-agents` are present. Report any mismatches or missing links and suggest `aw repo instructions link` to fix.
   - Devcontainer: check for presence of `.devcontainer/` and run its health‑check procedure (documented in `specs/devcontainer-setup.md` and `specs/devcontainer-design.md`). Report status and hints to fix.
+  TODO: turn the broken links to the referened devcontainer files into proper correct markdown links.
   - Dev environment: check `--devenv` (from config/flags) coherence with project files (e.g., Nix flake, direnv). Report inconsistencies.
 
 Output and exit codes:
@@ -692,18 +703,20 @@ Output and exit codes:
 #### 6) Runtimes, Agents, Hosts (capabilities)
 
 ```
-aw agents list
+aw remote agents
 ```
 
 ```
-aw runtimes list
+aw remote runtimes
 ```
 
 ```
-aw hosts list
+aw remote runners
 ```
 
-REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes`, `/api/v1/hosts`.
+REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes` and `/api/v1/runners`
+
+Useful for inspecting the capabilities of the remote server.
 
 #### 7) Config (Git-like)
 
@@ -778,6 +791,11 @@ OPTIONS:
 
 #### 9) Connectivity (Overlay/Relay)
 
+TODO: move the commands from this section to new commands under the `agent` sub-command.
+TODO: `aw connect keys` becomes `aw agent network get-keys`
+TODO: `aw connect handshake` becomes `aw agent followers accept-connections`
+TODO: `aw relay` becomes `aw agent relay`
+
 ```
 aw connect keys [OPTIONS]
 
@@ -785,7 +803,7 @@ DESCRIPTION: Request session connectivity credentials.
 
 OPTIONS:
   --provider <netbird|tailscale|auto>
-                           Connectivity provider
+                            Connectivity provider
   --tag <name>              Tag for the connection
 ```
 
@@ -822,12 +840,6 @@ aw relay socks5 --session <ID> --bind <ADDRESS:PORT>
 Start a local SOCKS5 relay for this session (client-hosted rendezvous).
 
 ```
-aw doctor
-```
-
-Environment diagnostics (snapshot providers, multiplexer availability, docker/devcontainer, git).
-
-```
 aw completion [SHELL]
 
 DESCRIPTION: Shell completions.
@@ -835,6 +847,8 @@ DESCRIPTION: Shell completions.
 ARGUMENTS:
   SHELL                       Shell type (bash|zsh|fish|pwsh)
 ```
+
+TODO: Is this enough? Read the [clap docs](../Research/How%20to%20use%20clap.md) to figure out whether we need something more here.
 
 #### 10) Agent Utilities (`aw agent ...`)
 
@@ -870,6 +884,8 @@ DESCRIPTION: Extracts and prints environment variables from @agents-setup direct
 OPTIONS:
   --repo <PATH>               Repository path
 ```
+
+TODO: document the `aw agent sandbox` commands, which are currently described with alternative names in the sandbox-related markdown files. After adding them here, use the consistent names everywhere.
 
 ```
 aw agent start-work [OPTIONS]
@@ -966,15 +982,11 @@ ARGUMENTS:
 ```
 
 - Filesystem (AgentFS) snapshot/branch utilities:
-  - `aw agent fs snapshot create [--name <NAME>] --mount <MOUNT>` — Create an AgentFS snapshot on a mounted volume. Translates to platform control: WinFsp DeviceIoControl, FUSE ioctl to `.agentfs/control`, or FSKit XPC.
-  - `aw agent fs snapshot list --mount <MOUNT>` — List snapshots on the volume.
-  - `aw agent fs branch create --from <SNAPSHOT_ID> [--name <NAME>] --mount <MOUNT>` — Create a writable branch from a snapshot.
-  - `aw agent fs branch bind --branch <BRANCH_ID> --mount <MOUNT> [--pid <PID>]` — Bind the current (or specified) process to the branch view.
-  - `aw agent fs branch exec --branch <BRANCH_ID> --mount <MOUNT> -- <COMMAND> [ARGS...]` — Bind then exec a command within the branch context.
-
-### Subcommand Implementation Strategy
-
-The `aw` executable lazily requires Ruby modules on demand based on the entered subcommand to minimize startup time (e.g., dispatch parses argv, then `require 'aw/subcommands/tasks'` only when `task` is invoked).
+  - `aw agent fs init-session [--name <NAME>] [--repo <name|path>] [--workspace <name>]` — Create an initial AgentFS snapshot on a mounted volume from the current state of the working copies. Translates to platform control: WinFsp DeviceIoControl, FUSE ioctl to `.agentfs/control`, or FSKit XPC.
+  - `aw agent fs snapshots <SESSION_ID>` — List snapshots created in a particular agent coding session.
+  - `aw agent fs branch create <SNAPSHOT_ID> [--name <NAME>]` — Create a writable branch from a snapshot.
+  - `aw agent fs branch bind <BRANCH_ID>` — Bind the current (or specified) process to the branch view.
+  - `aw agent fs branch exec <BRANCH_ID> -- <COMMAND> [ARGS...]` — Bind then exec a command within the branch context.
 
 ### Local State
 
@@ -984,13 +996,15 @@ Local enumeration and management of running sessions is backed by the canonical 
 
 Selection:
 
-- `--multiplexer` flag or `terminal-multiplexer` config determines which tool is used. Autodetect if unset (tmux > zellij > screen if found in PATH).
+- `--multiplexer` config value determines which tool is used. Autodetect if unset (tmux > zellij > screen if found in PATH).
 
 Layout on launch:
 
 - Create a new window in the current session (or create a session if none) with two panes:
   - Right: agent activity (logs/stream)
   - Left: terminal in the per-task workspace (or launch editor if configured)
+  TODO: suggest configuration option for the editor. It should support specifying a command pattern for how the editor should be launched. The default value `none` doesn't launch an editor.
+  TODO: suggest configuration option that specifies whether asciinema recording is being used and whether it records only inside the agent pane or the whole multiplexer.
 
 Remote attach:
 
@@ -998,7 +1012,7 @@ Remote attach:
 
 Devcontainers:
 
-- When `runtime.type=devcontainer`, run the multiplexer and both panes inside the container context. The left pane starts a login shell or editor; the right follows the agent process output.
+- When `runtime` is `devcontainer`, run the multiplexer and both panes inside the container context. The left pane starts a login shell or editor; the right follows the agent process output.
 
 ### Runtime and Workspace Behavior
 
@@ -1010,6 +1024,8 @@ Devcontainers:
 
 - `aw open ide` opens VS Code / Cursor / Windsurf for the per-task workspace (local or via remote commands as provided by the REST service).
 - Terminal-based agent alongside GUI editor: user can choose an editor in the left pane while the agent runs on the right; alternatively, `--editor` launches `vim`/`emacs`/other terminal editor with an integrated terminal.
+
+TODO: remove this command and mention that IDEs can be launched with the `session run` command.
 
 ### Examples
 
@@ -1043,6 +1059,8 @@ aw task \
   --agent openhands \
   --browser-automation false
 ```
+
+TODO: fix the unrealistic SESSION_IDs in the examples below
 
 List and tail logs for sessions:
 
@@ -1079,3 +1097,5 @@ For detailed exit codes specific to the `aw task` command, see the [Exit Codes](
 ### Security Notes
 
 - Honors admin-enforced config. Secrets never printed. `nosandbox` runtime gated and requires explicit opt-in.
+
+TODO: Create a plan for implementing the CLI interface

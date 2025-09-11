@@ -287,3 +287,5 @@ xdg-open "http://127.0.0.1:8787/tasks/1234" >/dev/null 2>&1 &
 - Prefer per‑user registration (HKCU on Windows, `~/.local/share/applications` on Linux) to avoid elevation.
 - Expect browser “Open external application?” prompts and document that for users.
 - Make the handler idempotent (re‑entry on already‑running tasks should just focus the page).
+
+TODO: Prepare an implementation plan for the custom URL handling executable.

@@ -35,3 +35,5 @@ All images include:
 
 - Common provisioning scripts (reused from Docker container setup)
 - Nix flake for agents-workflow tools
+
+TODO: Prepare an implementation plan for the Lima VM Images that will be started after the Devcontainer work is complete

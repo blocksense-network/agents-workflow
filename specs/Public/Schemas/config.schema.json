@@ -106,3 +106,5 @@
     "mode": { "$ref": "#/$defs/Mode" }
   }
 }
+
+// TODO: After all the other edits are done, collect all configuration options mentioned in the specs and make sure this schema is up to date.

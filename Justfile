@@ -12,6 +12,8 @@
 
 # Run the test suite
 
+set shell := ["./scripts/nix-env.sh", "-c"]
+
 test:
     ruby -Itest test/run_tests_shell.rb
 
