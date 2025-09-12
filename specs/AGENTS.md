@@ -26,10 +26,27 @@ Some of the markdown files have standardized Obsidian headers indicating their c
 
 ## Planning the implementation and tracking progress
 
-- Even though, we haven't started implementing the spec yet, we may start defining implementation plans that will break down the work in tasks and milestones.
-- Each task and milestone should have a well defined success criteria that can be tested will fully automated tests.
-- When a task is complete, the implementation plan should be updated with an implementation status section featuring references to key files that can serve as a good starting point for someone who would like to study the implementation.
-- When a task proves difficult to compete according to the plan, NEVER deviate significantly from the original goal. Instead, use the task status section to report what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. Always provide a very detailed context in the status reports for observed problems as they may be shared with AI agents who are not familiar with our project.
+Even though, we haven't started implementing the spec yet, we are now starting to define implementation plans that will break down the work in tasks and milestones.
+
+Each task and milestone should have a well defined success criteria that can be tested will fully automated tests.
+
+When a task is complete, the implementation plan should be updated with an implementation status section featuring references to key files that can serve as a good starting point for someone who would like to study the implementation.
+
+When a task proves difficult to compete according to the plan, developers and agents will NEVER deviate significantly from the original goal. Instead, they will update the task status section to report what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. Developers and agents should provide a very detailed context in the status reports for observed problems as they may be shared with online AI agents who are not familiar with our project.
+
+The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. An existing example is [Local Sandboxing on Linux.status.md](./Public/Sanboxing/Local%20Sandboxing%20on%20Linux.status.md).
+
+It's extremely important that the tasks are very granular and that they can be verified with automated tests. Prefer integration tests over unit tests, but apply reasonable gudgement on a case-by-case basis.
+
+All implementation plans and testing strategies will be reviewed before the implementation efforts starts. Ideally, the plans will identify various development tracks that can be started in parallel without interfering with each other.
+
+When applicable, plan the creation of reusable Rust crates that can be tested in isolation. We start from the building blocks and then assemble them into larger and larger components.
+
+Don't be shy to propose any specific software or technology for the testing strategy. We are willing to invest a lot of effort in making the described system as robust as possible by creating very sophisticated test harnesses for every single component.
+
+Try to make the milestones and the tasks in the plan as granular as possible. One strategy for this is to first think about the big picture and then to systematically break down the big items into smaller and smaller tasks.
+
+Good luck. Take your time to do this properly.
 
 ## Specs Maintenance
 
