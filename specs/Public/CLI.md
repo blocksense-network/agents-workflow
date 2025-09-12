@@ -29,7 +29,7 @@ All CLI commands use Clap's derive API for type-safe argument parsing, ensuring 
 See the clap guide: [How to use clap](../Research/How%20to%20use%20clap.md).
 TODO: Make sure that the help text for all commands and parameters is fully specified in this document (in the section of each respective command).
 
-Shell completions are automatically generated and can be installed via `aw completion <shell>`.
+Shell completions are provided via the `aw shell-completion` command group. They can be installed with `aw shell-completion install` or printed with `aw shell-completion script [shell]`.
 
 ### Primary Goals
 
@@ -104,8 +104,6 @@ OPTIONS:
   --follow                           Launch TUI/WebUI (according to `ui` config) and focus on monitoring the newly created task
 ```
 
-
-
 #### Multiple Agent Support
 
 The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
@@ -127,7 +125,7 @@ This enables sophisticated workflows where different AI agents can collaborate o
 
 #### Cloud Agent Support
 
-TODO: set up a separate planning gile for this and reference it here.
+TODO: set up a separate planning file for this and reference it here.
 
 The following cloud agent types are supported: `cloud-codex`, `cloud-copilot`, `cloud-cursor`, and `cloud-jules`. These agents run on external cloud platforms, typically configured and operated through a web interface.
 
@@ -356,8 +354,8 @@ Push to default remote? [Y/n]:
 
 **Error Handling and Cleanup:**
 
+- The flow charts in this document must be implemented precisely. All checks and error handling must be implemented.
 - Repository detection failures MUST abort with a descriptive error including the path from which discovery began.
-- VCS detection: When running inside a repository, the VCS type MUST be detected; unknown VCS SHALL abort. When targeting server/cloud outside a repo, VCS detection is not required.
 - Branch name validation MUST use the regex above; violations SHALL abort with a descriptive error.
 - Primary branch protection MUST be enforced as specified.
 - On errors after creating a new branch locally but before successful completion, the CLI MUST switch back to the original branch and delete the newly created branch (Git: `git branch -D <name>`, Fossil: close branch).
@@ -408,12 +406,8 @@ The `aw task` command returns the following exit codes:
 
 #### Notifications System
 
-The `--notifications` option (default: "yes") controls whether OS-level notifications are emitted when tasks complete. See:
-
-- [Handling AW URL Scheme](Handling%20AW%20URL%20Scheme.md)
-- [How to show OS notifications](../Research/How%20to%20show%20OS%20notifications.md)
-
-These documents specify cross‑platform notification behavior, the `agents-workflow://` scheme, and handler UX. This CLI document references those specs rather than duplicating them.
+The `--notifications` option (default: "yes") controls whether OS-level notifications are emitted when tasks complete.
+The behavior is defined in the [Handling AW URL Scheme](Handling%20AW%20URL%20Scheme.md) document.
 
 #### Agent Execution Architecture
 
@@ -463,8 +457,6 @@ When tasks complete:
 
 3. **Cross-Platform Support**: The notification system works across all supported platforms with appropriate fallbacks for systems without native notification support.
 
-
-
 #### 3) Sessions
 
 ```
@@ -481,7 +473,7 @@ SESSION IDENTIFIERS:
 
 - Default SESSION_ID is the most recently launched session when omitted.
 - Primary form: `<branch_name>` (branch name on the target repo).
-- Disambiguation across repos: `<repo>/<branch_name>` where `<repo>` is the VCS root directory name.
+- If the same branch exists in multiple repos, we use `<repo>/<branch_name>` as the session ID where `<repo>` is the VCS root directory name.
 - If still ambiguous (multiple sessions with same `<repo>/<branch_name>`), numeric suffix: `<repo>/<branch_name>.<N>` (N starts at 1).
 - `aw session list` includes repo name and creation time; output is sorted by creation time (most recent first).
 
@@ -613,20 +605,21 @@ Behavior and defaults:
 - When `nix` and `just` are enabled, uses the `set shell := ["./scripts/nix-env.sh", "-c"]` trick that is used by the agents-workflow repository.
 - The `dynamic-instructions(\.md|\.txt)?` file is processed like a task description file and it may include [workflow commands](./Workflows.md). The result of processing the file is written to AGENTS.md and then symlinks are created in the usual way for all supported agent types. This is typically done in the nix flake devShell shellHook or the .envrc file. It uses the shebang `#!/usr/bin/env aw agent instructions` which makes it easy to implement minor edit modes in editors such as vim and emacs. When dynamic instructions are used, the created instruction file links are added to the VCS ignore files.
 
-TODO: document the `aw agent instructions` command.
-
 The whole repo initialization is performed as an agentic task. The `aw repo` tool combines automated steps with prompt engineering to adapt to the specifics of the user project.
 
 Repo init prompts (algorithm outline):
 
-1) Collect inputs (flags/env/config) and detect project language stacks via lightweight scans (e.g., package.json, pyproject.toml, Cargo.toml, go.mod).
-2) Generate a seed prompt containing:
+1. Collect inputs (flags/env/config) and detect project language stacks via lightweight scans (e.g., package.json, pyproject.toml, Cargo.toml, go.mod).
+2. Generate a seed prompt containing:
    - Project description (from arg/editor) and detected stacks
    - Selected options: VCS, devenv, devcontainer, direnv, task runner, supported agents
    - Constraints: do not commit secrets; prefer reproducible tools; propose tests/linters
-3) Request a plan from the agent including: files to create/update, test/linter selections, and any approvals needed.
-4) Apply plan incrementally with checkpoints; on failures, surface diffs and retries.
-5) After AGENTS.md exists, run `aw agent instructions` to link agent instruction files.
+3. Request a plan from the agent including: files to create/update, test/linter selections, and any approvals needed.
+4. Apply plan incrementally with checkpoints; on failures, surface diffs and retries.
+5. After AGENTS.md exists, run `aw repo instructions link` to create agent instruction symlinks.
+
+TODO: The algorithm needs to be more concrete. The specific prompts that will be used must be defined here in the spec.
+Since this would be a large spec, we can move it to a new file `Repo Init.md`.
 
 Editor behavior:
 
@@ -664,31 +657,17 @@ Output and exit codes:
 
 ```
 aw repo instructions link [OPTIONS] [SOURCE-FILE]
-```
-aw agent instructions [OPTIONS] [SOURCE-FILE]
 
-DESCRIPTION: Generate agent instruction files (or symlinks) from a single source instruction file
-             (default: AGENTS.md). Intended for use in devShell hooks and automation.
-
-OPTIONS:
-  --dynamic-agent-instructions <yes|no>  Process `.agents/dynamic-instructions.md` with workflow commands (default: yes)
-  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
-                                         Target agent toolchains (default: all)
-  --force                                Overwrite existing links/files when needed
-  --dry-run                              Show actions without making changes
-
-ARGUMENTS:
-  SOURCE-FILE                            Source instruction file (default: AGENTS.md)
-```
+DESCRIPTION: Create relative symlinks from per‑agent instruction paths to a single source file.
 
 OPTIONS:
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
-                     Supported agent types (default: all)
-  --force             Force overwrite existing symlinks
-  --dry-run           Show what would be done without making changes
+                                           Supported agent types (default: all)
+  --force                                  Force overwrite existing symlinks
+  --dry-run                                Show what would be done without making changes
 
 ARGUMENTS:
-  SOURCE-FILE        Source instruction file (default: AGENTS.md)
+  SOURCE-FILE                              Source instruction file (default: AGENTS.md)
 ```
 
 Behavior:
@@ -713,7 +692,7 @@ aw repo check [OPTIONS]
 
 OPTIONS:
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
-                     Supported agent types (default: all)
+                                  Supported agent types (default: all)
 ```
 
 Behavior:
@@ -728,11 +707,13 @@ Output and exit codes:
 - Human‑readable summary with per‑check status; `--json` emits a structured report: `{ instructions: { ok, missing:[], extra:[] }, devcontainer: { ok, health: { passed, details } }, devenv: { ok, details } }`. Non‑zero exit if any critical check fails.
 
 ```
+
 aw health [OPTIONS]
 
 OPTIONS:
-  --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
-                     Supported agent types (default: all)
+--supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
+Supported agent types (default: all)
+
 ```
 
 Behavior:
@@ -746,15 +727,21 @@ Output and exit codes:
 #### 6) Runtimes, Agents, Hosts (capabilities)
 
 ```
+
 aw remote agents
+
 ```
 
 ```
+
 aw remote runtimes
+
 ```
 
 ```
+
 aw remote runners
+
 ```
 
 REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes` and `/api/v1/runners`
@@ -808,7 +795,7 @@ aw config --show-origin
 
 # Set with specific scope
 aw config --user ui.theme dark
-```
+````
 
 Mirrors `docs/configuration.md` including provenance, precedence, and Windows behavior.
 
@@ -832,80 +819,81 @@ OPTIONS:
   --rest <URL>                REST service URL to connect to
 ```
 
-#### 9) Connectivity (Overlay/Relay)
+#### 9) Shell Completion
 
 ```
-aw agent network get-keys [OPTIONS]
+aw shell-completion install [--shell <bash|zsh|fish|pwsh>] [--dest <DIR>] [--force]
 
-DESCRIPTION: Request session connectivity credentials.
+DESCRIPTION: Install the completion script for your shell.
 
 OPTIONS:
-  --provider <netbird|tailscale|auto>
-                            Connectivity provider
-  --tag <name>              Tag for the connection
+  --shell <SHELL>               Shell type (bash|zsh|fish|pwsh). Defaults to detection from $SHELL
+  --dest <DIR>                  Install directory. Defaults to a standard per-shell user location
+  --force                       Overwrite existing file if present
+
+DEFAULT INSTALL LOCATIONS:
+  bash: ~/.local/share/bash-completion/completions/aw
+  zsh:  ~/.zsh/completions/_aw  (ensures fpath contains ~/.zsh/completions)
+  fish: ~/.config/fish/completions/aw.fish
+  pwsh: Appends to $PROFILE to dot-source the generated script on startup
+
+NOTES:
+  - Detects Homebrew bash completion dirs on macOS when possible; falls back to user dir.
+  - Creates parent directories when needed.
 ```
 
 ```
-aw agent followers accept-connections --session <ID> [OPTIONS]
+aw shell-completion script [SHELL]
 
-DESCRIPTION: Initiate and wait for follower acks; prints per-host status.
-
-OPTIONS:
-  --hosts <list>            List of hosts to handshake with
-  --timeout <sec>           Timeout in seconds
-```
-
-```
-aw agent relay tail --session <ID> --host <NAME> [OPTIONS]
-
-DESCRIPTION: Relay utilities (fallback).
-
-OPTIONS:
-  --stream <stdout|stderr|status>
-                           Stream to tail (default: stdout)
-```
-
-```
-aw agent relay send --session <ID> --host <NAME> --control <JSON>
-```
-
-Relay send control payloads (fallback).
-
-```
-aw agent relay socks5 --session <ID> --bind <ADDRESS:PORT>
-```
-
-Start a local SOCKS5 relay for this session (client-hosted rendezvous).
-
-```
-aw completion [SHELL]
-
-DESCRIPTION: Print shell completion script to stdout.
+DESCRIPTION: Print the completion script to stdout.
 
 ARGUMENTS:
-  SHELL                       Shell type (bash|zsh|fish|pwsh)
+  SHELL                         Shell type (bash|zsh|fish|pwsh). When omitted, detected from $SHELL
 
 USAGE:
-  # Bash (user)
+  # Bash (per-user)
   mkdir -p ~/.local/share/bash-completion/completions && \
-  aw completion bash > ~/.local/share/bash-completion/completions/aw
+  aw shell-completion script bash > ~/.local/share/bash-completion/completions/aw
 
   # Zsh
   mkdir -p ~/.zsh/completions && \
-  aw completion zsh > ~/.zsh/completions/_aw && \
+  aw shell-completion script zsh > ~/.zsh/completions/_aw && \
   echo 'fpath=(~/.zsh/completions $fpath); autoload -U compinit && compinit' >> ~/.zshrc
 
   # Fish
   mkdir -p ~/.config/fish/completions && \
-  aw completion fish > ~/.config/fish/completions/aw.fish
+  aw shell-completion script fish > ~/.config/fish/completions/aw.fish
 
   # PowerShell (current session)
-  aw completion powershell | Out-String | Invoke-Expression
+  aw shell-completion script pwsh | Out-String | Invoke-Expression
 
 NOTES:
-  - Completions are generated from the CLI definition (clap_complete).
-  - You can wire a `completions` subcommand at build time for packaging.
-  - See also: [How to use clap](../Research/How%20to%20use%20clap.md).
+  - Scripts are generated from the CLI definition (`clap_complete`).
+```
+
+```
+aw shell-completion complete [--shell <SHELL>] [--line <LINE>] [--cursor <N>]
+
+DESCRIPTION: Emit dynamic completion suggestions for the current input line.
+
+OPTIONS:
+  --shell <SHELL>               Shell type (bash|zsh|fish|pwsh). Defaults to detection
+  --line <LINE>                 Full command line buffer. Defaults to shell-provided env
+  --cursor <N>                  Cursor position in bytes. Defaults to shell-provided env
+
+BEHAVIOR:
+  - Outputs one suggestion per line. The installed shell script invokes this command
+    to compute context-aware completions (e.g., repo branches, agents, flags, paths).
+  - When flags are omitted, arguments are inferred from standard shell env vars:
+      bash: COMP_LINE, COMP_POINT
+      zsh:  BUFFER, CURSOR
+      fish: commandline --current-process --tokenize / --cursor
+      pwsh: $args or $PSBoundParameters as wired by the script
+
+NOTES:
+  - Static scripts call back into this command to support dynamic algorithms when needed.
+  - The exact dynamic sources (e.g., listing branches or workspaces) are described in
+    the relevant sections of this spec (see Branch autocompletion under Tasks).
 ```
 
 #### 10) Agent Utilities (`aw agent ...`)
@@ -973,6 +961,42 @@ OPTIONS:
 TODO: document the `aw agent sandbox` commands, which are currently described with alternative names in the sandbox-related markdown files. After adding them here, use the consistent names everywhere.
 
 ```
+aw agent instructions [OPTIONS] [SOURCE-FILE]
+
+DESCRIPTION: Process a dynamic agent instruction file into the final prompt text
+             that an agent will use. Expands workflow commands (see `Workflows.md`)
+             and consumes `@agents-setup` directives without printing them.
+
+OPTIONS:
+  --output <FILE>                 Write processed prompt to FILE (default: stdout)
+  --json                          Emit JSON { prompt, diagnostics:[], env:{} }
+  --print-diagnostics <yes|no>    Also print diagnostics to stderr (default: yes)
+  --cwd <PATH>                    Resolve workflows relative to PATH (default: repo root)
+
+ARGUMENTS:
+  SOURCE-FILE                     Dynamic instruction file path
+                                  (default: .agents/dynamic-instructions.md)
+```
+
+Behavior:
+
+- Reads the `SOURCE-FILE`, expands lines beginning with `/` using the resolution rules in `Workflows.md`.
+- During processing, `@agents-setup` lines set environment variables for the session but are not included in the output prompt text.
+- Search path for workflow commands prepends `.agents/workflows` (if present) to the system `PATH`, so any executable in `PATH` is valid; `.agents/workflows` has highest priority.
+- If no executable for `/name` is found, include fallback contents of `.agents/workflows/name.txt` when present.
+- Prints the final prompt to stdout by default or writes to `--output`.
+
+JSON output and exit codes:
+
+- `--json` emits `{ prompt: <string>, diagnostics: [<string>...], env: { KEY: VALUE } }`.
+- Non‑zero exit on I/O errors; workflow command failures are reported in diagnostics but do not abort unless the executable is missing and no `.txt` fallback exists.
+
+Notes:
+
+- Useful for manual testing and editor shebang usage. Example shebang: `#!/usr/bin/env aw agent instructions`.
+- Linking per‑agent instruction file paths is handled by `aw repo instructions link`.
+
+```
 aw agent start-work [OPTIONS]
 
 DESCRIPTION: Records a task description and optionally creates a new branch.
@@ -984,6 +1008,49 @@ OPTIONS:
   --task-description <DESC>   Task description
   --branch-name <NAME>        Branch name to create
   --repo <PATH>               Repository path
+```
+
+```
+aw agent network get-keys [OPTIONS]
+
+DESCRIPTION: Request session connectivity credentials.
+
+OPTIONS:
+  --provider <netbird|tailscale|auto>
+                            Connectivity provider
+  --tag <name>              Tag for the connection
+```
+
+```
+aw agent relay tail --session <ID> --host <NAME> [OPTIONS]
+
+DESCRIPTION: Relay utilities (fallback).
+
+OPTIONS:
+  --stream <stdout|stderr|status>
+                           Stream to tail (default: stdout)
+```
+
+```
+aw agent relay send --session <ID> --host <NAME> --control <JSON>
+```
+
+Relay send control payloads (fallback).
+
+```
+aw agent relay socks5 --session <ID> --bind <ADDRESS:PORT>
+```
+
+Start a local SOCKS5 relay for this session (client-hosted rendezvous).
+
+```
+aw agent followers accept-connections --session <ID> [OPTIONS]
+
+DESCRIPTION: Initiate and wait for follower acks; prints per-host status.
+
+OPTIONS:
+  --hosts <list>            List of hosts to handshake with
+  --timeout <sec>           Timeout in seconds
 ```
 
 ```
@@ -1087,9 +1154,9 @@ Layout on launch:
 
 - Create a new window in the current session (or create a session if none) with two panes:
   - Right: agent activity (logs/stream)
-  - Left: terminal in the per-task workspace (or launch editor if configured)
-    Editor launch is configurable via `terminal.editor.command` (string; default: `none` to disable). Example: `"nvim {workspace}"`.
-    Recording scope is configurable via `tui.recording.scope` with values `agent-pane` (default) or `full-window`.
+  - Left: preferred shell or an editor environment in the per-task workspace multiplexer window
+    Editor launch is configurable via `tui-user-shell` (string; default: $SHELL). Example: `"lazygit {workspace}"`.
+    Recording scope is configurable via `session-recording-scope` with values `agent-tool` (default) or `tui-window`.
 
 Remote attach:
 

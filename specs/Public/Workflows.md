@@ -31,7 +31,7 @@ Under the new Rust CLI architecture, workflow commands will be handled by:
 
 ## Workflow Commands
 
-### Syntax
+### Syntax (Workflow Commands)
 
 Task descriptions may include lines beginning with `/` (e.g. `/front-end-task`). When `get-task` is executed, these lines are replaced with the output of matching programs or text files in the `.agents/workflows` folder.
 
@@ -39,9 +39,9 @@ Task descriptions may include lines beginning with `/` (e.g. `/front-end-task`).
 
 For a workflow command `/command`:
 
-1. **Executable Scripts**: First, look for an executable file at `.agents/workflows/command`
-2. **Text Files**: If no executable found, look for a text file at `.agents/workflows/command.txt`
-3. **Error Handling**: If neither exists, report an error in diagnostics
+1. **PATH Executables (with repo priority)**: Resolve `command` via the system `PATH` after temporarily prepending `.agents/workflows` (when it exists). Any executable found in `PATH` is valid. `.agents/workflows` takes precedence because it is placed first in the `PATH` for resolution.
+2. **Text File Fallback**: If no executable is found in `PATH`, look for a text file at `.agents/workflows/command.txt` and include its contents.
+3. **Error Handling**: If neither an executable nor a `.txt` fallback exists, report an error in diagnostics.
 
 ### Script Execution
 
@@ -139,7 +139,7 @@ end
 
 ## Integration with Setup Scripts
 
-### Current Implementation (Ruby)
+### Current Implementation Details (Ruby)
 
 All setup scripts include this pattern:
 
@@ -152,7 +152,7 @@ if [ -n "$SETUP_ENV" ]; then
 fi
 ```
 
-### Future Implementation (Rust CLI)
+### Future Implementation Details (Rust CLI)
 
 The Rust CLI will provide:
 
@@ -165,6 +165,10 @@ if [ -n "$SETUP_ENV" ]; then
   done <<< "$SETUP_ENV"
 fi
 ```
+
+## Manual Testing
+
+- You can manually test dynamic instruction and task prompts using `aw agent instructions`. It processes a dynamic instruction file by expanding workflow commands per the rules above and outputs the final prompt text.
 
 ### Command Line Interface
 

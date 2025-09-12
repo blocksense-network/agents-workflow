@@ -106,6 +106,7 @@
     "FSCTLs",
     "fskit",
     "fslckout",
+    "compinit",
     "fstatat",
     "fsyncdir",
     "ftruncate",
@@ -160,6 +161,9 @@
     "lseek",
     "MAGICLINKS",
     "mangen",
+    "devbox",
+    "flox",
+    "guix",
     "metacraft",
     "Microbenchmarks",
     "middleboxes",
@@ -359,6 +363,7 @@
     "Xwayland",
     "ZDOTDIR",
     "zellij",
-    "zram"
+    "zram",
+    "pyproject"
   ]
 }

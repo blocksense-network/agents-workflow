@@ -441,7 +441,11 @@ Add `propagate_version = true` (already shown in the quickstart) so `-V/--versio
 
 ### Completions subcommand pattern
 
-Wire a dedicated subcommand to print shell completions, matching `aw completion <shell>` behavior in the CLI spec.
+Wire a dedicated command group for shell completions, matching `aw shell-completion script [shell]` behavior in the CLI spec (plus `install` and `complete`).
+
+Note:
+- The helper functions shown below (`detect_shell`, `install_to_default`, `read_shell_line_and_cursor`, `compute_dynamic_suggestions`) are application-provided utilities. They are not part of `clap`/`clap_complete`.
+- `clap_complete` generates static scripts by default. To support dynamic, runtime suggestions, you must customize the installed completion script to call back into your binary (e.g., invoke `aw shell-completion complete ...`) using shell-specific mechanisms (bash `complete -C`, zsh functions, fish `complete --command` with a wrapper function).
 
 ```rust
 use clap::{Parser, Subcommand, CommandFactory};
@@ -456,20 +460,223 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    Completion { shell: Shell },
+    /// Shell completion utilities
+    #[command(subcommand)]
+    ShellCompletion(ShellCompletionCmd),
     // other subcommands...
+}
+
+#[derive(Debug, Subcommand)]
+enum ShellCompletionCmd {
+    /// Print completion script to stdout
+    Script { shell: Option<Shell> },
+    /// Install completion script into standard user location
+    Install {
+        #[arg(long)] shell: Option<Shell>,
+        #[arg(long)] dest: Option<std::path::PathBuf>,
+        #[arg(long)] force: bool,
+    },
+    /// Emit dynamic completion candidates for the current line
+    Complete {
+        #[arg(long)] shell: Option<Shell>,
+        #[arg(long)] line: Option<String>,
+        #[arg(long)] cursor: Option<usize>,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Completion { shell } => {
-            let mut cmd = Cli::command();
-            generate(shell, &mut cmd, cmd.get_name(), &mut std::io::stdout());
-        }
+        Cmd::ShellCompletion(sub) => match sub {
+            ShellCompletionCmd::Script { shell } => {
+                let mut cmd = Cli::command();
+                let shell = shell.unwrap_or(detect_shell());
+                generate(shell, &mut cmd, cmd.get_name(), &mut std::io::stdout());
+            }
+            ShellCompletionCmd::Install { shell, dest, force: _ } => {
+                let mut cmd = Cli::command();
+                let shell = shell.unwrap_or(detect_shell());
+                let mut buf = Vec::new();
+                generate(shell, &mut cmd, cmd.get_name(), &mut buf);
+                install_to_default(shell, &buf, dest.as_deref()).expect("install failed");
+            }
+            ShellCompletionCmd::Complete { shell, line, cursor } => {
+                let shell = shell.unwrap_or(detect_shell());
+                let (line, cursor) = read_shell_line_and_cursor(shell, line, cursor);
+                for s in compute_dynamic_suggestions(&line, cursor) {
+                    println!("{}", s);
+                }
+            }
+        },
         // ...
     }
 }
+```
+
+### Dynamic completion hooks per shell
+
+`clap_complete` generates static scripts. For runtime/dynamic suggestions (e.g., listing branches from the current repo), install a shell hook that calls your binary's `aw shell-completion complete` subcommand and prints one suggestion per line. Below are minimal, widely used patterns per shell.
+
+#### Bash
+
+Two viable approaches exist; pick the one you prefer.
+
+Option A: External completer (bash sets `COMP_LINE` and `COMP_POINT` automatically):
+
+```bash
+complete -o bashdefault -o default -C 'aw shell-completion complete --shell bash' aw
+```
+
+Option B: Function-based completer using `compgen`:
+
+```bash
+_aw_complete() {
+  local cur
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  local suggestions
+  suggestions=$(aw shell-completion complete --shell bash --line "$COMP_LINE" --cursor "$COMP_POINT")
+  COMPREPLY=( $(compgen -W "$suggestions" -- "$cur") )
+}
+complete -F _aw_complete aw
+```
+
+In both cases, `aw shell-completion complete` should write newline-delimited candidates to stdout.
+
+#### Zsh
+
+Zsh completion functions can call back into your CLI and then use `_describe` or `compadd`:
+
+```zsh
+_aw() {
+  local -a suggestions
+  suggestions=(${(f)$(aw shell-completion complete --shell zsh --line "$BUFFER" --cursor "$CURSOR")})
+  _describe -t commands 'aw suggestions' suggestions
+}
+compdef _aw aw
+```
+
+#### Fish
+
+Fish supports command substitutions for dynamic candidates. Use `commandline` to read the buffer and cursor position:
+
+```fish
+function __aw_complete
+    set -l line (commandline --current-process)
+    set -l cursor (commandline --cursor)
+    aw shell-completion complete --shell fish --line "$line" --cursor $cursor
+end
+complete -c aw -a '(__aw_complete)'
+```
+
+#### PowerShell (pwsh)
+
+Register a native argument completer that forwards the current buffer and cursor position:
+
+```powershell
+Register-ArgumentCompleter -Native -CommandName aw -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  $line = $commandAst.Extent.Text
+  aw shell-completion complete --shell pwsh --line $line --cursor $cursorPosition |
+    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+}
+```
+
+### Reading line and cursor by shell (fallbacks your CLI can honor)
+
+When `--line/--cursor` are omitted, your CLI can read standard shell-provided variables:
+
+- Bash: `COMP_LINE`, `COMP_POINT`
+- Zsh: `$BUFFER`, `$CURSOR`
+- Fish: `commandline --current-process`, `commandline --cursor`
+- PowerShell: Not env-based; use `Register-ArgumentCompleter` parameters (`$commandAst.Extent.Text`, `$cursorPosition`)
+
+### Install directories and detection heuristics
+
+For `aw shell-completion install`, prefer user-level locations and create parents as needed. Common defaults:
+
+- Bash (user): `~/.local/share/bash-completion/completions/aw`
+  - macOS (Homebrew): `/opt/homebrew/etc/bash_completion.d/aw` (Apple Silicon), `/usr/local/etc/bash_completion.d/aw` (Intel)
+  - System-wide (Linux): `/etc/bash_completion.d/aw` or `/usr/share/bash-completion/completions/aw`
+- Zsh (user): `~/.zsh/completions/_aw` and ensure in `~/.zshrc`:
+  - `fpath=(~/.zsh/completions $fpath)` then `autoload -U compinit && compinit`
+- Fish (user): `~/.config/fish/completions/aw.fish`
+- PowerShell: Append to `$PROFILE` to dot-source the script for each session, or register a completer at startup (as shown above).
+
+Heuristics:
+
+- Detect shell via `$SHELL` (POSIX shells) or `$PSMODULEPATH`/`$PROFILE` (PowerShell), with an override flag `--shell`.
+- On macOS, detect Homebrew prefix via `brew --prefix` and prefer `$PREFIX/etc/bash_completion.d` when writable.
+- Always avoid overwriting existing files unless `--force` is given.
+
+### Minimal Rust helpers for dynamic completion
+
+Your `aw shell-completion complete` can accept `--shell <SHELL>`, `--line <STRING>`, and `--cursor <usize>`, apply fallbacks, and print suggestions:
+
+```rust
+use clap::{Parser, Subcommand, CommandFactory};
+use clap_complete::Shell;
+
+#[derive(Debug, Parser)]
+#[command(version, propagate_version = true)]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Debug, Subcommand)]
+enum Cmd {
+    #[command(subcommand)]
+    ShellCompletion(ShellCompletionCmd),
+}
+
+#[derive(Debug, Subcommand)]
+enum ShellCompletionCmd {
+    Complete { #[arg(long)] shell: Option<Shell>, #[arg(long)] line: Option<String>, #[arg(long)] cursor: Option<usize> },
+}
+
+fn main() {
+    let cli = Cli::parse();
+    match cli.cmd {
+        Cmd::ShellCompletion(ShellCompletionCmd::Complete { shell, line, cursor }) => {
+            let shell = shell.unwrap_or_else(detect_shell);
+            let (line, cursor) = resolve_line_and_cursor(shell, line, cursor);
+            for s in compute_dynamic_suggestions(&line, cursor) { println!("{}", s); }
+        }
+        _ => {}
+    }
+}
+
+fn detect_shell() -> Shell { /* inspect $SHELL or platform; default to Shell::Bash */ Shell::Bash }
+fn resolve_line_and_cursor(shell: Shell, line: Option<String>, cursor: Option<usize>) -> (String, usize) {
+    if let (Some(l), Some(c)) = (line, cursor) { return (l, c); }
+    match shell {
+        Shell::Bash => {
+            let l = std::env::var("COMP_LINE").unwrap_or_default();
+            let c = std::env::var("COMP_POINT").ok().and_then(|v| v.parse().ok()).unwrap_or(l.len());
+            (l, c)
+        }
+        Shell::Zsh => {
+            // Zsh vars are in the invoking process; prefer passing --line/--cursor from the script
+            (line.unwrap_or_default(), cursor.unwrap_or(0))
+        }
+        Shell::Fish => {
+            (line.unwrap_or_default(), cursor.unwrap_or(0))
+        }
+        Shell::PowerShell => {
+            (line.unwrap_or_default(), cursor.unwrap_or(0))
+        }
+        _ => (line.unwrap_or_default(), cursor.unwrap_or(0)),
+    }
+}
+
+fn compute_dynamic_suggestions(line: &str, cursor: usize) -> Vec<String> {
+    // Your logic: tokenize, inspect context, list branches/agents/etc.
+    let _ = (line, cursor);
+    Vec::new()
+}
+```
+
+This section focuses on wiring. See the CLI spec for the specific dynamic sources (e.g., branch names, workspaces) to return.
 ```
 
 ### Environment variable prefix strategy
