@@ -1,0 +1,114 @@
+## Repository Layout (post‑Rust migration)
+
+This document defines the ideal repository structure after the migration to Rust, aligning with CLI and sandbox specs in `CLI.md` and `Sandbox Profiles.md`. It emphasizes library‑first design, thin binaries, strong testability, and clear platform boundaries, while temporarily preserving the existing Ruby implementation under `legacy/` and keeping current cloud setup scripts at their present paths.
+
+### Principles
+
+- Libraries first; binaries are thin entry points.
+- Clear prefixes per domain: `aw-*` (application), `agentfs-*` (filesystem), `sandbox-*` (isolation).
+- Cross‑platform adapters are minimal shims to a shared Rust core.
+- Specs remain authoritative in `specs/`; runtime JSON schemas are vendored under `schemas/` for code to consume.
+- Temporary coexistence: legacy Ruby kept intact under `legacy/` during transition.
+
+### Top‑level layout
+
+```text
+agents-workflow/
+├─ Cargo.toml                  # [workspace] with all crates
+├─ rust-toolchain.toml         # pinned toolchain
+├─ .cargo/config.toml          # linker/rpath, per-target cfgs
+├─ Justfile
+├─ flake.nix / flake.lock      # Nix dev shells and CI builds
+├─ .devcontainer/              # Devcontainer definitions
+├─ .github/workflows/          # CI: build, test, lint, package
+├─ specs/                      # Product/spec documents (source of truth)
+│  └─ Public/
+├─ docs/                       # Developer docs (how-to, runbooks)
+├─ scripts/                    # Small repo scripts (non-build)
+├─ schemas/                    # JSON schemas used at runtime (mirrors specs/Public/Schemas)
+│  └─ agentfs/
+├─ tests/                      # Cross-crate integration & acceptance tests
+│  ├─ integration/
+│  ├─ acceptance/
+│  └─ fixtures/
+├─ examples/                   # Small runnable examples per subsystem
+├─ adapters/
+│  └─ macos/
+│     └─ xcode/AgentFSKitExtension/   # FSKit App Extension (Swift) bridging Rust FFI
+├─ bins/                       # Packaging assets/manifests per final binary
+│  ├─ aw/                      # CLI packaging, completions, manpages
+│  ├─ agentfs-fuse/            # FUSE host packaging (Linux/macOS dev)
+│  ├─ agentfs-winfsp/          # WinFsp host packaging (Windows)
+│  └─ sbx-helper/              # Sandbox helper packaging
+├─ crates/                     # All Rust crates
+│  ├─ aw-cli/                  # Bin: `aw` (Clap subcommands; TUI glue)
+│  ├─ aw-tui/                  # TUI widgets/flows (Ratatui)
+│  ├─ aw-core/                 # Task/session lifecycle orchestration
+│  ├─ aw-config/               # Layered config + flag mapping
+│  ├─ aw-state/                # Local state (SQLite models, migrations)
+│  ├─ aw-repo/                 # VCS operations (Git/Hg/Bzr/Fossil)
+│  ├─ aw-rest-client/          # Client for remote REST mode
+│  ├─ aw-rest-server/          # Optional local REST service (lib + bin)
+│  ├─ aw-connectivity/         # SSH, relays, followers, rendezvous
+│  ├─ aw-notify/               # Cross-platform notifications
+│  ├─ aw-fleet/                # Multi-OS fleet orchestration primitives
+│  ├─ aw-workflows/            # Workflow expansion engine (`/cmd`, dynamic instructions)
+│  ├─ aw-schemas/              # Load/validate JSON schemas (e.g., AgentFS control)
+│  ├─ agentfs-core/            # Core FS: VFS, CoW, snapshots/branches, locks, xattrs/ADS
+│  ├─ agentfs-proto/           # Control plane types + validators
+│  ├─ agentfs-fuse-host/       # Bin: libfuse host → `agentfs-core`
+│  ├─ agentfs-winfsp-host/     # Bin: WinFsp host → `agentfs-core`
+│  ├─ agentfs-ffi/             # C ABI (FFI) for FSKit/Swift bridging
+│  ├─ sandbox-core/            # Namespaces/lifecycle/exec
+│  ├─ sandbox-fs/              # Mount planning (RO seal, overlays)
+│  ├─ sandbox-seccomp/         # Dynamic read allow-list (seccomp notify)
+│  ├─ sandbox-cgroups/         # cgroup v2 limits + metrics
+│  ├─ sandbox-net/             # Loopback/slirp/veth; nftables glue
+│  ├─ sandbox-proto/           # Helper⇄supervisor protocol types
+│  ├─ sbx-helper/              # Bin: PID 1 inside sandbox; composes sandbox-* crates
+│  ├─ aw-agent-runner/         # Bin/lib: `aw agent record` (asciinema integration)
+│  └─ platform-helpers/        # Per-OS helpers (paths, perms, names)
+├─ legacy/                     # Temporary home for the Ruby implementation
+│  └─ ruby/
+│     ├─ bin/                  # existing Ruby entrypoints (kept intact)
+│     ├─ lib/
+│     ├─ test/
+│     ├─ Gemfile / *.gemspec
+│     └─ README.md
+├─ bin/                        # Thin wrappers/launchers (may exec Rust bins)
+└─ (root scripts preserved; see below)
+```
+
+### Crate mapping (selected)
+
+- CLI/TUI: `aw-cli`, `aw-tui`, `aw-core`, `aw-config`, `aw-state`, `aw-repo`, `aw-workflows`, `aw-rest-client`, `aw-notify`, `aw-fleet`, `aw-agent-runner`, `aw-schemas`.
+- AgentFS: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`.
+- Sandbox (Local profile): `sandbox-core`, `sandbox-fs`, `sandbox-seccomp`, `sandbox-cgroups`, `sandbox-net`, `sandbox-proto`, `sbx-helper`.
+
+See `CLI.md` for command surface and `Sandbox Profiles.md` for isolation profiles and behavior.
+
+### Cloud setup scripts (paths preserved)
+
+The following existing setup scripts remain at the repository root to preserve current tooling and docs:
+
+- `codex-setup`
+- `copilot-setup`
+- `jules-setup`
+- `goose-setup`
+
+Notes:
+- These scripts are considered external helpers and may call into Rust binaries as migration proceeds.
+- Additional provider scripts (if added later) should also live at the repository root for consistency.
+
+### Legacy Ruby
+
+- All current Ruby code is retained under `legacy/ruby/` without restructuring to minimize churn during migration.
+- Existing Ruby `bin/` entrypoints are duplicated here; top‑level `bin/` may be thin shims that exec Rust `aw` as features roll over.
+- Tests continue to run under `legacy/ruby/test/` until replaced by Rust acceptance tests under `tests/`.
+
+### Testing and CI
+
+- Unit tests live within each crate; cross‑crate tests in `tests/` mirror acceptance plans in AgentFS and CLI specs.
+- CI fans out per crate (build/test/lint) and runs privileged lanes only where necessary (FUSE/WinFsp/FSKit).
+
+
