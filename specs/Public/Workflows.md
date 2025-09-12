@@ -46,14 +46,17 @@ For a workflow command `/command`:
 ### Script Execution
 
 #### Unix Systems
+
 - Scripts are executed directly using the system's shell
 - File permissions must allow execution (attempts `chmod +x` automatically if not executable)
 - Uses `Open3.capture3(script_path, *args)` for execution
 
 #### Windows Systems
+
 The implementation includes comprehensive Windows support:
 
 **File Extension Detection:**
+
 - `.bat`, `.cmd`: Executed with `cmd /c script_path args...`
 - `.rb`: Executed with `ruby script_path args...`
 - `.py`: Executed with `python script_path args...`
@@ -61,6 +64,7 @@ The implementation includes comprehensive Windows support:
 - `.ps1`: Executed with `powershell -ExecutionPolicy Bypass -File script_path args...`
 
 **Extensionless/Shell Scripts:**
+
 1. Check if bash is available (`bash --version` test)
 2. If bash available: `bash script_path args...`
 3. If not available but file exists: Parse shebang line
@@ -71,6 +75,7 @@ The implementation includes comprehensive Windows support:
    - Custom interpreters supported
 
 **Error Cases:**
+
 - Script not found or empty: Returns error status
 - No interpreter available: Returns error with diagnostic message
 
@@ -100,16 +105,19 @@ Lines starting with `@agents-setup` in either task files or workflow outputs are
 ### Assignment Rules
 
 **Direct Assignment (`VAR=value`):**
+
 - Sets the variable to the specified value
 - Multiple assignments to the same variable are checked for conflicts
 - Conflicting values result in diagnostic error: `"Conflicting assignment for VAR"`
 
 **Append Assignment (`VAR+=value`):**
+
 - Adds values to a comma-separated set
 - Multiple appends accumulate values: `VAR+=a,b VAR+=c` → `VAR=a,b,c`
 - Can be combined with direct assignments
 
 **Multiple Operations Processing:**
+
 - Direct assignment + appends: Final value contains assigned value plus all appended entries
 - Multiple appends: Values are accumulated and deduplicated
 - Order of operations doesn't affect final result
@@ -161,10 +169,12 @@ fi
 ### Command Line Interface
 
 **Current (Ruby):**
+
 - `get-task --get-setup-env`: Print environment variables in `KEY=VALUE` format
 - `get-task --autopush`: Process workflows with autopush setup
 
 **Future (Rust):**
+
 - `aw agent get-task [--autopush] [--agent TYPE] [--model MODEL]`: Get processed task
 - `aw agent get-setup-env`: Extract environment variables only
 - `aw agent start-work --task-description DESC [--branch-name NAME]`: Create task with workflow support
@@ -252,6 +262,7 @@ This involves updating both the UI and API components.
 ```
 
 Where `.agents/workflows/front-end-task.txt` contains:
+
 ```
 Focus on the user interface components:
 - Update the dashboard layout

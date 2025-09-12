@@ -8,14 +8,14 @@ This guide provides a comprehensive overview of Ratatui APIs that can be used to
 
 ### TUI Requirements → Ratatui Components
 
-| AW TUI Component | Ratatui API | Key Features Used |
-|-----------------|-------------|-------------------|
-| Dashboard Layout | `Layout`, `Constraint` | Vertical/horizontal splits, responsive design |
-| Project/Branch/Agent Selectors | `List`, `ListState` | Filtering, navigation, highlighting |
-| Task Description Editor | `Paragraph`, `Frame::set_cursor_position` | Multi-line input, cursor management |
-| Status/Error Display | `Paragraph`, `Block` | Styled text, borders |
-| Hotkey System | Event handling | Key combinations, modifiers |
-| Multiplexer Integration | Backend selection | Crossterm for terminal control |
+| AW TUI Component               | Ratatui API                               | Key Features Used                             |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------- |
+| Dashboard Layout               | `Layout`, `Constraint`                    | Vertical/horizontal splits, responsive design |
+| Project/Branch/Agent Selectors | `List`, `ListState`                       | Filtering, navigation, highlighting           |
+| Task Description Editor        | `Paragraph`, `Frame::set_cursor_position` | Multi-line input, cursor management           |
+| Status/Error Display           | `Paragraph`, `Block`                      | Styled text, borders                          |
+| Hotkey System                  | Event handling                            | Key combinations, modifiers                   |
+| Multiplexer Integration        | Backend selection                         | Crossterm for terminal control                |
 
 ## 1. Application Structure
 

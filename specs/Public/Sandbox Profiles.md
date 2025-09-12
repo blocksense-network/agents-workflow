@@ -25,11 +25,11 @@ Profile types (predefined):
 - vm: Lightweight Linux VM (Lima/Colima, Apple Virtualization.framework, WSL2/Hyper‑V). Options include image, resources, networking.
 - local: Local process sandbox using OS namespaces and primitives (Linux: user namespaces, cgroups v2, seccomp with dynamic file access control). See [Local Sandboxing on Linux](Sanboxing/Local%20Sandboxing%20on%20Linux.md) for detailed Linux implementation. Cross-platform support via equivalent isolation primitives.
 - firejail: Linux Firejail profile with caps/seccomp filters.
-- nosandbox: Run directly on host (policy‑gated, for already isolated environments like dedicated VMs).
+- disabled: Run directly on host (policy‑gated, for already isolated environments like dedicated VMs).
 
 Configuration:
 
-- See [Configuration](Configuration.md) for `[[sandbox]]` entries (name, type, and options) and selecting a profile via `--runtime`/fleet or by name in config.
+- See [Configuration](Configuration.md) for `[[sandbox]]` entries (name, type, and options) and selecting a profile via `--sandbox`/fleet or by name in config.
 
 Notes:
 

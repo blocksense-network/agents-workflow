@@ -61,6 +61,26 @@
         "default": { "type": "string", "minLength": 1 }
       }
     },
+    "tui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recording": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scope": { "type": "string", "enum": ["agent-pane", "full-window"] }
+          }
+        }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "type": "string", "enum": ["local", "devcontainer", "vm", "disabled"] }
+      }
+    },
     "network": {
       "type": "object",
       "additionalProperties": false,

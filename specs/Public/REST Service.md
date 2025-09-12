@@ -134,7 +134,7 @@ Response `201 Created`:
 Notes:
 
 - `repo.mode` may also be `upload` (use pre‑signed upload flow) or `none` (operate on previously provisioned workspace template).
-- `runtime.type` may be `local` (no container) or `nosandbox` (explicitly allowed by policy).
+- `runtime.type` may be `local` (no container) or `disabled` (explicitly allowed by policy).
 
 #### List Sessions
 

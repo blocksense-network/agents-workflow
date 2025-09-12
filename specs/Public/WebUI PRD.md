@@ -110,7 +110,7 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
   - Modes: Git URL/branch/commit; Upload; None (template workspace).
   - Validation and repo reachability check.
 - Step 3: Runtime
-  - Type: devcontainer (path selector), local, nosandbox (policy-guarded).
+  - Type: devcontainer (path selector), local, disabled (policy-guarded).
   - Resources: CPU, Memory; Time limit; Egress policy.
 - Step 4: Agent
   - Agent type/version; settings as schema-driven form.

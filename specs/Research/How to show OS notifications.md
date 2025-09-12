@@ -10,7 +10,9 @@ This updated guide addresses the limitation of `notify-rust` not supporting acti
 Use conditional compilation (`#[cfg(target_os = "...")]`) to isolate platform-specific code. Test on each OS, as user settings can override behaviors.
 
 ## Dependencies
+
 Add to `Cargo.toml`:
+
 ```toml
 [dependencies]
 notify-rust = "4.11"
@@ -22,6 +24,7 @@ objc2-user-notifications = "0.3"
 ```
 
 ## Setup and Permissions
+
 - **Cross-Platform (notify-rust)**: No setup needed; handles backends automatically.
 - **macOS-Specific**: Request permissions for alerts, sounds, and badges. App must be signed (use `codesign` for dev). Define categories for actions once on launch.
 - **Permissions Handling**:
@@ -30,7 +33,9 @@ objc2-user-notifications = "0.3"
 - **Error Handling**: Use `Result` for all calls.
 
 ### macOS Permission and Category Setup
+
 Call this once on app launch:
+
 ```rust
 #[cfg(target_os = "macos")]
 use objc2::rc::autoreleasepool;
@@ -77,6 +82,7 @@ fn setup_mac_notifications() {
 ```
 
 ## Implementation Example
+
 A task completion notification with title, body, icon, timeout (5 seconds), sound, and action ("View Details"). On macOS, use objc2 for full support; elsewhere, notify-rust.
 
 ```rust
@@ -144,6 +150,7 @@ fn send_task_complete_notification() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 ```
+
 - **Handling Actions**:
   - **Linux/Windows (notify-rust)**: Use `let handle = notif.show()?; handle.on_action(|action| { if action == "view" { /* Handle */ } });`.
   - **macOS (objc2)**: Implement `UNUserNotificationCenterDelegate` methods like `didReceive` to process `response.actionIdentifier` and `userInfo`.
