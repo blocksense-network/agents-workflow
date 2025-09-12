@@ -44,6 +44,20 @@
   - Volumes: `~/.ccache`, `~/.cache/sccache`.
   - Configure size limits and compression; record hit/miss metrics.
 
+### Build Systems (Hermetic/Deterministic)
+
+- Bazel:
+  - Caches: action outputs via `--disk_cache=/path`, external repositories via `--repository_cache=/path`.
+  - Devcontainer mounts: bind or named volume for `/home/vscode/.cache/bazel/{disk,repo}` and point `.bazelrc` to those paths.
+  - Compatibility: gate sharing by OS/arch, toolchain, and Bazel version; disable sharing on mismatch.
+  - Tests: host pre‑populates caches; guest builds twice and asserts cache hits and faster warm run.
+
+- Buck2:
+  - Caches: directory cache via `.buckconfig` `[cache] mode = dir; dir = /path` or HTTP cache.
+  - Devcontainer mounts: bind or named volume for `/home/vscode/.cache/buck2/cache`; configure `.buckconfig` accordingly.
+  - Compatibility: gate by OS/arch, compiler/toolchain versions.
+  - Tests: host pre‑populates dir cache; guest rebuilds and measures warm speedup.
+
 ### Security Considerations
 
 - Treat caches as untrusted inputs when switching branches or contributors; prefer read‑write volumes scoped per project or per user.

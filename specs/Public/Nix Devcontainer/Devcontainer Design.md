@@ -40,7 +40,7 @@ This document describes requirements, rationale, and implementation details. Nix
 2. Agents Base Image
    - FROM: Nix Devcontainer Base.
    - Installs all supported agentic CLIs using Nix. The list of agents is shared with the agents-workflow Nix package, defined at the root of this repository, ensuring consistency between the devcontainer and the Nix package set.
-   - Configures shell integration (zsh/bash/fish) to emit timeline SessionMoments via preexec/DEBUG traps and trigger FsSnapshots.
+   - Prepares integration with agent‑provided hook mechanisms (e.g., Claude Code hooks) to emit SessionMoments and trigger FsSnapshots.
    - Prepares netrc/SSH/gh credential bridges (runtime only; nothing baked into the image).
 
 3. Project Image
@@ -100,15 +100,15 @@ Mechanisms:
 
 Each agent’s exact mapping is captured in `docs/agents/<tool>.md` and validated in CI with probe commands (e.g., `gh auth status`, minimal API ping for OpenAI/Anthropic).
 
-### Time‑Travel Execution Hooks in Devcontainer
+### Time‑Travel Event Emission in Devcontainer
 
-- zsh: `preexec` emits a timeline SessionMoment before execution; `precmd` after. bash: `trap DEBUG` + `PROMPT_COMMAND`. fish: `fish_preexec`/`fish_postexec`.
-- The hook writes a small JSON event (`{ts, cmd, cwd, session}`) to a FIFO/log consumed by the runner to align SessionMoments with FsSnapshots.
-- Hooks are opt‑out via config key (see `docs/configuration.md`), and no‑op for non‑interactive shells.
+- Use agent tool built‑in hooks (e.g., Claude Code hooks) to emit SessionMoment events at tool boundaries and important milestones. Shell‑level hooks are not used.
+- Projects may ship hook scripts under `.claude/hooks/` or equivalent per‑agent location. The devcontainer ensures these paths are available and executable.
 
 ### Caching and Host↔Guest Cache Sharing
 
 - Persistent volumes for: `/nix`, language caches (Cargo, Go, npm/pnpm/yarn, pip, maven/gradle), and compiler caches (sccache/ccache).
+- Build systems: support Bazel (`--disk_cache`, `--repository_cache`) and Buck2 (dir/HTTP cache) via mounted cache paths and project config.
 - Host↔guest sharing guidelines and test plans are defined in `docs/nix-devcontainer/cache-guidelines.md` and `test-suite.md`.
 - For Windows hosts, prefer Docker volumes over bind mounts to avoid permission/line‑ending pitfalls; on macOS/Linux, bind mounts are acceptable for read‑only config.
 
@@ -124,6 +124,7 @@ Each agent’s exact mapping is captured in `docs/agents/<tool>.md` and validate
 - Cold/warm build benchmarks with and without caches.
 - Credential probes for each agent (non‑destructive): `gh auth status`, short `curl` to model/provider endpoints when keys present.
 - Time‑travel hook smoke tests: run a few commands and verify SessionMoments are emitted.
+- Bazel/Buck2 cache smoke tests: verify host‑prewarmed cache reuse and warm speedups; gate mounts by compatibility.
 - Multi‑OS smoke tests: verify Mutagen sessions, fence latency, and `run_everywhere` execution on tagged followers.
 - Cross‑platform matrix: Linux, macOS (Docker Desktop), Windows (WSL2/Hyper‑V).
 
