@@ -44,4 +44,4 @@ AgentFS implements the necessary filesystem snapshot and per-process mounting ca
 - `AgentFS - Per-process FS mounts.md`: Detailed specification for per-process mount namespace simulation
 - `AgentFS - Snapshots and Branching.md`: Comprehensive specification for snapshot and branching functionality
 
-TODO: Prepare an implemenmtation plan for AgentFS
+Implementation Plan: See `AgentFS.status.md` for milestones, tasks, and success criteria.
