@@ -127,8 +127,8 @@ CREATE TABLE IF NOT EXISTS fs_snapshots (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   ts           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  provider     TEXT NOT NULL,                  -- zfs|btrfs|overlay|copy
-  ref          TEXT,                           -- dataset/subvolume id, overlay dir, etc.
+  provider     TEXT NOT NULL,                  -- zfs|btrfs|agentfs|git
+  ref          TEXT,                           -- dataset/subvolume id, AgentFS snapshot/branch id, git ref/commit
   path         TEXT,                           -- mount or copy path
   parent_id    INTEGER REFERENCES fs_snapshots(id) ON DELETE SET NULL,
   metadata     TEXT                            -- JSON payload

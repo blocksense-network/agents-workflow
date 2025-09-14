@@ -62,6 +62,8 @@ Shell completions are provided via the `aw shell-completion` command group. They
   - `--quiet`: Reduce output
   - `--log-level <debug|info|warn|error>`: Defaults to `info` in release builds and `debug` in debug builds.
   - `--no-color`: Automatically enabled when not running inside a TTY. Otherwise, enabled by default.
+  - `--fs-snapshots <auto|zfs|btrfs|agentfs|git|disable>`: Select snapshot strategy (default: `auto`).
+  - `--working-copy <auto|cow-overlay|worktree|in-place>`: Select how the agent’s workspace is presented (default: `auto`).
 
 ### Subcommands
 
@@ -242,22 +244,19 @@ flowchart TD
   resolve_target --> is_target_local_repository{Target is local repository?}
   prompt_select_target --> is_target_local_repository
   is_target_local_repository -->|Yes| chdir_to_repo["Change directory to selected repo"]
-  is_target_local_repository -->|No| plan_server_side_task["Plan server-side task (branch created server-side); receive task ID"]
+  is_target_local_repository -->|No| skip_local_branch_and_task_files["Skip local branch and task file creation (remote repo)"]
 
   chdir_to_repo --> are_task_files_enabled
-  plan_server_side_task --> is_follow_flag_set{--follow flag?}
-  is_follow_flag_set -->|Yes| launch_ui_focus_remote_task["Launch UI; focus on new remote task"]
-  is_follow_flag_set -->|No| return_task_id_exit["Return task ID and exit"]
 
   are_task_files_enabled -->|Yes| create_local_branch["Create local task branch (validate or feature-branch from current)"]
-  are_task_files_enabled -->|No| skip_local_branch_and_task_files["Skip local branch and task file creation"]
+  are_task_files_enabled -->|No| skip_local_branch_and_task_files
 
   create_local_branch --> collect_task_input["Collect task input (prompt, prompt-file, or editor)"]
   skip_local_branch_and_task_files --> collect_task_input
 
   collect_task_input --> is_task_content_empty{Task content empty?}
-  is_task_content_empty -->|Yes| exit_error["Exit with error"]
-  is_task_content_empty -->|No| record_task_file["Record task file (.agents/tasks) when enabled"]
+  is_task_content_empty -->|Yes| exit_abort["Abort: no task created"]
+  is_task_content_empty -->|No| record_task_file["Record task file (.agents/tasks) when enabled (local repos only)"]
 
   record_task_file --> commit_with_metadata["Commit with metadata"]
   commit_with_metadata --> should_push_now{"Push to remote now? (--yes/--push-to-remote)"}
@@ -268,11 +267,23 @@ flowchart TD
   skip_push --> proceed_to_execution
 
   proceed_to_execution --> is_remote_server_configured{remote-server configured?}
-  is_remote_server_configured -->|Yes| send_task_to_server_receive_task_id["Send task to server; receive task ID"]
-  is_remote_server_configured -->|No| local_or_cloud_execution["Local or cloud execution"]
+  is_remote_server_configured -->|Yes| plan_server_side_task["Plan server-side task; send to server; receive task ID"]
+  is_remote_server_configured -->|No| select_working_copy["Resolve working-copy mode (config/flags)"]
 
-  send_task_to_server_receive_task_id --> are_notifications_enabled
-  local_or_cloud_execution --> which_runtime{runtime}
+  select_working_copy --> select_fs_provider["Resolve fs-snapshots provider (config/flags)"]
+  select_fs_provider --> record_selection["Record selection in local DB"]
+  record_selection --> wc_in_place{working-copy = in-place?}
+  wc_in_place -->|Yes| run_in_place["Run in place; snapshots per provider (e.g., Git/ZFS)"]
+  wc_in_place -->|No| fs_snapshots_disabled{fs-snapshots = disable?}
+  fs_snapshots_disabled -->|Yes| run_in_place
+  fs_snapshots_disabled -->|No| prepare_fs_workspace["Prepare workspace (provider + working-copy mode); persist workspace_path + cleanup_token"]
+
+  plan_server_side_task --> is_follow_flag_set{--follow flag?}
+  is_follow_flag_set -->|Yes| launch_ui_focus_remote_task["Launch UI; focus on new remote task"]
+  is_follow_flag_set -->|No| return_task_id_exit["Return task ID and exit"]
+
+  run_in_place --> which_runtime{runtime}
+  prepare_fs_workspace --> which_runtime
   which_runtime -->|devcontainer| runtime_devcontainer["Run in devcontainer"]
   which_runtime -->|local| runtime_local["Run with sandbox profile"]
   which_runtime -->|disabled| runtime_nosandbox["Run without sandbox"]
@@ -291,7 +302,7 @@ flowchart TD
   monitor_until_completion --> emit_notification_if_enabled["Emit OS notification if enabled"]
   emit_notification_if_enabled --> done["Done"]
 
-  exit_error --> done
+  exit_abort --> done
   exit_interactive_required --> done
   return_task_id_exit --> done
 ```
@@ -332,7 +343,7 @@ Behavior:
 ```
 
 - Upon editor exit, the CLI MUST strip both the template block and any single leading blank line from the file, normalize `CRLF` to `LF`, and use the remaining content as the task.
-- Empty content: If, after processing, the task content is empty or consists only of whitespace, the CLI MUST abort with an "empty task" error without making changes.
+- Empty content: If, after processing, the task content is empty or consists only of whitespace, the CLI MUST abort gracefully with a clear message (no error), making no changes.
 
 **Development Environment Integration:**
 
@@ -1168,8 +1179,22 @@ Devcontainers:
 
 ### Runtime and Workspace Behavior
 
-- Snapshot selection priority: ZFS → Btrfs → OverlayFS → copy (`cp --reflink=auto` when available), per `docs/fs-snapshots/overview.md`.
+- Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See `specs/Public/FS Snapshots/FS Snapshots Overview.md`.
+- In-place runs: `--working-copy in-place` (or `working-copy = "in-place"`) executes directly on the user’s working copy. Snapshots remain available when the selected provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). If `--fs-snapshots disable` is set, snapshots are off regardless of working-copy mode.
 - Disabled sandbox local runs require explicit `--sandbox disabled` and may be disabled by admin policy.
+
+### Session Workspace Recording
+
+Before spawning the agent process (local mode), AW writes to the local state DB:
+
+- provider (zfs|btrfs|agentfs|git|disable)
+- working-copy (auto|cow-overlay|worktree|in-place) — resolved value
+- workspace_path (if prepared)
+- provider metadata (JSON): e.g., for Git, `shadowRepoPath` and `worktreesDir`; for AgentFS, branch id; for ZFS/Btrfs, dataset/subvolume identifiers
+
+Subsequent FsSnapshots are appended to `fs_snapshots` with provider/ref/path/metadata.
+
+Remote mode: the REST service records equivalent fields in its backend store; the client does not write local DB entries for remote sessions.
 - Delivery modes: PR, Branch push, Patch artifact (as in REST spec).
 
 ### IDE and Terminal Agent Integration

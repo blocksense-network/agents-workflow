@@ -2,11 +2,11 @@
 
 ### Summary
 
-Agent Time-Travel lets a user review an agent’s coding session and jump back to precise moments in time to intervene by inserting a new chat message. Seeking to a timestamp restores the corresponding filesystem state using filesystem snapshots (FsSnapshots). The feature integrates across CLI, TUI, WebUI, and REST, and builds on the snapshot provider model referenced by other docs (see `docs/fs-snapshots/overview.md`).
+Agent Time-Travel lets a user review an agent’s coding session and jump back to precise moments in time to intervene by inserting a new chat message. Seeking to a timestamp restores the corresponding filesystem state using filesystem snapshots (FsSnapshots). The feature integrates across CLI, TUI, WebUI, and REST, and builds on the snapshot provider model referenced by other docs (see `specs/Public/FS Snapshots/FS Snapshots Overview.md`).
 
 ### Implementation Phasing
 
-The initial implementation will focus on supporting regular FsSnapshot on copy-on-write (CoW) Linux filesystems (such as ZFS, Btrfs, and NILFS2), using a session recorder based on Claude Code hooks. An end-to-end prototype will be developed for the entire Agent Time-Travel system, including session recording, timeline navigation, and snapshot/seek/branch operations, to validate the core workflow and user experience. Once this prototype is functional, we will incrementally add support for additional recording and snapshotting mechanisms, including user-space overlay filesystems for macOS and Windows, and advanced recording integrations.
+The initial implementation will focus on supporting regular FsSnapshot on copy-on-write (CoW) Linux filesystems (such as ZFS and Btrfs), using a session recorder based on Claude Code hooks. An end-to-end prototype will be developed for the entire Agent Time-Travel system, including session recording, timeline navigation, and snapshot/seek/branch operations, to validate the core workflow and user experience. Once this prototype is functional, we will incrementally add support for additional recording and snapshotting mechanisms, including AgentFS (FSKit/WinFsp) on macOS/Windows and Git-based snapshots as a universal fallback.
 
 First targeted agent: Claude Code. We will leverage its hook system (see `specs/Public/3rd-Party Agents/Claude Code Hooks.md` and `specs/Public/3rd-Party Agents/Claude Code.md`) to emit `SessionMoment`s at tool boundaries (e.g., `PostToolUse`) and to capture transcript paths for resume/trim flows.
 
@@ -18,7 +18,7 @@ Testability strategy from day one:
 
 - Enable scrubbing through an agent session with exact visual terminal playback and consistent filesystem state.
 - Allow the user to pause at any moment, inspect the workspace at that time, and create a new SessionBranch with an injected instruction.
-- Provide first-class support for ZFS/Btrfs/NILFS2 where available; offer robust fallbacks on non‑CoW Linux, macOS and Windows through file system in user space CoW overlays.
+- Provide first-class support for ZFS/Btrfs and AgentFS where available; offer a robust Git-based fallback on platforms/filesystems without CoW support.
 - Expose a consistent API and UX across WebUI, TUI, and CLI.
 
 ### Non-Goals
@@ -40,7 +40,7 @@ Testability strategy from day one:
 
 - **Recorder**: Captures terminal output as an asciinema session recording (preferred) or ttyrec; emits SessionMoments at logical boundaries (e.g., per-command). The initial prototype will use a recorder based on Claude Code hooks.
 - **FsSnapshot Manager**: Creates and tracks filesystem snapshots; maintains mapping {moment → snapshotId}.
-- **Snapshot Provider Abstraction**: Chooses provider per host (ZFS → Btrfs → NILFS2 → Overlay → copy; FSKit/WinFsp overlays on macOS/Windows). See Provider Matrix below.
+- **Snapshot Provider Abstraction**: Chooses provider per host (ZFS → Btrfs → AgentFS → Git). AgentFS provides cow‑overlay (path‑stable CoW) isolation on macOS/Windows. See Provider Matrix below.
 - **SessionTimeline Service (REST)**: Lists FsSnapshots/SessionMoments, seeks, and creates SessionBranches; streams session recording events via SSE.
 - **Players (WebUI/TUI)**: Embed the session recording; render streaming SessionRecordings in real-time and allows seeking to arbitrary SessionFrames; orchestrate SessionBranch actions.
 - **Workspace Manager**: Mounts read-only snapshots for inspection and prepares writable clones/upper layers for SessionBranches.
@@ -63,19 +63,16 @@ Testability strategy from day one:
   - Linux:
     - ZFS: instantaneous snapshots and cheap writable clones (SessionBranch from snapshot via clone).
     - Btrfs: subvolume snapshots (constant-time), cheap writable snapshots for SessionBranching.
-    - NILFS2: continuous checkpoints; promote relevant checkpoints to snapshots (mkcp -s); mount past checkpoints read-only (`-o ro,cp=<cno>`).
-    - Overlay fallback: lower = base tree, upper/work on fast storage (tmpfs or RAM-backed NILFS2/zram/brd) for ephemeral SessionBranches.
+    - Git fallback: capture shadow commits with a temporary index (include untracked optional); materialize branches via `git worktree` when isolation is desired.
     - Copy fallback: `cp --reflink=auto` when possible; otherwise deep copy (last resort).
-  - macOS:
-    - User-space overlay: Use FSKit to provide a copy-on-write overlay filesystem for both inspection and SessionBranching, as APFS snapshots are not fast enough for our needs.
-  - Windows:
-    - User-space overlay: Use WinFsp to provide a copy-on-write overlay filesystem for both inspection and SessionBranching, as VSS snapshots are not fast enough for our needs.
-
+  - macOS, Windows:
+    - AgentFS (FSKit, WinFsp): Provide a user-space filesystem with native snapshots/branches for inspection and SessionBranching, with per-process cow-overlay (path-stable CoW) mounts.
+  
 - **SessionBranch Semantics**:
-  - Writable clones are native on ZFS/Btrfs. On macOS and Windows, SessionBranching is implemented via user-space overlay filesystems (FSKit/WinFsp) rather than native snapshotting.
+  - Writable clones are native on ZFS/Btrfs. On macOS and Windows, SessionBranching is implemented via AgentFS (FSKit/WinFsp) rather than native OS snapshots.
   - SessionBranches are isolated workspaces; original session remains immutable.
 
-### User‑Space Filesystem Overlay (macOS and Windows)
+### AgentFS on macOS and Windows
 
 - macOS (FSKit): Ship an FSKit filesystem extension implementing a copy‑on‑write overlay over the host filesystem. For each task, mount a per‑task overlay root and `chroot` the agent process into it to preserve original project path layout while writing to the CoW upper. This preserves build and config paths and enables efficient incremental builds.
 - Windows (WinFsp): Ship a WinFsp filesystem implementing the same CoW overlay. Mount per‑task at a stable path and map that path to a per‑process drive letter (e.g., `S:`) using per‑process device maps so the agent sees the original project path under `S:`. This provides a chroot‑like illusion on Windows.
@@ -120,8 +117,8 @@ Synchronization between terminal time and agent state:
 - When intervening at an arbitrary timestamp that is not precisely on a fence, we snap to the nearest prior `FsSnapshot` and, if needed, fast‑forward the agent session state to the chosen time by trimming (flow 2) or replaying non‑mutating interactions. We do not attempt to mutate file state beyond the chosen snapshot; instead we choose the previous snapshot to maintain filesystem and transcript coherence.
 
 Launch semantics for the new SessionBranch:
-- Workspace: Writable clone/overlay per provider semantics; original session remains immutable.
-- Process isolation: The agent process is launched bound to the SessionBranch workspace view (Linux: chroot/container; macOS: FSKit overlay; Windows: WinFsp drive mapping) as specified in AgentFS docs.
+- Workspace: Writable clone/branch/worktree per provider semantics; original session remains immutable unless working-copy=in-place.
+- Process isolation: The agent process is launched bound to the SessionBranch workspace view (Linux: chroot/container; macOS: AgentFS FSKit; Windows: AgentFS WinFsp) as specified in AgentFS docs.
 - Message injection: The REST/TUI/WebUI afford a text box for the injected message. The runner translates this into agent‑specific CLI/IPC arguments.
 
 Safety and validation:
@@ -263,10 +260,10 @@ See the `aw agent fs` [commands](./CLI.md).
 - **NILFS2**: Continuous checkpoints; promote to snapshots; mount via `cp=<cno>`; SessionBranch via overlay.
 - **APFS**: Not targeted; APFS snapshots are not fast enough for our needs. Use FSKit overlay instead.
 - **VSS**: Not targeted; VSS snapshots are not fast enough for our needs. Use WinFsp overlay instead.
-- **Overlay/Copy**: Universal fallbacks when CoW is unavailable.
+- **Git fallback**: Universal fallback when CoW is unavailable.
 
 ### Open Issues and Future Work
 
 - eBPF PTY and FS hooks for automatic, runner‑independent capture.
-- FSKit backend maturation on macOS for robust overlay SessionBranching without kexts.
+- FSKit/AgentFS backend maturation on macOS for robust SessionBranching without kexts.
 - Windows containers integration to provide stronger per‑session isolation when SessionBranching.

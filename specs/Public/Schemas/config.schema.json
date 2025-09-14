@@ -36,7 +36,12 @@
     },
     "YesNo": { "type": "boolean" },
     "Uri": { "type": "string", "format": "uri" },
-    "UiDefault": { "type": "string", "enum": ["tui", "webui"] }
+    "UiDefault": { "type": "string", "enum": ["tui", "webui"] },
+    "SnapshotProvider": {
+      "type": "string",
+      "enum": ["auto", "zfs", "btrfs", "agentfs", "git", "disable"]
+    },
+    "WorkingCopy": { "type": "string", "enum": ["auto", "cow-overlay", "worktree", "in-place"] }
   },
   "properties": {
     "ui": { "$ref": "#/$defs/UiDefault" },
@@ -123,7 +128,9 @@
       }
     },
     "logLevel": { "$ref": "#/$defs/LogLevel" },
-    "mode": { "$ref": "#/$defs/Mode" }
+    "mode": { "$ref": "#/$defs/Mode" },
+    "fs-snapshots": { "$ref": "#/$defs/SnapshotProvider" },
+    "working-copy": { "$ref": "#/$defs/WorkingCopy" }
   }
 }
 

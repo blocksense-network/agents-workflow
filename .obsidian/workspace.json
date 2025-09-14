@@ -97,12 +97,24 @@
             "id": "dccfea43a5379c8a",
             "type": "leaf",
             "state": {
-              "type": "release-notes",
+              "type": "markdown",
               "state": {
-                "currentVersion": "1.9.12"
+                "file": "specs/Public/CLI.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
               },
-              "icon": "lucide-book-up",
-              "title": "Release Notes 1.9.12"
+              "icon": "lucide-file",
+              "title": "CLI"
             }
           }
         ],
@@ -256,6 +268,17 @@
   },
   "active": "dccfea43a5379c8a",
   "lastOpenFiles": [
+    "specs/Research/Git-based Snapshots Research.md",
+    "agent-task-0.1.0.gem",
+    "test/logs/temp_output_20250914_232409.log",
+    "test/temp_test_runner_1757881449.rb",
+    "test/logs/test_run_20250914_232409.log",
+    "specs/Public/FS Snapshots/Git-based Snapshots.md",
+    "specs/Initial Developer Input/Git-snapshots.md",
+    "specs/Research/Git-based Snapshots.md",
+    "specs/Public/Repository Layout.md",
+    "specs/Public/AgentFS/AgentFS.status.md",
+    "specs/Public/Nix Devcontainer/Devcontainer Design.status.md",
     "specs/Public/Sanboxing/Local Sandboxing on Linux.status.md",
     "specs/Research/Tools/SessionFileExperiments/opencode.py",
     "specs/Research/Tools/SessionFileExperiments/list_recent.py",
@@ -263,16 +286,12 @@
     "specs/Research/Tools/SessionFileExperiments/gemini.py",
     "specs/Research/Tools/SessionFileExperiments/common.py",
     "specs/Research/Tools/SessionFileExperiments/codex.py",
-    "specs/Research/Tools/SessionFileExperiments/claude.py",
     "specs/Research/Tools/SessionFileExperiments/AGENTS.md",
-    "specs/Research/Tools/SessionFileExperiments",
-    "specs/Research/Tools",
     "specs/Research/How to use clap.md",
     "specs/Research/How to use Ratatui.md",
     "specs/Research/How to test TUI apps.md",
     "specs/Research/How to show OS notifications.md",
     "specs/Public/Workflows.md",
-    "scripts/nix-env.sh",
     "specs/Research/Intercepting Terminal IO with seccomp.md",
     "specs/Research/Intercepting Terminal IO with FsKit on macOS.md",
     "specs/Public/AgentFS/AgentFS Control Messages.md",
@@ -285,13 +304,6 @@
     "specs/Public/AgentFS/AgentFS FsKit Adapter.md",
     "specs/Public/AgentFS/AgentFS FUSE Adapter.md",
     "specs/Public/AgentFS/AgentFS Core.md",
-    "specs/Public/AgentFS/AgentFS Core Testing.md",
-    "specs/Research/CLI Best Practices.md",
-    "specs/Public/Handling AW URL Scheme.md",
-    "specs/Public/Agent Workflow GUI.md",
-    "specs/Public/3rd-Party Agents/OpenCode.md",
-    "specs/Public/3rd-Party Agents/OpenAI Codex CLI.md",
-    "specs/Public/3rd-Party Agents/Goose.md",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_tests.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_write_page_test.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_read_page_test.png",

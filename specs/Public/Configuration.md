@@ -145,6 +145,33 @@ Flags and mapping:
 - `--fleet <NAME>` selects a fleet; default is the fleet named `default`.
 - Bare `aw` uses `ui` to decide between TUI and WebUI (defaults to `tui`).
 
+### Filesystem Snapshots
+
+Control snapshotting and working‑copy strategy. Defaults are `auto`.
+
+TOML keys (top‑level):
+
+```toml
+fs-snapshots = "auto"        # auto|zfs|btrfs|agentfs|git|disable
+working-copy = "auto"        # auto|cow-overlay|worktree|in-place
+
+# Provider‑specific (optional; may be organized under a [snapshots] section in the future)
+# git.includeUntracked = false
+# git.worktreesDir = "/var/tmp/aw-worktrees"
+# git.shadowRepoDir = "/var/cache/aw/shadow-repos"
+```
+
+Flag and ENV mapping:
+
+- Flags: `--fs-snapshots`, `--working-copy`
+- ENV: `AGENTS_WORKFLOW_FS_SNAPSHOTS`, `AGENTS_WORKFLOW_WORKING_COPY`
+
+Behavior:
+
+- `auto` selects the highest‑score provider for the repo and platform. Users can pin to `git` (or any provider) even if CoW is available.
+- `cow-overlay` requests isolation at the original repo path (Linux: namespaces/binds; macOS/Windows: AgentFS). When impossible, the system falls back to `worktree` with a diagnostic.
+- `in-place` runs the agent directly on the original working copy. Isolation is disabled, but FsSnapshots may still be available when the chosen provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). Use `fs-snapshots = "disable"` to turn snapshots off entirely.
+
 ### Example TOML (partial)
 
 ```toml
