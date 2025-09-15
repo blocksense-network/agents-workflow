@@ -102,9 +102,14 @@ OPTIONS:
   --push-to-remote <BOOL>            Automatically push to remote
   --dev-shell <NAME>                 Development shell name
   --create-task-files <yes|no>       Control creation of local task files (default: yes)
+  --create-metadata-commits <yes|no> Control creation of metadata-only commits when task files are disabled (default: yes; implied yes when task files are enabled)
   --notifications <yes|no>          Enable/disable OS notifications on task completion (default: yes)
   --follow                           Launch TUI/WebUI (according to `ui` config) and focus on monitoring the newly created task
 ```
+
+Notes:
+
+- Alias: `--crate-metadata-commits` is accepted as a synonym for `--create-metadata-commits` for convenience.
 
 #### Multiple Agent Support
 
@@ -226,11 +231,13 @@ The `aw task` command preserves and extends the core functionality of the existi
 - **Repository Validation**: Validates repository state and VCS type detection
 - **Branch Name Validation**: Enforces VCS-specific branch naming rules
 - **Cleanup on Failure**: Ensures proper cleanup of partial operations
+ - **Interactive abort affordance (TUI)**: During interactive prompts (for example, “Prompt user to select repo/workspace and target branch”), the TUI footer shows a dynamic list of context-sensitive shortcuts. When a prompt is active, it MUST include “Esc Back” and “Ctrl+C Abort” to indicate safe navigation and abort; on the dashboard (no modal/prompt), it MUST include “Ctrl+C Ctrl+C Quit”. Shortcuts are displayed only when actionable.
 
 Flow (high‑level):
 
 ```mermaid
 flowchart TD
+  %% High-level Task Creation Flow with explicit assignments and subgraphs
   start_aw_task["Start: aw task invoked"] --> are_we_inside_repo{Inside VCS repository?}
 
   are_we_inside_repo -->|Yes| are_task_files_enabled{create-task-files enabled?}
@@ -239,7 +246,7 @@ flowchart TD
   are_repo_or_workspace_provided -->|Yes| resolve_target["Resolve repository/workspace target"]
   are_repo_or_workspace_provided -->|No| are_we_in_non_interactive_mode{--non-interactive?}
   are_we_in_non_interactive_mode -->|Yes| exit_interactive_required["Exit (code 10): interactive selection required"]
-  are_we_in_non_interactive_mode -->|No| prompt_select_target["Prompt user to select repo/workspace and target branch"]
+  are_we_in_non_interactive_mode -->|No| prompt_select_target["Prompt user to select repo/workspace and target branch\n(footer: Esc Back, Ctrl+C Abort)"]
 
   resolve_target --> is_target_local_repository{Target is local repository?}
   prompt_select_target --> is_target_local_repository
@@ -256,34 +263,55 @@ flowchart TD
 
   collect_task_input --> is_task_content_empty{Task content empty?}
   is_task_content_empty -->|Yes| exit_abort["Abort: no task created"]
-  is_task_content_empty -->|No| record_task_file["Record task file (.agents/tasks) when enabled (local repos only)"]
+  is_task_content_empty -->|No| record_or_commit["If task files enabled: record task file;\nelse if create-metadata-commits: create metadata-only commit"]
 
-  record_task_file --> commit_with_metadata["Commit with metadata"]
-  commit_with_metadata --> should_push_now{"Push to remote now? (--yes/--push-to-remote)"}
+  record_or_commit --> should_push_now{"Push to remote now? (--yes/--push-to-remote)"}
   should_push_now -->|Yes| push_branch["Push branch"]
   should_push_now -->|No| skip_push["Skip push"]
 
   push_branch --> proceed_to_execution["Proceed to execution"]
   skip_push --> proceed_to_execution
 
-  proceed_to_execution --> is_remote_server_configured{remote-server configured?}
-  is_remote_server_configured -->|Yes| plan_server_side_task["Plan server-side task; send to server; receive task ID"]
-  is_remote_server_configured -->|No| select_working_copy["Resolve working-copy mode (config/flags)"]
+  %% Fleet orchestration entry: a fleet can mix local and remote members
+  proceed_to_execution --> is_fleet_configured{fleet specified?}
+  is_fleet_configured -->|Yes| expand_fleet["Expand fleet (resolve members and roles)"]
+  is_fleet_configured -->|No| single_member["Single-member session"]
 
-  select_working_copy --> select_fs_provider["Resolve fs-snapshots provider (config/flags)"]
-  select_fs_provider --> record_selection["Record selection in local DB"]
-  record_selection --> wc_in_place{working-copy = in-place?}
-  wc_in_place -->|Yes| run_in_place["Run in place; snapshots per provider (e.g., Git/ZFS)"]
-  wc_in_place -->|No| fs_snapshots_disabled{fs-snapshots = disable?}
-  fs_snapshots_disabled -->|Yes| run_in_place
-  fs_snapshots_disabled -->|No| prepare_fs_workspace["Prepare workspace (provider + working-copy mode); persist workspace_path + cleanup_token"]
+  %% Handle single-member path using the same subgraphs
+  single_member --> is_remote_server_configured{remote-server configured?}
+  expand_fleet --> fanout_local_remote["For each member: route by location"]
+  fanout_local_remote --> is_member_remote{member is remote?}
+  is_member_remote -->|Yes| plan_server_side_task["Plan server-side task; send to server; receive task ID"]
+  is_member_remote -->|No| select_working_copy
+  single_member --> is_remote_server_configured
+  is_remote_server_configured -->|Yes| plan_server_side_task
+  is_remote_server_configured -->|No| select_working_copy
+
+  %% Local execution subgraph with explicit assignments
+  subgraph Local_Execution_Path [Local Execution Path]
+    select_working_copy["working_copy := resolve(config/flags)"] --> select_fs_provider["fs_snapshots := resolve(config/flags)"]
+    select_fs_provider --> record_selection["Record selection in local DB"]
+    record_selection --> wc_in_place{working_copy == in-place?}
+
+    %% In-place: snapshots may still be enabled
+    wc_in_place -->|Yes| in_place_snapshots_disabled{fs_snapshots == disable?}
+    in_place_snapshots_disabled -->|Yes| run_in_place_no_snaps["Run in-place; snapshots disabled"]
+    in_place_snapshots_disabled -->|No| run_in_place_with_snaps["Run in-place; capture snapshots per provider (Git/ZFS/Btrfs/AgentFS)"]
+
+    %% Not in-place: workspace preparation may depend on snapshots
+    wc_in_place -->|No| not_in_place_snaps_disabled{fs_snapshots == disable?}
+    not_in_place_snaps_disabled -->|Yes| prepare_wc_only["Prepare workspace (working_copy only); persist workspace_path + cleanup_token"]
+    not_in_place_snaps_disabled -->|No| prepare_fs_workspace["Prepare workspace (provider + working_copy); persist workspace_path + cleanup_token"]
+  end
 
   plan_server_side_task --> is_follow_flag_set{--follow flag?}
   is_follow_flag_set -->|Yes| launch_ui_focus_remote_task["Launch UI; focus on new remote task"]
   is_follow_flag_set -->|No| return_task_id_exit["Return task ID and exit"]
 
-  run_in_place --> which_runtime{runtime}
+  run_in_place_no_snaps --> which_runtime{runtime}
+  run_in_place_with_snaps --> which_runtime
   prepare_fs_workspace --> which_runtime
+  prepare_wc_only --> which_runtime
   which_runtime -->|devcontainer| runtime_devcontainer["Run in devcontainer"]
   which_runtime -->|local| runtime_local["Run with sandbox profile"]
   which_runtime -->|disabled| runtime_nosandbox["Run without sandbox"]
@@ -327,6 +355,7 @@ Behavior:
   - `Dev-Shell: <name>` (only when `--devshell` is provided)
 
 - `--create-task-files <yes|no>`: When `no`, the CLI MUST skip local branch and task file creation entirely and proceed with cloud/remote automation paths (server‑side branch creation). When `yes` (default), the CLI MUST perform local branch and task file creation as specified.
+- `--create-metadata-commits <yes|no>`: Controls whether to create metadata-only commits when task files are disabled. Defaults to `yes`. When `--create-task-files yes`, this option is implied `yes` and cannot be turned off for the initial task commit (the commit carries task metadata alongside the task file changes). When `--create-task-files no` and `--create-metadata-commits no`, the CLI MUST avoid creating any local commits prior to execution.
 
 **Input Handling:**
 
@@ -377,12 +406,16 @@ Push to default remote? [Y/n]:
 - Snapshot strategy (local): Prefer ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`).
 - Runtimes: `devcontainer`, `local` (sandbox profile), `disabled` (policy‑gated).
 - Multi‑OS fleets: Snapshots are taken on the leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md).
+- Fleet resolution and orchestration: When `--fleet` is provided (or a default fleet is defined in config), the client expands the fleet into members and orchestrates both local and remote execution:
+  - Local members: The client creates one or more local executions, potentially combining a local sandbox and local VMs, applying the selected sandbox profile to each member.
+  - Remote members: The client issues the appropriate remote‑server requests per member (respecting per‑member server selection) and monitors returned `taskId`s.
+  - Coordination: The client emits/consumes events required by the multi‑OS flow (leader FsSnapshot, sync‑fence, run‑everywhere), as specified in [Multi-OS Testing](Multi-OS%20Testing.md).
 - State: The CLI MUST persist session/task state in the local SQLite database.
 - Outside a repo (remote/cloud targeting): Branch creation and task recording MUST occur server/cloud‑side; the CLI MUST return/display the `taskId`.
 
 **Advanced Features:**
 
-- Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name.
+- Fleet resolution: When `--fleet` is provided (or a default fleet is defined in config), AW expands the fleet into one or more members. For local members, it applies the referenced sandbox profile; for `remote` members, it targets the specified server URL/name. See also the orchestration details above.
 - Browser automation: When `--browser-automation true` (default), launches site-specific browser automation (e.g., Codex) using the selected agent browser profile. When `false`, web automation is skipped
 - Browser automation modes: with local branch/task file creation (default) or server/cloud-only mode when `--create-task-files no`
 - Codex integration: If `--browser-profile` is not specified, discovers or creates a ChatGPT profile per [Codex browser automation](Browser%20Automation/Codex.md), optionally filtered by `--chatgpt-username`. Workspace is taken from `--codex-workspace` or config; branch is taken from `--branch`.
@@ -1188,7 +1221,13 @@ Devcontainers:
 ### Runtime and Workspace Behavior
 
 - Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See `specs/Public/FS Snapshots/FS Snapshots Overview.md`.
-- In-place runs: `--working-copy in-place` (or `working-copy = "in-place"`) executes directly on the user’s working copy. Snapshots remain available when the selected provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). If `--fs-snapshots disable` is set, snapshots are off regardless of working-copy mode.
+- In-place runs: `--working-copy in-place` (or `working-copy = "in-place"`) executes directly on the user’s working copy. Snapshots remain available when the selected provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). If `--fs-snapshots disable` is set, snapshots are off regardless of working-copy mode. The updated flow above reflects that `fs-snapshots` can still be enabled in in‑place mode.
+
+Commit step details:
+
+- If `create-task-files == yes`: write task file, then create a commit that includes the task file changes and standardized metadata lines.
+- If `create-task-files == no` and `create-metadata-commits == yes`: create a metadata-only commit (no task file) on the selected branch; this preserves auditability while keeping the workspace clean.
+- If both are disabled for commits: skip the commit step entirely.
 - Disabled sandbox local runs require explicit `--sandbox disabled` and may be disabled by admin policy.
 
 ### Session Workspace Recording

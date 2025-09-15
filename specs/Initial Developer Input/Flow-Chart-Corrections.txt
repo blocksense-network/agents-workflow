@@ -1,0 +1,2 @@
+1) From the "Prompt user to select repo/workspace and target branch", the user should be able to easily abort. Specify that the TUI should show a dynamic list of short cuts at the bottom that suggests that pressing Ctrl+C is a safe way to quit (it would be active at this particular point in time)
+

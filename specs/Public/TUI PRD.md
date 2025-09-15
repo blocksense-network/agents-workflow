@@ -24,6 +24,11 @@ The main TUI dashboard focuses on quick launch:
 - Bottom area: task description editor (multiline input) with resizable height.
 - A single Start action (hotkey + button) to launch the task, which creates a new multiplexer window immediately.
 
+Footer (dynamic shortcuts):
+
+- A single-line footer shows context-sensitive shortcuts relevant to the current screen or prompt.
+- While an interactive prompt is active (e.g., repository/workspace/branch selection), the footer MUST include “Esc Back” and “Ctrl+C Abort” to signal safe navigation and abort of the current action; on the dashboard (no modal/prompt), it MUST include “Ctrl+C Ctrl+C Quit”. Shortcuts only appear when actionable.
+
 ### Selectors and Filtering
 
 - Fixed-height list widgets for Project, Branch, and Agent.
@@ -47,6 +52,9 @@ The main TUI dashboard focuses on quick launch:
 - Ctrl+Up/Down: resize the description editor.
 - Enter in Description with modifier (e.g., Ctrl+Enter): Start task.
 - F1: Help overlay with keymap.
+- Esc: Go back to the previous window/view.
+- Ctrl+C: Abort the current prompt/action (safe abort), stay in TUI.
+- Ctrl+C (twice): Quit the TUI altogether from the dashboard or when no modal is active.
 
 ### Error Handling and Status
 
