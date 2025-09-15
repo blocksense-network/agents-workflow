@@ -44,6 +44,8 @@ agents-workflow/
 │  ├─ aw-cli/                  # Bin: `aw` (Clap subcommands; TUI glue)
 │  ├─ aw-tui/                  # TUI widgets/flows (Ratatui)
 │  ├─ aw-core/                 # Task/session lifecycle orchestration
+│  ├─ aw-mux-core/             # Low-level, AW-agnostic multiplexer trait + shared types
+│  ├─ aw-mux/                  # Monolith crate: AW adapter + all backends as feature-gated modules
 │  ├─ aw-config/               # Layered config + flag mapping
 │  ├─ aw-state/                # Local state (SQLite models, migrations)
 │  ├─ aw-repo/                 # VCS operations (Git/Hg/Bzr/Fossil)
@@ -85,6 +87,38 @@ agents-workflow/
 - CLI/TUI: `aw-cli`, `aw-tui`, `aw-core`, `aw-config`, `aw-state`, `aw-repo`, `aw-workflows`, `aw-rest-client`, `aw-notify`, `aw-fleet`, `aw-agent-runner`, `aw-schemas`.
 - AgentFS: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`.
 - Sandbox (Local profile): `sandbox-core`, `sandbox-fs`, `sandbox-seccomp`, `sandbox-cgroups`, `sandbox-net`, `sandbox-proto`, `sbx-helper`.
+
+### Multiplexer crates structure
+
+We adopt a monolith + facades strategy to reduce compile times while preserving optional tiny crates:
+
+- `aw-mux-core` — low‑level AW‑agnostic trait and shared types (no OS bindings).
+- `aw-mux` (monolith) — contains the high‑level AW adapter and all concrete backends as modules gated by cargo features (e.g., `tmux`, `wezterm`, `kitty`, `iterm2`, `tilix`, `winterm`, `vim`, `emacs`). Only requested features are compiled.
+- Optional facade crates (tiny re‑exports) to keep per‑backend packages when desired:
+  - `aw-mux-tmux` depends on `aw-mux` with `features=["tmux"]` and `default-features=false`, then `pub use aw_mux::tmux::*;`
+  - Same for `aw-mux-wezterm`, `aw-mux-kitty`, …
+
+Usage
+
+- Apps can depend directly on `aw-mux` and request the union of backends they need, compiling the monolith once.
+- Or depend on multiple facades; cargo feature unification compiles `aw-mux` once with the union of features.
+
+Why this helps
+
+- One heavy compilation unit: all codegen happens in `aw-mux` once, even if multiple backends are used together.
+- Keep or publish tiny crates: facades compile in milliseconds and maintain package boundaries.
+- Flexible consumption: choose single‑dep monolith or per‑backend facades without N× compile cost.
+
+Gotchas
+
+- Visibility changes: code moved under `aw-mux` modules; adjust `pub(crate)`/paths accordingly.
+- Proc‑macro crates cannot be merged; not applicable here.
+- Tests/examples may need to move into `aw-mux/tests/` or remain in facades if they rely on crate boundaries.
+
+Extra compile‑time wins
+
+- Unify dependency versions/features across the workspace (consider a workspace‑hack crate).
+- Use sccache/`RUSTC_WRAPPER` and check `CARGO_BUILD_TIMINGS` to validate improvements.
 
 See `CLI.md` for command surface and `Sandbox Profiles.md` for isolation profiles and behavior.
 

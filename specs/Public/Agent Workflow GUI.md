@@ -21,9 +21,9 @@ The Agent Workflow GUI (AW GUI) is a cross-platform Electron application that pr
 
 ### Custom URL Scheme Handler
 
-- Registers `agents-workflow://` protocol on installation
-- Routes incoming URLs to appropriate WebUI pages
-- Handles URL scheme conflicts and fallbacks
+- Registers `agents-workflow://` protocol on installation and acts as the preferred handler when the GUI is present. Headless systems use the standalone AW URL Handler binary.
+- Routes incoming URLs to appropriate WebUI pages or delegates to an existing GUI window via IPC to reuse the window/tab instead of spawning a new one.
+- Handles URL scheme conflicts and fallbacks.
 
 ### Native OS Integration
 
@@ -180,4 +180,4 @@ This specification focuses on GUI-specific concerns and delegates to:
 - **[WebUI PRD.md](WebUI%20PRD.md)**: All WebUI functionality and user interface details
 - **[Configuration.md](../Initial%20Developer%20Input/Configuration.md)**: Configuration system and file formats
 - **[CLI.md](CLI.md)**: CLI command specifications and behavior
-- **[Handling AW URL Scheme.md](Handling%20AW%20URL%20Scheme.md)**: URL scheme implementation details
+  - **[Handling AW URL Scheme.md](Handling%20AW%20URL%20Scheme.md)**: URL scheme desired behavior. See the `.status.md` sibling for milestones and tests.

@@ -1,6 +1,6 @@
 # Handling `agents-workflow://` URL Scheme
 
-Developer guide for implementing a cross‑platform custom URL handler that launches a small utility (the **AW URL Handler**) to route `agents-workflow://...` links into your app’s local **AW WebUI** and task database.
+Desired behavior and UX contract for a cross‑platform custom URL handler that launches a small utility (the **AW URL Handler**) to route `agents-workflow://...` links into the local **AW WebUI** and task database.
 
 > Target OSes: **Windows**, **macOS**, **Linux**
 
@@ -158,13 +158,13 @@ To open a URL in the default browser from your handler, execute `xdg-open "http:
 
 # Handling task URLs
 
-The `agents-workflow://` scheme transports task intents into the local AW system. The **AW URL Handler** performs four jobs: **validate → normalize → ensure WebUI → open**.
+The `agents-workflow://` scheme transports task intents into the local AW system. The **AW URL Handler** performs four jobs: **validate → normalize → ensure WebUI → open**. This document specifies the required behavior; implementation plans and status tracking live in a sibling `.status.md` file.
 
-## URL shapes
+## URL shapes (required)
 
 - `agents-workflow://task/<id>` → Open task result page for ID
 - `agents-workflow://task/<id>?tui=1` → Also launch the TUI follow view
-- `agents-workflow://create?spec=…` → (optional) Create & queue task from a spec payload
+- `agents-workflow://create?spec=…` → (optional) Create & queue task from a spec payload, subject to the confirmation policy below.
 
 All URLs should be purely declarative; don’t embed secrets. Reject unknown hosts/components.
 
@@ -289,3 +289,133 @@ xdg-open "http://127.0.0.1:8787/tasks/1234" >/dev/null 2>&1 &
 - Make the handler idempotent (re‑entry on already‑running tasks should just focus the page).
 
 TODO: Prepare an implementation plan for the custom URL handling executable.
+
+## Required Behaviors and Constraints
+
+### Scope and Goals
+
+- Provide a tiny, updateable native executable that is the OS‑registered handler for `agents-workflow://…` links.
+- Responsibilities: validate → normalize → ensure WebUI/TUI → open/focus. Avoid business logic; delegate to AW CLI/WebUI/REST.
+- Must work without elevation and respect per‑user registration where possible.
+
+### URL Forms and Validation
+
+- Supported forms:
+  - `agents-workflow://task/<id>` → open WebUI task page
+  - `agents-workflow://task/<id>?tui=1` → open WebUI task page and also launch TUI follow view
+  - `agents-workflow://create?spec=<payload>` → optional fast path to create and queue a task from a payload
+- Validation:
+  - `<id>` MUST be `^[A-Za-z0-9_-]{6,128}$` (ULID/UUID/slug subset). Reject otherwise.
+  - Reject unknown hosts and extra path segments.
+  - For `spec`, accept percent‑encoded UTF‑8 text. Do not require secrets; reject payloads over 256KB.
+
+### Configuration and Defaults
+
+- Read AW layered config (see `Configuration.md`): `${configDirs}/agents-workflow/config.toml`.
+- Keys used:
+  - `ui`: default UI (`tui` or `webui`) when needing an auxiliary view.
+  - `remote-server`: when set, prefer REST paths; otherwise local SQLite paths.
+  - `service-base-url`: when running a persistent WebUI at a fixed origin (enterprise). In local mode, default to `http://127.0.0.1:<port>`.
+- Local defaults (align with `CLI.md` examples): WebUI `127.0.0.1:8080`, REST `127.0.0.1:8081` unless overridden.
+
+### Discovery and Startup Strategy
+
+1. Resolve target WebUI URL
+   - If `service-base-url` is an HTTP(S) origin, compute WebUI base from it (documented enterprise mode).
+   - Otherwise, discover local WebUI:
+     - Check AW GUI IPC (if present) for current WebUI URL.
+     - Check PID/state file: `${cacheDir}/agents-workflow/webui.json` with `{ pid, url, startedAt }`.
+     - Probe candidates `http://127.0.0.1:8080` (and any configured port) for an `/_aw/healthz` endpoint (served by WebUI process).
+
+2. Ensure WebUI is running
+   - If no responsive WebUI is found, start it using the CLI:
+     - `aw webui --local --port <port> --rest http://127.0.0.1:8081`
+     - Wait up to 5s (configurable) for `/_aw/healthz` to respond 200.
+   - If REST is required by the WebUI and is not responding at the configured URL, optionally start it:
+     - `aw serve rest --local --port 8081` (non‑interactive, background) and wait for `/api/v1/readyz`.
+   - If AW GUI is installed, prefer delegating “ensure WebUI” to the GUI via IPC; otherwise fall back to CLI.
+
+3. Optional task existence check (best‑effort)
+   - If URL is `task/<id>` and REST is reachable, attempt `GET /api/v1/sessions/<id>`:
+     - On 200: proceed to open.
+     - On 404/Network error: still open the WebUI route; the UI will render a Not Found banner.
+
+### Action Mapping per URL
+
+- `task/<id>`:
+  - Ensure WebUI is running.
+  - Open default browser to `${webuiBase}/tasks/<id>`.
+  - If an Electron shell (AW GUI) is hosting the WebUI, prefer delegating focus and navigation via IPC to the GUI main process so the existing window/tab is reused; else open in the OS default browser.
+
+- `task/<id>?tui=1`:
+  - Perform the same as `task/<id>`.
+  - If a TUI session is already tracking this task, prefer reusing that exact terminal window instead of launching a new one (see “TUI Window Reuse” below).
+  - Otherwise start: `aw tui --follow <id>` (non‑blocking). Multiplexer selection from config or default.
+
+- `create?spec=<payload>` (optional capability):
+  - MUST enforce a user confirmation dialog before any task creation (see “Create Flow Confirmation” below).
+  - If `remote-server` is set: try `POST /api/v1/tasks` with the payload; on success, get an `id` and open `${webuiBase}/tasks/<id>`.
+  - Otherwise (local mode): write the payload to a temp file and run `aw task --prompt-file <file> --non-interactive`. On success, parse the emitted `taskId` and open WebUI to its page.
+  - If the user cancels or creation fails, open `${webuiBase}/create` with prefill via local handoff (see “Security and Hand‑Off”) or show an error toast.
+
+### Security and Hand‑Off
+
+- Never include secrets in query strings. For `create` hand‑off, prefer one of:
+  - Local hand‑off file: `${cacheDir}/agents-workflow/inbox/<random>.json` referenced as `${webuiBase}/create?inbox=<random>`; the WebUI reads and deletes locally via a small helper endpoint hosted by the WebUI process.
+  - Or, when REST is available, POST the spec and navigate to the created task.
+- Bind all local HTTP servers to `127.0.0.1` only (see WebUI Local Mode in `WebUI PRD.md`).
+- Use short timeouts and idempotent restarts. Avoid privilege elevation.
+
+#### Create Flow Confirmation (required)
+
+- Rationale: Clicking a custom URL from an arbitrary website must not lead to silent local code execution.
+- Policy: For any `agents-workflow://create?...` invocation, the handler MUST present a native confirmation dialog owned by the handler process, even if the browser already displayed an external‑protocol confirmation.
+- Dialog content (minimum):
+  - Title: “Create Agents‑Workflow Task?”
+  - Source context: browser name (when detectable) and referring host (if provided), otherwise “unknown source”.
+  - Precise action summary: the prompt title or first 120 chars; agent type; where it will run (local or remote server hostname); snapshot mode; network policy; and whether files, repos, or credentials will be accessed.
+  - Buttons: “Create Task” (default) and “Cancel”.
+  - A checkbox: “Always require confirmation for task creation” (default ON) and an optional per‑source trust rule (“Trust this site for 1 hour”), stored in the handler’s local trust store. Global policy toggles live in `Configuration.md`.
+- Behavior:
+  - If the user cancels, NO task is created and the dialog closes.
+  - If confirmed, proceed with the creation flow (REST or local CLI), then navigate to the created task page.
+  - The dialog MUST NOT render arbitrary HTML from the payload; only render safe, escaped summaries.
+
+### TUI Window Reuse (required)
+
+When the URL includes `tui=1` or when the user’s preference indicates a TUI‑first workflow, the handler should prefer showing the task in an existing terminal window that is already following the task, instead of launching a new TUI instance.
+
+Mechanism:
+
+- The TUI maintains a small control socket and index file, e.g., `${XDG_RUNTIME_DIR:-/tmp}/agents-workflow/tui.sock` and `${STATE_DIR}/tui-sessions.json`, mapping `taskId → { mux: tmux|wezterm|kitty, windowId/paneId, terminal: appId, hintTitle }`.
+- The handler queries the socket or reads the index to determine whether a live session exists for the given task id.
+- If present:
+  - For `tmux`: run `tmux select-window -t <windowId>` and `tmux select-pane -t <paneId>`.
+  - For WezTerm: invoke `wezterm cli activate --window-id <id>` (if enabled) and `wezterm cli activate-pane --pane-id <id>`.
+  - For Kitty: use `kitty @ focus-window --match title:<hintTitle>`.
+  - On macOS, if necessary, bring the terminal app to front via AppleScript/JXA using the recorded `appId`/window title.
+  - On Windows, use the Windows Terminal `wt.exe` commandline or the ConPTY host API (when available) to activate the window; otherwise fall back to opening WebUI.
+- If not present: start `aw tui --follow <id>` in the preferred multiplexer/terminal from config.
+- The handler SHOULD avoid stealing focus when a browser tab is in fullscreen unless the OS allows safe attention requests (bounce dock/taskbar or flash window).
+
+### OS Integrations (registration kept minimal)
+
+- Windows: HKCU registration (see registry snippet above). Binary path points to `aw-url-handler.exe`.
+- macOS: `CFBundleURLTypes` for the helper bundle or register via Electron (`open-url` event). Binary: `AW URL Handler.app` or a CLI shim. When AW GUI is installed, the GUI registers as the protocol handler and proxies URL handling to its main process.
+- Linux: `.desktop` with `MimeType=x-scheme-handler/agents-workflow` pointing to `aw-url-handler %u`.
+
+### Packaging and Update Strategy
+
+- Build a single small Rust binary (`aw-url-handler`) per platform with static runtime. Keep startup under 50ms.
+- Ship as part of AW GUI and as a standalone package. On GUI installs, the GUI registers itself as protocol handler and proxies to the same flow via IPC.
+- Provide a feature flag to prefer GUI IPC when present: the handler immediately forwards the deep link to the GUI and exits.
+
+### Telemetry and Logging
+
+- Write minimal rotating logs to `${cacheDir}/agents-workflow/logs/url-handler.log` with:
+  - timestamp, URL, action taken, durations, and errors (no secrets).
+- On user‑visible failures, show OS notification with an actionable message and a button to open troubleshooting docs.
+
+<!-- Testing strategy has been moved to the sibling .status.md file for this spec. -->
+
+<!-- Milestones and success criteria are tracked in the .status.md file. -->
