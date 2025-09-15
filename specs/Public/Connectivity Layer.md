@@ -15,18 +15,14 @@ Key properties:
 - **Leader**: The primary workspace host (Linux preferred) that owns FsSnapshots and initiates fences and run‑everywhere.
 - **Followers**: Secondary hosts (Windows/macOS/Linux) that execute commands and validate builds/tests.
 
-### Recommended Options
+### Recommended Options (preferred first)
 
-- Tailscale (default)
-  - WireGuard‑based mesh with automatic NAT traversal, MagicDNS, device tags/ACLs, and optional Tailscale SSH.
-  - Simple SSO onboarding across OS’s. Suitable for parallel tasks because a single daemon/TUN per host serves all sessions.
-  - Userspace mode for locked‑down containers: `tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:1055` and route SSH/Mutagen via the SOCKS proxy.
-  - Self‑hosted control plane: Headscale.
-
-  - Ephemeral nodes for short‑lived sessions:
-    - Use ephemeral auth keys (or `--state=mem:`) so devices auto‑remove shortly after going offline; they receive a fresh IP each time.
-    - Immediate cleanup: call `tailscale logout` on teardown.
-    - Scope access via ACL tags (e.g., `tag:session-<id>` ↔ `tag:session-<id>` only).
+- Tailscale or NetBird (preferred; feature‑comparable, easy multi‑OS)
+  - Both provide WireGuard‑based overlays with automatic NAT traversal.
+  - Central policy with device/user identities, ACLs/tags, and MagicDNS‑style naming.
+  - Ephemeral/short‑lived peers supported (auth keys or setup keys) for per‑session isolation and automatic cleanup.
+  - Userspace/TUN‑less modes available for locked‑down containers with a local SOCKS5 proxy route for SSH/Mutagen.
+  - Self‑hosted control planes: Headscale (Tailscale) and NetBird Management Server.
 
 - ZeroTier (good alternative)
   - L2/L3 virtual network with NAT traversal and central controller. Easy multi‑OS setup.

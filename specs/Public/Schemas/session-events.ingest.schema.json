@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agents-workflow.example/schemas/session-events.ingest.schema.json",
+  "title": "Session Events Ingest (Batch or NDJSON)",
+  "oneOf": [
+    {
+      "title": "Batch JSON array",
+      "type": "array",
+      "items": { "$ref": "session-events.schema.json" },
+      "minItems": 1
+    },
+    {
+      "title": "Single JSON event (streaming)",
+      "$ref": "session-events.schema.json"
+    }
+  ]
+}
+

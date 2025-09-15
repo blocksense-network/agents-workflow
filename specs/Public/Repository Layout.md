@@ -47,6 +47,7 @@ agents-workflow/
 │  ├─ aw-config/               # Layered config + flag mapping
 │  ├─ aw-state/                # Local state (SQLite models, migrations)
 │  ├─ aw-repo/                 # VCS operations (Git/Hg/Bzr/Fossil)
+│  ├─ aw-rest-api-contract/    # Schema types, input validation, etc (also used by mock servers)
 │  ├─ aw-rest-client/          # Client for remote REST mode
 │  ├─ aw-rest-server/          # Optional local REST service (lib + bin)
 │  ├─ aw-connectivity/         # SSH, relays, followers, rendezvous
@@ -97,6 +98,7 @@ The following existing setup scripts remain at the repository root to preserve c
 - `goose-setup`
 
 Notes:
+
 - These scripts are considered external helpers and may call into Rust binaries as migration proceeds.
 - Additional provider scripts (if added later) should also live at the repository root for consistency.
 
@@ -110,5 +112,3 @@ Notes:
 
 - Unit tests live within each crate; cross‑crate tests in `tests/` mirror acceptance plans in AgentFS and CLI specs.
 - CI fans out per crate (build/test/lint) and runs privileged lanes only where necessary (FUSE/WinFsp/FSKit).
-
-

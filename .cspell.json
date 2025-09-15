@@ -364,6 +364,21 @@
     "ZDOTDIR",
     "zellij",
     "zram",
-    "pyproject"
+    "pyproject",
+    "netem",
+    "backpressure",
+    "seedable",
+    "wezterm",
+    "uiautomation",
+    "dogtail",
+    "ydotool",
+    "rpath",
+    "cfgs",
+    "runbooks",
+    "manpages",
+    "worktree",
+    "AUTOCONFIRM",
+    "NetBird",
+    "ndjson"
   ]
 }

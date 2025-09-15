@@ -95,17 +95,60 @@ run-everywhere --tag os=windows -- build
 run-everywhere --host win-12 -- lint
 ```
 
-### REST Extensions (high‑level)
+### REST Observability (control‑plane)
 
-- `GET /api/v1/followers` → list configured followers (host, os, tags, status).
-- `POST /api/v1/followers/sync-fence` → perform sync fence; returns states per follower.
-- `POST /api/v1/run-everywhere` → body: { command, args, selectors }; streams per‑host logs via SSE.
+- `GET /api/v1/followers` → list followers as seen by the server (populated from leader‑ingested `followersCatalog` events or configured inventories).
+- `POST /api/v1/sessions/{id}/events/ingest` → leader pushes `fence*` and `host*` events for UI/automation; server rebroadcasts via the session SSE stream.
 
 ### CLI Additions (high‑level)
 
 - `aw agent followers list` — show followers and status.
 - `aw agent followers sync-fence [--timeout s] [--tag ... | --host ... | --all]`
 - `aw agent run-everywhere <action> [args...] [--tag ... | --host ... | --all]`
+
+Notes:
+
+- These `aw agent` commands execute on the leader and fan out over SSH to followers. They are used by agents for testing during a session and by humans/CI for manual/automated verification.
+
+### Execution Flow (diagrams)
+
+Execution (agent‑driven, SSH data plane)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant A as Agent (on Leader)
+  participant L as Leader (Linux)
+  participant M as Mutagen
+  participant Fw as Followers (macOS/Windows/Linux)
+
+  Note over A,L: Step begins → snapshot
+  A->>L: fs_snapshot_and_sync()  (implicit sync-fence)
+  L->>M: Create FsSnapshot; fence leader→followers
+  M->>Fw: Sync leader→followers (one-way)
+  M-->>L: Fence result { per-host }
+
+  A->>L: run-everywhere <cmd> [selectors]
+  L->>Fw: SSH cd <mapped path>; run <cmd>
+  Fw-->>L: stdout/stderr + exit codes
+```
+
+Event ingestion to REST (for UI/CI)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant L as Leader
+  participant S as REST Service
+  participant UI as WebUI/TUI
+
+  L->>S: POST /sessions/{id}/events/ingest followersCatalog
+  L->>S: POST /sessions/{id}/events/ingest fenceStarted
+  L->>S: POST /sessions/{id}/events/ingest fenceResult
+  L->>S: POST /sessions/{id}/events/ingest hostStarted/hostLog/hostExited
+  L->>S: POST /sessions/{id}/events/ingest summary
+  S-->>UI: SSE /sessions/{id}/events (timeline)
+```
 
 ### Time‑Travel Integration
 
@@ -133,6 +176,4 @@ run-everywhere --host win-12 -- lint
 
 ### Connectivity & Networking
 
-See `docs/connectivity-layer.md` for overlay options (Tailscale/Headscale, NetBird, ZeroTier, WireGuard, SSH-only), ephemeral peer modes for short‑lived sessions, and operational guidance.
-
-Fallback relay: If overlays are unavailable, the coordinator can act as a relay by subscribing to per-host SSE logs and forwarding messages (pub/sub) between leader and followers. This preserves basic run‑everywhere semantics at higher latency.
+See the [Connectivity Layer](Connectivity%20Layer.md) spec for overlay options (Tailscale/Headscale, NetBird, ZeroTier, WireGuard, SSH‑only), ephemeral peers, and rendezvous SOCKS. The server never dials followers. The leader is the sole initiator of SSH (or SSH via rendezvous SOCKS), and the server only receives events for observability.

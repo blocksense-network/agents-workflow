@@ -1,0 +1,19 @@
+include = ["specs/**/*.md"]
+exclude = [
+  # External blog tends to fail TLS/cert checks intermittently
+  "https://www.trio.so/.*",
+  # Absolute, site-scoped doc paths used as examples in specs
+  "^/en/docs/.*",
+  # Volatile or gated docs that frequently 403/redirect or move
+  "https://openai.com/blog/openai-codex/.*",
+  "https://github.com/OpenAI/openai-codex-cli/.*",
+  "https://github.com/google/gemini-cli/.*",
+  # Also exclude exact repo URLs without trailing slash
+  "https://github.com/OpenAI/openai-codex-cli",
+  "https://github.com/google/gemini-cli",
+  "https://docs.anthropic.com/.*",
+  "https://opencode.dev/.*",
+  "https://docs.opencode.dev/.*",
+]
+max_concurrency = 8
+timeout = 20

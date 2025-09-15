@@ -2,7 +2,7 @@
 
 ### Purpose
 
-- **Central orchestration**: Provide a network API to create and manage isolated agent coding sessions on demand, aligned with the filesystem snapshot model described in `docs/fs-snapshots/overview.md`.
+- **Central orchestration**: Provide a network API to create and manage isolated agent coding sessions on demand, aligned with the filesystem snapshot model described in [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
 - **On‑prem/private cloud ready**: Designed for enterprises running self‑managed clusters or single hosts.
 - **UI consumers**: Back the WebUI and TUI dashboards; enable custom internal portals and automations.
 - **Uniform abstraction**: Normalize differences between agents (Claude Code, OpenHands, Copilot, etc.), runtimes (devcontainer/local), and snapshot providers (ZFS/Btrfs/Overlay/copy).
@@ -172,6 +172,32 @@ Event payload (SSE `data:` line):
 }
 ```
 
+#### Event Ingestion (leader → server)
+
+The server does not initiate any connections to followers. Multi‑OS execution (sync‑fence, run‑everywhere) is performed by the leader over SSH (or SSH via rendezvous SOCKS). To keep the UI and automations informed, the leader pushes timeline events to the server.
+
+- `POST /api/v1/sessions/{id}/events/ingest`
+  - Purpose: Accepts session timeline events emitted by the leader for observability (and later rebroadcast over the session SSE stream).
+  - AuthZ: Same as other session write operations; scoped to the session.
+  - Idempotency and ordering: Clients may include `seq` per event and an optional `Event-Sequence` header to enable deduplication and ordered processing.
+  - Formats:
+    - Batch: `application/json` with a JSON array of events.
+    - Streaming: `application/x-ndjson` with one JSON event per line.
+  - Schema: see `specs/Public/Schemas/session-events.schema.json` and `specs/Public/Schemas/session-events.ingest.schema.json`.
+
+Accepted event types (minimum set):
+
+```json
+{ "type": "followersCatalog", "hosts": [{"name":"win-01","os":"windows","tags":["os=windows"]}] }
+{ "type": "fenceStarted",  "snapshotId": "snap-01H...", "ts": "...", "origin": "leader", "transport": "ssh" }
+{ "type": "fenceResult",   "snapshotId": "snap-01H...", "hosts": {"win-01": {"state": "consistent", "tookMs": 842}}, "ts": "..." }
+{ "type": "hostStarted",    "host": "mac-02", "ts": "..." }
+{ "type": "hostLog",        "host": "win-01", "stream": "stdout", "message": "Running tests...", "ts": "..." }
+{ "type": "hostExited",     "host": "mac-02", "code": 0, "ts": "..." }
+{ "type": "summary",        "passed": ["mac-02","lin-03"], "failed": ["win-01"], "ts": "..." }
+{ "type": "note",           "message": "optional annotation", "ts": "..." }
+```
+
 #### Workspace and IDE/TUI Launch Helpers
 
 - `GET /api/v1/sessions/{id}/workspace` → mount paths (host/container), snapshot provider, devcontainer info.
@@ -192,15 +218,60 @@ Response example:
 
 #### Capability Discovery
 
+- `GET /api/v1/agents` → List supported agent types and configurable options.
+  - Response:
+
+  ```json
+  {
+    "items": [
+      {
+        "type": "openhands",
+        "versions": ["latest"],
+        "settingsSchemaRef": "/api/v1/schemas/agents/openhands.json"
+      },
+      {
+        "type": "claude-code",
+        "versions": ["latest"],
+        "settingsSchemaRef": "/api/v1/schemas/agents/claude-code.json"
+      }
+    ]
+  }
+  ```
+
+- `GET /api/v1/runtimes` → Available runtime kinds and images/templates.
+  - Response:
+
+  ```json
+  {
+    "items": [
+      {
+        "type": "devcontainer",
+        "images": ["ghcr.io/acme/base:latest"],
+        "paths": [".devcontainer/devcontainer.json"]
+      },
+      { "type": "local", "sandboxProfiles": ["default", "disabled"] }
+    ]
+  }
+  ```
+
+- `GET /api/v1/runners` → Execution runner hosts (terminology aligned with CLI.md).
+  - Response entries include: `id`, `os`, `arch`, `snapshotCapabilities` (e.g., `zfs`, `btrfs`, `overlay`, `copy`), and health.
+
+- Optional helper endpoints used by CLI completions and WebUI forms:
+  - `GET /api/v1/git/refs?url=<git_url>` → Cached branch/ref suggestions for `--target-branch` UX.
+  - `GET /api/v1/projects` → List known projects per tenant for filtering.
+
 #### Followers and Multi‑OS Execution
 
-- `GET /api/v1/followers` → List follower hosts with metadata (os, tags, status).
-- `POST /api/v1/followers/sync-fence` → Body: `{ selectors: { all?: boolean, hosts?: [string], tags?: [string] }, timeoutSec?: number }`.
-  - Response: per‑host fence status and timings.
-- `POST /api/v1/run-everywhere` → Body: `{ command: string, args?: [string], selectors: {...} }`.
-  - Streams per‑host logs via SSE at `/api/v1/run-everywhere/{id}/events`.
+- `GET /api/v1/followers` → List follower hosts with metadata (os, tags, status). The server’s view is populated from the `followersCatalog` events ingested for active sessions or via configured inventories.
+
+Notes:
+
+- Sync‑fence and run‑everywhere are leader‑executed actions over SSH. They are not exposed as server‑triggered REST methods. The server observes progress via events ingested at `/api/v1/sessions/{id}/events/ingest` and rebroadcasts them on the session SSE stream.
 
 #### Connectivity (Overlay Keys, Handshake, Relay)
+
+Note: The REST service never connects directly to followers. The leader initiates all data‑plane communication to followers over SSH (or SSH routed via the session SOCKS5 rendezvous when overlays/TUNs are unavailable). The server’s role is limited to control‑plane coordination and event ingestion/broadcast.
 
 - `POST /api/v1/connect/keys` → Request session‑scoped connectivity credentials.
   - Body: `{ providers: ["netbird","tailscale"], tags?: [string] }`
@@ -235,7 +306,7 @@ Client‑hosted rendezvous: The `aw` client may alternatively host a session‑s
 
 - `GET /api/v1/agents` → supported agent types and configurable options.
 - `GET /api/v1/runtimes` → available runtime images/devcontainers.
-- `GET /api/v1/hosts` → execution hosts and their snapshot capabilities.
+- `GET /api/v1/runners` → execution runner hosts and their snapshot capabilities.
 
 #### Uploads (optional flow)
 
@@ -249,7 +320,7 @@ Client‑hosted rendezvous: The `aw` client may alternatively host a session‑s
 
 ### Snapshot and Workspace Behavior
 
-- Implements the snapshot priority described in `docs/fs-snapshots/overview.md`.
+- Implements the snapshot priority described in [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
 - When `runtime.type=devcontainer`, the snapshot is mounted as the container workspace path; otherwise, mounted directly on host.
 - On non‑CoW filesystems, OverlayFS or efficient copy (`cp --reflink=auto`) is used; the original working tree remains untouched.
 
@@ -303,6 +374,30 @@ curl -X POST "$BASE/api/v1/tasks" \
   }'
 ```
 
-TODO: This spec was based on a very old version of the CLI.md document. Review the latest version of CLI.md, assume the information there is correct and re-think this document from the ground up.
+### Alignment with CLI.md (current)
 
-TODO: Create an implementation plan for the REST Service crate. The plan should include a mock implementation that we can use to test the CLI in a more isolated way.
+- `aw task` → `POST /api/v1/tasks` (returns `sessionId` usable for polling and SSE).
+- `aw session list|get|logs|events` → `GET /api/v1/sessions[/{id}]`, `GET /api/v1/sessions/{id}/logs`, `GET /api/v1/sessions/{id}/events`.
+- `aw session run <SESSION_ID> <IDE>` → `POST /api/v1/sessions/{id}/open/ide`.
+- `aw remote agents|runtimes|runners` → `GET /api/v1/agents`, `GET /api/v1/runtimes`, `GET /api/v1/runners`.
+- `aw agent followers list` → `GET /api/v1/followers` (optional; server view populated from ingested `followersCatalog`).
+- `aw agent sync-fence|run-everywhere` → leader‑executed over SSH; server observes via `POST /api/v1/sessions/{id}/events/ingest` and rebroadcasts on session SSE.
+
+SSE event taxonomy for sessions:
+
+```json
+{ "type": "status",  "status": "provisioning", "ts": "..." }
+{ "type": "log",     "level": "info", "message": "Running tests...", "ts": "..." }
+{ "type": "moment",  "snapshotId": "snap-01H...", "note": "post-fence", "ts": "..." }
+{ "type": "delivery", "mode": "pr", "url": "https://github.com/.../pull/123", "ts": "..." }
+{ "type": "fenceStarted",  "snapshotId": "snap-01H...", "ts": "..." }
+{ "type": "fenceResult",   "snapshotId": "snap-01H...", "hosts": {"...": {"state": "consistent", "tookMs": 842}}, "ts": "..." }
+{ "type": "hostStarted",   "host": "...", "ts": "..." }
+{ "type": "hostLog",       "host": "...", "stream": "stdout", "message": "...", "ts": "..." }
+{ "type": "hostExited",    "host": "...", "code": 0, "ts": "..." }
+{ "type": "summary",       "passed": ["..."], "failed": ["..."], "ts": "..." }
+```
+
+### Implementation and Testing Plan
+
+Planning and status tracking for this spec live in `REST Service.status.md`. That document defines milestones, success criteria, and a precise, automated test plan per specs/AGENTS.md.

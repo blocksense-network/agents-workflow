@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agents-workflow.example/schemas/session-events.schema.json",
+  "title": "Session Event (Leader → Server Ingest)",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/followersCatalog" },
+    { "$ref": "#/definitions/fenceStarted" },
+    { "$ref": "#/definitions/fenceResult" },
+    { "$ref": "#/definitions/hostStarted" },
+    { "$ref": "#/definitions/hostLog" },
+    { "$ref": "#/definitions/hostExited" },
+    { "$ref": "#/definitions/summary" },
+    { "$ref": "#/definitions/note" }
+  ],
+  "definitions": {
+    "base": {
+      "type": "object",
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "origin": { "type": "string", "enum": ["leader"] },
+        "transport": { "type": "string", "enum": ["ssh", "rendezvous"] },
+        "seq": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "followersCatalog": {
+      "allOf": [
+        { "properties": { "type": { "const": "followersCatalog" } }, "required": ["type", "hosts"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "followersCatalog" },
+            "hosts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "os": { "type": "string", "enum": ["linux", "macos", "windows"] },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "address": { "type": "string" },
+                  "sshUser": { "type": "string" }
+                },
+                "required": ["name", "os"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "fenceStarted": {
+      "allOf": [
+        { "properties": { "type": { "const": "fenceStarted" } }, "required": ["type", "snapshotId"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "fenceStarted" },
+            "snapshotId": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "fenceResult": {
+      "allOf": [
+        { "properties": { "type": { "const": "fenceResult" } }, "required": ["type", "snapshotId", "hosts"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "fenceResult" },
+            "snapshotId": { "type": "string", "minLength": 1 },
+            "hosts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string", "enum": ["consistent", "timeout", "error"] },
+                  "tookMs": { "type": "integer", "minimum": 0 },
+                  "error": { "type": "string" }
+                },
+                "required": ["state"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "hostStarted": {
+      "allOf": [
+        { "properties": { "type": { "const": "hostStarted" } }, "required": ["type", "host"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "hostStarted" },
+            "host": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "hostLog": {
+      "allOf": [
+        { "properties": { "type": { "const": "hostLog" } }, "required": ["type", "host", "stream", "message"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "hostLog" },
+            "host": { "type": "string", "minLength": 1 },
+            "stream": { "type": "string", "enum": ["stdout", "stderr"] },
+            "message": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "hostExited": {
+      "allOf": [
+        { "properties": { "type": { "const": "hostExited" } }, "required": ["type", "host", "code"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "hostExited" },
+            "host": { "type": "string", "minLength": 1 },
+            "code": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "summary": {
+      "allOf": [
+        { "properties": { "type": { "const": "summary" } }, "required": ["type", "passed", "failed"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "summary" },
+            "passed": { "type": "array", "items": { "type": "string" } },
+            "failed": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    },
+    "note": {
+      "allOf": [
+        { "properties": { "type": { "const": "note" } }, "required": ["type", "message"] },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "note" },
+            "message": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        { "$ref": "#/definitions/base" }
+      ]
+    }
+  }
+}
+

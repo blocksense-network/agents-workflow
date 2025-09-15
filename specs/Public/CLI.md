@@ -806,7 +806,7 @@ aw config --show-origin
 
 # Set with specific scope
 aw config --user ui.theme dark
-````
+```
 
 Mirrors `docs/configuration.md` including provenance, precedence, and Windows behavior.
 
@@ -928,29 +928,32 @@ OPTIONS:
 ```
 aw agent get-setup-env [OPTIONS]
 ```
+
 aw agent sandbox run [OPTIONS] -- <CMD> [ARGS...]
 
 DESCRIPTION: Launch a process inside a local Linux sandbox (namespaces, cgroups, seccomp),
-             applying filesystem policy and network defaults from config.
+applying filesystem policy and network defaults from config.
 
 OPTIONS:
-  --mode <dynamic|static>     Dynamic read allow-list (default) or static RO/overlay
-  --no-debug                  Disable in-sandbox debugging tools
-  --allow-network             Enable egress (still no inbound by default)
-  --containers                Allow rootless containers inside sandbox
-  --vm                        Allow nested VMs inside sandbox
-  --allow-kvm                 Allow /dev/kvm (implies --vm)
-  --rw <PATH>...              Additional writable bind mounts
-  --overlay <PATH>...         Paths made writable via overlayfs
-  --blacklist <PATH>...       Additional sensitive paths to block
+--mode <dynamic|static> Dynamic read allow-list (default) or static RO/overlay
+--no-debug Disable in-sandbox debugging tools
+--allow-network Enable egress (still no inbound by default)
+--containers Allow rootless containers inside sandbox
+--vm Allow nested VMs inside sandbox
+--allow-kvm Allow /dev/kvm (implies --vm)
+--rw <PATH>... Additional writable bind mounts
+--overlay <PATH>... Paths made writable via overlayfs
+--blacklist <PATH>... Additional sensitive paths to block
 
 ```
 
 ```
+
 aw agent sandbox attach <SESSION_ID>
 aw agent sandbox ps <SESSION_ID>
 aw agent sandbox kill <SESSION_ID>
 aw agent sandbox audit <SESSION_ID>
+
 ```
 
 See also: Local Sandboxing on Linux for detailed semantics.
@@ -1098,6 +1101,11 @@ ARGUMENTS:
   ARGS                        Arguments for the command
 ```
 
+Execution model:
+
+- These `aw agent` subcommands execute on the leader for the session and fan out to followers over SSH (or SSH via session rendezvous SOCKS). The REST service never connects to followers; it only receives events for observability.
+- For remote sessions, prefer: `ssh <leader> -- aw agent ...` so execution remains leader‑local.
+
 ```
 aw agent record [OPTIONS] [--] <AGENT_COMMAND> [ARGS...]
 
@@ -1195,6 +1203,7 @@ Before spawning the agent process (local mode), AW writes to the local state DB:
 Subsequent FsSnapshots are appended to `fs_snapshots` with provider/ref/path/metadata.
 
 Remote mode: the REST service records equivalent fields in its backend store; the client does not write local DB entries for remote sessions.
+
 - Delivery modes: PR, Branch push, Patch artifact (as in REST spec).
 
 ### IDE and Terminal Agent Integration

@@ -99,7 +99,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "specs/Public/CLI.md",
+                "file": "specs/Public/Connectivity Layer.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -114,7 +114,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "CLI"
+              "title": "Connectivity Layer"
             }
           }
         ],
@@ -268,6 +268,11 @@
   },
   "active": "dccfea43a5379c8a",
   "lastOpenFiles": [
+    "specs/Public/Schemas/session-events.ingest.schema.json",
+    "specs/Public/Schemas/session-events.schema.json",
+    "specs/Public/CLI.md",
+    "specs/Public/REST Service.status.md",
+    "specs/Public/Handling AW URL Scheme.status.md",
     "specs/Research/Git-based Snapshots Research.md",
     "agent-task-0.1.0.gem",
     "test/logs/temp_output_20250914_232409.log",
@@ -285,7 +290,6 @@
     "specs/Research/Tools/SessionFileExperiments/goose.py",
     "specs/Research/Tools/SessionFileExperiments/gemini.py",
     "specs/Research/Tools/SessionFileExperiments/common.py",
-    "specs/Research/Tools/SessionFileExperiments/codex.py",
     "specs/Research/Tools/SessionFileExperiments/AGENTS.md",
     "specs/Research/How to use clap.md",
     "specs/Research/How to use Ratatui.md",
@@ -300,10 +304,6 @@
     "specs/Research/Creating macOS Endpoint Security Extension.md",
     "specs/Research/Compiling FsKit Extensions.md",
     "specs/Public/AgentFS/AgentFS.md",
-    "specs/Public/AgentFS/AgentFS WinFsp Adapter.md",
-    "specs/Public/AgentFS/AgentFS FsKit Adapter.md",
-    "specs/Public/AgentFS/AgentFS FUSE Adapter.md",
-    "specs/Public/AgentFS/AgentFS Core.md",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_tests.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_write_page_test.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_read_page_test.png",
