@@ -16,7 +16,7 @@
 ### Architecture Overview
 
 - **API Server (stateless)**: Exposes REST + SSE/WebSocket endpoints to localhost only by default. Optionally persists state in a database.
-- **Executors (runners)**: One or many worker processes/hosts that provision workspaces and run agents.
+- **Executors**: One or many worker processes/hosts that provision workspaces and run agents.
 - **Workspace provisioning**: Uses ZFS/Btrfs snapshots when available; falls back to OverlayFS or copy; can orchestrate devcontainers.
 - **Transport**: JSON over HTTPS; events over SSE (preferred) and WebSocket (optional).
 - **Identity & Access**: API Keys, OIDC/JWT, optional mTLS; project‑scoped RBAC.
@@ -28,7 +28,7 @@
 - **Session**: The running instance of a task with lifecycle and logs; owns a per‑task workspace.
 - **Workspace**: Isolated filesystem mount realized by snapshot provider or copy, optionally inside a devcontainer.
 - **Runtime**: The execution environment for the agent (devcontainer/local), plus resource limits.
-- **Agent**: The tool/runner performing the coding task.
+- **Agent**: The tool performing the coding task.
 
 ### Lifecycle States
 
@@ -99,7 +99,7 @@ Request:
   },
   "workspace": {
     "snapshotPreference": ["zfs", "btrfs", "overlay", "copy"],
-    "executionHostId": "runner-a"
+    "executionHostId": "executor-a"
   },
   "agent": {
     "type": "claude-code",
@@ -174,16 +174,9 @@ Event payload (SSE `data:` line):
 
 #### Event Ingestion (leader → server)
 
-The server does not initiate any connections to followers. Multi‑OS execution (sync‑fence, run‑everywhere) is performed by the leader over SSH (or SSH via rendezvous SOCKS). To keep the UI and automations informed, the leader pushes timeline events to the server.
+The server does not initiate any connections to executors. Multi‑OS execution (sync‑fence, run‑everywhere) is performed by the leader over SSH. For connectivity, clients use the access point’s HTTP CONNECT tunnel to reach each executor’s local sshd, as defined in Executor‑Enrollment. To keep the UI and automations informed, the leader pushes timeline events to the server.
 
-- `POST /api/v1/sessions/{id}/events/ingest`
-  - Purpose: Accepts session timeline events emitted by the leader for observability (and later rebroadcast over the session SSE stream).
-  - AuthZ: Same as other session write operations; scoped to the session.
-  - Idempotency and ordering: Clients may include `seq` per event and an optional `Event-Sequence` header to enable deduplication and ordered processing.
-  - Formats:
-    - Batch: `application/json` with a JSON array of events.
-    - Streaming: `application/x-ndjson` with one JSON event per line.
-  - Schema: see `specs/Public/Schemas/session-events.schema.json` and `specs/Public/Schemas/session-events.ingest.schema.json`.
+- Control‑plane event flow: Session timeline events (`fence*`, `host*`, etc.) are delivered over the QUIC control channel from the leader to the access point server and rebroadcast on the session SSE stream. No REST ingestion endpoint is exposed for these events.
 
 Accepted event types (minimum set):
 
@@ -196,24 +189,6 @@ Accepted event types (minimum set):
 { "type": "hostExited",     "host": "mac-02", "code": 0, "ts": "..." }
 { "type": "summary",        "passed": ["mac-02","lin-03"], "failed": ["win-01"], "ts": "..." }
 { "type": "note",           "message": "optional annotation", "ts": "..." }
-```
-
-#### Workspace and IDE/TUI Launch Helpers
-
-- `GET /api/v1/sessions/{id}/workspace` → mount paths (host/container), snapshot provider, devcontainer info.
-- `POST /api/v1/sessions/{id}/open/ide` with body `{ "ide": "vscode" | "cursor" | "windsurf" }`
-
-Response example:
-
-```json
-{
-  "ide": "vscode",
-  "commands": [
-    "devcontainer open --workspace-folder /workspaces/agent-01HVZ6K9",
-    "code --folder-uri file:///workspaces/agent-01HVZ6K9"
-  ],
-  "notes": "Run locally on a machine with access to the workspace mount."
-}
 ```
 
 #### Capability Discovery
@@ -254,81 +229,25 @@ Response example:
   }
   ```
 
-- `GET /api/v1/runners` → Execution runner hosts (terminology aligned with CLI.md).
+- `GET /api/v1/executors` → Execution hosts (terminology aligned with CLI.md).
   - Response entries include: `id`, `os`, `arch`, `snapshotCapabilities` (e.g., `zfs`, `btrfs`, `overlay`, `copy`), and health.
+  - Long‑lived executors:
+    - Executors register with the Remote Service when `aw serve` starts and send heartbeats including overlay status and addresses (MagicDNS/IP).
+    - The `GET /executors` response includes `overlay`: `{ provider, address, magicName, state }` and `controller` hints (typically `server`).
 
 - Optional helper endpoints used by CLI completions and WebUI forms:
   - `GET /api/v1/git/refs?url=<git_url>` → Cached branch/ref suggestions for `--target-branch` UX.
   - `GET /api/v1/projects` → List known projects per tenant for filtering.
 
+TODO: Add getters for obtaining repos and workspaces on the server. In CLI.md, add matching `aw remote` commands.
+
 #### Followers and Multi‑OS Execution
 
-- `GET /api/v1/followers` → List follower hosts with metadata (os, tags, status). The server’s view is populated from the `followersCatalog` events ingested for active sessions or via configured inventories.
+- `GET /api/v1/sessions/{id}/info` → Session summary including current fleet membership (server view), health, and endpoints.
 
 Notes:
 
-- Sync‑fence and run‑everywhere are leader‑executed actions over SSH. They are not exposed as server‑triggered REST methods. The server observes progress via events ingested at `/api/v1/sessions/{id}/events/ingest` and rebroadcasts them on the session SSE stream.
-
-#### Connectivity (Overlay Keys, Handshake, Relay)
-
-Note: The REST service never connects directly to followers. The leader initiates all data‑plane communication to followers over SSH (or SSH routed via the session SOCKS5 rendezvous when overlays/TUNs are unavailable). The server’s role is limited to control‑plane coordination and event ingestion/broadcast.
-
-- `POST /api/v1/connect/keys` → Request session‑scoped connectivity credentials.
-  - Body: `{ providers: ["netbird","tailscale"], tags?: [string] }`
-  - Response: `{ provider: "netbird"|"tailscale"|"none", credentials?: {...} }`
-    - For `netbird`: `{ setupKey: string, reusable: bool, ephemeral: bool, autoGroups: [string] }`
-    - For `tailscale`: `{ authKey: string, ephemeral: bool, aclTags: [string] }`
-
-- `POST /api/v1/connect/handshake` → Initiate follower connectivity check.
-  - Body: `{ sessionId: string, hosts: [string], timeoutSec?: number }`
-  - Response: `{ statuses: { [host: string]: { overlay: "ok"|"fail"|"skip", relay: "ok"|"fail"|"skip", ssh: "ok"|"fail" } } }`
-
-- `POST /api/v1/connect/handshake/ack` → Follower ack upon readiness.
-  - Body: `{ sessionId: string, host: string, overlayReady?: bool, relayReady?: bool, sshOk?: bool }`
-
-- Relay endpoints (fallback):
-  - `GET /api/v1/relay/{sessionId}/{host}/control` (SSE) — control stream to follower
-  - `GET /api/v1/relay/{sessionId}/{host}/stdin` (SSE) — stdin stream to follower (optional)
-  - `POST /api/v1/relay/{sessionId}/{host}/stdout`
-  - `POST /api/v1/relay/{sessionId}/{host}/stderr`
-  - `POST /api/v1/relay/{sessionId}/{host}/status`
-
-#### Session SOCKS5 Rendezvous (fallback)
-
-- `GET /api/v1/connect/socks` → Session‑scoped SOCKS5 front‑end (TCP only). Auth via session token; maps logical hostnames to registered peers.
-- `GET /api/v1/connect/socks/register` (WebSocket) → Peer registers local targets.
-  - Query: `?sessionId=...&peerId=...&role=leader|follower`
-  - On connect, peer sends JSON: `{ "targets": { "ssh": "127.0.0.1:22" } }`
-  - Server binds logical names (e.g., `follower-01:22`) to that WS stream.
-- SOCKS name resolution: leader’s SSH connects to `follower-01:22`; server forwards over WS to peer’s target (e.g., `127.0.0.1:22`).
-
-Client‑hosted rendezvous: The `aw` client may alternatively host a session‑scoped SOCKS5 front‑end and a WS hub, using the same register protocol. In this mode, peers connect their WS to the client, and SSH/Mutagen use the client’s local SOCKS5.
-
-- `GET /api/v1/agents` → supported agent types and configurable options.
-- `GET /api/v1/runtimes` → available runtime images/devcontainers.
-- `GET /api/v1/runners` → execution runner hosts and their snapshot capabilities.
-
-#### Uploads (optional flow)
-
-- `POST /api/v1/uploads` → returns pre‑signed URL and upload token; use with `repo.mode=upload`.
-
-#### Health and Metadata
-
-- `GET /api/v1/healthz` → liveness.
-- `GET /api/v1/readyz` → readiness.
-- `GET /api/v1/version` → server version/build.
-
-### Snapshot and Workspace Behavior
-
-- Implements the snapshot priority described in [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
-- When `runtime.type=devcontainer`, the snapshot is mounted as the container workspace path; otherwise, mounted directly on host.
-- On non‑CoW filesystems, OverlayFS or efficient copy (`cp --reflink=auto`) is used; the original working tree remains untouched.
-
-### Delivery Modes
-
-- **PR**: Create PR against `targetBranch`.
-- **Branch push**: Push to a designated branch.
-- **Patch**: Provide a downloadable patch artifact.
+- Sync‑fence and followers run are leader‑executed actions over SSH. They are not exposed as server‑triggered REST methods. The server observes progress via QUIC control‑plane events and rebroadcasts them on the session SSE stream.
 
 ### Authentication Examples
 
@@ -351,13 +270,12 @@ Client‑hosted rendezvous: The `aw` client may alternatively host a session‑s
 
 ### Deployment Topologies
 
-- Single host: API + runner in one process.
-- Scaled cluster: API behind LB; multiple runners with shared DB/queue; shared snapshot‑capable storage or local snapshots per host.
+- Single host: API + executor in one process.
+- Scaled cluster: API behind LB; multiple executors with shared DB/queue; shared snapshot‑capable storage or local snapshots per host.
 
 ### Security Considerations
 
 - Egress controls; per‑session network policies.
-- Least‑privilege mounts; readonly base layers with CoW upper layers.
 - Secret redaction in logs/events.
 
 ### Example: Minimal Task Creation
@@ -379,9 +297,9 @@ curl -X POST "$BASE/api/v1/tasks" \
 - `aw task` → `POST /api/v1/tasks` (returns `sessionId` usable for polling and SSE).
 - `aw session list|get|logs|events` → `GET /api/v1/sessions[/{id}]`, `GET /api/v1/sessions/{id}/logs`, `GET /api/v1/sessions/{id}/events`.
 - `aw session run <SESSION_ID> <IDE>` → `POST /api/v1/sessions/{id}/open/ide`.
-- `aw remote agents|runtimes|runners` → `GET /api/v1/agents`, `GET /api/v1/runtimes`, `GET /api/v1/runners`.
-- `aw agent followers list` → `GET /api/v1/followers` (optional; server view populated from ingested `followersCatalog`).
-- `aw agent sync-fence|run-everywhere` → leader‑executed over SSH; server observes via `POST /api/v1/sessions/{id}/events/ingest` and rebroadcasts on session SSE.
+- `aw remote agents|runtimes|executors` → `GET /api/v1/agents`, `GET /api/v1/runtimes`, `GET /api/v1/executors`. (TODO: update here as well)
+- `aw agent followers list` → `GET /api/v1/sessions/{id}/info` (server view of current fleet membership for that session). TODO: This should be done through the QUIC protocol as well
+- `aw agent sync-fence|followers run` → leader‑executed over SSH; server observes via the control plane (QUIC) and rebroadcasts on session SSE.
 
 SSE event taxonomy for sessions:
 
@@ -401,3 +319,29 @@ SSE event taxonomy for sessions:
 ### Implementation and Testing Plan
 
 Planning and status tracking for this spec live in `REST Service.status.md`. That document defines milestones, success criteria, and a precise, automated test plan per specs/AGENTS.md.
+
+#### Session Info (summary)
+
+- `GET /api/v1/sessions/{id}/info`
+
+Response `200 OK`:
+
+```json
+{
+  "id": "01HVZ6K9T1...",
+  "status": "running",
+  "fleet": {
+    "leader": "exec-linux-01",
+    "followers": [
+      { "name": "win-01", "os": "windows", "health": "ok" },
+      { "name": "mac-01", "os": "macos", "health": "ok" }
+    ]
+  },
+  "endpoints": { "events": "/api/v1/sessions/01HV.../events" }
+}
+```
+
+Notes:
+
+- Health reflects the access point’s current view and recent QUIC/SSH checks.
+- This is a read‑only summary used by UIs to render session topology.

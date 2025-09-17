@@ -19,7 +19,7 @@
       "properties": {
         "ts": { "type": "string", "format": "date-time" },
         "origin": { "type": "string", "enum": ["leader"] },
-        "transport": { "type": "string", "enum": ["ssh", "rendezvous"] },
+        "transport": { "type": "string", "enum": ["ssh"] },
         "seq": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
@@ -169,4 +169,3 @@
     }
   }
 }
-

@@ -6,7 +6,7 @@ Spec: See “REST Service.md” for the API behavior. This file tracks the imple
 
 Deliver a reliable REST + SSE service that the CLI, TUI, and WebUI can use to create and manage agent sessions. Optimize for testability by sharing a transport crate between the mock and real server and by validating all flows through black‑box HTTP tests and CLI‑level E2E tests.
 
-This plan is expanded to explicitly cover multi‑OS execution and connectivity constraints per Multi‑OS Testing and Connectivity Layer specs. The near‑term priority is to validate the communication topology on a single Linux host using Incus or Docker containers to simulate multiple machines. Subsequent phases verify true cross‑OS synchronization (Linux/macOS/Windows) including overlay networking, SSH‑only, and relay/rendezvous fallbacks.
+This plan is expanded to explicitly cover multi‑OS execution and connectivity constraints per Multi‑OS Testing and Connectivity Layer specs. The near‑term priority is to validate the communication topology on a single Linux host using Incus or Docker containers to simulate multiple machines. Subsequent phases verify true cross‑OS synchronization (Linux/macOS/Windows) using QUIC control plane and SSH over HTTP CONNECT (with optional client‑side relay in hybrid fleets).
 
 ## Milestones and Tasks
 
@@ -33,7 +33,7 @@ This plan is expanded to explicitly cover multi‑OS execution and connectivity 
 
 5. Capability discovery
 
-- `GET /api/v1/agents`, `/runtimes`, `/runners`; optional `/git/refs` cache.
+- `GET /api/v1/agents`, `/runtimes`, `/executors`; optional `/git/refs` cache.
 - Tests assert schemas and stable field names for CLI completions.
 
 6. Event ingestion for multi‑OS (mock)
@@ -41,9 +41,9 @@ This plan is expanded to explicitly cover multi‑OS execution and connectivity 
 - Implement followers listing and leader‑originated event ingestion (`followersCatalog`, `fence*`, `host*`, `summary`).
 - Tests validate per‑host log/event framing and summary events via session SSE.
 
-7. Connectivity stubs
+7. Connectivity
 
-- Keys/handshake endpoints with placeholder providers; strict type contracts.
+- CONNECT handler and QUIC control plane stubs; strict type contracts.
 - Tests cover error paths, timeouts, and validation.
 
 8. Persistence + RBAC (real server only)
@@ -73,20 +73,18 @@ Success criteria
 
 - Fixture a single Linux host running: one REST server, one leader, N followers as separate containers/VMs (Incus preferred; Docker acceptable).
 - Provide a host catalog for the fleet (`.agents/hosts.json`) surfaced by `/api/v1/followers`.
-- Prove end‑to‑end flows over container networking via SSH: `sync-fence` and `run-everywhere` with per‑host SSE.
+- Prove end‑to‑end flows over container networking via SSH: `sync-fence` and `aw agent followers run` with per‑host SSE.
 - Add failure‑injection knobs (pause a follower, simulate packet loss/latency with `tc netem`, drop ports with iptables/Incus profiles).
 
 12. Connectivity layer E2E (Linux host)
 
-- Validate handshake and key distribution endpoints with mocked providers and local simulators:
-  - Overlay mocked (no TUN) → verify server reports `overlay=skip`, `ssh=ok`.
-  - Userspace SOCKS (tailscaled/netbird in userspace or a dummy SOCKS) with ProxyCommand → verify reachability.
-- Exercise server‑hosted rendezvous (Session SOCKS5 over WebSocket) and client‑hosted hub relay for SSH/Mutagen.
+- Validate HTTP CONNECT handler and QUIC control channel with local simulators.
+- Exercise client‑hosted relay across two access points for SSH/Mutagen.
 
-13. Cross‑OS followers (true multi‑OS)
+13. Cross‑OS executors (true multi‑OS)
 
-- Bring up at least one follower per OS: Linux, macOS, Windows (physical/VM). Use overlay networking (Tailscale/NetBird/ZeroTier) when available, fall back to SSH‑only or rendezvous.
-- Verify Mutagen leader→followers sync fence semantics and `run-everywhere` adapters (POSIX shells vs PowerShell) per Multi‑OS Testing.
+- Bring up at least one follower per OS: Linux, macOS, Windows (physical/VM). Use SSH over CONNECT; no dynamic VPNs.
+- Verify Mutagen leader→followers sync fence semantics and `aw agent followers run` adapters (POSIX shells vs PowerShell) per Multi‑OS Testing.
 
 14. Resilience and partition tolerance
 
@@ -159,17 +157,15 @@ This section elaborates concrete topologies, milestones, and automated scenarios
 
 - CLI.md (fleet orchestration, local vs remote)
 - Multi‑OS Testing.md (leader/followers, sync‑fence, run‑everywhere)
-- Connectivity Layer.md (overlay, SSH‑only, relay/rendezvous, userspace VPN SOCKS)
+- Multi‑OS Testing.md (QUIC control plane, SSH over CONNECT, client‑side relay)
 
 ### Topologies Under Test
 
 - T0 — Single host (no followers): baseline REST/SSE behavior.
 - T1 — Linux leader + 1 follower (same host, containers): SSH over container network.
 - T2 — Linux leader + N followers (same host, containers): star topology.
-- T3 — Cross‑host Linux leader + Linux followers: overlay IPs (MagicDNS) or SSH‑only.
-- T4 — Cross‑OS: Linux leader + macOS + Windows followers via overlay; fallback SSH‑only when overlay/TUN blocked.
-- T5 — Fallback rendezvous: server‑hosted or client‑hosted SOCKS5 over WS; no inbound connectivity, no HTTP CONNECT.
-- T6 — Mixed: some followers reachable via overlay, others via rendezvous simultaneously.
+- T3 — Cross‑host Linux leader + Linux followers over CONNECT.
+- T4 — Cross‑OS: Linux leader + macOS + Windows followers over CONNECT; hybrid relay across multiple access points.
 
 ### Milestone A — Linux Containers Topology (first goal)
 
@@ -181,10 +177,10 @@ Objective: Prove the communication topology and APIs work on a single Linux box 
   - Host catalog emitted via REST (`/api/v1/followers`) from `.agents/hosts.json` seeded by the harness.
 
 - Scenarios (A1–A8)
-  - A1: Handshake (SSH‑only) — `POST /connect/handshake` returns `ssh=ok`, `overlay=skip` for all followers.
+- A1: Connectivity — executors connected over QUIC; leader reaches followers via CONNECT.
   - A2: Mutagen session up — leader→followers one‑way sync sessions established; ignore rules applied; report health.
   - A3: Sync fence happy path — agent runs `fs_snapshot_and_sync`; leader ingests `fenceStarted/fenceResult`; SSE reflects consistent across hosts < 5s.
-  - A4: run‑everywhere fan‑out — invoke `aw agent run-everywhere` on leader; leader ingests `host*` and `summary`; SSE aggregates match CLI output.
+  - A4: fleet run fan‑out — invoke `aw agent followers run` on leader; leader ingests `host*` and `summary`; SSE aggregates match CLI output.
   - A5: Fence timeout — `tc netem delay 1500ms loss 20%` on follower‑2; `fenceResult` shows timeout for that host only.
   - A6: Partial failure — stop SSH on follower‑3; run‑everywhere `summary` marks that host failed; others succeed.
   - A7: SSE liveness — long‑running runs stream heartbeats/logs without blocking.
@@ -193,18 +189,13 @@ Objective: Prove the communication topology and APIs work on a single Linux box 
 - Assertions
   - REST responses match transport types; SSE ordering preserved per host; leader exit code reflects aggregate failure.
 
-### Milestone B — Connectivity E2E on Linux (overlays and fallbacks)
+### Milestone B — Connectivity E2E on Linux (CONNECT and relay)
 
 Objective: Validate Connectivity Layer choices and fallbacks without leaving Linux.
 
 - Scenarios (B1–B7)
-  - B1: Overlay mocked/no TUN — request keys; followers report `overlay=skip`; SSH reachability remains `ok`.
-  - B2: Userspace VPN SOCKS — start userspace daemon or dummy SOCKS in containers; SSH/Mutagen via ProxyCommand; fence + run‑everywhere succeed.
-  - B3: Server‑hosted rendezvous — start session SOCKS5 front‑end and WS hub; SSH via SOCKS to logical hostnames; end‑to‑end run passes.
-  - B4: Client‑hosted hub — `aw` client hosts SOCKS5/WS; followers connect out; same assertions as B3.
-  - B5: Mixed reachability — follower‑1 via SSH direct, follower‑2 via rendezvous; both appear healthy.
-  - B6: Rendezvous backpressure — large stdout from followers; no stuck streams; per‑host flow control observed.
-  - B7: Security — rendezvous rejects unauthenticated peers; session‑scoped tokens enforced.
+- B1: CONNECT only — verify SSH/Mutagen via ProxyCommand; fence + run‑everywhere succeed.
+- B2: Client relay — two access points, client relays across CONNECT streams; fence + run‑everywhere succeed.
 
 ### Milestone C — Cross‑OS Synchronization
 
@@ -216,7 +207,7 @@ Objective: Verify real multi‑OS synchronization and command adapters.
 
 - Scenarios (C1–C8)
   - C1: Sync fence across OSes — leader snapshot → `fenceResult` shows consistent on macOS and Windows.
-  - C2: Command adapters — `run-everywhere -- npm test` executes via zsh (macOS) and PowerShell (Windows) with correct quoting.
+  - C2: Command adapters — `aw agent followers run -- npm test` executes via zsh (macOS) and PowerShell (Windows) with correct quoting.
   - C3: Env normalization — required env vars and PATH present; toolchain discovery succeeds on all followers.
   - C4: Large tree — sync efficiency across ignores; no runaway CPU on followers.
   - C5: File rename edge cases — case sensitivity mismatch (Windows/macOS) handled; no oscillation.
@@ -232,7 +223,7 @@ Objective: Verify real multi‑OS synchronization and command adapters.
   - D3: Slow follower quarantine — configurable selector lets fast hosts proceed while laggards are excluded.
   - D4: Log integrity — ordered per‑host streams under jitter; SSE heartbeats prevent idle timeouts.
   - D5: Cancel/stop — mid‑run cancellation propagates, all transports tear down cleanly.
-  - D6: Cleanup — ephemeral overlay peers and rendezvous registrations removed on session end.
+  - D6: Cleanup — CONNECT sessions are torn down cleanly at session end.
 
 ### Milestone E — Scale and CI
 
@@ -244,7 +235,7 @@ Objective: Verify real multi‑OS synchronization and command adapters.
 - `just` targets
   - `just e2e-topology up [n=3] backend=incus|docker`
   - `just e2e-topology netem host=follower-2 delay=1500ms loss=20%`
-  - `just e2e-topology rendezvous mode=server|client`
+- `just e2e-topology relay two-aps=true`
   - `just e2e-topology down`
 
 - Artifacts
@@ -255,7 +246,7 @@ Objective: Verify real multi‑OS synchronization and command adapters.
 
 - Contracts
   - All new endpoints remain covered by black‑box tests using shared transport types.
-  - SSE event taxonomies for run‑everywhere and rendezvous are stable and documented.
+- SSE event taxonomies for followers run are stable and documented.
 
 - Security
   - Non‑privileged SSH users; API keys/JWT/mTLS honored where configured.
@@ -264,7 +255,7 @@ Objective: Verify real multi‑OS synchronization and command adapters.
 ### Exit Criteria per Milestone
 
 - A: All A‑series scenarios pass on Linux with containers (Incus or Docker).
-- B: B‑series scenarios pass; SOCKS rendezvous can carry SSH/Mutagen reliably.
+- B: B‑series scenarios pass; client‑side relay can carry SSH/Mutagen reliably.
 - C: Cross‑OS smoke suite passes on at least one Windows and one macOS follower.
 - D: Resilience tests demonstrate graceful degradation and clear error reporting.
 - E: Scale tests meet agreed p95/p99 targets; metrics exported for dashboards.

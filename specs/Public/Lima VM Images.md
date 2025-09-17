@@ -26,7 +26,7 @@ All images include:
 
 - **Agents-workflow tooling**: Installed via Nix for version consistency
 - **Filesystem snapshots**: ZFS or Btrfs support for Agent Time-Travel
-- **Multi-OS integration**: SSH access, Tailscale/Netbird/overlay networking
+- **Multi-OS integration**: SSH access via HTTP CONNECT; no dynamic VPNs required
 - **Development essentials**: Git, build tools, terminal multiplexers
 
 ## Build Components

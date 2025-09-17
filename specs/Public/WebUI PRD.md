@@ -21,7 +21,7 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 
 ### User Roles
 
-- Admin: Manage tenants, runners, policies.
+- Admin: Manage tenants, executors, policies.
 - Operator: Create/monitor sessions, manage queues, pause/resume.
 - Viewer: Read-only access to sessions and logs.
 
@@ -130,7 +130,7 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 
 #### Runners
 
-- Show registered execution runner hosts, snapshot capabilities (zfs/btrfs/overlay/copy), capacity, and health.
+- Show registered execution hosts, snapshot capabilities (zfs/btrfs/overlay/copy), capacity, and health.
 
 #### Settings
 

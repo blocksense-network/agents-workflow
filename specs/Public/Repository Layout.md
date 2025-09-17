@@ -84,7 +84,7 @@ agents-workflow/
 
 ### Crate mapping (selected)
 
-- CLI/TUI: `aw-cli`, `aw-tui`, `aw-core`, `aw-config`, `aw-state`, `aw-repo`, `aw-workflows`, `aw-rest-client`, `aw-notify`, `aw-fleet`, `aw-agent-runner`, `aw-schemas`.
+- CLI/TUI: `aw-cli`, `aw-tui`, `aw-core`, `aw-config`, `aw-state`, `aw-repo`, `aw-workflows`, `aw-rest-client`, `aw-notify`, `aw-fleet`, `aw-agent-executor`, `aw-schemas`.
 - AgentFS: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`.
 - Sandbox (Local profile): `sandbox-core`, `sandbox-fs`, `sandbox-seccomp`, `sandbox-cgroups`, `sandbox-net`, `sandbox-proto`, `sbx-helper`.
 

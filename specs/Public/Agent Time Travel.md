@@ -80,9 +80,9 @@ Testability strategy from day one:
 
 ### Syncing Terminal Time to Filesystem State
 
-- **Runtime Integration**: The agent runner executes a hook that creates the snapshot in between chat messages, agent thinking streams and tool executions.
+- **Runtime Integration**: The agent execution system executes a hook that creates the snapshot in between chat messages, agent thinking streams and tool executions.
 - **Advanced (future)**: eBPF capture of PTY I/O and/or FS mutations
-- **Multi‑OS Sync Fence**: When multi‑OS testing is enabled, each execution cycle performs `fs_snapshot_and_sync` on the leader (create FsSnapshot, then fence Mutagen sessions to followers) before invoking `run-everywhere`. See `docs/multi-os-testing.md`.
+- **Multi‑OS Sync Fence**: When multi‑OS testing is enabled, each execution cycle performs `fs_snapshot_and_sync` on the leader (create FsSnapshot, then fence Mutagen sessions to followers) before invoking `aw agent followers run`. See `specs/Public/Multi-OS Testing.md`.
 
 ### Restarting the agent from a SessionMoment
 

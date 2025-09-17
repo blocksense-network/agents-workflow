@@ -99,7 +99,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "specs/Public/Connectivity Layer.md",
+                "file": "specs/Public/REST Service.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -114,7 +114,31 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Connectivity Layer"
+              "title": "REST Service"
+            }
+          },
+          {
+            "id": "92b2265b51f5dd27",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "specs/Research/HowTo-Persistent-SSH-Connections.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "HowTo-Persistent-SSH-Connections"
             }
           }
         ],
@@ -268,6 +292,16 @@
   },
   "active": "dccfea43a5379c8a",
   "lastOpenFiles": [
+    "specs/Public/Executor-Enrollment.md",
+    "specs/Public/CLI.md",
+    "specs/Public/Multi-OS Testing.md",
+    "specs/AGENTS.md",
+    "specs/Public/Connectivity Layer.md",
+    "specs/Public/FS Snapshots/FS Snapshots Overview.md",
+    "specs/Research/Intro-to-Mutagen-Projects.md",
+    "specs/Research/HowTo-Persistent-SSH-Connections.md",
+    "specs/Public/Configuration.md",
+    "specs/Public/Agent Workflow GUI.md",
     "specs/Public/Terminal Multiplexers/GNU Screen.md",
     "specs/Public/Terminal Multiplexers/Zellij.md",
     "specs/Public/Terminal Multiplexers/TUI-Multiplexers-Overview.md",
@@ -287,21 +321,11 @@
     "specs/Public/Terminal Multiplexers",
     "specs/Public/Schemas/session-events.ingest.schema.json",
     "specs/Public/Schemas/session-events.schema.json",
-    "specs/Public/CLI.md",
     "specs/Public/REST Service.status.md",
-    "specs/Public/Handling AW URL Scheme.status.md",
-    "specs/Research/Git-based Snapshots Research.md",
     "agent-task-0.1.0.gem",
     "test/logs/temp_output_20250914_232409.log",
     "test/temp_test_runner_1757881449.rb",
     "test/logs/test_run_20250914_232409.log",
-    "specs/Public/FS Snapshots/Git-based Snapshots.md",
-    "specs/Initial Developer Input/Git-snapshots.md",
-    "specs/Research/Git-based Snapshots.md",
-    "specs/Public/Repository Layout.md",
-    "specs/Public/AgentFS/AgentFS.status.md",
-    "specs/Public/Nix Devcontainer/Devcontainer Design.status.md",
-    "specs/Public/Sanboxing/Local Sandboxing on Linux.status.md",
     "specs/Research/Tools/SessionFileExperiments/opencode.py",
     "specs/Research/Tools/SessionFileExperiments/list_recent.py",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_tests.png",

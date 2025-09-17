@@ -1,11 +1,3 @@
-### Mermaid Diagram Guidelines (authoring)
-
-- Use descriptive node IDs (e.g., `are_we_inside_repo`) instead of single letters.
-- Quote labels with spaces/parentheses: `["Label (with details)"]`.
-- Quote decision nodes that include punctuation: `{"Question?"}`.
-- Terminal nodes must have no outgoing edges; name them clearly (e.g., `done`, `exit_error`).
-- Close code fences correctly: use proper markdown code fence syntax.
-
 # Agents Workflow Specs
 
 This folder contains a work-in-progress specification for the next iteration of the agents-workflow product.
@@ -54,6 +46,18 @@ Good luck. Take your time to do this properly.
 
 If the pre-commit hook blocks your commit, run `just lint-specs`, address the reported issues, and commit again.
 
+## API Design Guidelines During Spec Development
+
+During the specification design phase, prioritize consistent and clear terminology over backward compatibility concerns (we haven't shipped anything based on this spec yet). API endpoints, message formats, and data structures should use the most accurate and consistent terminology available, even if this means changing names as the spec evolves. This allows for cleaner, more maintainable specifications without being constrained by early naming decisions that may become outdated.
+
+## Mermaid Diagram Guidelines (authoring)
+
+- Use descriptive node IDs (e.g., `are_we_inside_repo`) instead of single letters.
+- Quote labels with spaces/parentheses: `["Label (with details)"]`.
+- Quote decision nodes that include punctuation: `{"Question?"}`.
+- Terminal nodes must have no outgoing edges; name them clearly (e.g., `done`, `exit_error`).
+- Close code fences correctly: use proper markdown code fence syntax.
+
 ## CLI Documentation Guidelines
 
 ### Command Parameter Formatting
@@ -64,6 +68,8 @@ When documenting CLI commands with multiple parameters, use the following format
 
 ```
 aw command [OPTIONS] [ARGUMENTS]
+
+DESCRIPTION: The precise user-facing brief description of the command
 
 OPTIONS:
   --option1 <value>           Description of option1

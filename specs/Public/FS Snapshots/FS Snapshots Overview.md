@@ -1,5 +1,3 @@
-# FS Snapshots Overview (Rust)
-
 This document specifies the filesystem snapshot abstraction used by Agents‑Workflow (Rust rewrite) and the provider matrix that implements it across platforms. It supersedes the legacy Ruby‑era overview while preserving the original objectives and context.
 
 ## Objectives & Context
@@ -102,7 +100,7 @@ Why `cleanup_token`?
 
 - ZFS snapshots/clones
 - Btrfs subvolume snapshots
-- AgentFS (user‑space CoW FS with branches; see specs/Public/AgentFS/*.md)
+- AgentFS (user‑space CoW FS with branches; see specs/Public/AgentFS/\*.md)
 - Git‑based snapshots (see Git‑based Snapshots doc)
 
 Providers expose the same operations via the trait; the Workspace Manager and Agent Time‑Travel are provider‑agnostic.
@@ -126,11 +124,11 @@ Rationale: Users may prefer a Git worktree–based flow even when a more efficie
 
 Auto detection evaluates all available providers and picks the highest‑scoring capability for the host repo and requested working‑copy mode:
 
-0) Disabled (explicit): bypass snapshotting entirely; Time‑Travel FsSnapshots disabled
-1) ZFS (dataset or ancestor dataset writable): cow‑overlay supported on Linux via clone + bind
-2) Btrfs subvolume: cow‑overlay supported on Linux via subvolume snapshot + bind
-3) AgentFS (macOS/Windows best‑effort; Linux optional): cow‑overlay supported via FSKit/WinFsp/FUSE
-4) Git‑based snapshots: supports Worktree and In‑Place; does not support Cow‑Overlay. When Cow‑Overlay is requested and only Git is available, the orchestrator SHALL either select AgentFS (if available) or fall back to Worktree with a diagnostic.
+0. Disabled (explicit): bypass snapshotting entirely; Time‑Travel FsSnapshots disabled
+1. ZFS (dataset or ancestor dataset writable): cow‑overlay supported on Linux via clone + bind
+2. Btrfs subvolume: cow‑overlay supported on Linux via subvolume snapshot + bind
+3. AgentFS (macOS/Windows best‑effort; Linux optional): cow‑overlay supported via FSKit/WinFsp/FUSE
+4. Git‑based snapshots: supports Worktree and In‑Place; does not support Cow‑Overlay. When Cow‑Overlay is requested and only Git is available, the orchestrator SHALL either select AgentFS (if available) or fall back to Worktree with a diagnostic.
 
 Working‑copy compatibility:
 
@@ -140,13 +138,13 @@ Diagnostics surface detection notes and the final decision in `aw doctor` and ve
 
 ## Workflow Overview
 
-1) Prepare workspace (independent writable copy or in‑place):
+1. Prepare workspace (independent writable copy or in‑place):
    - ZFS/Btrfs: create snapshot + clone/subvolume snapshot
    - AgentFS: create branch from base snapshot and bind process
    - Git: create a dedicated worktree/branch at a snapshot commit
    - In‑Place: no workspace preparation; run on the original working copy; provider may still capture snapshots in place (Git, ZFS/Btrfs)
 
-2) Working copy mode:
+2. Working copy mode:
    - Cow‑overlay: mount/bind so the agent sees the workspace at the original repo path with CoW isolation
    - Worktree: run agent in the provider’s workspace directory (isolated)
    - In‑Place: run directly in the original working copy (no isolation), while still allowing snapshots when supported
@@ -166,9 +164,9 @@ Before launching a local agent session, AW writes session workspace information 
 
 This record is created before the agent process starts and updated as snapshots/branches are created (rows in `fs_snapshots`).
 
-3) Snapshot during session: `snapshot_now(label)` records points for Agent Time‑Travel
+3. Snapshot during session: `snapshot_now(label)` records points for Agent Time‑Travel
 
-4) Branch from snapshot (intervene): create a new writable workspace using `branch_from_snapshot`
+4. Branch from snapshot (intervene): create a new writable workspace using `branch_from_snapshot`
 
 ## Git‑Based Snapshots (Summary)
 

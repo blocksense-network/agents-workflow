@@ -4,67 +4,57 @@
 
 Enable agents to validate builds and tests across multiple operating systems in parallel with a simple, reliable flow:
 
-- The Linux host acts as the leader workspace (preferred for CoW FsSnapshots and orchestration).
+- One of the executors acts as the leader workspace (typically a Linux executor, due to the stronger support for [CoW Snapshots](FS%20Snapshots/FS%20Snapshots%20Overview.md)).
 - One or more follower workspaces (macOS, Windows, Linux) mirror the leader via Mutagen high‑speed file sync.
-- Each execution cycle fences the filesystem state (FsSnapshot + sync) and then invokes project‑defined commands everywhere via `run-everywhere`.
+- Each execution cycle fences the filesystem state (FsSnapshot + sync).
+- The agent on the leader can drive the execution of arbitrary commands (typically tests) on all executors via instructions to run the `aw agent run-everywhere` command.
 
 ### Goals
 
 - Deterministic, low‑latency propagation of file changes from leader to followers.
 - Atomic test execution view based on a consistent leader FsSnapshot.
 - Simple project integration via a single `run-everywhere` entrypoint and tagging.
-- Minimal OS‑specific logic inside agents; orchestration handled by the runner.
+- Minimal OS‑specific logic inside agents; orchestration handled by the executor.
 - Avoid the complexity of filesystem snapshots on followers. The snapshots of the leader are sufficient to restore any filesystem state on the followers as well.
 
 ### Terminology
 
-- **Coordinator**: The controller that creates sessions, provisions followers, requests connectivity credentials, orchestrates handshakes, and issues `run-everywhere` (typically the `aw` client or WebUI backend acting on behalf of the user).
-- **Leader**: The primary workspace on Linux (snapshot‑enabled when possible).
-- **Followers**: Secondary workspaces on other OSes, receiving file updates via Mutagen.
+- **End-User**: The user invoking the `aw task` command and the software components being part of this executable.
+- **Executor Access Point**: A server started with `aw serve` that offers the end-user a set of APIs for launching agentic coding tasks on one or more executors. The end-user specifies the address of the access point through the `remote-server` configuration option.
+- **Logical Coordinator** is the union of the end user’s `aw` client and the access point servers, listed in the fleet config. The fleet config fully determines which fleet members are managed directly by the end user and which are managed by the configured `remote-server` on the user’s behalf.
+- **Executors**: Executors typically run `aw agent enroll`, registering themselves with the access point and maintaining a persistent QUIC control connection. See [Executor-Enrollment](Executor-Enrollment.md) for mode details. The server running `aw serve` can also act as an executor. Executors are long‑lived and expected to be "always‑on" and ready to start tasks quickly, leveraging the FS Snapshot mechanisms defined in `FS Snapshots/FS Snapshots Overview.md`.
+- **Leader**: The primary executor in a fleet (Linux preferred) that owns FsSnapshots and initiates `sync-fence` and `run‑everywhere`.
+- **Followers**: Secondary executors un a fleet (Windows/macOS/Linux) that execute commands and validate builds/tests.
 - **Sync Fence**: An explicit operation ensuring all follower file trees match the leader FsSnapshot before execution.
 - **run-everywhere**: Project command that runs an action (e.g., build/test) on selected hosts and returns output of the command execution to the agent running on the leader.
 - **Fleet**: The set of one leader and one or more followers participating in a single multi‑OS session.
 
-### Architecture
+### Execution Cycle
 
-1. Workspace Topology
-   - Leader path (e.g., `/workspaces/proj`) is the source of truth.
-   - Mutagen sessions map leader→follower working directories with optimized ignores.
-   - Followers are prepared using container/VM/native shells; Windows may still use the `S:` drive mapping even when not using the WinFsp overlay (which is not required in a follower configuration).
+- Session start preflight (leader):
+- Establish persistent SSH masters (ControlMaster/ControlPersist) to all followers via HTTP CONNECT (see [Persistent SSH Connections](../Research/HowTo-Persistent-SSH-Connections.md)).
+- Write and start a Mutagen project describing sync/forward sessions to all followers (see [Mutagen Projects](../Research/Intro-to-Mutagen-Projects.md)).
+- Sync ignores: `node_modules`, `.venv`, `target`, `build`, large caches unless explicitly needed; per‑project config supported via the standard configuration system (see `sync-ignores` in config.schema.json — string list; defaults as above; project‑specific overrides allowed in repo config).
 
-2. Execution Cycle
-   - Agent edits files on the leader.
-   - Runner executes `fs_snapshot_and_sync`:
-     - Create a leader FsSnapshot (native CoW when available; FSKit/WinFsp overlay fallback otherwise).
-     - Issue a sync fence: wait until Mutagen confirms followers are in sync with the leader snapshot content.
-   - The agent is instructed to invoke `run-everywhere` with appropriate selectors in the agent instructions inserted automatically by agents-workflow.
+- Agent edits files on the leader.
+- Execute `fs_snapshot_and_sync`:
+- Create a leader [FsSnapshot](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Issue a sync fence: run `mutagen project flush` and wait until followers reflect the leader snapshot content.
+- Invoke `aw agent followers run` with the project‑specific test commands, specified in the agent instructions.
 
-3. Selectors
-   - `--host <name>`: run on a single follower by host name.
-   - `--tag <tag>`: run on all followers tagged with `<tag>` (e.g., `os=windows`, `gpu=nvidia`).
-     By default, the supplied command is executed on all configured followers (the default).
+Initiator:
 
-### Snapshot Strategy
+- Default: The leader connects with SSH to followers using persistent connections. If a follower is directly reachable by TCP per policy, the leader may connect directly; otherwise it uses HTTP CONNECT via the access point.
+- Hybrid: When the fleet spans multiple access points, the logical coordinator (aw client) relays bytes between CONNECT streams as needed.
 
-- Leader on CoW FS (ZFS/Btrfs/NILFS2):
-  - Only the leader creates FsSnapshots; followers rely on sync fence to reflect that exact state.
-- Leader without CoW (Windows‑only/macos‑only projects):
-  - Use user‑space overlay (FSKit/WinFsp) for the leader to provide efficient CoW behavior.
-  - Followers still rely on sync fence; no follower snapshots required.
+### Targeting and Selectors (overview)
 
-### Mutagen Integration
+Fleet member selection (by host name or tag) is defined in Fleet config and can be overridden per task from `aw task`. See CLI (fleet options) for the exact flags; the leader’s followers run honors that selection.
 
-- Use Mutagen to establish persistent, resilient sync sessions (bidirectional disabled; leader→followers only).
-- Sync ignores: `node_modules`, `.venv`, `target`, `build`, large caches unless explicitly needed; per‑project config via `.agents/mutagen.yml`.
-- Sync fence API: wait for `watchState == consistent` across all selected followers with a timeout and backoff.
+### Project Contract: followers run
 
-### Project Contract: run-everywhere
-
-The `run-everywhere` command is installed by the agents‑workflow setup scripts (same class as `get-task`) and is available in the project dev environment and the published base Docker images (see `devcontainer-design.md`).
-
-- Option parsing precedes the forwarded command: `run-everywhere [--host <name>]... [--tag <k=v>]... [--] <command> [args...]`.
+- Option parsing precedes the forwarded command: `aw agent followers run [--host <name>]... [--tag <k=v>]... [--all] [--] <command> [args...]`.
 - Supports (but does not require) `--` to delimit its own options from the forwarded command.
-- Host catalog discovery (local file `.agents/hosts.json`, REST query, or env).
 - Per‑host command adapters (what this means):
   - Purpose: A thin OS-specific shim that ensures the same logical command runs correctly on each follower.
   - Responsibilities per host:
@@ -86,69 +76,20 @@ Illustrative usage:
 
 ```bash
 # Run tests on all followers (default)
-run-everywhere -- test
+aw agent followers run -- test
 
 # Run build only on Windows hosts
-run-everywhere --tag os=windows -- build
+aw agent followers run --tag os=windows -- build
 
 # Run lint on a specific host
-run-everywhere --host win-12 -- lint
+aw agent followers run --host win-12 -- lint
 ```
 
 ### REST Observability (control‑plane)
 
-- `GET /api/v1/followers` → list followers as seen by the server (populated from leader‑ingested `followersCatalog` events or configured inventories).
-- `POST /api/v1/sessions/{id}/events/ingest` → leader pushes `fence*` and `host*` events for UI/automation; server rebroadcasts via the session SSE stream.
-
-### CLI Additions (high‑level)
-
-- `aw agent followers list` — show followers and status.
-- `aw agent followers sync-fence [--timeout s] [--tag ... | --host ... | --all]`
-- `aw agent run-everywhere <action> [args...] [--tag ... | --host ... | --all]`
-
-Notes:
-
-- These `aw agent` commands execute on the leader and fan out over SSH to followers. They are used by agents for testing during a session and by humans/CI for manual/automated verification.
-
-### Execution Flow (diagrams)
-
-Execution (agent‑driven, SSH data plane)
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant A as Agent (on Leader)
-  participant L as Leader (Linux)
-  participant M as Mutagen
-  participant Fw as Followers (macOS/Windows/Linux)
-
-  Note over A,L: Step begins → snapshot
-  A->>L: fs_snapshot_and_sync()  (implicit sync-fence)
-  L->>M: Create FsSnapshot; fence leader→followers
-  M->>Fw: Sync leader→followers (one-way)
-  M-->>L: Fence result { per-host }
-
-  A->>L: run-everywhere <cmd> [selectors]
-  L->>Fw: SSH cd <mapped path>; run <cmd>
-  Fw-->>L: stdout/stderr + exit codes
-```
-
-Event ingestion to REST (for UI/CI)
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant L as Leader
-  participant S as REST Service
-  participant UI as WebUI/TUI
-
-  L->>S: POST /sessions/{id}/events/ingest followersCatalog
-  L->>S: POST /sessions/{id}/events/ingest fenceStarted
-  L->>S: POST /sessions/{id}/events/ingest fenceResult
-  L->>S: POST /sessions/{id}/events/ingest hostStarted/hostLog/hostExited
-  L->>S: POST /sessions/{id}/events/ingest summary
-  S-->>UI: SSE /sessions/{id}/events (timeline)
-```
+- `GET /api/v1/sessions/{id}/info` → session summary including current fleet membership (server view), health, and endpoints.
+- `GET /api/v1/sessions/{id}/info` → session summary including current fleet membership (server view), health, and endpoints.
+- Control‑plane: the leader uses QUIC to push `fence*` and `host*` events; the server rebroadcasts via the session SSE stream.
 
 ### Time‑Travel Integration
 
@@ -156,11 +97,12 @@ sequenceDiagram
 - SessionMoments are emitted before/after the fence; the FsSnapshot id is linked to the post‑fence SessionMoment.
 - Seeking to that SessionMoment restores leader FsSnapshot; followers are re‑synced by issuing a fence before re‑execution.
 
-### Devcontainer/Runner Notes
+### Devcontainer/ Notes
 
 - Followers can be provisioned via devcontainers or native shells with the same project devshell.
-- Credentials and environment normalization follow the base image’s credential propagation rules.
+- Credentials and environment normalization follow the base image’s credential propagation rules. TODO: credentials are typically not needed on followers because the agentic coding software is not executed there. In general, credentials are only forwarded in [Local Mode](Local%20Mode.md).
 - Health checks verify Mutagen sessions and per‑host readiness before execution.
+  TODO: Specify these health checks. They must be executed over SSH.
 
 ### Failure Modes
 
@@ -171,9 +113,185 @@ sequenceDiagram
 ### Open Questions
 
 - Artifact collection and centralization strategy across followers.
+  TODO: This seem like something that each project would like to do differently, but we can add support for a command like `aw agent followers slurp` with a command-line interface and behavior modeled after pslurp (use web search to find the details)
 - Test sharding and orchestration policies (e.g., split tests by tag or runtime).
-- Security posture for follower access (SSH, certificates, RBAC via REST).
+  TODO: This is a cool feature. We should allow many executors to be connected (potentially having the same OS) - `aw agent followers run` should support accepting multiple commands which are then sharded over the set of executors to effectively run in parallel (each command should run on at exactly one executor matching the tags/labels).
 
-### Connectivity & Networking
+## Connectivity Layer — QUIC Control + SSH over CONNECT
 
-See the [Connectivity Layer](Connectivity%20Layer.md) spec for overlay options (Tailscale/Headscale, NetBird, ZeroTier, WireGuard, SSH‑only), ephemeral peers, and rendezvous SOCKS. The server never dials followers. The leader is the sole initiator of SSH (or SSH via rendezvous SOCKS), and the server only receives events for observability.
+### Purpose
+
+Provide reliable, low‑friction connectivity for run‑everywhere and Mutagen between the leader and follower hosts across Linux, macOS, and Windows — without dynamic VPNs. Control plane uses QUIC between executors and access points; data plane uses SSH tunneled via HTTP CONNECT (with optional client‑side multi‑hop relay in hybrid fleets).
+
+Key properties:
+
+- No dynamic VPNs required by the system.
+- Prefer SSH as the execution transport; Mutagen spawns its agent over SSH.
+
+### Assumptions
+
+The following assumptions are normative and apply to all connectivity modes (local, remote, hybrid):
+
+1. Coordinator reachability: The coordinator can execute control‑plane remote procedure calls against the access point (HTTPS/QUIC on :443). All executors are reachable for control and SSH tunneling through the access point.
+
+2. Hybrid coordination: A hybrid mode is supported where the end user reaches some executors directly, while the remote server acts as coordinator on behalf of the user for others.
+
+3. Logical coordinator: In all cases, the logical coordinator (the combination of the end user plus the remote server) can execute control‑plane RPCs via the access point; through it, the logical coordinator can reach all executors.
+
+4. Data plane: The leader connects to followers over SSH. Direct TCP dials are preferred when reachable and allowed by policy; otherwise, use HTTP CONNECT via the access point. No dynamic VPNs are provisioned by the system. In hybrid fleets, relaying through the client (and possibly a second access point hop) is allowed.
+
+5. Pre‑connected executors: A long‑lived executor may already be connected to the desired fleet peers; in such cases, connection steps are skipped and verification/probing proceeds directly.
+
+6. Automatic fallback: If a direct connection is not possible, the system automatically falls back to communicating through the logical coordinator using the most efficient available rendezvous/relay mechanism defined in this spec.
+
+7. Session transport: Once leader–followers connectivity is established, the coding session begins and all fleet operations communicate over SSH (and Mutagen over SSH) along the selected path.
+
+### Transport Summary
+
+- Control: QUIC (mutually‑authenticated, SPIFFE by default) between executors and access points.
+- SSH/Mutagen: Direct SSH dials from the leader to followers are preferred when reachable and allowed by policy. Otherwise, use HTTP CONNECT through the access point, bridged over QUIC to each executor’s local sshd.
+- Hybrid: When a fleet spans multiple access points, the client relays bytes between two CONNECT streams (multi‑hop) to stitch endpoints.
+  TODO: Explain this with an example. Describe what will happen as a strory.
+
+### Operational Guidance
+
+- Standardize on SSH
+  - Mutagen can run over SSH; run‑everywhere executes remote commands via SSH.
+  - Keep follower SSH access non‑root; prefer short‑lived keys or SSO.
+
+- Security
+  - Disable password auth on SSH; prefer keys/SSO; limit to non‑privileged users.
+  - QUIC identities follow Executor‑Enrollment; peer verification is always enforced.
+
+- Performance
+  - Co‑locate followers when possible; validate MTU; monitor sync‑fence latency in CI multi‑OS smoke tests.
+
+### Mutagen Project (session setup)
+
+At session start, the leader creates a Mutagen project file that enumerates all follower endpoints and any required forwardings. The project is started immediately so that SSH‑based syncs/forwards are established early. See specs/Research/Intro-to-Mutagen-Projects.md.
+
+- Project contents: one `sync:` entry per follower with `alpha`=leader path and `beta`=`ssh://<user>@<executor>/~/path` (resolved through CONNECT). Optional `forward:` entries for ports.
+- Lifecycle: `mutagen project start` on session creation; `mutagen project flush` is used for sync‑fence; `mutagen project terminate` on session end.
+- Non‑reachable peers become reachable through the QUIC CONNECT relay automatically; the CLI controls both CONNECT streams.
+
+### Hybrid Multi‑Hop Forwarding (client‑relay)
+
+### Handshake & Sync Confirmation
+
+Goal: Confirm follower connectivity (CONNECT or client‑relay) before first run‑everywhere, with a short timeout.
+
+Sequence (CONNECT path):
+
+1. Establish CONNECT and QUIC control channels; no key distribution or VPN enrollment is performed by the system.
+
+Fallback (hybrid relay): If endpoints live behind different access points, the client opens two CONNECT streams and relays bytes between them.
+
+### Hybrid Multi‑Hop Forwarding (client‑relay)
+
+Followers do not initiate outbound connections to other executors.
+The leader dials followers directly over SSH when reachable; otherwise it tunnels
+over HTTP CONNECT via the relevant access point(s). When followers belong to
+different access points, the access point coordinates and may instruct the
+end‑user client to relay by opening two CONNECT streams and copying bytes between
+them. If both executors belong to the same access point, the access point bridges
+internally over QUIC. The relay is session‑scoped and ephemeral; the CLI tears it down when the action completes.
+
+Policy and security:
+
+- The client authenticates to each access point with user OIDC/JWT; ACLs ensure it can open tunnels only to authorized executors.
+- Host key verification remains end‑to‑end to each executor.
+
+### Session setup details
+
+#### Persistent SSH connections (multiplexing)
+
+To minimize SSH handshake costs during a session, the leader (or the logical coordinator in hybrid mode) creates persistent SSH masters to all followers at session start, using OpenSSH ControlMaster/ControlPersist. Subsequent execs reuse the connection, dramatically reducing command latency. See specs/Research/HowTo-Persistent-SSH-Connections.md.
+
+#### Status and Observability
+
+- Session setup emits standard `status`/`log`/`host*`/`fence*` events; there is no VPN enrollment telemetry in the system.
+
+### Connectivity Algorithm (simplified)
+
+This section specifies the algorithm the Coordinator (aw client or WebUI backend acting as coordinator) uses to establish connectivity between the leader and followers for a fleet. The server never dials followers; all data‑plane connections originate from the leader (or are stitched by the client in hybrid multi‑hop).
+
+Inputs
+
+- `fleet`: list of followers with metadata: `name`, `os`, `sshUser`, `sshPort` (default 22), and tags.
+- `timeouts`: `{ connect: 5s, overall: 60s }` (configurable per policy).
+
+High‑Level Stages
+
+1. Session initialization
+2. SSH path (Direct TCP preferred; CONNECT fallback; client‑relay for hybrid)
+3. SSH Liveness Check
+4. Mutagen project health (flush)
+5. Monitoring and Re‑route on Failure
+
+#### Stage 1: Session initialization
+
+1. QUIC control connections are established (executors already run `aw agent enroll`).
+2. The leader (or logical coordinator) creates persistent SSH masters to followers via CONNECT (multiplexing enabled).
+3. The leader writes a Mutagen project file covering all followers and starts it.
+
+#### Stage 2: SSH path
+
+Use HTTP CONNECT via the relevant access point(s). In hybrid, stitch endpoints with client‑side multi‑hop relay. No dynamic VPNs are provisioned by the system.
+
+#### Stage 3: SSH Liveness Check
+
+Upon a successful probe, mark `sshPath` for the follower with details: `method` (P1..P7), `target` (host/port), and `proxy` (if any). Immediately perform a second liveness command to validate interactive command execution and latency budget:
+
+```
+ssh ... uname -a && id -u
+```
+
+Record `rtt_estimate_ms` as the measured round‑trip time.
+
+#### Stage 4: Mutagen project health
+
+Verify the Mutagen project is running and `mutagen project flush` completes (equivalent to sync‑fence). If a follower is temporarily unavailable, Mutagen will connect when the CONNECT relay is available.
+
+#### Stage 5: Path Fixation and Persistence
+
+- Persist in session state (SQLite/REST):
+  - `follower.sshPath = { method, target, relay, rtt_estimate_ms }`
+- Emit event `connect.path.fixed` for observability.
+
+#### Stage 6: Monitoring and Re‑route on Failure
+
+During the session:
+
+- Health probe every 30s: `ssh ... echo ok` with timeout 1s; tolerate 3 consecutive failures before marking path degraded.
+- On degradation, attempt seamless re‑route by re‑running Stage 2 starting from the last successful method, then earlier priorities. Emit `connect.path.degraded` and `connect.path.restored` events.
+- If an access point changes addressing, reconnect CONNECT streams; SSH masters are re‑established automatically by ControlPersist.
+
+#### Reverse path (rare)
+
+If an executor cannot keep a QUIC control connection, the session cannot proceed. Reverse WS tunnels are not required; bring the executor back online or exclude it from the fleet.
+
+#### Failure Handling and Telemetry
+
+- Every failure includes `method`, `error`, and timestamps; the Coordinator aggregates and reports best diagnostics per follower.
+- Common causes and guidance are included in messages (e.g., corporate proxy blocks CONNECT → use client relay across allowed endpoints).
+
+#### Security & Cleanup
+
+- SSH keys are short‑lived or use SSO. Password auth MUST be disabled.
+
+#### Pseudocode (per follower)
+
+```pseudo
+function establish_paths(fleet):
+  # Assume executors are connected over QUIC to access points
+  for follower in fleet.followers:
+    # Always use CONNECT via access point; in hybrid, open two CONNECT streams and relay
+    open_connect_stream(fleet.leader, follower)
+    start_ssh_control_master(fleet.leader, follower)  # ControlMaster/ControlPersist
+  write_mutagen_project(fleet)
+  mutagen_project_start()
+  mutagen_project_flush()  # sync-fence
+  return OK
+```
+
+This algorithm is normative for initial leader↔follower connectivity in fleets and is referenced by Multi‑OS Testing and CLI orchestration.

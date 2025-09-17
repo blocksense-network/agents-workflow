@@ -70,7 +70,7 @@ Shell completions are provided via the `aw shell-completion` command group. They
 #### 1) TUI
 
 - `aw` or `aw tui [--multiplexer <tmux|zellij|screen>] [--remote-server <NAME|URL>]` — See [TUI PRD](TUI%20PRD.md) for full UI details and flows.
-- With `--remote-server` (or configured `remote-server`), the same dashboard is presented, but panes may attach to remote sessions over SSH. See [Connectivity Layer](Connectivity%20Layer.md) for options (overlay VPN, SSH via HTTP CONNECT proxy, or session relay).
+- With `--remote-server` (or configured `remote-server`), the same dashboard is presented, but panes may attach to remote sessions over SSH. See [Multi‑OS Testing](Multi-OS%20Testing.md) for details on QUIC control plane, SSH via HTTP CONNECT, and client‑side relay in hybrid fleets.
 
 #### 2) Tasks
 
@@ -231,7 +231,7 @@ The `aw task` command preserves and extends the core functionality of the existi
 - **Repository Validation**: Validates repository state and VCS type detection
 - **Branch Name Validation**: Enforces VCS-specific branch naming rules
 - **Cleanup on Failure**: Ensures proper cleanup of partial operations
- - **Interactive abort affordance (TUI)**: During interactive prompts (for example, “Prompt user to select repo/workspace and target branch”), the TUI footer shows a dynamic list of context-sensitive shortcuts. When a prompt is active, it MUST include “Esc Back” and “Ctrl+C Abort” to indicate safe navigation and abort; on the dashboard (no modal/prompt), it MUST include “Ctrl+C Ctrl+C Quit”. Shortcuts are displayed only when actionable.
+- **Interactive abort affordance (TUI)**: During interactive prompts (for example, “Prompt user to select repo/workspace and target branch”), the TUI footer shows a dynamic list of context-sensitive shortcuts. When a prompt is active, it MUST include “Esc Back” and “Ctrl+C Abort” to indicate safe navigation and abort; on the dashboard (no modal/prompt), it MUST include “Ctrl+C Ctrl+C Quit”. Shortcuts are displayed only when actionable.
 
 Flow (high‑level):
 
@@ -406,9 +406,10 @@ Push to default remote? [Y/n]:
 - Snapshot strategy (local): Prefer ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`).
 - Runtimes: `devcontainer`, `local` (sandbox profile), `disabled` (policy‑gated).
 - Multi‑OS fleets: Snapshots are taken on the leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md).
-- Fleet resolution and orchestration: When `--fleet` is provided (or a default fleet is defined in config), the client expands the fleet into members and orchestrates both local and remote execution:
-  - Local members: The client creates one or more local executions, potentially combining a local sandbox and local VMs, applying the selected sandbox profile to each member.
-  - Remote members: The client issues the appropriate remote‑server requests per member (respecting per‑member server selection) and monitors returned `taskId`s.
+- Fleet resolution and orchestration: When `--fleet` is provided (or a default fleet is defined in config), the `aw task` invocation produces an explicit fleet plan that assigns each member to a controller (`client` or `server`). No reachability probing is used to decide this. The client then orchestrates both local and remote execution accordingly:
+  - Local members (controller: client): The client creates one or more local executions, potentially combining a local sandbox and local VMs, applying the selected sandbox profile to each member.
+  - Remote members (controller: server): The client issues the appropriate remote‑server requests per member (respecting per‑member server selection) and monitors returned `taskId`s.
+  - Membership info for remote executors is discovered via the server’s existing endpoints (e.g., `GET /api/v1/executors`) and selected by the user/config.
   - Coordination: The client emits/consumes events required by the multi‑OS flow (leader FsSnapshot, sync‑fence, run‑everywhere), as specified in [Multi-OS Testing](Multi-OS%20Testing.md).
 - State: The CLI MUST persist session/task state in the local SQLite database.
 - Outside a repo (remote/cloud targeting): Branch creation and task recording MUST occur server/cloud‑side; the CLI MUST return/display the `taskId`.
@@ -568,7 +569,7 @@ Behavior:
 Remote sessions:
 
 - When a session runs on another machine (VM or remote host), the REST service returns SSH connection details. `aw attach` uses these to open a remote multiplexer session (e.g., `ssh -t host tmux attach -t <name>`), or zellij/screen equivalents.
-- Connectivity options when hosts lack public IPs: (a) SSH over HTTP CONNECT via a proxy; see [Can SSH work over HTTPS?](../Research/Can%20SSH%20work%20over%20HTTPS.md). (b) Ephemeral overlay networks (Tailscale/NetBird) provisioned per session. (c) Session relays/SOCKS rendezvous as described in [Connectivity Layer](Connectivity%20Layer.md).
+- Connectivity when hosts lack public IPs: SSH over HTTP CONNECT via access points, with optional client‑side relay in hybrid fleets. See [Multi‑OS Testing](Multi-OS%20Testing.md) and [Can SSH work over HTTPS?](../Research/Can%20SSH%20work%20over%20HTTPS.md).
 
 #### 5) Repositories and Projects
 
@@ -784,11 +785,11 @@ aw remote runtimes
 
 ```
 
-aw remote runners
+aw remote executors
 
 ```
 
-REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes` and `/api/v1/runners`
+REST-backed: proxies to `/api/v1/agents`, `/api/v1/runtimes` and `/api/v1/executors`
 
 Useful for inspecting the capabilities of the remote server.
 
@@ -846,22 +847,18 @@ Mirrors `docs/configuration.md` including provenance, precedence, and Windows be
 #### 8) Service and WebUI (local developer convenience)
 
 ```
-aw serve [OPTIONS]
-
-OPTIONS:
-  --bind <ADDRESS>            Bind address (default: 0.0.0.0)
-  --port <P>                  Port to listen on
-  --db <URL|PATH>             Database URL or path
-```
-
-```
 aw webui [OPTIONS]
 
 OPTIONS:
   --bind <ADDRESS>            Bind address (default: 127.0.0.1)
   --port <P>                  Port to serve WebUI on
-  --rest <URL>                REST service URL to connect to
+  --max-concurrent-tasks <N>  Maximum concurrent tasks (default: auto-detect)
 ```
+
+BEHAVIOR:
+
+- If `--remote-server` is not provided, `aw webui` starts a local access point daemon
+  in‑process (same code path as `aw agent access-point`) and points the WebUI at it.
 
 #### 9) Shell Completion
 
@@ -945,6 +942,94 @@ NOTES:
 - Subcommands used only in agent dev environments live under `aw agent ...`. This keeps end‑user command space clean while still scriptable for agents.
 
 ```
+aw agent access-point [OPTIONS]
+
+DESCRIPTION: Run a local access point daemon for executors. The access point accepts
+             QUIC control connections from executors, exposes an HTTP CONNECT handler
+             for SSH/Mutagen tunneling, and provides the REST/SSE API for UIs and CLI.
+             When `--max-concurrent-tasks > 0`, this daemon also acts as an executor
+             on the same host (dual role).
+
+OPTIONS:
+  --bind <ADDRESS>            Bind address (default: 0.0.0.0)
+  --port <P>                  Port to listen on
+  --db <URL|PATH>             Database URL or path
+  --max-concurrent-tasks <N>  Maximum concurrent tasks (default: 0)
+```
+
+BEHAVIOR:
+
+- QUIC control plane per Executor‑Enrollment; validates executor identities.
+- HTTP CONNECT handler for SSH to connected executors.
+- If `--max-concurrent-tasks > 0`, schedules tasks locally as an executor.
+
+NOTE: The following command is part of the same daemon code path; flags select
+identity provider and optional embedded REST API.
+
+TODO: The description below assumes SPIFFE is enabled, but there are other identity options as well. The description should just list them perhaps (this message is intended for end users).
+
+```
+aw agent enroll [OPTIONS]
+
+DESCRIPTION: Enrolls an executor machine with the AW server. The executor establishes
+             a persistent outbound connection to the access point server, performs
+             SPIFFE workload attestation (via the SPIRE Workload API), and registers
+             its capabilities for task execution. Certificates are not managed on disk;
+             the daemon obtains an X.509 SVID and trust bundle from the local SPIRE
+             Agent and auto‑rotates them while running.
+             Once enrolled, the executor remains connected and ready to receive tasks.
+
+OPTIONS (choose identity via --identity; SPIFFE is default):
+  --remote-server <URL>          Access point server URL (default: from config)
+  --rest-api <yes|no>            Enable the REST API (default: no)
+  --bind <ADDRESS>               Bind address for the REST API (default: 0.0.0.0)
+  --port <P>                     Port to listen on
+  --db <URL|PATH>                Database URL or path
+  --labels <KEY=VALUE>...        Labels for executor (e.g., region=us-west, gpu=true)
+  --resources <JSON>             Resource capabilities as JSON object
+  --resources-file <PATH>        Resource capabilities from a JSON/YAML file
+  --tags <TAG>...                Tags for grouping executors
+  --name <NAME>                  Friendly name for this executor
+  --heartbeat-interval <SEC>     Heartbeat interval in seconds (default: 30)
+  --max-concurrent-tasks <N>     Maximum concurrent tasks (default: auto-detect)
+  --ssh <enabled|disabled>       Enable or disable SSH tunnel target (default: enabled)
+  --ssh-dst <HOST:PORT>          Allowed tunnel destination for OpenTcp (default: 127.0.0.1:22)
+
+  --identity <spiffe|files|vault|exec|insecure>  Identity provider (default: spiffe)
+  --spiffe-socket <PATH>         SPIFFE Workload API socket path (default: /run/spire/sockets/agent.sock)
+  --expected-server-id <SPIFFE>  Expected SPIFFE ID of the access point (e.g., spiffe://example.org/aw/serve)
+  --spiffe-mode <x509|jwt>       SPIFFE SVID type to request (default: x509)
+
+  --cert-file <PATH>             [files] Client certificate (PEM)
+  --key-file <PATH>              [files] Client private key (PEM)
+  --ca-file <PATH>               [files] CA bundle (PEM)
+  --server-san <LIST>            [files|vault|exec] Peer verification policy: comma‑sep items like dns=ap.example.com,uri=spiffe://example.org/aw/serve,pin=<sha256>
+
+  --vault-addr <URL>             [vault] Vault address
+  --vault-role <ROLE>            [vault] Role name (AppRole/JWT auth implied by env/config)
+  --vault-path <PATH>            [vault] Issue path (default: pki/issue/<role>)
+
+  --dynamic-cert-cmd <CMD>       [exec] Command that prints PEM materials on stdout
+  --dynamic-cert-ttl <DURATION>  [exec] Refresh interval (e.g., 30m)
+
+DEV‑ONLY:
+  --identity insecure            Dev: insecure mode (no peer verification). Not allowed in release builds unless explicitly enabled.
+
+BEHAVIOR:
+- Exactly one `--identity` mode is active. If omitted, `spiffe` is assumed.
+- SPIFFE mode: the agent obtains and auto‑rotates its X.509 SVID from the SPIRE Workload API; file‑based mTLS flags are invalid.
+- Files/Vault/Exec modes: `--server-san` is required to define peer verification policy (SAN allowlist and optional SPKI pinning).
+- Insecure mode: for development only; refused unless explicitly permitted by build/config.
+- `--ssh` defaults to `enabled`; when `disabled`, CONNECT/OpenTcp to this executor is refused.
+- `--ssh-dst` specifies the exact destination enforced by the agent for `OpenTcp` (default `127.0.0.1:22`).
+
+When `--rest-api yes` and `--bind/--port` are set, the daemon also serves the REST API
+documented in [REST Service](REST%20Service.md).
+```
+
+TODO: Clarify that when `--rest-api` is enabled, the launched daemon also acts as server implementing the [REST Service](REST%20Service.md).
+
+```
 aw agent get-task [OPTIONS]
 
 DESCRIPTION: Prints the current task prompt for agents. When --autopush is specified,
@@ -960,8 +1045,22 @@ OPTIONS:
 
 ```
 aw agent get-setup-env [OPTIONS]
+
+DESCRIPTION: Extracts and prints environment variables from @agents-setup directives
+             in the current task file(s). Processes all tasks (initial task + follow-up tasks)
+             on the current agent branch, parsing @agents-setup directives to extract
+             environment variables. Supports both VAR=value and VAR+=value syntax for
+             setting and appending values. Merges environment variables from multiple tasks,
+             with append operations combining values. Outputs in KEY=VALUE format, one per line.
+             In multi-repo scenarios, auto-discovers all repositories in subdirectories and
+             prefixes each repository's output with "In directory dirname:" followed by the
+             environment variables. Requires being on an agent branch with a valid task file.
+
+OPTIONS:
+  --repo <PATH>               Repository path
 ```
 
+```
 aw agent sandbox run [OPTIONS] -- <CMD> [ARGS...]
 
 DESCRIPTION: Launch a process inside a local Linux sandbox (namespaces, cgroups, seccomp),
@@ -977,33 +1076,16 @@ OPTIONS:
 --rw <PATH>... Additional writable bind mounts
 --overlay <PATH>... Paths made writable via overlayfs
 --blacklist <PATH>... Additional sensitive paths to block
-
 ```
 
 ```
-
 aw agent sandbox attach <SESSION_ID>
 aw agent sandbox ps <SESSION_ID>
 aw agent sandbox kill <SESSION_ID>
 aw agent sandbox audit <SESSION_ID>
-
 ```
 
 See also: Local Sandboxing on Linux for detailed semantics.
-
-DESCRIPTION: Extracts and prints environment variables from @agents-setup directives
-             in the current task file(s). Processes all tasks (initial task + follow-up tasks)
-             on the current agent branch, parsing @agents-setup directives to extract
-             environment variables. Supports both VAR=value and VAR+=value syntax for
-             setting and appending values. Merges environment variables from multiple tasks,
-             with append operations combining values. Outputs in KEY=VALUE format, one per line.
-             In multi-repo scenarios, auto-discovers all repositories in subdirectories and
-             prefixes each repository's output with "In directory dirname:" followed by the
-             environment variables. Requires being on an agent branch with a valid task file.
-
-OPTIONS:
-  --repo <PATH>               Repository path
-```
 
 TODO: document the `aw agent sandbox` commands, which are currently described with alternative names in the sandbox-related markdown files. After adding them here, use the consistent names everywhere.
 
@@ -1088,7 +1170,7 @@ Relay send control payloads (fallback).
 aw agent relay socks5 --session <ID> --bind <ADDRESS:PORT>
 ```
 
-Start a local SOCKS5 relay for this session (client-hosted rendezvous).
+Start a client-side CONNECT relay for this session (multi-hop across access points).
 
 ```
 aw agent followers accept-connections --session <ID> [OPTIONS]
@@ -1120,9 +1202,9 @@ OPTIONS:
 ```
 
 ```
-aw agent run-everywhere [OPTIONS] [--] <COMMAND> [ARGS...]
+aw agent followers run [OPTIONS] [--] <COMMAND> [ARGS...]
 
-DESCRIPTION: Invoke run-everywhere on selected followers.
+DESCRIPTION: Run a command on selected followers (multi‑OS fleet execution).
 
 OPTIONS:
   --tag <k=v>                 Tag filter
@@ -1136,7 +1218,7 @@ ARGUMENTS:
 
 Execution model:
 
-- These `aw agent` subcommands execute on the leader for the session and fan out to followers over SSH (or SSH via session rendezvous SOCKS). The REST service never connects to followers; it only receives events for observability.
+- These `aw agent` subcommands execute on the leader for the session and fan out to followers over SSH (via HTTP CONNECT, with optional client‑side relay in hybrid fleets). The REST service never connects to followers; it only receives events for observability.
 - For remote sessions, prefer: `ssh <leader> -- aw agent ...` so execution remains leader‑local.
 
 ```
@@ -1192,9 +1274,15 @@ ARGUMENTS:
   - `aw agent fs branch bind <BRANCH_ID>` — Bind the current (or specified) process to the branch view.
   - `aw agent fs branch exec <BRANCH_ID> -- <COMMAND> [ARGS...]` — Bind then exec a command within the branch context.
 
+TODO: Use the consistent style used in the rest of the document when describing the commands above.
+
 ### Local State
 
 Local enumeration and management of running sessions is backed by the canonical state database described in `docs/state-persistence.md`. The SQLite database is authoritative; no PID files are used.
+
+### Deamonization
+
+TODO: Clarify that the commands `aw webui`, `aw agent access-point` and `aw agent enroll` are all different entry-points into the same "run daemon" routine. Clarify how the daemonization is actually performed on all supported operating systems.
 
 ### Multiplexer Integration
 
