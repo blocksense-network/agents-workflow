@@ -9,7 +9,17 @@ apt-get install -y --no-install-recommends \
   mercurial \
   just \
   ruby-full \
+  ruby-dev \
   zfsutils-linux \
-  btrfs-progs
+  btrfs-progs \
+  build-essential \
+  pkg-config \
+  libyaml-dev \
+  libffi-dev \
+  libxml2-dev \
+  libxslt-dev \
+  libgmp-dev \
+  libssl-dev \
+  libreadline-dev
 
 sudo gem install rubocop

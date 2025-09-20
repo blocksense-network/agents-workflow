@@ -17,6 +17,10 @@ set shell := ["./scripts/nix-env.sh", "-c"]
 test:
     RUBYLIB=lib ruby -Itest test/run_tests_shell.rb
 
+# Run codex-setup integration tests (Docker-based)
+test-codex-setup-integration:
+    ./setup-tests/test-runner.sh
+
 # Lint the Ruby codebase
 lint:
     rubocop

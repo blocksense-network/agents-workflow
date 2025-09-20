@@ -4,7 +4,19 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # Install any requested extras (nix, direnv, cachix, etc.)
 if [ -n "${EXTRAS:-}" ] || [ "${NIX:-}" = "1" ]; then
-  "$AGENTS_WORKFLOW_DIR/bin/install-extras"
+  echo "Installing extras..."
+
+  # Create a temporary post-install script for environment propagation
+  POST_INSTALL_SCRIPT="/tmp/post-install-scripts/setup-post-install-$$.sh"
+
+  # Use Ruby installer with post-install script generation
+  "$AGENTS_WORKFLOW_DIR/bin/install-extras" --out-post-install-script="$POST_INSTALL_SCRIPT"
+
+  # Source the generated post-install script to get environment changes
+  if [ -f "$POST_INSTALL_SCRIPT" ]; then
+    echo "Sourcing post-install environment setup..."
+    . "$POST_INSTALL_SCRIPT"
+  fi
 fi
 
 ruby "$AGENTS_WORKFLOW_DIR/bin/download-internet-resources"

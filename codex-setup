@@ -4,13 +4,13 @@ AGENTS_WORKFLOW_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # Configure ~/.netrc for Git hosting services
 NETRC_CONTENT=""
-if [ -n "${GITHUB_TOKEN}" ]; then
+if [ -n "${GITHUB_TOKEN:-}" ]; then
   NETRC_CONTENT+=$'machine github.com\n  login x-access-token\n  password '${GITHUB_TOKEN}$'\n'
 fi
-if [ -n "${GITLAB_TOKEN}" ]; then
+if [ -n "${GITLAB_TOKEN:-}" ]; then
   NETRC_CONTENT+=$'machine gitlab.com\n  login oauth2\n  password '${GITLAB_TOKEN}$'\n'
 fi
-if [ -n "${BITBUCKET_TOKEN}" ]; then
+if [ -n "${BITBUCKET_TOKEN:-}" ]; then
   NETRC_CONTENT+=$'machine bitbucket.org\n  login x-token-auth\n  password '${BITBUCKET_TOKEN}$'\n'
 fi
 if [ -n "$NETRC_CONTENT" ]; then
@@ -22,7 +22,9 @@ else
   GET_TASK_CMD="get-task"
 fi
 
-cat > ../AGENTS.md << EOF
+# Create AGENTS.md file if we can write to the parent directory
+if [ -w "$(dirname "$AGENTS_WORKFLOW_DIR")" ]; then
+  cat > ../AGENTS.md << EOF
 When you a given a task description or developer instructions that
 just state "go", execute the shell command \`${GET_TASK_CMD}\` under
 the repository root and follow the instructions provided in the output.
@@ -45,14 +47,17 @@ DESCRIPTION OR DEVELOPER INSTRUCTIONS ARE NOT "go" AND IT SHOULD BE
 EXECUTED IMMEDIATELY UNDER THE REPOSITORY ROOT.
 
 EOF
+else
+  echo "Warning: Cannot write to parent directory, skipping AGENTS.md creation"
+fi
 
-bash "$AGENTS_WORKFLOW_DIR/common-pre-setup"
+. "$AGENTS_WORKFLOW_DIR/common-pre-setup"
 
 SETUP_ENV="$("$AGENTS_WORKFLOW_DIR/bin/get-task" --get-setup-env 2>/dev/null)"
 if [ -n "$SETUP_ENV" ]; then
-  while IFS= read -r line; do
+  printf '%s\n' "$SETUP_ENV" | while IFS= read -r line; do
     export "$line"
-  done <<< "$SETUP_ENV"
+  done
 fi
 
 if [ -f .agents/codex-setup ]; then
@@ -63,4 +68,4 @@ if [ -f .agents/common-post-setup ]; then
   .agents/common-post-setup
 fi
 
-bash "$AGENTS_WORKFLOW_DIR/common-post-setup"
+. "$AGENTS_WORKFLOW_DIR/common-post-setup"

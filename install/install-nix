@@ -73,7 +73,12 @@ esac
 
 # Download and run the Nix installer
 echo "Downloading Nix installer..."
-curl -L https://nixos.org/nix/install | sh -s -- --daemon --yes
+if curl -L https://nixos.org/nix/install | sh -s -- --daemon --yes; then
+    echo "Nix installer completed successfully"
+else
+    echo "Warning: Nix installer may have encountered issues"
+    echo "Checking if Nix was still installed..."
+fi
 
 # Set up Nix profile for login shells
 echo "Setting up Nix profile..."
@@ -86,20 +91,44 @@ printf '%s\n' \
   '  export PATH=/root/.nix-profile/bin:$PATH' \
   'fi' \
   > /etc/profile.d/nix-path.sh \
- && chmod +x /etc/profile.d/nix-path.sh
+ && chmod +x /etc/profile.d/nix-path.sh || echo "Warning: Could not set up system-wide Nix profile (permission denied)"
 
 # Create Nix configuration
 echo "Configuring Nix..."
-mkdir -p /etc/nix \
- && cat <<EOF > /etc/nix/nix.conf
+if mkdir -p /etc/nix 2>/dev/null; then
+    cat <<EOF > /etc/nix/nix.conf
 experimental-features = flakes nix-command
 EOF
+else
+    echo "Warning: Could not create system-wide Nix configuration (permission denied)"
+fi
 
 echo "Nix installation completed successfully!"
 
-# Verify installation (source the profile first)
+# Verify installation and set up post-install script
+echo "Setting up Nix environment..."
+
+# Try to source the appropriate Nix profile
 if [ -f /etc/profile.d/nix-path.sh ]; then
+    echo "Using system-wide Nix profile"
     source /etc/profile.d/nix-path.sh
+    PROFILE_SOURCE="/etc/profile.d/nix-path.sh"
+elif [ -f '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+    echo "Using Nix's built-in daemon profile"
+    source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+    PROFILE_SOURCE="/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+else
+    echo "Warning: Could not find Nix profile to source"
+    PROFILE_SOURCE=""
+fi
+
+# If POST_INSTALL_SCRIPT is set, append the appropriate source command
+if [ -n "${POST_INSTALL_SCRIPT:-}" ] && [ -n "$PROFILE_SOURCE" ]; then
+    echo "# Source Nix profile for environment setup" >> "$POST_INSTALL_SCRIPT"
+    echo "if [ -f $PROFILE_SOURCE ]; then" >> "$POST_INSTALL_SCRIPT"
+    echo "    source $PROFILE_SOURCE" >> "$POST_INSTALL_SCRIPT"
+    echo "fi" >> "$POST_INSTALL_SCRIPT"
+    echo "" >> "$POST_INSTALL_SCRIPT"
 fi
 
 if command -v nix >/dev/null 2>&1; then

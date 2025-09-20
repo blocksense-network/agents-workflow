@@ -28,6 +28,9 @@ module ExtrasTask
         opts.on('--extras=COMPONENTS', 'Specify components to install') do |val|
           options[:extras] = val
         end
+        opts.on('--out-post-install-script=FILE', 'Output script for post-install environment setup') do |val|
+          options[:post_install_script] = val
+        end
       end.parse!(args)
 
       # Handle special commands
@@ -49,15 +52,22 @@ module ExtrasTask
 
       if extras_string.strip.empty?
         stdout.puts 'No extras specified in EXTRAS environment variable'
+        stdout.puts 'For Nix installation with environment propagation, use NIX=1 instead.'
         stdout.puts "Available extras: #{ExtrasInstaller::VALID_COMPONENTS.join(', ')}"
-        stdout.puts "Example: EXTRAS='nix,direnv' #{$PROGRAM_NAME}"
+        stdout.puts 'Examples:'
+        stdout.puts "  EXTRAS='nix,direnv' #{$PROGRAM_NAME}"
+        stdout.puts '  NIX=1  # Direct sourcing (recommended for environment propagation)'
         return
       end
 
       begin
         # Check for test mode from command line flag or environment variable
         test_mode = options[:test_mode] || ENV['TEST_MODE'] == '1'
-        installer = ExtrasInstaller.new(extras_string, test_mode: test_mode)
+        installer = ExtrasInstaller.new(
+          extras_string,
+          test_mode: test_mode,
+          post_install_script: options[:post_install_script]
+        )
         installer.install_all_direct
       rescue ExtrasError => e
         stdout.puts "ERROR: #{e.message}"
