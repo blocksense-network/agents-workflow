@@ -94,10 +94,8 @@ class TestCopyProvider < Minitest::Test
     # Stub all other providers to be unavailable
     Snapshot::ZfsProvider.stub(:available?, false) do
       Snapshot::BtrfsProvider.stub(:available?, false) do
-        Snapshot::OverlayFsProvider.stub(:available?, false) do
-          provider = Snapshot.provider_for(repo)
-          assert_kind_of Snapshot::CopyProvider, provider
-        end
+        provider = Snapshot.provider_for(repo)
+        assert_kind_of Snapshot::CopyProvider, provider
       end
     end
   ensure

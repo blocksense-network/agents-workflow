@@ -188,9 +188,6 @@ class TestMockAgentIsolation < Minitest::Test
       # CoW filesystems should be very fast
       assert avg_creation_time < 2.0, "CoW snapshot creation should be fast (avg: #{avg_creation_time}s)"
       assert max_creation_time < 5.0, "CoW snapshot creation should be fast (max: #{max_creation_time}s)"
-    when Snapshot::OverlayFsProvider
-      # Overlay should be reasonably fast
-      assert avg_creation_time < 5.0, "OverlayFS creation should be reasonable (avg: #{avg_creation_time}s)"
     when Snapshot::CopyProvider
       # Copy provider will be slower but should still be reasonable for small repos
       assert avg_creation_time < 10.0,

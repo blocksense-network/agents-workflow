@@ -16,9 +16,10 @@ class TestMockAgentPerformance < Minitest::Test
     # Get memory usage in KB using ps command
     output = `ps -o rss= -p #{Process.pid}`.strip
     output.to_i
-  rescue
+  rescue StandardError
     0 # Return 0 if memory monitoring fails
   end
+
   def setup
     @original_repo = Dir.mktmpdir('perf_test_repo')
     @workspaces = []
@@ -77,8 +78,6 @@ class TestMockAgentPerformance < Minitest::Test
     when Snapshot::ZfsProvider, Snapshot::BtrfsProvider
       assert avg_time < 1.0, "CoW snapshots should average < 1s (actual: #{avg_time.round(3)}s)"
       assert max_time < 3.0, "CoW snapshots should max < 3s (actual: #{max_time.round(3)}s)"
-    when Snapshot::OverlayFsProvider
-      assert avg_time < 3.0, "OverlayFS should average < 3s (actual: #{avg_time.round(3)}s)"
     when Snapshot::CopyProvider
       assert avg_time < 10.0, "Copy provider should average < 10s (actual: #{avg_time.round(3)}s)"
     end
@@ -329,8 +328,6 @@ class TestMockAgentPerformance < Minitest::Test
       @workspaces.clear
     end
   end
-
-  private
 
   def create_test_repository
     # Create a basic repository with some test files

@@ -7,15 +7,15 @@ module PlatformHelpers
   module_function
 
   def windows?
-    RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+    !!(RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/)
   end
 
   def linux?
-    RbConfig::CONFIG['host_os'] =~ /linux/
+    !!(RbConfig::CONFIG['host_os'] =~ /linux/)
   end
 
   def macos?
-    RbConfig::CONFIG['host_os'] =~ /darwin|mac os/
+    !!(RbConfig::CONFIG['host_os'] =~ /darwin|mac os/)
   end
 end
 

@@ -142,13 +142,6 @@
       "supports_concurrent": true,
       "efficiency_rating": "excellent"
     },
-    "OverlayFsProvider": {
-      "max_snapshot_time": 5.0,
-      "max_cleanup_time": 3.0,
-      "supports_concurrent": true,
-      "efficiency_rating": "good",
-      "requires_privileges": true
-    },
     "CopyProvider": {
       "max_snapshot_time": 15.0,
       "max_cleanup_time": 5.0,

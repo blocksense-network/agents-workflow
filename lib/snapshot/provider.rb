@@ -8,7 +8,6 @@ module Snapshot
     path = File.expand_path(path)
     return ZfsProvider.new(path) if ZfsProvider.available?(path)
     return BtrfsProvider.new(path) if BtrfsProvider.available?(path)
-    return OverlayFsProvider.new(path) if OverlayFsProvider.available?(path)
 
     CopyProvider.new(path)
   end
@@ -34,6 +33,5 @@ module Snapshot
 
   require_relative 'zfs_provider'
   require_relative 'btrfs_provider'
-  require_relative 'overlay_fs_provider'
   require_relative 'copy_provider'
 end
