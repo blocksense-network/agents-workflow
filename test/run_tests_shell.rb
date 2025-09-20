@@ -310,6 +310,13 @@ class ShellTestRunner
     puts
     puts "📄 Full test output available at: #{@log_file}"
 
+    # Provide helpful hint for skips
+    if stats[:skips].positive?
+      puts
+      puts '💡 Hint: If tests are being skipped due to missing ZFS/Btrfs filesystems,'
+      puts "   run 'just create-test-filesystems' to set up reusable test environments."
+    end
+
     # Add summary to log file
     File.open(@log_file, 'a') do |f|
       f.puts

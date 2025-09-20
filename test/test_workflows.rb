@@ -212,7 +212,7 @@ class WorkflowAdditionalTest < Minitest::Test
     File.chmod(0o755, File.join(stub_dir, 'mv'))
 
     path_env = ENV.fetch('PATH', nil)
-    env = { 'PATH' => "#{stub_dir}:#{path_env}", 'HOME' => Dir.mktmpdir('home') }
+    env = { 'PATH' => "#{stub_dir}:#{path_env}", 'HOME' => Dir.mktmpdir('home'), 'TEST_MODE' => '1' }
     IO.popen(env, [File.join(clone, 'codex-setup')], chdir: repo, &:read)
 
     # setup script from repo should capture env variable

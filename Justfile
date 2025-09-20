@@ -21,6 +21,10 @@ test:
 test-codex-setup-integration:
     ./setup-tests/test-runner.sh
 
+# Run only snapshot-related tests (ZFS, Btrfs, and Copy providers)
+test-snapshot:
+    RUBYLIB=lib ruby scripts/run_snapshot_tests.rb
+
 # Lint the Ruby codebase
 lint:
     rubocop
@@ -82,6 +86,19 @@ md-links:
 # Spell-check Markdown with cspell (uses default dictionaries unless configured)
 md-spell:
     cspell "specs/**/*.md"
+
+# Create reusable file-backed filesystems for testing ZFS and Btrfs providers
+# This sets up persistent test environments in ~/.cache/agents-workflow
+create-test-filesystems:
+    scripts/create-test-filesystems.sh
+
+# Check the status of test filesystems
+check-test-filesystems:
+    scripts/check-test-filesystems.sh
+
+# Clean up test filesystems created by create-test-filesystems
+cleanup-test-filesystems:
+    scripts/cleanup-test-filesystems.sh
 
 # Run all spec linting/validation in one go
 lint-specs:

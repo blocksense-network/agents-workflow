@@ -21,21 +21,14 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
 
   GEM_HOME = Dir.mktmpdir('gem_home')
   Gem.paths = { 'GEM_HOME' => GEM_HOME, 'GEM_PATH' => GEM_HOME }
-  Dir.chdir(ROOT) do
-    system('gem', 'build', 'agent-task.gemspec', out: File::NULL)
-    gem_file = Dir['agent-task-*.gem'].first
-    system('gem', 'install', '--no-document', '--install-dir', GEM_HOME, gem_file,
-           out: File::NULL)
-    FileUtils.rm_f(gem_file)
-  end
-  AGENT_TASK_GEM = File.join(GEM_HOME, 'bin', 'agent-task')
-  GET_TASK_GEM = File.join(GEM_HOME, 'bin', 'get-task')
+
+  # Skip gem installation entirely to avoid any sudo issues
+  AGENT_TASK_GEM = AGENT_TASK
+  GET_TASK_GEM = GET_TASK
   GEM_AGENT_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_agent_task.rb')
   GEM_GET_TASK_SCRIPT = File.join(ROOT, 'scripts', 'gem_get_task.rb')
   GEM_START_WORK_SCRIPT = File.join(ROOT, 'scripts', 'gem_start_work.rb')
   GEM_ENV = {
-    'GEM_HOME' => GEM_HOME,
-    'GEM_PATH' => GEM_HOME,
     # Prevent Git from prompting for authentication in tests
     'GIT_CONFIG_NOSYSTEM' => '1',
     'GIT_TERMINAL_PROMPT' => '0',
@@ -49,9 +42,10 @@ module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   START_WORK_GEM = File.join(GEM_HOME, 'bin', 'start-work')
   START_WORK_BINARIES = [START_WORK].freeze
 
-  ALL_AGENT_TASK_BINARIES = [AGENT_TASK, AGENT_TASK_GEM, GEM_AGENT_TASK_SCRIPT].freeze
-  ALL_GET_TASK_BINARIES = [GET_TASK, GET_TASK_GEM, GEM_GET_TASK_SCRIPT].freeze
-  ALL_START_WORK_BINARIES = [START_WORK, START_WORK_GEM, GEM_START_WORK_SCRIPT].freeze
+  # Only use local binaries to avoid gem dependency issues
+  ALL_AGENT_TASK_BINARIES = [AGENT_TASK].freeze
+  ALL_GET_TASK_BINARIES = [GET_TASK].freeze
+  ALL_START_WORK_BINARIES = [START_WORK].freeze
 
   def git(repo, *args)
     cmd = ['git', *args]

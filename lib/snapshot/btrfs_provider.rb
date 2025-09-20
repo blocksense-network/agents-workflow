@@ -19,7 +19,11 @@ module Snapshot
     end
 
     def cleanup_workspace(dest)
-      run('btrfs', 'subvolume', 'delete', dest)
+      # Only try to delete if the path exists
+      return unless File.exist?(dest)
+
+      # Delete recursively in case there are nested subvolumes
+      run('btrfs', 'subvolume', 'delete', '-R', dest)
     end
 
     def self.fs_type(path)
