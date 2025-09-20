@@ -8,7 +8,7 @@ require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
 require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
-require_relative '../../lib/snapshot/provider'
+require 'snapshot/provider'
 
 # Comprehensive tests for Copy provider combining generic and specific tests
 class TestCopyProvider < Minitest::Test

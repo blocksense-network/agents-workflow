@@ -3,6 +3,7 @@
 require 'logger'
 require 'fileutils'
 require 'digest'
+require 'time'
 
 # Simple JSON-like output without requiring the JSON gem
 # This avoids compatibility issues while maintaining test functionality
@@ -75,8 +76,8 @@ class MockAgent
     @config = DEFAULT_CONFIG.merge(config)
     @activity_log = []
 
-    setup_logger
     validate_workspace
+    setup_logger
   end
 
   # Main entry point - simulates a complete agent work session

@@ -15,7 +15,7 @@
 set shell := ["./scripts/nix-env.sh", "-c"]
 
 test:
-    ruby -Itest test/run_tests_shell.rb
+    RUBYLIB=lib ruby -Itest test/run_tests_shell.rb
 
 # Lint the Ruby codebase
 lint:

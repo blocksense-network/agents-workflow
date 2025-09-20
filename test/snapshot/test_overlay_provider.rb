@@ -7,7 +7,7 @@ require_relative '../test_helper'
 require_relative 'provider_shared_behavior'
 require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
-require_relative '../../lib/snapshot/provider'
+require 'snapshot/provider'
 
 # Shared behavior for OverlayFS multi-filesystem testing
 module ProviderOverlayTestBehavior

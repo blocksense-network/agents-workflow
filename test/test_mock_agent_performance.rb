@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative '../test_helper'
-require_relative '../../lib/snapshot/provider'
-require_relative '../../lib/mock_agent'
+require_relative 'test_helper'
+require 'snapshot/provider'
+require 'mock_agent'
 require 'tmpdir'
 require 'benchmark'
 require 'etc'
@@ -10,6 +10,15 @@ require 'etc'
 # Performance and scalability tests for MockAgent and snapshot providers
 # Measures resource usage, timing, and system limits under various loads
 class TestMockAgentPerformance < Minitest::Test
+  private
+
+  def get_process_memory
+    # Get memory usage in KB using ps command
+    output = `ps -o rss= -p #{Process.pid}`.strip
+    output.to_i
+  rescue
+    0 # Return 0 if memory monitoring fails
+  end
   def setup
     @original_repo = Dir.mktmpdir('perf_test_repo')
     @workspaces = []
@@ -78,7 +87,9 @@ class TestMockAgentPerformance < Minitest::Test
   def test_concurrent_snapshot_creation
     puts "\n--- Concurrent Snapshot Creation ---"
 
-    num_concurrent = [2, 4, 8].min(Etc.nprocessors * 2)
+    # Choose concurrency level based on available processors
+    max_concurrent = [Etc.nprocessors * 2, 8].min
+    num_concurrent = [2, 4, 8].select { |n| n <= max_concurrent }.max || 2
 
     num_concurrent.times do |concurrency|
       next if concurrency.zero?

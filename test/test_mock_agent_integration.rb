@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative '../test_helper'
-require_relative '../../lib/snapshot/provider'
-require_relative '../../lib/mock_agent'
+require_relative 'test_helper'
+require 'snapshot/provider'
+require 'mock_agent'
 require 'tmpdir'
 require 'fileutils'
 

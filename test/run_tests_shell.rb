@@ -75,8 +75,7 @@ class ShellTestRunner
       #!/usr/bin/env ruby
       # frozen_string_literal: true
 
-      # Change to the test directory to ensure proper loading
-      Dir.chdir("#{__dir__}")
+      # Stay in the project root directory to maintain load paths
 
       require 'minitest/autorun'
 
@@ -102,8 +101,8 @@ class ShellTestRunner
 
       # Load all test files
       test_files = []
-      test_files.concat(Dir["test_*.rb"].sort)
-      test_files.concat(Dir["snapshot/test_*.rb"].sort)
+      test_files.concat(Dir["test/test_*.rb"].sort)
+      test_files.concat(Dir["test/snapshot/test_*.rb"].sort)
 
       test_files.each do |test_file|
         puts "Loading: \#{File.basename(test_file)}"

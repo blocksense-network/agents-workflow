@@ -231,6 +231,10 @@
           # Linux-only filesystem utilities for snapshot functionality
           pkgs.zfs # ZFS utilities for copy-on-write snapshots
           pkgs.btrfs-progs # Btrfs utilities for subvolume snapshots
+          # Docker for containerized testing
+          pkgs.docker
+          # System monitoring tools for performance tests
+          pkgs.procps # ps, top, etc. for memory monitoring
         ] ++ pkgs.lib.optionals isDarwin [
           # macOS-only VM manager
           pkgs.lima # Linux virtual machines on macOS

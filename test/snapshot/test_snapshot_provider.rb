@@ -3,7 +3,7 @@
 require 'minitest/autorun'
 require 'tmpdir'
 require_relative '../test_helper'
-require_relative '../../lib/snapshot/provider'
+require 'snapshot/provider'
 
 # Tests for snapshot provider detection and basic copy provider
 class TestSnapshotProvider < Minitest::Test

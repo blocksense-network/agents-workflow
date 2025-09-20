@@ -8,8 +8,13 @@ module Snapshot
       return false unless RUBY_PLATFORM.include?('linux')
 
       # Check if /proc/filesystems exists and contains overlay
-      File.exist?('/proc/filesystems') &&
-        File.read('/proc/filesystems').include?('overlay')
+      return false unless File.exist?('/proc/filesystems') &&
+                          File.read('/proc/filesystems').include?('overlay')
+
+      # Check if we have root privileges (required for mounting)
+      return false unless Process.uid.zero?
+
+      true
     end
 
     def create_workspace(dest)

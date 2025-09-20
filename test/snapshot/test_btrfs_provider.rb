@@ -10,7 +10,7 @@ require_relative 'provider_quota_test_behavior'
 require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
 require_relative 'filesystem_space_utils'
-require_relative '../../lib/snapshot/provider'
+require 'snapshot/provider'
 
 # Comprehensive tests for Btrfs provider combining generic and specific tests
 class TestBtrfsProvider < Minitest::Test

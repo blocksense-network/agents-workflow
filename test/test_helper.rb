@@ -3,12 +3,12 @@
 require 'English'
 require 'rbconfig'
 require 'tmpdir'
-require_relative '../lib/platform_helpers'
-require_relative '../lib/vcs_repo'
+require 'platform_helpers'
+require 'vcs_repo'
 
 # Add debugging support when ENV variable is set
 if ENV['RUBY_DEBUG'] || ENV['DEBUG_TESTS']
-  require_relative '../lib/pry_debug'
+  require 'pry_debug'
   puts '🔍 Debug mode enabled for tests'
 end
 

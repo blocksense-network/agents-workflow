@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative '../test_helper'
-require_relative '../../lib/snapshot/provider'
+require_relative 'test_helper'
+require 'snapshot/provider'
 require 'tmpdir'
 require 'open3'
 

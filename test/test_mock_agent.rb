@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'test_helper'
-require_relative '../lib/mock_agent'
+require 'mock_agent'
 require 'tmpdir'
 require 'json'
 
@@ -49,8 +49,9 @@ class TestMockAgent < Minitest::Test
   end
 
   def test_invalid_workspace_path
+    nonexistent_path = File.join(Dir.tmpdir, "definitely_nonexistent_#{rand(1_000_000)}")
     assert_raises(ArgumentError) do
-      MockAgent.new('/nonexistent/path')
+      MockAgent.new(nonexistent_path)
     end
   end
 
@@ -113,8 +114,8 @@ class TestMockAgent < Minitest::Test
 
   def test_file_modification_behavior
     agent = MockAgent.new(@test_workspace, 'modifier', {
-                            min_work_duration: 0.1,
-                            max_work_duration: 0.2,
+                            min_work_duration: 1.0,
+                            max_work_duration: 1.5,
                             create_file_probability: 0.0,
                             modify_file_probability: 1.0,
                             read_file_probability: 0.0
@@ -259,8 +260,8 @@ class TestMockAgent < Minitest::Test
 
     file_types.each do |ext|
       agent = MockAgent.new(@test_workspace, "gen_#{ext.gsub('.', '')}", {
-                              min_work_duration: 0.1,
-                              max_work_duration: 0.2,
+                              min_work_duration: 1.0,
+                              max_work_duration: 1.5,
                               create_file_probability: 1.0,
                               generated_file_types: [ext],
                               max_generated_lines: 10
@@ -269,7 +270,8 @@ class TestMockAgent < Minitest::Test
       agent.run_work_session
 
       # Check that a file with the expected extension was created
-      generated_files = Dir.glob(File.join(@test_workspace, "*#{ext}"))
+      all_files_with_ext = Dir.glob(File.join(@test_workspace, "*#{ext}"))
+      generated_files = all_files_with_ext.select { |f| File.basename(f).include?('generated') }
       assert generated_files.size.positive?, "Should generate #{ext} file"
 
       # Check file content is appropriate for type
