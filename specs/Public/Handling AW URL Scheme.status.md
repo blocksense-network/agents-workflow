@@ -1,162 +1,195 @@
-# Handling `agents-workflow://` URL Scheme — Status and Plan
+### Overview
 
-Spec: See “Handling AW URL Scheme.md” for the required behavior. This file tracks implementation tasks, milestones, and a precise test plan.
+This document tracks the implementation status of the [Handling AW URL Scheme](./Handling%20AW%20URL%20Scheme.md) functionality.
 
-## Goal
+Goal: Implement a secure, cross‑platform URL scheme handler that opens tasks and (optionally) creates tasks with an explicit confirmation dialog. Support TUI reuse when a task is already followed in an existing terminal window.
 
-Implement a secure, cross‑platform URL scheme handler that opens tasks and (optionally) creates tasks with an explicit confirmation dialog. Support TUI reuse when a task is already followed in an existing terminal window.
+### Milestones and tasks (with automated success criteria)
 
-## Milestones and Tasks
+M0. Protocol installation and basic registration (3–4d)
 
-0. Select test automation framework(s)
+- Implement Windows registry (HKCU) and MSIX URI activation.
+- Implement macOS `CFBundleURLTypes` and Electron deep‑link handling.
+- Implement Linux `.desktop` with `x-scheme-handler/agents-workflow`.
+- Create minimal test handler binary that logs URL reception for testing automation frameworks.
+- Success criteria (system integration tests):
+  - OS registration succeeds without elevation.
+  - Handler launches when URL is clicked in browsers (logs URL reception).
+  - Unregistration cleans up registry/desktop entries.
+- Deliverable: Cross-platform protocol registration working, minimal handler binary for testing.
 
-- Evaluate candidates for reliably handling browser external‑protocol prompts and the handler’s native confirmation dialog across Windows/macOS/Linux:
-  - Playwright + OS accessibility automation (macOS AppleScript/JXA; Windows UIAutomation; Linux AT‑SPI/dogtail).
-  - OpenQA (openQA) with VM orchestration and needle‑based UI assertions for full desktop flows.
-  - Optional: WebDriver BiDi + OS automation glue.
+Acceptance checklist (M0)
+
+- [ ] S1 Windows registry registration works (HKCU)
+- [ ] S2 macOS CFBundleURLTypes registration succeeds
+- [ ] S3 Linux desktop file registration functions
+- [ ] Handler launches from browser clicks and logs URLs
+
+M1. Test automation framework selection (2–3d)
+
+- Evaluate candidates for reliably handling browser external‑protocol prompts and the handler's native confirmation dialog across Windows/macOS/Linux.
+- Test Playwright + OS accessibility automation (macOS AppleScript/JXA; Windows UIAutomation; Linux AT‑SPI/dogtail).
+- Test OpenQA with VM orchestration and needle‑based UI assertions for full desktop flows.
+- Optional: WebDriver BiDi + OS automation glue.
+- Use the registered protocol from M0 to test end-to-end URL clicking flows.
 - Criteria: flake rate in CI, cross‑OS coverage, maintenance overhead, artifact quality (video/screenshot/traces), ability to drive native dialogs, and total runtime.
+- Success criteria:
+  - PoC automation can detect and click "Open <app>" buttons in external protocol dialogs across all target browsers.
+  - Test execution completes within 5 minutes per scenario on CI hardware.
 - Deliverable: a short report with PoC repos, CI configs, and a recommended primary+fallback stack.
 
-1. Core handler skeleton (parse → normalize → ensure WebUI → open)
+Acceptance checklist (M1)
 
-- Rust bin `aw-url-handler` (Windows/macOS/Linux) with structured logs.
-- URL parsing/validation; reject unknown hosts/components and secrets in query.
-- Config resolution (webui base, rest base) + health probes.
+- [ ] PoC repos demonstrate browser protocol prompt handling
+- [ ] Native dialog automation works on Windows/macOS/Linux
+- [ ] CI matrix configured for cross-platform testing
+- [ ] Performance benchmarks meet 5-minute target
 
-2. WebUI bootstrap + REST probing
+M2. Core handler skeleton (3–5d)
 
-- Start WebUI locally when needed, wait for `/_aw/healthz`.
-- Probe optional REST at `/api/v1/readyz`.
-- Open `${webuiBase}/tasks/<id>` reliably across OSes.
+- Build Rust binary `aw-url-handler` (Windows/macOS/Linux) with structured logging.
+- Implement URL parsing/validation; reject unknown hosts/components and secrets in query.
+- Implement config resolution (webui base, rest base) + health probes.
+- Success criteria (unit tests):
+  - URL parsing rejects malformed schemes, unknown paths, and query secrets.
+  - Config resolution finds WebUI ports from state files and health endpoints.
+  - Binary startup time < 100ms; memory usage < 10MB resident.
 
-3. TUI integration and reuse
+Acceptance checklist (M2)
 
-- Read TUI control index `${STATE_DIR}/tui-sessions.json` and/or query `${XDG_RUNTIME_DIR}/agents-workflow/tui.sock`.
-- For existing sessions, reuse window via tmux/WezTerm/Kitty commands; platform focus helpers wired.
-- Fallback: start `aw tui --follow <id>`.
+- [ ] U1 URL validation rejects invalid schemes and malicious inputs
+- [ ] U2 Config resolution finds local WebUI/REST endpoints
+- [ ] Binary performance meets targets
+- [ ] Structured logging emits parse/config events
 
-4. Create flow with confirmation (security)
+M3. WebUI bootstrap and REST probing (3–4d)
 
-- Native confirmation dialog with required fields (title, source, summary, where/how it will run, access scope, buttons, trust checkbox).
-- Trust store with per‑source ephemeral rules; global policy from config.
-- Safe rendering (escape all user content); cancellation cancels creation.
+- Implement WebUI startup when absent, waiting for `/_aw/healthz`.
+- Implement optional REST probing at `/api/v1/readyz`.
+- Implement cross-platform browser opening to `${webuiBase}/tasks/<id>`.
+- Success criteria (integration tests):
+  - Handler starts WebUI process when health check fails.
+  - Browser opens correct URL after WebUI becomes responsive.
+  - REST probing succeeds when service is available.
 
-5. Packaging and registration
+Acceptance checklist (M3)
 
-- Windows registry (HKCU) and MSIX URI activation.
-- macOS `CFBundleURLTypes` and Electron deep‑link handling.
-- Linux `.desktop` with `x-scheme-handler/agents-workflow`.
+- [ ] I1 WebUI auto-start works when health check fails
+- [ ] I2 Browser opens correct task URL across platforms
+- [ ] REST optional probing succeeds when available
+- [ ] Startup time < 3s p95 on target hardware
 
-6. Telemetry, docs, and hardening
+M4. TUI integration and reuse (4–6d)
 
-- Rotating logs; error surfacing; minimal diagnostics.
-- Docs update and examples in spec and CLI.md.
+- Implement TUI control index reading `${STATE_DIR}/tui-sessions.json` and socket queries.
+- Implement existing session reuse via tmux/WezTerm/Kitty commands with platform focus helpers.
+- Implement fallback: start `aw tui --follow <id>` (non-blocking).
+- Success criteria (integration tests):
+  - Existing TUI sessions are detected and reused instead of spawning new ones.
+  - Platform-specific focus commands execute successfully.
+  - Fallback TUI startup works when no existing session found.
 
-Success criteria
+Acceptance checklist (M4)
+
+- [ ] I3 TUI session index reading works
+- [ ] I4 Existing session reuse succeeds across multiplexers
+- [ ] Platform focus helpers activate correct windows
+- [ ] Fallback TUI startup works when sessions absent
+
+M5. Create flow with confirmation dialog (5–8d)
+
+- Implement native confirmation dialog with required fields (title, source, summary, execution venue, access scope, buttons, trust checkbox).
+- Implement trust store with per‑source ephemeral rules and global policy support.
+- Implement safe rendering with user content escaping; cancellation prevents creation.
+- Success criteria (integration tests):
+  - Dialog displays all required fields with escaped content.
+  - Cancellation prevents task creation; confirmation proceeds with proper handoff.
+  - Trust policy suppresses dialog for whitelisted sources within time window.
+
+Acceptance checklist (M5)
+
+- [ ] I5 Confirmation dialog shows all required fields
+- [ ] I6 Cancellation prevents creation; confirmation proceeds
+- [ ] Trust policy suppresses dialog appropriately
+- [ ] Content escaping prevents injection attacks
+
+M6. Telemetry, docs, and hardening (2–3d)
+
+- Implement rotating logs and error surfacing with minimal diagnostics.
+- Update docs and examples in spec and CLI.md.
+- Add input validation hardening and timeout handling.
+- Success criteria (system tests):
+  - Logs rotate properly and contain actionable error information.
+  - Documentation examples work end-to-end.
+  - Handler gracefully handles network timeouts and malformed inputs.
+
+Acceptance checklist (M6)
+
+- [ ] Logs rotate and contain diagnostic information
+- [ ] Documentation examples are accurate and testable
+- [ ] Error handling covers network failures and timeouts
+- [ ] Security hardening prevents common attacks
+
+### Overall success criteria
 
 - Cold start to task page < 3s p95 on macOS/Windows/Linux default dev boxes.
-- TUI reuse succeeds when index/socket indicates an existing session (see tests).
+- TUI reuse succeeds when index/socket indicates an existing session.
 - Create flow always presents the handler confirmation UI (unless test override explicitly enabled) and behaves per spec.
+- All acceptance checklists pass on CI matrix.
 
-## Test Plan (precise)
+### Test strategy & tooling
 
-Test matrix
+- Unit tests (cargo test) for URL parsing, config resolution, and core logic.
+- Integration tests for WebUI startup, browser opening, TUI session management, and dialog interactions.
+- System tests for OS registration, browser protocol handling, and end-to-end URL processing.
+- E2E automation using selected framework (from M1) for browser + native dialog flows.
+- Cross-platform CI matrix: GitHub Actions with `windows-latest`, `macos-latest`, `ubuntu-latest`.
+- Test harness components:
+  - Browser automation: Playwright.
+  - Desktop automation for external-protocol prompts and handler confirmation:
+    - Windows: PowerShell + UIAutomation (or Python `uiautomation`) to locate and click buttons by name; fallback AutoHotkey.
+    - macOS: AppleScript/JXA using Accessibility API to detect browser confirmation sheets; standard `osascript` runner in CI.
+    - Linux: AT‑SPI via `dogtail` (preferred) to find "External Protocol Request" dialogs; X11 fallback via `xdotool`.
+  - Handler observability: temporary test log sink `${TMPDIR}/aw-url-handler-test.log` with structured events.
+- Fixtures: Stub WebUI server, optional stub REST, TUI control stub with sessions.json and socket.
+- Test matrix: OS (Windows Win10/11, macOS 13+, Linux GNOME/KDE), Browsers (Chrome/Chromium, Edge, Firefox, Safari).
+- Golden tests for structured logs, protocol compliance, and dialog interactions.
 
-- OS: Windows (Win10/11), macOS (13+), Linux (GNOME/KDE; X11 and Wayland when feasible).
-- Browsers: Chrome/Chromium, Edge (Win), Firefox, Safari (macOS).
+### Deliverables
 
-Test harness components
+- Rust binary `aw-url-handler` with cross-platform builds.
+- OS-specific packaging and registration scripts.
+- Comprehensive automated test suite with CI matrix.
+- Updated documentation and CLI examples.
+- Security audit report for confirmation dialog and URL handling.
 
-- Browser automation: Playwright.
-- Desktop automation for external‑protocol prompts (browser‑controlled dialogs) and handler confirmation:
-  - Windows: PowerShell + UIAutomation (or Python `uiautomation`) to locate and click buttons by name; fallback AutoHotkey for stubborn cases.
-  - macOS: AppleScript/JXA using Accessibility API to detect Chrome/Firefox/Safari confirmation sheets; standard `osascript` runner in CI.
-  - Linux: AT‑SPI via `dogtail` (preferred) to find “External Protocol Request” dialogs; X11 fallback via `xdotool` (Wayland: `ydotool`/portal hints).
-- Handler observability: temporary test log sink `${TMPDIR}/aw-url-handler-test.log` with structured events to assert flows without scraping UI text.
+### Risks & mitigations
 
-Fixtures
+- Browser/OS protocol handling variance: extensive testing across browser/OS combinations; fallback automation strategies.
+- Native dialog accessibility APIs unstable: feature-gate automation approaches; manual testing as backup.
+- Security risks from URL handling: strict input validation; no secrets in URLs; safe dialog rendering.
+- CI performance for UI automation: optimize test flows; parallel execution where possible; acceptable timeouts.
 
-- Stub WebUI server exposing `/_aw/healthz` and routes `/tasks/:id` (no auth), launched on random free port.
-- Optional stub REST at `/api/v1/readyz`, `/api/v1/sessions/:id`, `/api/v1/tasks`.
-- TUI control stub: script to create `tui-sessions.json` with entries mapping task id to mux/window identifiers; optional UNIX socket echo server that replies to `FIND <taskId>`.
+### Parallelization notes
 
-Scenarios
+- M0 (protocol registration) can proceed independently as the foundation.
+- M1 (test framework evaluation) can start immediately after M0 completes, using the registered protocol.
+- M2 (core handler) can start after M0 and proceed in parallel with M1.
+- M3/M4 can proceed in parallel after M2 stabilizes.
+- M5 requires M2–M4 for integration testing (needs handler skeleton and TUI/WebUI integration).
+- M6 finalizes after all milestones complete.
 
-1. Open task — happy path
+### Status tracking
 
-- Start stub WebUI on port P.
-- Invoke handler with `agents-workflow://task/ABC`.
-- Assert: browser navigates to `http://127.0.0.1:P/tasks/ABC` (Playwright URL check) and handler log shows `action=open`.
+- M0: pending
+- M1: pending
+- M2: pending
+- M3: pending
+- M4: pending
+- M5: pending
+- M6: pending
 
-2. Open task — start WebUI when absent
-
-- Ensure no WebUI running.
-- Invoke handler.
-- Assert: handler starts WebUI (detect child process or health probe), then opens the route; p95 time < 3s on CI hardware.
-
-3. TUI reuse present
-
-- Create `tui-sessions.json` with `ABC → { mux: tmux, windowId: X }` and ensure `tmux` is available.
-- Invoke `agents-workflow://task/ABC?tui=1`.
-- Assert: handler executes `tmux select-window -t X`; no new `aw tui` process is spawned; optional platform focus succeeds.
-
-4. TUI fallback when absent
-
-- Ensure no `tui-sessions.json` entry.
-- Invoke `...tui=1`.
-- Assert: handler launches `aw tui --follow ABC` without blocking; WebUI still opens.
-
-5. Create flow — confirmation required
-
-- From each browser, open a page with `<a href="agents-workflow://create?spec=%7B...%7D">`.
-- Trigger click via Playwright; handle the browser’s external‑protocol prompt via OS automation.
-- Assert: handler’s own native confirmation dialog appears with:
-  - prompt summary snippet
-  - execution venue (local/remote)
-  - agent type and snapshot mode
-  - “Create Task” and “Cancel” buttons, confirmation checkbox
-- Click “Cancel”: assert no task created; WebUI shows create page with prefilled payload via local hand‑off id.
-- Click “Create Task”: assert REST/CLI invoked; new `taskId` logged; browser navigates to task page.
-
-6. Trust policy
-
-- In confirmation dialog, tick “Trust this site for 1 hour”.
-- Repeat click within the hour: assert dialog suppressed, creation proceeds; after expiry, dialog returns.
-
-7. Negative URLs
-
-- Malformed scheme, unsupported path, oversized payloads.
-- Assert rejection with safe error UI and no external side effects.
-
-8. Browser coverage — external protocol prompts
-
-- Validate that the test harness detects and clicks the correct control for:
-  - Chrome/Edge: “Open <app>” button in the external protocol dialog.
-  - Firefox: “Open link” confirmation dialog.
-  - Safari: sheet asking to open the application.
-
-9. Accessibility labels presence
-
-- Ensure confirmation dialog controls have stable accessibility names/roles to make tests resilient.
-
-10. Headless test mode (non‑UI)
-
-- With `AW_URL_HANDLER_TEST_AUTOCONFIRM=true`, bypass the confirmation UI for unit/integration tests.
-- E2E tests MUST run without this flag to exercise the real UI.
-
-CI wiring
-
-- GitHub Actions matrix: `windows-latest`, `macos-latest`, `ubuntu-latest`.
-- Install Playwright browsers; enable accessibility permissions on macOS runner for `osascript`.
-- Preload AutoHotkey on Windows for fallback flows.
-- Publish artifacts: handler logs, Playwright traces, screenshots of dialogs.
-
-Exit criteria
-
-- All scenarios above pass on the CI matrix.
-- Manual spot‑checks confirm reasonable UX and focus behavior.
-
-### GUI Scenarios (when AW GUI is installed)
+### GUI integration notes (when AW GUI is installed)
 
 - Delegation: The protocol handler delegates to the GUI main process via IPC when the GUI is running.
 - Window reuse: A new browser window is not spawned if the GUI window exists; the GUI focuses its window and navigates to the route.

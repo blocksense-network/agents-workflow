@@ -28,7 +28,7 @@ When a task proves difficult to compete according to the plan, developers and ag
 
 The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. An existing example is [Local Sandboxing on Linux.status.md](./Public/Sanboxing/Local%20Sandboxing%20on%20Linux.status.md).
 
-It's extremely important that the tasks are very granular and that they can be verified with automated tests. Prefer integration tests over unit tests, but apply reasonable gudgement on a case-by-case basis.
+It's extremely important that the tasks are very granular and that they can be verified with automated tests. Prefer integration tests over unit tests, but apply reasonable judgment on a case-by-case basis.
 
 All implementation plans and testing strategies will be reviewed before the implementation efforts starts. Ideally, the plans will identify various development tracks that can be started in parallel without interfering with each other.
 

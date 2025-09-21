@@ -49,12 +49,12 @@ Notes
 
 ## Launching Commands in Each Pane
 
-- Create a new window in the current region: `screen -S <sess> -X screen bash -lc '<cmd>'`. [2]
-- Or start the session detached with a command: `screen -dmS <sess> bash -lc '<cmd>'`. [2]
+- Create a new window in the current region: `screen -S <session_id> -X screen bash -lc '<cmd>'`. [2]
+- Or start the session detached with a command: `screen -dmS <session_id> bash -lc '<cmd>'`. [2]
 
 ## Scripting Interactive Answers (Send Keys)
 
-- Use `screen -S <sess> -X stuff 'y\n'` to send keystrokes to the focused window. Quote and escape carefully. [4]
+- Use `screen -S <session_id> -X stuff 'y\n'` to send keystrokes to the focused window. Quote and escape carefully. [4]
 
 ## Focusing an Existing Task’s Pane/Window
 
@@ -85,7 +85,7 @@ Create or reattach the `aw-<id>` session, set up regions with `split`/`focus`, t
 3. GNU Screen Manual — Split command and regions: [GNU Screen split/regions][3]
 4. GNU Screen Manual — stuff (send input to window): [GNU Screen stuff][4]
 
-[1]: https://www.gnu.org/software/screen/manual/
-[2]: https://www.gnu.org/software/screen/manual/html_node/Screen-Command.html
-[3]: https://www.gnu.org/software/screen/manual/html_node/Split.html
-[4]: https://www.gnu.org/software/screen/manual/html_node/Stuff.html
+[1]: https://man7.org/linux/man-pages/man1/screen.1.html#DESCRIPTION
+[2]: https://man7.org/linux/man-pages/man1/screen.1.html#COMMAND-LINE_OPTIONS
+[3]: https://man7.org/linux/man-pages/man1/screen.1.html#WINDOW_TYPES
+[4]: https://man7.org/linux/man-pages/man1/screen.1.html#STRING_ESCAPES

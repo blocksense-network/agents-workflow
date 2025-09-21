@@ -97,25 +97,52 @@ aw agent followers run --host win-12 -- lint
 - SessionMoments are emitted before/after the fence; the FsSnapshot id is linked to the post‑fence SessionMoment.
 - Seeking to that SessionMoment restores leader FsSnapshot; followers are re‑synced by issuing a fence before re‑execution.
 
-### Devcontainer/ Notes
-
-- Followers can be provisioned via devcontainers or native shells with the same project devshell.
-- Credentials and environment normalization follow the base image’s credential propagation rules. TODO: credentials are typically not needed on followers because the agentic coding software is not executed there. In general, credentials are only forwarded in [Local Mode](Local%20Mode.md).
-- Health checks verify Mutagen sessions and per‑host readiness before execution.
-  TODO: Specify these health checks. They must be executed over SSH.
-
 ### Failure Modes
 
 - Fence timeout: abort run_everywhere; report lagging followers and suggest narrowing selectors.
 - Partial host failure: aggregate failures and return non‑zero; provide per‑host logs and artifacts.
 - Sync divergence: force rescan/rebuild of stale directories; optionally clear ignores for critical paths.
 
-### Open Questions
+### Fetching files from followers
 
-- Artifact collection and centralization strategy across followers.
-  TODO: This seem like something that each project would like to do differently, but we can add support for a command like `aw agent followers slurp` with a command-line interface and behavior modeled after pslurp (use web search to find the details)
-- Test sharding and orchestration policies (e.g., split tests by tag or runtime).
-  TODO: This is a cool feature. We should allow many executors to be connected (potentially having the same OS) - `aw agent followers run` should support accepting multiple commands which are then sharded over the set of executors to effectively run in parallel (each command should run on at exactly one executor matching the tags/labels).
+This is done through the `aw agent followers slurp` command which takes a list of file sets. Each file set has the following properties:
+
+* name: string (consisting of alphanumeric characters, dashes and underscores)
+* include: array of paths and blobs (in URL-encoded form can be repeated)
+* exclude: array of paths and blobs to exclude (filtered from the selection of included files)
+* required: optional boolean (yes|no|true|false|1|0)
+* dest: destination folder path where the downloaded files will appear
+
+`--fileset-data=<data>` accept a fileset in URL-encoded form
+`--fileset <name>` expects the fileset to be registered by name in the configuration files
+`--fileset-file=<path>` loads the fileset from a file. Supported file formats are TOML and JSON.
+
+The files paths and globs specify files that will be fetched from the followers. File paths and globs MUST be relative to the workspace directory.
+
+By default, each requested file set is considered optional, unless it's marked as required. Typically, these would be build artificats which have unique names per platform, so a single follower will respond with the requested file set.
+
+If multiple responses are present, the results are written in the destination folder under a sub-directory `<fileset-name>/<follower-name>`. Please note that a different destination folder can be specified for each requested file set. The donwloaded files are first written to a temporary location until their unique/non-unique status is resolved and then they are moved to their final destination.
+
+Compression is determined per-file by the sender by examining the format of the requested files; checksum verification runs after each host finishes.
+
+Transfer concurrency follows the fleet limit (default 16) and retries once on transient SSH errors.
+
+All metadata (host, mtime, checksum) is recorded in the session timeline so REST consumers can download per-host bundles later.
+
+### Test sharding and orchestration
+
+The execution of tests can be accelerated by adding more followers.
+
+`aw agent followers run` accepts multiple `--command` entries and shards them across all matching executors. The scheduler builds a job queue and assigns tasks round-robin while respecting per-host concurrency=1 to avoid oversubscription. Each command is scheduled on exactly one executor per operating system. All outputs are collected before being returned to the agent.
+
+[^agent-forwarding]: <https://mikebarkas.dev/configure-ssh-agent-forwarding-security/>
+[^check-by-ssh]: <https://nagios-plugins.org/doc/man/check_by_ssh.html>
+[^systemctl]: <https://linux-audit.com/systemd/faq/how-to-show-failed-units-with-systemctl/>
+[^df-command]: <https://www.redhat.com/sysadmin/Linux-df-command>
+[^get-computerinfo]: <https://www.pdq.com/powershell/get-computerinfo/>
+[^test-netconnection]: <https://www.pdq.com/powershell/test-netconnection/>
+[^pslurp]: <https://www.mankier.com/1/pslurp>
+[^pssh]: <https://parallel-ssh.readthedocs.io/en/stable/quickstart.html>
 
 ## Connectivity Layer — QUIC Control + SSH over CONNECT
 
@@ -151,7 +178,6 @@ The following assumptions are normative and apply to all connectivity modes (loc
 - Control: QUIC (mutually‑authenticated, SPIFFE by default) between executors and access points.
 - SSH/Mutagen: Direct SSH dials from the leader to followers are preferred when reachable and allowed by policy. Otherwise, use HTTP CONNECT through the access point, bridged over QUIC to each executor’s local sshd.
 - Hybrid: When a fleet spans multiple access points, the client relays bytes between two CONNECT streams (multi‑hop) to stitch endpoints.
-  TODO: Explain this with an example. Describe what will happen as a strory.
 
 ### Operational Guidance
 
@@ -186,7 +212,7 @@ Sequence (CONNECT path):
 
 Fallback (hybrid relay): If endpoints live behind different access points, the client opens two CONNECT streams and relays bytes between them.
 
-### Hybrid Multi‑Hop Forwarding (client‑relay)
+### Client-relay workflow
 
 Followers do not initiate outbound connections to other executors.
 The leader dials followers directly over SSH when reachable; otherwise it tunnels

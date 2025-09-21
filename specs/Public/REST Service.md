@@ -238,8 +238,19 @@ Accepted event types (minimum set):
 - Optional helper endpoints used by CLI completions and WebUI forms:
   - `GET /api/v1/git/refs?url=<git_url>` → Cached branch/ref suggestions for `--target-branch` UX.
   - `GET /api/v1/projects` → List known projects per tenant for filtering.
+  - `GET /api/v1/repos?tenantId=<id>&projectId=<id>` → Returns repositories the service has indexed (from historical tasks or explicit imports). Each item includes `id`, `displayName`, `scmProvider`, `remoteUrl`, `defaultBranch`, and `lastUsedAt`, mirroring common REST patterns for repository catalogs.
+  - `GET /api/v1/workspaces?status=active` → Lists provisioned workspaces with metadata.
+  - `GET /api/v1/workspaces/{id}` → Detailed view including workspace repository URLs, storage usage, task history, etc.
 
-TODO: Add getters for obtaining repos and workspaces on the server. In CLI.md, add matching `aw remote` commands.
+CLI parity:
+
+```
+aw remote repos [--tenant <id>] [--project <id>] [--json]
+aw remote workspaces [--status <state>] [--json]
+aw remote workspace show <WORKSPACE_ID>
+```
+
+The `aw remote` subcommands call the endpoints above and surface consistent column layouts (name, provider, branch for repos; workspace state, executor, age for workspaces). They support `--json` for scripting and respect the CLI’s existing pager/formatting options.
 
 #### Followers and Multi‑OS Execution
 
@@ -297,8 +308,9 @@ curl -X POST "$BASE/api/v1/tasks" \
 - `aw task` → `POST /api/v1/tasks` (returns `sessionId` usable for polling and SSE).
 - `aw session list|get|logs|events` → `GET /api/v1/sessions[/{id}]`, `GET /api/v1/sessions/{id}/logs`, `GET /api/v1/sessions/{id}/events`.
 - `aw session run <SESSION_ID> <IDE>` → `POST /api/v1/sessions/{id}/open/ide`.
-- `aw remote agents|runtimes|executors` → `GET /api/v1/agents`, `GET /api/v1/runtimes`, `GET /api/v1/executors`. (TODO: update here as well)
-- `aw agent followers list` → `GET /api/v1/sessions/{id}/info` (server view of current fleet membership for that session). TODO: This should be done through the QUIC protocol as well
+- `aw remote agents|runtimes|executors` → `GET /api/v1/agents`, `GET /api/v1/runtimes`, `GET /api/v1/executors`.
+- `aw remote repos|workspaces` → `GET /api/v1/repos`, `GET /api/v1/workspaces` (and `GET /api/v1/workspaces/{id}` for detail views).
+- `aw agent followers list` → QUIC `SessionFollowers` stream for real-time membership; the REST `GET /api/v1/sessions/{id}/info` endpoint remains available for static snapshots. QUIC keeps the connection open so membership and health changes arrive with minimal latency, matching the transport used elsewhere in the control plane.
 - `aw agent sync-fence|followers run` → leader‑executed over SSH; server observes via the control plane (QUIC) and rebroadcasts on session SSE.
 
 SSE event taxonomy for sessions:

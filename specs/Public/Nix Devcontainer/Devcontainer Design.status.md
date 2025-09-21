@@ -18,29 +18,29 @@ References:
 
 ### Deliverables
 
-1) `agents-workflow-nix-base` image (GHCR)
+1. `agents-workflow-nix-base` image (GHCR)
 
 - Nix with flakes enabled, substituters/cachix configured.
 - Declared persistent volumes for `/nix` and common caches.
 - Minimal init and entrypoint that sources project devshell if present.
 
-2) `agents-workflow-agents-base` image (GHCR)
+2. `agents-workflow-agents-base` image (GHCR)
 
 - FROM nix base, installs supported agentic CLIs via Nix; aligns versions with repository’s Nix package set.
 - Integrations with agent‑provided hook mechanisms (e.g., Claude Code hooks) to emit SessionMoments and trigger FsSnapshots. Shell‑level hooks are out of scope.
 - Credential bridges via env pass‑through and read‑only mounts; no secrets in layers.
 
-3) Reference project devcontainer
+3. Reference project devcontainer
 
 - `devcontainer.json` consuming Agents Base; named volumes for caches; `postCreateCommand` hooks.
 - `.devcontainer/aw-healthcheck` implementing the health contract with `--json` output.
 
-4) AW CLI integration
+4. AW CLI integration
 
 - `aw repo check` invokes `.devcontainer/aw-healthcheck` via Dev Containers CLI when available; falls back to `just health`/`make health` on host.
 - `aw health --caches` prints configured cache mounts and sizes.
 
-5) CI pipeline
+5. CI pipeline
 
 - Image builds, cache benchmarks (cold vs warm), credential probes, hook smoke tests, and cross‑platform matrix.
 
@@ -137,7 +137,3 @@ M9. Documentation and examples (1–2d)
 - M9: pending
 
 ### Change log
-
-- Initial plan created; TODO in test suite now points here.
-
-

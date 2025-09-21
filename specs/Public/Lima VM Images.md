@@ -36,4 +36,11 @@ All images include:
 - Common provisioning scripts (reused from Docker container setup)
 - Nix flake for agents-workflow tools
 
-TODO: Prepare an implementation plan for the Lima VM Images that will be started after the Devcontainer work is complete
+Implementation Plan: See [Lima VM Images.status.md](./Lima%20VM%20Images.status.md) for milestones, success criteria, and CI strategy.
+
+### Deliverables
+
+- Published QCOW2 images for Alpine+Nix and Ubuntu LTS variants
+- Cloud-config and build scripts under `infra/lima/`
+- Documentation snippet for `aw lima images fetch`
+- CI job covering boot + agent enrollment regression

@@ -99,7 +99,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "specs/Public/REST Service.md",
+                "file": "specs/Public/Agent Browsers/Agent Browser Profiles.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -114,7 +114,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "REST Service"
+              "title": "Agent Browser Profiles"
             }
           },
           {
@@ -199,7 +199,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 266.5
+    "width": 266.5,
+    "collapsed": true
   },
   "right": {
     "id": "6bab4bb451c2c34d",
@@ -292,11 +293,22 @@
   },
   "active": "dccfea43a5379c8a",
   "lastOpenFiles": [
+    "specs/Public/CLI.md~",
+    "specs/Public/Plans/CLI-Cloud-Automation.status.md",
+    "specs/Public/REST Service.md",
+    "specs/Public/Cloud-Automation.status.md",
+    "specs/Public/CLI.status.md",
+    "specs/Public/CLI-Cloud-Automation.status.md",
+    "specs/Public/Connectivity Layer.md",
+    "specs/Public/Plans/CLI-Implementation.status.md",
+    "specs/Public/Lima VM Images.status.md",
+    "specs/Public/Plans/CLI-Implementation.md",
+    "specs/Public/Plans/CLI-Cloud-Automation.md",
+    "specs/Public/Plans",
     "specs/Public/Executor-Enrollment.md",
     "specs/Public/CLI.md",
     "specs/Public/Multi-OS Testing.md",
     "specs/AGENTS.md",
-    "specs/Public/Connectivity Layer.md",
     "specs/Public/FS Snapshots/FS Snapshots Overview.md",
     "specs/Research/Intro-to-Mutagen-Projects.md",
     "specs/Research/HowTo-Persistent-SSH-Connections.md",
@@ -309,25 +321,14 @@
     "specs/Initial Developer Input/Flow-Chart-Corrections.md",
     "specs/Public/Terminal Multiplexers/Ghostty.md",
     "specs/Public/Terminal Multiplexers/Emacs.md",
-    "specs/Public/Terminal Multiplexers/Vim.md",
-    "specs/Public/Terminal Multiplexers/Tilix.md",
-    "specs/Public/Terminal Multiplexers/Windows Terminal.md",
-    "specs/Public/Terminal Multiplexers/iTerm2.md",
-    "specs/Public/Terminal Multiplexers/Kitty.md",
-    "specs/Public/Terminal Multiplexers/WezTerm.md",
-    "specs/Public/Terminal Multiplexers/tmux.md",
-    "specs/Public/Terminal Multiplexers/Multiplexer Description Template.md",
-    "specs/Public/Terminal Multiplexers/README.md",
     "specs/Public/Terminal Multiplexers",
     "specs/Public/Schemas/session-events.ingest.schema.json",
     "specs/Public/Schemas/session-events.schema.json",
-    "specs/Public/REST Service.status.md",
     "agent-task-0.1.0.gem",
     "test/logs/temp_output_20250914_232409.log",
     "test/temp_test_runner_1757881449.rb",
     "test/logs/test_run_20250914_232409.log",
     "specs/Research/Tools/SessionFileExperiments/opencode.py",
-    "specs/Research/Tools/SessionFileExperiments/list_recent.py",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_tests.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_write_page_test.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_read_page_test.png",

@@ -6,7 +6,7 @@ Spec: See “REST Service.md” for the API behavior. This file tracks the imple
 
 Deliver a reliable REST + SSE service that the CLI, TUI, and WebUI can use to create and manage agent sessions. Optimize for testability by sharing a transport crate between the mock and real server and by validating all flows through black‑box HTTP tests and CLI‑level E2E tests.
 
-This plan is expanded to explicitly cover multi‑OS execution and connectivity constraints per Multi‑OS Testing and Connectivity Layer specs. The near‑term priority is to validate the communication topology on a single Linux host using Incus or Docker containers to simulate multiple machines. Subsequent phases verify true cross‑OS synchronization (Linux/macOS/Windows) using QUIC control plane and SSH over HTTP CONNECT (with optional client‑side relay in hybrid fleets).
+This plan is expanded to explicitly cover multi‑OS execution and connectivity constraints per Multi‑OS Testing specs. The near‑term priority is to validate the communication topology on a single Linux host using Incus or Docker containers to simulate multiple machines. Subsequent phases verify true cross‑OS synchronization (Linux/macOS/Windows) using QUIC control plane and SSH over HTTP CONNECT (with optional client‑side relay in hybrid fleets).
 
 ## Milestones and Tasks
 

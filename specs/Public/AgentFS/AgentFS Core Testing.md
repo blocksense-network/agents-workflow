@@ -12,6 +12,7 @@
 The following plans are the authoritative, step-by-step procedures. Sections below provide background and matrices.
 
 #### U1. Create/Read/Write round-trip (unit)
+
 1. Initialize `FsCore` with default `FsConfig` (in-memory backend; writeback cache off).
 2. Call `mkdir("/dir", 0o755)`.
 3. Call `create("/dir/a.txt", OpenOptions{ create:true, write:true, truncate:true, .. })` → keep `HandleId`.
@@ -20,6 +21,7 @@ The following plans are the authoritative, step-by-step procedures. Sections bel
 6. Call `read(h2, 0, buf[0..5])`; expect 5 bytes, contents "hello"; `close(h2)`.
 
 #### U2. Delete-on-close semantics (unit)
+
 1. Create `/x` and write non-empty content; keep `HandleId` open.
 2. Call `unlink("/x")`.
 3. Call `read(h, 0, buf)`; expect success while handle open.
@@ -27,6 +29,7 @@ The following plans are the authoritative, step-by-step procedures. Sections bel
 5. Call `open("/x", OpenOptions{ read:true })`; expect `Err(NotFound)`.
 
 #### U3. Snapshot immutability vs branch writes (unit)
+
 1. Create `/f` and write "base"; `close`.
 2. Call `snapshot_create(name="base")` → `snap`.
 3. Call `branch_create_from_snapshot(snap, name="b")` → `branch`.
@@ -35,6 +38,7 @@ The following plans are the authoritative, step-by-step procedures. Sections bel
 6. Read `/f` through the snapshot context (helper resolving by `snap`) and assert content is still "base".
 
 #### U4. Branch process isolation (unit/scenario)
+
 1. Create `snap = snapshot_create("clean")`.
 2. `b1 = branch_create_from_snapshot(snap, "p1")`; `b2 = branch_create_from_snapshot(snap, "p2")`.
 3. Bind current process to `b1`; write `/same.txt` → "one".
@@ -43,17 +47,20 @@ The following plans are the authoritative, step-by-step procedures. Sections bel
 6. From `b2` context, read `/same.txt` and expect "two".
 
 #### U5. Xattrs and ADS basics (unit)
+
 1. Create `/x`.
 2. Call `xattr_set("/x", "user.test", b"v")`; then `xattr_get` → expect `b"v"`.
 3. If Windows ADS is enabled in config, open `/x:meta` with `OpenOptions{ create:true, write:true, stream:Some("meta") }` and write "s"; `streams_list("/x")` should include `meta`.
 
 #### U6. POSIX locks and Windows share modes (unit/component)
+
 1. Open `/lock` twice with read/write allowed; keep `h1`, `h2`.
 2. Call `lock(h1, LockRange { 0..100, Exclusive })`; expect success.
 3. On `h2`, attempt `lock(..., Exclusive)` overlapping range; expect conflict error.
 4. For share modes (component test via adapter): open first handle with deny-write; attempt second open with write access; expect adapter to reject per share admission.
 
 #### C1. C ABI round-trip (component)
+
 1. Build the C test harness linking to the core’s C ABI symbols.
 2. Call `af_fs_create` with JSON config; expect `AF_OK`.
 3. Call `af_snapshot_create` and `af_branch_create_from_snapshot` and `af_bind_process_to_branch`.
@@ -61,7 +68,9 @@ The following plans are the authoritative, step-by-step procedures. Sections bel
 5. Call `af_close` and `af_fs_destroy`.
 
 #### I1. FUSE host basic operations (integration)
-Prereq: libfuse available; adapter binary built.
+
+Prerequisite: libfuse available; adapter binary built.
+
 1. Start the FUSE host mounting to a temporary directory (e.g., `/tmp/awfs`).
 2. `mkdir /tmp/awfs/dir` → expect success; `ls` shows `dir`.
 3. `sh -lc 'echo hello > /tmp/awfs/dir/a.txt'`.
@@ -70,13 +79,16 @@ Prereq: libfuse available; adapter binary built.
 6. Unmount cleanly; no panics or leaks in logs.
 
 #### I2. FUSE control plane (integration)
+
 1. Open `<MOUNT>/.agentfs/control` and issue ioctl for `snapshot.create(name="clean")`.
 2. Issue `branch.create(from=<id>, name="test")`.
 3. Issue `branch.bind(branch=<id>, pid=<self>)`.
 4. Write `/x` and verify content exists; after unbinding and re-binding a fresh branch, `/x` should be absent.
 
 #### I3. WinFsp host basics (integration, Windows)
-Prereq: WinFsp installed; adapter built.
+
+Prerequisite: WinFsp installed; adapter built.
+
 1. Start the host; mount to `X:`.
 2. `cmd /c echo hello > X:\a.txt`; `type X:\a.txt` → expect `hello`.
 3. Create ADS: `cmd /c echo meta > X:\a.txt:meta`; enumerate streams via adapter API or `GetStreamInfo`; expect `meta` present.
@@ -84,12 +96,15 @@ Prereq: WinFsp installed; adapter built.
 5. Use DeviceIoControl to send `snapshot.create/list` and `branch.create/bind`; verify behavior per IDs.
 
 #### I4. FSKit adapter basics (integration, macOS 15+)
-Prereq: FSKit extension built and signed; XPC client available.
+
+Prerequisite: FSKit extension built and signed; XPC client available.
+
 1. Activate the volume via the extension; root item present.
 2. Create directory/file; enumerate; read/write succeed.
 3. Send XPC control messages for snapshot/branch/bind; verify behavior.
 
 #### S1. AW workflow scenario: branch-per-task
+
 1. Mount an adapter (FUSE/WinFsp/FSKit) to a test mount.
 2. Create `snapshot.create(name="clean")`.
 3. Create branch `task-1` from `clean` and bind current PID.
@@ -97,22 +112,26 @@ Prereq: FSKit extension built and signed; XPC client available.
 5. In a second shell bound to a new branch `task-2`, write "task2" to the same path.
 6. Verify each branch sees its own content; `snapshot.list` shows both parent and new branches; discard `task-2` and verify `task-1` unaffected.
 
-#### P1. Microbench baseline (performance)
+#### P1. Microbenchmark baseline (performance)
+
 1. Run criterion benchmarks for small-file create/delete, sequential 64KB writes to 16MB file, random 4KB IO.
 2. Record throughput and p99 latency.
 3. Acceptance: within 1.5x memfs baseline for RAM-backed; document variance when spill enabled.
 
 #### R1. Spill-to-disk and ENOSPC (reliability)
+
 1. Configure `MemoryPolicy { max_bytes_in_memory: 64 MiB, spill_directory: <tmp> }`.
 2. Write multiple files totaling >256 MiB; confirm `bytes_spilled > 0` in `stats()`.
 3. Fill spill directory quota to force ENOSPC; ensure writes return `FsError::NoSpace` and no invariants are violated.
 
 #### R2. Crash safety (reliability)
+
 1. Start adapter host; begin sustained writes to a file.
 2. Abruptly terminate the host process.
 3. Restart host; mount again; run consistency checks (no panics; directory tree invariants hold; no partial API-visible corruption).
 
 #### CI1. Cross-platform lanes (CI)
+
 1. Linux: run unit + FUSE integration (privileged where required); ensure mounts/unmounts succeed and tests are green.
 2. macOS: run unit + macFUSE integration; later add FSKit extension build and smoke tests.
 3. Windows: run unit + WinFsp integration; run `winfstest`/`IfsTest` subsets.
@@ -221,7 +240,7 @@ fn unlink_delete_on_close_semantics() {
 
 ### Performance Tests
 
-- Microbenchmarks (criterion): small file create/delete, sequential RW (1MB–1GB), random RW, stat heavy ops.
+- Microbenchmark suite (criterion): small file create/delete, sequential RW (1MB–1GB), random RW, stat-heavy operations.
 - Macro tests (fsbench/fio): throughput and p99 latency under concurrency; with/without writeback cache; readdir+ on large directories.
 - Memory pressure: tune `max_bytes_in_memory`; verify spill path IO; ensure bounded memory growth with steady workload.
 

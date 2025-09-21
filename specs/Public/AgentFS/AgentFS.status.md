@@ -21,6 +21,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 ### Milestones and tasks (with automated success criteria)
 
 M1. Project bootstrap (1–2d)
+
 - Initialize Cargo workspace and scaffolding for `agentfs-core`, `agentfs-proto`, adapter crates, and tests.
 - Set up CI: build + test on Linux/macOS/Windows; clippy, rustfmt, coverage (grcov/llvm-cov).
 - Success criteria:
@@ -28,11 +29,13 @@ M1. Project bootstrap (1–2d)
   - Lints and formatting enforced; coverage pipeline present.
 
 Acceptance checklist (M1)
+
 - [ ] CI builds succeed on Linux, macOS, Windows
 - [ ] `cargo test` runs at least one core unit test per platform
 - [ ] clippy + rustfmt gates enabled and passing
 
 M2. Core VFS skeleton and in‑memory storage (3–5d)
+
 - Implement minimal path resolver, directories, create/open/read/write/close, unlink/rmdir, getattr/set_times.
 - Provide `InMemoryBackend` storage and `FsConfig`, `OpenOptions`, `Attributes` types as specified in `AgentFS Core.md`.
 - Success criteria (unit tests):
@@ -40,11 +43,13 @@ M2. Core VFS skeleton and in‑memory storage (3–5d)
   - Unlink exhibits delete‑on‑close semantics at core level.
 
 Acceptance checklist (M2)
+
 - [ ] U1 Create/Read/Write passes
 - [ ] U2 Delete-on-close passes
 - [ ] Readdir lists expected entries after create/rename/unlink
 
 M3. Copy‑on‑Write content store and snapshots (4–6d)
+
 - Implement chunked content store with refcounts and `clone_cow` mechanics; seal snapshots immutable.
 - Implement `snapshot_create`, `snapshot_list`, `snapshot_delete`; persistent directory tree nodes per snapshot.
 - Success criteria (unit tests + property tests):
@@ -52,11 +57,13 @@ M3. Copy‑on‑Write content store and snapshots (4–6d)
   - Path‑copy on write maintains sharing and bounded memory growth.
 
 Acceptance checklist (M3)
+
 - [ ] U3 Snapshot immutability passes
 - [ ] Property tests for CoW invariants pass under randomized workloads
 - [ ] Memory growth bounded under repetitive clone/write workload
 
 M4. Branching and process‑scoped binding (3–4d)
+
 - Implement `branch_create_from_snapshot`, `branch_create_from_current`, branch listing, and process→branch map.
 - Expose `bind_process_to_branch` and `unbind_process` with PID‑aware context.
 - Success criteria (unit + scenario tests):
@@ -64,10 +71,12 @@ M4. Branching and process‑scoped binding (3–4d)
   - Handles opened before binding switch remain stable per invariants.
 
 Acceptance checklist (M4)
+
 - [ ] U4 Branch process isolation passes
 - [ ] Handle stability verified by opening pre-bind and post-bind
 
 M5. Locking, share modes, xattrs, and ADS (5–8d)
+
 - Add byte‑range locks and Windows share mode admission logic; open handle tables.
 - Implement xattrs and ADS surface (`streams_list`, `OpenOptions.stream`).
 - Success criteria:
@@ -76,21 +85,25 @@ M5. Locking, share modes, xattrs, and ADS (5–8d)
   - xattr/ADS round‑trip unit tests.
 
 Acceptance checklist (M5)
+
 - [ ] U5 Xattrs/ADS basic flows pass
 - [ ] U6 POSIX locks conflict matrix passes
 - [ ] Windows share mode admission validated via adapter test harness
 
 M6. Events, stats, and caching knobs (2–3d)
+
 - Add event subscription (`EventSink`), stats reporting, and cache policy mapping (readdir+, attr/entry TTLs).
 - Success criteria:
   - Event emission on create/remove/rename and branch/snapshot ops validated by unit tests.
   - Readdir+ returns attributes without extra getattr calls in adapter harness.
 
 Acceptance checklist (M6)
+
 - [ ] Event subscription receives create/remove/rename and snapshot/branch events
 - [ ] Stats report non-zero counters after representative workload
 
 M7. FUSE adapter host (Linux/macOS dev path) (4–6d)
+
 - Implement libfuse high‑level `struct fuse_operations` mapping to core; support `.agentfs/control` ioctl.
 - Provide mount binary for tests; map cache knobs to `fuse_config`.
 - Success criteria (integration):
@@ -98,11 +111,13 @@ M7. FUSE adapter host (Linux/macOS dev path) (4–6d)
   - pjdfstests subset green; readdir+ validated; basic fsbench throughput measured.
 
 Acceptance checklist (M7)
+
 - [ ] I1 FUSE host basic ops pass on CI
 - [ ] I2 Control plane ioctl flows pass with schema validation
 - [ ] pjdfstests subset green (documented list)
 
 M8. WinFsp adapter host (Windows) (5–8d)
+
 - Map `FSP_FILE_SYSTEM_INTERFACE` ops; implement DeviceIoControl control plane.
 - Implement share modes, delete‑on‑close, ADS enumeration.
 - Success criteria (integration):
@@ -110,22 +125,26 @@ M8. WinFsp adapter host (Windows) (5–8d)
   - `GetStreamInfo` returns ADS; delete‑on‑close behaves per tests; control ops functional.
 
 Acceptance checklist (M8)
+
 - [ ] I3 WinFsp basic ops pass
 - [ ] WinFsp test batteries: core subsets pass; exceptions documented
 - [ ] DeviceIoControl control ops pass schema validation
 
 M9. FSKit adapter (macOS 15+) (6–10d)
+
 - Build FSKit Unary File System extension; bridge to core via C ABI; provide XPC control.
 - Success criteria (integration):
   - Mounts on macOS CI or local; file/basic directory ops pass; control ops functional.
   - Case‑insensitive‑preserving names honored by default; xattrs round‑trip for quarantine/FinderInfo.
 
 Acceptance checklist (M9)
+
 - [ ] I4 FSKit adapter smoke tests pass locally/CI lane
 - [ ] XPC control plane snapshot/branch/bind functions
 - [ ] FinderInfo/quarantine xattrs round-trip validated
 
 M10. Control plane and CLI integration (3–5d)
+
 - Finalize `agentfs-proto` JSON schemas (already spec’d) and validators; generate Rust types.
 - Implement `aw agent fs` subcommands invoking platform transport: DeviceIoControl (Windows), ioctl on control file (FUSE), XPC (FSKit).
 - Success criteria (CLI tests):
@@ -133,11 +152,13 @@ M10. Control plane and CLI integration (3–5d)
   - Schema validation enforced; informative errors on invalid payloads.
 
 Acceptance checklist (M10)
+
 - [ ] `aw agent fs snapshot create/list` passes against FUSE/WinFsp/FSKit
 - [ ] `branch create/bind/exec` passes including PID binding resolution
 - [ ] Requests validated against schemas; error mapping covered by tests
 
 M11. Scenario, performance, and fault‑injection suites (4–7d)
+
 - Scenario tests for AW workflows (per `AgentFS Core Testing.md`): multi‑process branches, repo tasks, discard/keep flows.
 - Criterion microbenchmarks; fsbench/fio macro tests; spill‑to‑disk stress; induced failures in `StorageBackend`.
 - Success criteria:
@@ -145,17 +166,20 @@ M11. Scenario, performance, and fault‑injection suites (4–7d)
   - Fault injection does not violate core invariants; linearizable API boundaries maintained.
 
 Acceptance checklist (M11)
+
 - [ ] S1 Branch-per-task scenario passes end-to-end
-- [ ] P1 Microbench baseline within target factors; thresholds documented
+- [ ] P1 microbenchmark baseline within target factors; thresholds documented
 - [ ] R1/R2 reliability plans pass (spill ENOSPC; crash safety)
 
 M12. Packaging, docs, and stability gates (2–3d)
+
 - Package adapter hosts; document setup for libfuse/macFUSE, WinFsp, and FSKit extension.
 - Stabilize public API and C ABI; version crates; document upgrade/versioning policy for control plane.
 - Success criteria:
   - Reproducible build artifacts; documented installation for each platform; examples runnable end‑to‑end.
 
 Acceptance checklist (M12)
+
 - [ ] Reproducible builds documented and verified in CI artifacts
 - [ ] Platform setup docs validated via smoke scripts
 - [ ] Public API/ABI versioned; upgrade notes published
@@ -191,5 +215,3 @@ Acceptance checklist (M12)
 
 - See `specs/Public/AgentFS/AgentFS Core.md`, `AgentFS FUSE Adapter.md`, `AgentFS WinFsp Adapter.md`, `AgentFS FSKit Adapter.md`, and `AgentFS Control Messages.md`.
 - Reference code in `reference_projects/libfuse`, `reference_projects/winfsp`, and `reference_projects/FSKitSample`.
-
-

@@ -65,7 +65,7 @@ md-lint:
 
 # Check external links in Markdown with lychee
 md-links:
-    lychee --config .lychee.toml --no-progress --require-https --max-concurrency 8 "specs/**/*.md"
+    lychee --config .lychee.toml --accept "200..=299,403" --no-progress --require-https --max-concurrency 8 "specs/**/*.md"
 
 # Spell-check Markdown with cspell (uses default dictionaries unless configured)
 md-spell:

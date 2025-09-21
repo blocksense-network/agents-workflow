@@ -213,28 +213,94 @@ Use quic-rpc as the primary RPC framework over our existing quinn connection. It
 - **Connection:** one QUIC connection per executor (mutually authenticated with SPIFFE SVIDs).
 - **Streams:**
   - **Control:** long‑lived unidirectional stream (hello/heartbeat/config).
-  - **RPC:** **one bi‑stream per request** created by the access point when it invokes a method on an executor (e.g., `StartTask`).
+  - **RPC:** **one bi‑stream per request** created by the access point when it invokes a method on an executor (e.g., `LaunchSession`).
   - **Tunnels:** separate bi‑streams for OpenTcp/SSH sessions.
 - **Flow control:** QUIC stream‑level flow control provides natural backpressure. If an executor is saturated, new RPC streams will queue at the access point until the peer credits more window.
 - **Cancellation:** callers drop the stream handle; the callee observes EOF and aborts work if safe.
 
 ### 6.3 Service definition pattern
 
-Define message types as serde‑serializable structures. With `quic-rpc` we implement a service interface whose methods are invoked over newly opened QUIC streams.
+Expose a single `ExecutorControl` service over `quic-rpc`. All payloads derive `Serialize`/`Deserialize` and encode as CBOR by default (JSON available for debugging). Every request carries:
 
-**Example (conceptual):**
+- `request_id` (ULID, optional): lets the scheduler safely retry idempotent calls.
+- `trace` block: OpenTelemetry trace/span context propagated end-to-end.
+- `authz_context`: entitlements already validated by the executor access point deamon (tenant, project, RBAC role) so the executor can perform fine-grained policy checks locally.
 
-```rust
-// Messages (serde or prost-compatible)
-#[derive(Serialize, Deserialize)]
-pub struct StartTaskReq { pub task_id: String, /* command, env, mounts, resources, labels */ }
-#[derive(Serialize, Deserialize)]
-pub struct StartTaskResp { pub pid: u32, pub accepted: bool }
-```
+#### LaunchSession (server → executor)
 
-On the **access point**, when the scheduler places a task on runner `R`, it opens a new RPC stream to `R` and sends `StartTaskReq`. The **runner** handles the request, starts the container/process, and writes `StartTaskResp`, then closes the stream.
+Launch an agent coding session. This is the RPC behind `aw task …` and the REST `POST /api/v1/tasks` flow.
 
-TODO: This should evolve into a concrete spec with the actual messages types that we are going to use.
+| Field             | Type                      | Source               | Notes                                                                                        |
+| ----------------- | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------- |
+| `session_id`      | ULID                      | aw-serve scheduler   | Stable identifier reused across CLIs, REST, and telemetry.                                   |
+| `tenant_id`       | String                    | REST request         | Optional multi-tenant routing key.                                                           |
+| `project_id`      | Option<String>            | REST request         | Enables project-level quota & RBAC.                                                          |
+| `controller_role` | `Leader \| Follower`      | Fleet planner        | Followers mirror the leader’s workspace; leader receives orchestration duties.               |
+| `submitted_at`    | RFC3339 timestamp         | Scheduler            | For SLA/timeout accounting.                                                                  |
+| `spec`            | `SessionSpec` (see below) | Aggregated           | Canonical description of prompt, runtime, workspace, agent, network, credentials, and hooks. |
+| `io`              | `IoRouting`               | CLI defaults + flags | Declares where stdout/stderr/events flow (logs, SSE, websocket, file sinks).                 |
+| `deadlines`       | `SessionDeadlines`        | Policy engine        | Contains hard (`absolute_stop`) and soft (`checkpoint_after`) cut-offs.                      |
+| `restart`         | `RestartPolicy`           | Policy engine        | Governs auto-retry for transient executor failures.                                          |
+| `stream_tokens`   | map<`channel`, `token`>   | Event service        | Bearer tokens the executor uses to publish timeline/log events back to aw-serve.             |
+
+`SessionSpec` consolidates everything the task spawner needs in one structure:
+
+| Field       | Type                | Description                                                                                                                                                                                                             |
+| ----------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`    | `PromptSpec`        | Final prompt text + attachments as resolved by the CLI (includes rendered templates and merge markers).                                                                                                                 |
+| `agent`     | `AgentSpec`         | Agent name/version plus settings schema reference (direct mirror of REST `agent` block).                                                                                                                                |
+| `runtime`   | `RuntimeSpec`       | Runtime kind (`devcontainer`, `vm`, `bare`), image/digest, entrypoint, working directory, shell, and runtime-specific options (devcontainer name, Nix profile, Lima VM ID, etc.).                                       |
+| `workspace` | `WorkspaceSpec`     | Snapshot identifier, mount path, writable overlay semantics, git metadata, and optional `followerSeeds` for multi-host sync.                                                                                            |
+| `resources` | `ResourceRequest`   | CPU (millicores), memory bytes, ephemeral-storage bytes, GPU requirements (count, vendor, min VRAM), and optional network bandwidth floor; matches the REST `runtime.resources` shape and Nomad/Kubernetes conventions. |
+| `env`       | map<String, String> | Merged environment variables (user-provided, policy defaults, secrets references). Secrets are wrapped in `SecretRef` to avoid cleartext exposure.                                                                      |
+| `mounts`    | `[MountSpec]`       | Additional bind mounts (host → container/session path) with read/write flags.                                                                                                                                           |
+| `net`       | `NetworkPolicy`     | Outbound allowlists, SOCKS/CONNECT relay settings, required inbound listeners.                                                                                                                                          |
+| `hooks`     | `LifecycleHooks`    | Commands the executor must run before/after launching the agent (provision devcontainer, seed datasets, etc.).                                                                                                          |
+| `recording` | `RecordingPolicy`   | Controls terminal/session capture (scope, retention, redaction configuration).                                                                                                                                          |
+| `artifacts` | `ArtifactPolicy`    | Directories to persist back to storage and retention rules.                                                                                                                                                             |
+
+Response:
+
+| Field                 | Type                  | Notes                                                                                                             |
+| --------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `accepted`            | bool                  | `false` means executor rejected the launch (no resources, policy violation). Scheduler will reschedule elsewhere. |
+| `executor_session_id` | Option<String>        | Executor-local handle used in subsequent RPCs/logging.                                                            |
+| `error`               | Option<`LaunchError`> | Populated when `accepted=false`; includes machine-readable `code` and human-readable `message`.                   |
+
+#### PauseSession / ResumeSession
+
+Back interactive pause/resume flows (`aw session pause|resume`, REST `/pause` `/resume`). Requests include:
+
+- `session_id`
+- `mode` (`checkpoint` vs `suspend`): `checkpoint` tells the executor to flush workspace/cache before pausing; `suspend` only freezes processes.
+- `deadline` (optional): guardrail for how long the operation may take.
+
+Responses acknowledge with `{ acknowledged: bool, error?: ControlError }`. Executors emit progress via timeline events so the UI can mirror status transitions.
+
+#### StopSession
+
+Gracefully wrap up (`aw session stop`, REST `/stop`). Request carries `session_id`, `reason`, `deadline`, and a `final_snapshot` directive (take/skip snapshot, artifact policy override). Response mirrors `PauseSession`.
+
+#### CancelSession
+
+Force termination (`aw session cancel`, REST `DELETE /sessions/{id}`). Includes `cancellation_mode` (`SIGTERM`, `SIGKILL`, `reboot`) so policies can escalate if soft termination fails.
+
+#### DispatchProcess
+
+Implements `aw session run <SESSION_ID> …`. Request contains command argv, environment delta, working directory, stdio routing, and execution policy (foreground, background, restart-on-exit). Response returns `pid`, `process_id` (stable handle), and a `log_token` for streaming output via the existing event transport.
+
+This catalog intentionally excludes direct filesystem RPCs. Workspace access happens via the SSH tunnel (`OpenTcp`) for POSIX tooling or through the artifact subsystem. HashiCorp Nomad follows the same pattern—out-of-band HTTP endpoints for file streaming rather than primary RPC methods—so we keep the control surface minimal and auditable.
+
+Mapping summary:
+
+| CLI / REST action                                  | RPC method        |
+| -------------------------------------------------- | ----------------- |
+| `aw task …` / `POST /api/v1/tasks`                 | `LaunchSession`   |
+| `aw session pause` / `POST /sessions/{id}/pause`   | `PauseSession`    |
+| `aw session resume` / `POST /sessions/{id}/resume` | `ResumeSession`   |
+| `aw session stop` / `POST /sessions/{id}/stop`     | `StopSession`     |
+| `aw session cancel` / `DELETE /sessions/{id}`      | `CancelSession`   |
+| `aw session run`                                   | `DispatchProcess` |
 
 ### 6.4 Namespacing & lanes
 
@@ -246,28 +312,29 @@ Keep **control** traffic on its own stream (or a tiny control service) and invok
 - **Retries:** access point may retry non‑started operations; executors should implement at‑least‑once semantics guarded by idempotency.
 - **Deadlines:** include optional `deadline_ms` in request metadata; the callee should abort on expiry and close the stream.
 
-### 6.6 Example RPC surface (server → executor)
+### 6.6 Example RPC flow (server → executor)
 
-- `StartTask { task_id, image/command, env, mounts, resources } -> Started{ pid }`
-  TODO: The fields here are placeholders. Complete the spec by examining the needs of the task spawner in a more holistic fashion.
-
-- `StopTask  { task_id } -> Stopped{ status }`
-  TODO: This should be made consistent with the session commands available in the CLI.
-  The UIs (TUI and WebUI) should offer the same controls as visible short-cuts/buttons.
-
-  TODO: It's unclear whether the messages below are needed
-
-- `FsRead/FsWrite` (bounded, carefully authorized)
-- `Ping -> Pong { ts }`
+1. Scheduler selects executor `R` based on the latest heartbeat inventory and opens a `LaunchSession` stream. `R` validates policy, provisions the workspace/runtime, and responds `{ accepted: true, executor_session_id: "session-123" }`.
+2. CLI requests `aw session run …` → aw-serve opens `DispatchProcess` on `R` with the session handle. The executor returns `process_id` and starts streaming stdout/stderr back via the log channel referenced in the request.
+3. User presses pause in the TUI → aw-serve issues `PauseSession { mode: checkpoint }`. Executor moves the agent into a quiescent state, emits `session.pausing`/`session.paused` timeline events, and acknowledges the RPC.
+4. When the SLA window expires, the policy engine sends `StopSession { final_snapshot: { mode: take, label: "auto" } }`. Executor flushes artifacts, captures the snapshot, and acknowledges.
+5. If the executor becomes unhealthy before the stop completes, aw-serve escalates with `CancelSession { cancellation_mode: SIGKILL }` and records the failure for rescheduling.
 
 ### 6.7 Scheduling hook
 
-- Executor's `Hello/Heartbeat` carries resources + labels (`region=eu`, `gpu=true`, …).
-  TODO: Detail the resource reporting.
-  The hello mesasge should include OS, disk space, memory, access to special hardware (e.g. GPU).
-  The heartbeat message should should cover free system resources (CPU, memory, etc), so the scheduler can make intelligent decisions on where to launch new coding sessions.
+- Executor `Hello` includes rich static metadata:
+  - `executor_id`, semantic version of aw-agent, build hash.
+  - Host facts: OS name/version/build, kernel, architecture, virtualization hints, region/zone, tags/labels, supported runtimes, and SSH endpoint fingerprint.
+  - `ResourceCapacity` block summarizing total allocatable resources: logical CPU cores (and clock info), memory bytes, ephemeral storage, dedicated NVMe, GPU inventory (vendor, model, driver version, VRAM), and network characteristics (max egress throughput, latency tier). Align capacities with Kubernetes `capacity/allocatable` semantics so the scheduler can reason about overcommit in a familiar way.
 
-- Access point selects an executor and invokes `StartTask` over that executor's RPC stream.
+- Periodic `Heartbeat` (default every 5 seconds) reports dynamic state:
+  - `timestamp` and monotonic `uptime_ms`.
+  - `ResourceUsage`: 1-minute CPU load average per core, memory used/free (RSS + cache breakdown), ephemeral disk usage, GPU utilization per device (core % + memory %), and current network throughput. Nomad clients expose similar deltas; we mirror that model so scheduling heuristics like bin packing behave predictably.
+  - `Sessions`: list of active `executor_session_id`, their states (`running`, `pausing`, `stopped`), and cumulative resource reservations.
+  - `HealthChecks`: results of executor-local probes (SSH loopback, workspace mount availability, container runtime health). Each probe records `name`, `status`, `latency_ms`, and optional `details`.
+  - `alerts`: optional array of warning strings for transient conditions (disk pressure, GPU ECC errors, etc.).
+
+- Access point consumes the heartbeat stream to keep its resource graph current, then invokes `LaunchSession` when placing new work.
 
 ---
 
@@ -388,10 +455,13 @@ Then: raw TCP byte‑pump until EOF.
 ### 10.3 RPC (example)
 
 ```protobuf
-service Runner {
-  rpc StartTask(StartTaskReq) returns (StartTaskResp);
-  rpc StopTask(StopTaskReq)   returns (StopTaskResp);
-  rpc Exec(ExecReq)           returns (ExecResp);
+service ExecutorControl {
+  rpc LaunchSession(LaunchSessionRequest) returns (LaunchSessionResponse);
+  rpc PauseSession(PauseSessionRequest)   returns (ControlAck);
+  rpc ResumeSession(ResumeSessionRequest) returns (ControlAck);
+  rpc StopSession(StopSessionRequest)     returns (ControlAck);
+  rpc CancelSession(CancelSessionRequest) returns (ControlAck);
+  rpc DispatchProcess(DispatchProcessRequest) returns (DispatchProcessResponse);
 }
 ```
 
@@ -437,7 +507,7 @@ Usage: `ssh ubuntu@w-123`.
 ## 13) Milestones
 
 1. Minimal: agent QUIC connect; hello/heartbeat; CONNECT handler; SSH tunnel.
-2. RPC v0: `StartTask`/`StopTask`; placement by label.
+2. RPC v0: `LaunchSession`/`StopSession`; placement by label.
 3. Web terminal (russh client + xterm.js).
 4. Policy engine & hardened allow‑lists; production SPIRE rollout.
 
@@ -454,4 +524,4 @@ Usage: `ssh ubuntu@w-123`.
 - **Framing/IDL:** `prost` (Protobuf) or `serde`+`cbor`
 - **Async runtime:** `tokio`
 
-That’s the blueprint. Next step: pick the framing (tarpc vs protobuf), then stub the QUIC control loop and a CONNECT handler, and wire a trivial `StartTask` RPC.
+That’s the blueprint. Next step: pick the framing (tarpc vs protobuf), then stub the QUIC control loop and a CONNECT handler, and wire a trivial `LaunchSession` RPC.

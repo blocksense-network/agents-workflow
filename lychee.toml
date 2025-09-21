@@ -2,12 +2,14 @@ exclude = [
   "^https://github.com/.*",
   "^https://docs.podman.io/.*",
   "^https://fruty.medium.com/.*",
+  "^https://medium.com/.*",
   "^https://aws.amazon.com/.*",
   "^https://ignite.readthedocs.io/.*",
   "^https://www.qemu.org/.*",
   "^https://wiki.qemu.org/.*",
   "^https://firecracker-microvm.github.io/.*",
   "^https://www.freedesktop.org/.*",
+  "^https://www.gnu.org/software/screen/.*",
   "^https://docs.kernel.org/.*",
   "^https://arxiv.org/.*",
   "^https://www.cloudhypervisor.org/.*",
@@ -26,6 +28,8 @@ exclude = [
   "^https://lwn.net/.*",
   "^https://news.ycombinator.com/.*",
 ]
+
+accept = ["200..=299", "403"]
 
 # Be lenient with intermittent CDN/SSL issues
 max_retries = 3

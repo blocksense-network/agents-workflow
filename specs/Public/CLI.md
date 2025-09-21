@@ -17,7 +17,7 @@ This architecture ensures maximum reusability - the core functionality can be us
 
 #### CLI Parsing and User Experience
 
-The CLI parsing, help screens, and shell autocompletions are implemented using the **Clap** Rust crate and its companion crates:
+- The CLI parsing, help screens, and shell autocompletions are implemented using the **Clap** Rust crate and its companion crates:
 
 - **clap**: Core command-line argument parser with derive macros for type-safe CLI definitions
 - **clap_complete**: Generates shell completion scripts for bash, zsh, fish, and PowerShell
@@ -27,7 +27,18 @@ The CLI parsing, help screens, and shell autocompletions are implemented using t
 All CLI commands use Clap's derive API for type-safe argument parsing, ensuring compile-time validation of CLI structure and automatic generation of help text, usage examples, and shell completions. Help text includes examples and detailed descriptions.
 
 See the clap guide: [How to use clap](../Research/How%20to%20use%20clap.md).
-TODO: Make sure that the help text for all commands and parameters is fully specified in this document (in the section of each respective command).
+
+#### Documentation conventions (help text baseline)
+
+To keep the CLI spec and generated help aligned, every command section in this document MUST include the following, mirroring guidance from the [Rust CLI book](https://rust-cli.github.io/book/in-depth/docs.html) and the [Better CLI help page](https://bettercli.org/design/cli-help-page/).
+
+- **Synopsis block** using fenced code with the exact invocation string (`aw <command> [OPTIONS] [ARGS...]`).
+- **DESCRIPTION** paragraph summarizing purpose and side-effects in one or two sentences.
+- **OPTIONS** table or bullet list including flag name, parameter placeholder, default, and whether it is repeatable.
+- **ARGUMENTS** section for positional parameters (if any).
+- **Examples** (shell fenced code) for common workflows when the command warrants it.
+
+When a command set is defined elsewhere (e.g., sandboxing or repo tooling), link to the section and still include at least the synopsis plus a pointer to detailed docs. The clap-derived help text in code MUST match the synopsis and option descriptions captured here so that generated man pages, `--help`, and the spec remain in sync.
 
 Shell completions are provided via the `aw shell-completion` command group. They can be installed with `aw shell-completion install` or printed with `aw shell-completion script [shell]`.
 
@@ -132,7 +143,7 @@ This enables sophisticated workflows where different AI agents can collaborate o
 
 #### Cloud Agent Support
 
-TODO: set up a separate planning file for this and reference it here.
+See [Cloud-Automation.status.md](Cloud-Automation.status.md) for the dedicated implementation roadmap covering browser automation workers, secure tunnels, and provider-specific adapters.
 
 The following cloud agent types are supported: `cloud-codex`, `cloud-copilot`, `cloud-cursor`, and `cloud-jules`. These agents run on external cloud platforms, typically configured and operated through a web interface.
 
@@ -202,8 +213,17 @@ The `aw task` command preserves and extends the core functionality of the existi
 
 - **Editor Discovery**: Uses `$EDITOR` environment variable with intelligent fallback chain (nano, pico, micro, vim, helix, vi)
 - **Prompt Sources**: Supports `--prompt` for direct text, `--prompt-file` for file input, or interactive editor session
-- **Editor Hints**: Provides helpful template text when launching editor for task input
-  TODO: Specify precisely what will be included in the inserted commented out message. As explained elsewhere in this spec, the content is dynamic to some extent, so specify in the detail the precise algorithm for generating it.
+- **Editor Hints**: Provides helpful template text when launching editor for task input. The hint generator follows these steps, similar to how [`git commit` templates](https://www.5balloons.info/git-commit-template) use comment-prefixed guidance:
+  1. Resolve the user’s preferred comment prefix. By default we use `#` followed by a space. When `task-editor.use-vcs-comment-string` (config option, default `true`) is enabled and we are inside a Git repository, pull the value from `git config core.commentString` so the hint matches local tooling.
+
+  2. If the configuration option `task-template` is not specified, insert a blank line (no prefix) where the user will type the prompt.
+
+  If the option is specified, treat it as a file path. The configuration system ensures that relative file path are resolved in relation to the file where they appear (or the working dir when supplied from the command-line).
+  3. Render a block with: a reminder that comment lines are ignored, and mentioning how the task creation operation can be aborted (by enterin ga blank description). End with an explanation that saving the file and exiting the editor will result in the agent work being delivered according the configured delivery method (the explanation should point out the concrete method by inserting a different string depending on the active configuration options).
+
+  4. When the user saves, strip every line that starts with the resolved comment prefix and trim trailing whitespace; collapse multiple blank lines into a single newline before validation.
+  5. If the resulting content is empty, abort with “Task prompt aborted (no content after removing comments).”
+
 - **Empty Task Validation**: Prevents creation of empty tasks with clear error messages
 
 **VCS Integration:**
@@ -473,7 +493,7 @@ When agents are spawned, the execution follows this detailed process:
 
 ##### Cloud Agent Execution
 
-TODO: Create a separate plan file for developing the browser automation and the cloud integration
+See the implementation roadmap in [Plans/CLI-Cloud-Automation.status.md](Plans/CLI-Cloud-Automation.status.md) for detailed milestones covering browser automation workers, access-point tunnels, and CLI integration.
 
 1. **Browser Automation Launch**: Cloud agents are launched using browser automation that:
    - Handles authentication and session management
@@ -621,6 +641,7 @@ Behavior:
 aw repo init [OPTIONS] [PROJECT-DESCRIPTION]
 
 OPTIONS:
+  --template <url|github-slug>
   --vcs <git|hg|bzr|fossil>                Version control system (default: git)
   --devenv <nix|nix-shell|devbox|devenv|spack|mise|flox|guix|conda|bazel|buck2|pants|please|brioche|custom|none>
                                            Specifies how the development environment will be managed (default: nix)
@@ -652,19 +673,14 @@ Behavior and defaults:
 
 The whole repo initialization is performed as an agentic task. The `aw repo` tool combines automated steps with prompt engineering to adapt to the specifics of the user project.
 
-Repo init prompts (algorithm outline):
+### Repo init templates
 
-1. Collect inputs (flags/env/config) and detect project language stacks via lightweight scans (e.g., package.json, pyproject.toml, Cargo.toml, go.mod).
-2. Generate a seed prompt containing:
-   - Project description (from arg/editor) and detected stacks
-   - Selected options: VCS, devenv, devcontainer, direnv, task runner, supported agents
-   - Constraints: do not commit secrets; prefer reproducible tools; propose tests/linters
-3. Request a plan from the agent including: files to create/update, test/linter selections, and any approvals needed.
-4. Apply plan incrementally with checkpoints; on failures, surface diffs and retries.
-5. After AGENTS.md exists, run `aw repo instructions link` to create agent instruction symlinks.
-
-TODO: The algorithm needs to be more concrete. The specific prompts that will be used must be defined here in the spec.
-Since this would be a large spec, we can move it to a new file `Repo Init.md`.
+1. The provided template may include a slot for the project desecription. When a slot desecription is not provided, the project description follows the text in the template.
+2. The provided template declares variables that the user can provide as command-line flags. The flags listed above are merely the variables of the default template.
+3. The CLI parser should allow arbitrary name/value pairs to supplied to this command. Supplying a parameter that's not declarated in the template is an error. If a parameter doesn't have a default value specified in the template, not suppying it on the command-line is considered an error.
+4. The syntax of the GitHub slug is `org/repo:file`. `org:file` is also a valid syntax. The repo then is assumed to be named `repository-templates`. Supplying just `org` is also a valid syntax. The template is then assumed to be `repository-templates:default`.
+5. The template is passed as an initial prompt to the agent. Typically, it will instruct the agent to ask clarifying questions before initializing the repository.
+6. Once the repository is initialized, `aw repo instructions link` is automatically executed to create agent instruction symlinks.
 
 Editor behavior:
 
@@ -966,17 +982,10 @@ BEHAVIOR:
 NOTE: The following command is part of the same daemon code path; flags select
 identity provider and optional embedded REST API.
 
-TODO: The description below assumes SPIFFE is enabled, but there are other identity options as well. The description should just list them perhaps (this message is intended for end users).
-
 ```
 aw agent enroll [OPTIONS]
 
-DESCRIPTION: Enrolls an executor machine with the AW server. The executor establishes
-             a persistent outbound connection to the access point server, performs
-             SPIFFE workload attestation (via the SPIRE Workload API), and registers
-             its capabilities for task execution. Certificates are not managed on disk;
-             the daemon obtains an X.509 SVID and trust bundle from the local SPIRE
-             Agent and auto‑rotates them while running.
+DESCRIPTION: Enrolls an executor machine with an agents workflow access point server.
              Once enrolled, the executor remains connected and ready to receive tasks.
 
 OPTIONS (choose identity via --identity; SPIFFE is default):
@@ -1017,17 +1026,14 @@ DEV‑ONLY:
 
 BEHAVIOR:
 - Exactly one `--identity` mode is active. If omitted, `spiffe` is assumed.
-- SPIFFE mode: the agent obtains and auto‑rotates its X.509 SVID from the SPIRE Workload API; file‑based mTLS flags are invalid.
-- Files/Vault/Exec modes: `--server-san` is required to define peer verification policy (SAN allowlist and optional SPKI pinning).
+- SPIFFE mode: the agent obtains and auto‑rotates its X.509 SVID from the [SPIFFE Workload API](<https://spiffe.io/docs/latest/spiffe-about/overview/>); file‑based mTLS flags are invalid.
+- Files/Vault/Exec modes: `--server-san` is required to define peer verification policy (SAN allowlist and optional SPKI pinning). When using Vault, certificates are issued from the [Vault PKI secrets engine](<https://developer.hashicorp.com/vault/docs/secrets/pki>); exec mode can wrap custom brokers.
 - Insecure mode: for development only; refused unless explicitly permitted by build/config.
 - `--ssh` defaults to `enabled`; when `disabled`, CONNECT/OpenTcp to this executor is refused.
 - `--ssh-dst` specifies the exact destination enforced by the agent for `OpenTcp` (default `127.0.0.1:22`).
 
-When `--rest-api yes` and `--bind/--port` are set, the daemon also serves the REST API
-documented in [REST Service](REST%20Service.md).
+When `--rest-api yes` and `--bind/--port` are set, the daemon also serves the REST API documented in [REST Service](REST%20Service.md). This is the same code path used by `aw agent access-point`, so enabling it effectively turns the enrolling executor into a valid `remote-server` for `aw task` clients.
 ```
-
-TODO: Clarify that when `--rest-api` is enabled, the launched daemon also acts as server implementing the [REST Service](REST%20Service.md).
 
 ```
 aw agent get-task [OPTIONS]
@@ -1061,33 +1067,27 @@ OPTIONS:
 ```
 
 ```
-aw agent sandbox run [OPTIONS] -- <CMD> [ARGS...]
+aw agent sandbox [OPTIONS] -- <CMD> [ARGS...]
 
-DESCRIPTION: Launch a process inside a local Linux sandbox (namespaces, cgroups, seccomp),
-applying filesystem policy and network defaults from config.
+DESCRIPTION: Launches a process inside the configured sandbox profile. Useful for testing.
 
 OPTIONS:
---mode <dynamic|static> Dynamic read allow-list (default) or static RO/overlay
---no-debug Disable in-sandbox debugging tools
---allow-network Enable egress (still no inbound by default)
---containers Allow rootless containers inside sandbox
---vm Allow nested VMs inside sandbox
---allow-kvm Allow /dev/kvm (implies --vm)
---rw <PATH>... Additional writable bind mounts
---overlay <PATH>... Paths made writable via overlayfs
---blacklist <PATH>... Additional sensitive paths to block
+  --sandbox <local|devcontainer|vm>  Sandbox profile (default: local).
+  --allow-egress <yes|no>        Override default egress policy (default: no).
+  --allow-ingress <PORT[/PROTO]> Allow inbound tunnels on specific ports (repeatable).
+  --allow-containers <yes|no>    Permit launching nested containers (default: no).
+  --allow-vms <yes|no>           Permit nested virtualization inside the sandbox.
+  --allow-kvm <yes|no>           Expose /dev/kvm (implies --allow-vms).
+  --mount-rw <PATH>...           Additional host paths to mount writable (policy checked).
+  --mount-ro <PATH>...           Extra read-only mounts.
+  --overlay <PATH>...            Promote read-only paths to copy-on-write overlays.
+  --env <KEY=VALUE>...           Inject environment variables (filtered against policy).
+  --timeout <DURATION>           Auto-terminate sandbox after wall clock timeout.
 ```
 
-```
-aw agent sandbox attach <SESSION_ID>
-aw agent sandbox ps <SESSION_ID>
-aw agent sandbox kill <SESSION_ID>
-aw agent sandbox audit <SESSION_ID>
-```
+TODO: Verify that these align with everything described in [Sandox Profiles](./Sandbox%20Profiles.md)
 
 See also: Local Sandboxing on Linux for detailed semantics.
-
-TODO: document the `aw agent sandbox` commands, which are currently described with alternative names in the sandbox-related markdown files. After adding them here, use the consistent names everywhere.
 
 ```
 aw agent instructions [OPTIONS] [SOURCE-FILE]
@@ -1268,7 +1268,7 @@ ARGUMENTS:
 ```
 
 - Filesystem (AgentFS) snapshot/branch utilities:
-  - `aw agent fs init-session [--name <NAME>] [--repo <name|path>] [--workspace <name>]` — Create an initial AgentFS snapshot on a mounted volume from the current state of the working copies. Translates to platform control: WinFsp DeviceIoControl, FUSE ioctl to `.agentfs/control`, or FSKit XPC.
+  - `aw agent fs init-session [--name <NAME>] [--repo <name|path>] [--workspace <name>]` — Create an initial AgentFS snapshot on a mounted volume from the current state of the working copy.
   - `aw agent fs snapshots <SESSION_ID>` — List snapshots created in a particular agent coding session.
   - `aw agent fs branch create <SNAPSHOT_ID> [--name <NAME>]` — Create a writable branch from a snapshot.
   - `aw agent fs branch bind <BRANCH_ID>` — Bind the current (or specified) process to the branch view.
@@ -1280,9 +1280,9 @@ TODO: Use the consistent style used in the rest of the document when describing 
 
 Local enumeration and management of running sessions is backed by the canonical state database described in `docs/state-persistence.md`. The SQLite database is authoritative; no PID files are used.
 
-### Deamonization
+### Daemonization
 
-TODO: Clarify that the commands `aw webui`, `aw agent access-point` and `aw agent enroll` are all different entry-points into the same "run daemon" routine. Clarify how the daemonization is actually performed on all supported operating systems.
+`aw webui`, `aw agent access-point`, and `aw agent enroll --rest-api yes` all invoke the shared **daemon** path in the codebase.
 
 ### Multiplexer Integration
 
@@ -1384,6 +1384,21 @@ Attach to a running session window:
 aw attach my-repo/feature/auth-refactor --pane left
 ```
 
+Inspect sandbox audit trail for a session:
+
+```bash
+aw session audit <SESSION_ID> [--format <text|json>] [--tail <N>] [--follow]
+
+DESCRIPTION: Print the sandbox audit log for a session. The log includes filesystem approval prompts, network access decisions, and resource usage deltas captured by the sandbox supervisor. For remote sessions the CLI streams the same audit events exposed by the REST service so results match the WebUI/TUI.
+
+OPTIONS:
+  --format <text|json>   Output format (default: text)
+  --tail <N>             Return only the most recent N entries
+  --follow               Stream live audit events until interrupted
+
+See [Sanboxing/Local Sandboxing on Linux](Sanboxing/Local%20Sandboxing%20on%20Linux.md) for policy configuration and event schema details.
+```
+
 Run the TUI against a REST service:
 
 ```bash
@@ -1407,4 +1422,4 @@ For detailed exit codes specific to the `aw task` command, see the [Exit Codes](
 
 - Honors admin-enforced config. Secrets never printed. `nosandbox` runtime gated and requires explicit opt-in.
 
-TODO: Create a plan for implementing the CLI interface
+Implementation roadmap: see [CLI.status.md](CLI.status.md) for phased delivery of the CLI/TUI, daemon runtime, sandbox commands, and packaging milestones.
