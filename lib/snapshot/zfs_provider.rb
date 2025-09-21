@@ -1,10 +1,14 @@
 # frozen_string_literal: true
 
 require 'shellwords'
+require 'json'
+require 'socket'
 
 module Snapshot
   # ZFS snapshot implementation
   class ZfsProvider < Provider
+    DAEMON_SOCKET_PATH = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
+
     def self.available?(path)
       # ZFS is only available on Linux in this implementation
       return false unless RUBY_PLATFORM.include?('linux')
@@ -20,11 +24,29 @@ module Snapshot
       dataset = dataset_for(@repo_path)
       raise 'ZFS dataset not found' unless dataset
 
-      tag = "agent#{Process.pid}_#{Time.now.to_i}"
+      tag = "agent#{Process.pid}_#{Thread.current.object_id}_#{Time.now.to_f.to_s.gsub('.', '_')}"
       snapshot = "#{dataset}@#{tag}"
       clone = "#{dataset}-clone-#{tag}"
       run('zfs', 'snapshot', snapshot)
-      # ZFS clone may succeed but return exit code 1 if mounting requires root
+
+      # Try to create clone using daemon if available
+      if daemon_available?
+        result = create_clone_via_daemon(snapshot, clone)
+        if result && result[:success] && result[:mountpoint] && Dir.exist?(result[:mountpoint])
+          # Clone created successfully via daemon
+          FileUtils.mkdir_p(File.dirname(dest))
+          # Remove existing file/directory if it exists, then create symlink
+          FileUtils.rm_rf(dest) if File.exist?(dest) || File.symlink?(dest)
+          File.symlink(result[:mountpoint], dest)
+          return dest
+        elsif result && result[:success] == false
+          # Daemon operation failed - don't fall back, raise error to make test fail
+          raise "Daemon ZFS clone operation failed: #{result[:error]}"
+        end
+        # If result is nil (communication error), fall back to direct execution
+      end
+
+      # Fallback to direct zfs clone (may require sudo or fail)
       clone_success = system('zfs', 'clone', snapshot, clone)
       unless clone_success
         # Check if the clone was actually created despite the error
@@ -44,13 +66,16 @@ module Snapshot
           # Clone appears to be properly mounted and accessible
           # Create a symlink from dest to the actual mountpoint
           FileUtils.mkdir_p(File.dirname(dest))
-          File.symlink(actual_mountpoint, dest) unless File.exist?(dest)
+          # Remove existing file/directory if it exists, then create symlink
+          FileUtils.rm_rf(dest) if File.exist?(dest) || File.symlink?(dest)
+          File.symlink(actual_mountpoint, dest)
           return dest
         end
       end
 
       # Clone is not properly accessible - this indicates ZFS mounting permissions issue
-      raise 'ZFS clone created but not accessible - check ZFS mounting permissions'
+      raise 'ZFS clone created but not accessible - check ZFS mounting permissions ' \
+            'or start the AW filesystem snapshots daemon with `just launch-aw-fs-snapshots-daemon`'
     end
 
     def cleanup_workspace(dest)
@@ -63,14 +88,70 @@ module Snapshot
 
       dataset = dataset_for(actual_path)
       dataset ||= dataset_for(dest)
-      begin
-        run('zfs', 'destroy', '-r', dataset)
-      rescue StandardError
-        nil
+
+      if dataset
+        # Try to use daemon for privileged cleanup first
+        if daemon_available?
+          result = delete_dataset_via_daemon(dataset)
+          if result && result[:success]
+            # Remove the symlink if it exists
+            File.unlink(dest) if File.symlink?(dest)
+            return
+          elsif result && result[:success] == false
+            # Daemon operation failed - don't fall back, raise error to make test fail
+            raise "Daemon ZFS delete operation failed: #{result[:error]}"
+          end
+          # If result is nil (communication error), fall back to direct execution
+        end
+
+        # Fallback to direct execution
+        begin
+          run('zfs', 'destroy', '-r', dataset)
+        rescue StandardError
+          nil
+        end
       end
 
       # Remove the symlink if it exists
       File.unlink(dest) if File.symlink?(dest)
+    end
+
+    private
+
+    def daemon_available?
+      File.socket?(DAEMON_SOCKET_PATH)
+    end
+
+    def send_daemon_request(request)
+      return nil unless daemon_available?
+
+      UNIXSocket.open(DAEMON_SOCKET_PATH) do |socket|
+        socket.puts(request.to_json)
+        response = socket.gets
+        return nil unless response
+
+        JSON.parse(response)
+      end
+    rescue StandardError
+      nil
+    end
+
+    def create_clone_via_daemon(snapshot, clone)
+      request = {
+        'command' => 'clone',
+        'filesystem' => 'zfs',
+        'snapshot' => snapshot,
+        'clone' => clone
+      }
+
+      response = send_daemon_request(request)
+      return nil unless response
+
+      {
+        success: response['success'],
+        mountpoint: response['mountpoint'],
+        error: response['error']
+      }
     end
 
     def self.fs_type(path)
@@ -79,6 +160,24 @@ module Snapshot
     private_class_method :fs_type
 
     private
+
+    def daemon_available?
+      File.socket?(DAEMON_SOCKET_PATH)
+    end
+
+    def send_daemon_request(request)
+      return nil unless daemon_available?
+
+      UNIXSocket.open(DAEMON_SOCKET_PATH) do |socket|
+        socket.puts(request.to_json)
+        response = socket.gets
+        return nil unless response
+
+        JSON.parse(response)
+      end
+    rescue StandardError
+      nil
+    end
 
     def validate_destination_path(dest)
       # Check if the destination path can be created as a directory
@@ -112,6 +211,22 @@ module Snapshot
       return unless best && File.exist?(path)
 
       best.first
+    end
+
+    def delete_dataset_via_daemon(dataset)
+      request = {
+        'command' => 'delete',
+        'filesystem' => 'zfs',
+        'target' => dataset
+      }
+
+      response = send_daemon_request(request)
+      return nil unless response
+
+      {
+        success: response['success'],
+        error: response['error']
+      }
     end
 
     def run(*cmd)

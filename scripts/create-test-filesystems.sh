@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Source shared configuration
+GID=$(id -g "$USER")
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-filesystems-config.sh"
 
@@ -24,7 +25,7 @@ if command -v zfs >/dev/null 2>&1; then
   if [ ! -f "$ZFS_FILE" ]; then
     echo "Creating 2GB ZFS backing file..."
     sudo truncate -s 2G "$ZFS_FILE"
-    sudo chown "$USER" "$ZFS_FILE"
+    sudo chown "$USER:$GID" "$ZFS_FILE"
   else
     echo "ZFS backing file already exists."
   fi
@@ -36,7 +37,7 @@ if command -v zfs >/dev/null 2>&1; then
     sudo zfs create "$ZFS_POOL"/test_dataset
     sudo zfs allow "$USER" snapshot,create,destroy,mount,mountpoint "$ZFS_POOL"/test_dataset
     # Set ownership on the mounted dataset
-    sudo chown -R "$USER" "/$ZFS_POOL/test_dataset"
+    sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
     echo "ZFS pool created and permissions delegated to $USER."
   else
     echo "ZFS pool $ZFS_POOL already exists."
@@ -45,7 +46,7 @@ if command -v zfs >/dev/null 2>&1; then
       echo "Updating ZFS permissions..."
       sudo zfs allow "$USER" snapshot,create,destroy,mount,mountpoint "$ZFS_POOL"/test_dataset
       # Set ownership on the mounted dataset
-      sudo chown -R "$USER" "/$ZFS_POOL/test_dataset"
+      sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
     fi
   fi
 else
@@ -94,7 +95,7 @@ if command -v mkfs.btrfs >/dev/null 2>&1; then
     fi
 
     # Change ownership to user for delegation
-    sudo chown -R "$USER:$USER" "$CACHE_DIR/btrfs_mount/test_subvol"
+    sudo chown -R "$USER:$GID" "$CACHE_DIR/btrfs_mount/test_subvol"
 
     echo "Btrfs filesystem created and mounted."
   fi

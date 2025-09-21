@@ -6,7 +6,6 @@ require 'fileutils'
 require_relative '../test_helper'
 require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
-require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_space_utils'
 require 'snapshot/provider'
 
@@ -16,7 +15,6 @@ class TestZfsProvider < Minitest::Test
   include FilesystemSpaceUtils
   include ProviderSharedBehavior
   include ProviderQuotaTestBehavior
-  include ProviderLoopDeviceTestBehavior
 
   def setup
     skip 'ZFS tests only run on Linux' unless linux?
@@ -83,14 +81,19 @@ class TestZfsProvider < Minitest::Test
       snapshots_to_destroy << snapshot.strip!
     end
 
-    # Find agent snapshots (from ZFS provider)
+    # Find agent snapshots (from ZFS provider) - both old and new formats
     `zfs list -H -o name -t snapshot 2>/dev/null | grep "agent.*#{pid}"`.each_line do |snapshot|
       snapshots_to_destroy << snapshot.strip!
     end
 
-    # Destroy the snapshots
-    snapshots_to_destroy.each do |snapshot|
-      system('zfs', 'destroy', snapshot, out: File::NULL, err: File::NULL)
+    # Also clean up any agent snapshots without PID (legacy)
+    `zfs list -H -o name -t snapshot 2>/dev/null | grep "^agents_workflow_test_zfs/test_dataset@agent[0-9]"`.each_line do |snapshot|
+      snapshots_to_destroy << snapshot.strip!
+    end
+
+    # Destroy the snapshots (and their clones)
+    snapshots_to_destroy.uniq.each do |snapshot|
+      system('zfs', 'destroy', '-r', snapshot, out: File::NULL, err: File::NULL)
     end
   end
 
@@ -113,9 +116,33 @@ class TestZfsProvider < Minitest::Test
   end
 
   def provider_skip_reason
-    return 'ZFS pool not created' unless @pool_created
+    # ZFS provider needs the daemon for reliable concurrent operations
+    # The daemon provides proper isolation and mounting for concurrent ZFS clones
+    daemon_socket = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
 
-    nil
+    # Check if socket exists and we can actually connect to it
+    if File.socket?(daemon_socket)
+      begin
+        # Try to connect to test if daemon is actually running
+        UNIXSocket.open(daemon_socket) do |socket|
+          # Send a test ping
+          socket.puts({ 'command' => 'ping' }.to_json)
+          response = socket.gets
+          if response
+            resp = begin
+              JSON.parse(response.strip)
+            rescue StandardError
+              nil
+            end
+            return nil if resp && resp['success'] # Daemon is working
+          end
+        end
+      rescue StandardError
+        # Daemon not responding, socket is stale
+      end
+    end
+
+    'ZFS daemon not available for concurrent operations'
   end
 
   def expected_max_creation_time
@@ -150,18 +177,23 @@ class TestZfsProvider < Minitest::Test
     Dir.mktmpdir(base_name)
   end
 
-  # === Loop device test implementation ===
-
-  def supports_loop_device_testing?
-    false # ZFS doesn't support loop device testing
+  def cleanup_test_workspace(workspace_dir)
+    FileUtils.rm_rf(workspace_dir) if workspace_dir && File.exist?(workspace_dir)
   end
 
-  def setup_loop_device_environment
-    # Already set up in main setup
+  def test_repo_content
+    'test repo content'
   end
 
-  def cleanup_loop_device_environment
-    # Handled in main teardown
+  def verify_cleanup_behavior(workspace_dir, _result_path)
+    # For ZFS provider, cleanup should remove the symlink but the directory may remain
+    # (depending on whether the clone unmounting succeeded)
+    # The important thing is that the symlink is gone
+    refute File.symlink?(workspace_dir), 'Workspace symlink should not exist after cleanup'
+  end
+
+  def provider_class_name
+    'ZfsProvider'
   end
 
   def expected_provider_class
@@ -179,13 +211,14 @@ class TestZfsProvider < Minitest::Test
   # === Quota test implementation ===
 
   def supports_quota_testing?
-    false # Quota testing requires additional ZFS quota setup
+    true # ZFS supports quota testing
   end
 
   def setup_quota_environment
     # Set a quota on the dataset
     dataset = get_dataset_for_path(@repo_dir)
-    system('zfs', 'set', 'quota=10M', dataset, out: File::NULL, err: File::NULL)
+    success = system('zfs', 'set', 'quota=10M', dataset, out: File::NULL, err: File::NULL)
+    raise "Failed to set quota on #{dataset}" unless success
   end
 
   def cleanup_quota_environment
@@ -197,11 +230,68 @@ class TestZfsProvider < Minitest::Test
     assert quota_exceeded, 'ZFS should have enforced the 10MB quota limit'
   end
 
+  # Override the quota test to set quota on the clone after creation
+  def test_provider_quota_limits
+    return skip "Quota testing not supported for #{provider_class_name}" unless supports_quota_testing?
+
+    provider = create_test_provider
+    workspace_dir = create_workspace_destination('quota_test')
+
+    begin
+      # Create workspace first
+      result_path = provider.create_workspace(workspace_dir)
+
+      # Now set quota on the clone dataset
+      clone_dataset = get_dataset_for_path(result_path)
+      success = system('zfs', 'set', 'quota=10M', clone_dataset, out: File::NULL, err: File::NULL)
+      raise "Failed to set quota on #{clone_dataset}" unless success
+
+      # Try to exceed quota
+      large_file = File.join(result_path, 'large_file.dat')
+      quota_exceeded = false
+
+      begin
+        File.write(large_file, 'x' * quota_test_size)
+      rescue Errno::ENOSPC, Errno::EDQUOT
+        quota_exceeded = true
+      end
+
+      # Verify quota behavior
+      verify_quota_behavior(quota_exceeded)
+    ensure
+      # Clean up quota
+      system('zfs', 'set', 'quota=none', clone_dataset, out: File::NULL, err: File::NULL) if clone_dataset
+      provider.cleanup_workspace(workspace_dir) if File.exist?(workspace_dir)
+    end
+  end
+
   public
 
   # === ZFS-specific tests ===
 
   def zfs_mounting_available?
+    # Check if daemon is available and responding
+    daemon_socket = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
+    if File.socket?(daemon_socket)
+      begin
+        # Try to connect to test if daemon is actually running
+        UNIXSocket.open(daemon_socket) do |socket|
+          socket.puts({ 'command' => 'ping' }.to_json)
+          response = socket.gets
+          if response
+            resp = begin
+              JSON.parse(response.strip)
+            rescue StandardError
+              nil
+            end
+            return true if resp && resp['success'] # Daemon is working
+          end
+        end
+      rescue StandardError
+        # Daemon not responding, socket is stale
+      end
+    end
+
     # Test if ZFS mounting works for regular users by creating a test clone
     test_snapshot = "#{@dataset_name}@mount_test_#{Process.pid}_#{Time.now.to_i}"
     test_clone = "#{@dataset_name}-clone-mount_test_#{Process.pid}_#{Time.now.to_i}"
@@ -236,7 +326,9 @@ class TestZfsProvider < Minitest::Test
   end
 
   def test_zfs_snapshot_and_clone_operations
-    skip 'ZFS mounting not available for regular users' unless zfs_mounting_available?
+    unless zfs_mounting_available?
+      skip 'ZFS mounting not available for regular users. Start the daemon with `just launch-aw-fs-snapshots-daemon`'
+    end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
     workspace_dir = create_workspace_destination('clone_test')
 
@@ -278,7 +370,9 @@ class TestZfsProvider < Minitest::Test
   end
 
   def test_zfs_error_conditions
-    skip 'ZFS mounting not available for regular users' unless zfs_mounting_available?
+    unless zfs_mounting_available?
+      skip 'ZFS mounting not available for regular users. Start the daemon with `just launch-aw-fs-snapshots-daemon`'
+    end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
 
     # Test with invalid destination (system directory)
@@ -295,9 +389,65 @@ class TestZfsProvider < Minitest::Test
     end
   end
 
-  def test_zfs_space_usage_efficiency
-    skip 'ZFS space usage test temporarily disabled for debugging'
+  def test_daemon_success_error_reporting
+    # Test that daemon operations work when daemon is available
+    # This test will be skipped if daemon is not running
+    daemon_socket = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
+    if File.socket?(daemon_socket)
+      begin
+        # Try to connect to test if daemon is actually running
+        UNIXSocket.open(daemon_socket) do |socket|
+          socket.puts({ 'command' => 'ping' }.to_json)
+          response = socket.gets
+          if response
+            resp = begin
+              JSON.parse(response.strip)
+            rescue StandardError
+              nil
+            end
+            skip 'Daemon ping failed' unless resp && resp['success']
+          else
+            skip 'Daemon not responding to ping'
+          end
+        end
+      rescue StandardError
+        skip 'Daemon not available'
+      end
+    else
+      skip 'Daemon not available'
+    end
 
+    provider = Snapshot::ZfsProvider.new(@repo_dir)
+    workspace_dir = create_workspace_destination('daemon_test')
+
+    begin
+      # Test successful daemon operation
+      result_path = provider.create_workspace(workspace_dir)
+
+      # Verify workspace was created successfully
+      assert File.exist?(result_path), 'Workspace should be created'
+      assert File.exist?(File.join(result_path, 'README.md')), 'Workspace should contain files'
+
+      # Verify daemon operation succeeded (no exception should be raised)
+      pass 'Daemon operation succeeded as expected'
+
+      provider.cleanup_workspace(workspace_dir)
+    ensure
+      provider.cleanup_workspace(workspace_dir) if File.exist?(workspace_dir)
+      begin
+        FileUtils.rm_rf(workspace_dir)
+      rescue StandardError
+        nil
+      end
+    end
+  end
+
+  def daemon_available?
+    socket_path = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
+    File.socket?(socket_path)
+  end
+
+  def test_zfs_space_usage_efficiency
     provider = Snapshot::ZfsProvider.new(@repo_dir)
     workspace_dir = create_workspace_destination('space_test')
 

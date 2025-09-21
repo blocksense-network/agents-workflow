@@ -40,7 +40,8 @@ module ProviderPerformanceTestBehavior
   # Test concurrent operations
   def test_provider_concurrent_operations
     provider = create_test_provider
-    return skip provider_skip_reason if provider_skip_reason
+    skip_reason = provider_skip_reason
+    return skip skip_reason if skip_reason
 
     workspace_results = {}
     threads = []

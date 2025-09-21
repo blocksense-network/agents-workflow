@@ -6,7 +6,6 @@ require 'fileutils'
 require_relative '../test_helper'
 require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
-require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
 require 'snapshot/provider'
 

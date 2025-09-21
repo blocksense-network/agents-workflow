@@ -39,23 +39,7 @@ publish-gem:
 
 # Validate all JSON Schemas with ajv (meta-schema compile)
 conf-schema-validate:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if command -v ajv >/dev/null 2>&1; then
-        AJV=ajv
-    else
-        if [ -n "${IN_NIX_SHELL:-}" ]; then
-            echo "Error: 'ajv' is missing inside Nix dev shell. Add pkgs.nodePackages.\"ajv-cli\" to flake.nix devShell inputs." >&2
-            exit 127
-        fi
-        echo "ajv not found; falling back to 'npx ajv-cli' outside Nix shell (requires network)" >&2
-        AJV='npx -y ajv-cli'
-    fi
-    for f in specs/schemas/*.json; do
-        echo Validating $$f
-        $$AJV compile -s "$$f"
-    done
-    echo All schemas valid.
+    scripts/conf-schema-validate.sh
 
 # Check TOML files with Taplo (uses schema mapping if configured)
 conf-schema-taplo-check:
@@ -100,26 +84,18 @@ check-test-filesystems:
 cleanup-test-filesystems:
     scripts/cleanup-test-filesystems.sh
 
+# Launch the AW filesystem snapshots daemon for testing (requires sudo)
+launch-aw-fs-snapshots-daemon:
+    scripts/launch-aw-fs-snapshots-daemon.sh
+
+# Stop the AW filesystem snapshots daemon
+stop-aw-fs-snapshots-daemon:
+    scripts/stop-aw-fs-snapshots-daemon.sh
+
+# Check status of AW filesystem snapshots daemon
+check-aw-fs-snapshots-daemon:
+    scripts/check-aw-fs-snapshots-daemon.sh
+
 # Run all spec linting/validation in one go
 lint-specs:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -n "${IN_NIX_SHELL:-}" ]; then
-        echo "Running lint-specs inside Nix dev shell (no fallbacks)." >&2
-    fi
-    just md-lint
-    just md-links
-    just md-spell
-    # Prose/style linting via Vale (warn-only): our custom style lowers
-    # spelling to warnings and uses project vocab so this won't fail commits.
-    if command -v vale >/dev/null 2>&1; then
-        vale specs/Public || true
-    else
-        if [ -n "${IN_NIX_SHELL:-}" ]; then
-            echo "vale is missing inside Nix dev shell; add pkgs.vale to flake.nix." >&2
-            exit 127
-        fi
-        echo "vale not found; skipping outside Nix shell." >&2
-    fi
-    # Mermaid syntax validation (enabled by default)
-    just md-mermaid-check
+    scripts/lint-specs.sh

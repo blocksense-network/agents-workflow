@@ -7,7 +7,6 @@ require 'fileutils'
 require_relative '../test_helper'
 require_relative 'provider_shared_behavior'
 require_relative 'provider_quota_test_behavior'
-require_relative 'provider_loop_device_test_behavior'
 require_relative 'filesystem_test_helper'
 require_relative 'filesystem_space_utils'
 require 'snapshot/provider'
@@ -19,7 +18,6 @@ class TestBtrfsProvider < Minitest::Test
   include FilesystemSpaceUtils
   include ProviderSharedBehavior
   include ProviderQuotaTestBehavior
-  include ProviderLoopDeviceTestBehavior
 
   def setup
     skip 'Btrfs tests only run on Linux' unless linux?
@@ -66,8 +64,7 @@ class TestBtrfsProvider < Minitest::Test
   end
 
   def provider_skip_reason
-    return 'Btrfs filesystem not mounted' unless @mounted
-
+    # Btrfs provider doesn't have special skip conditions beyond the main setup
     nil
   end
 
@@ -101,20 +98,6 @@ class TestBtrfsProvider < Minitest::Test
     timestamp = Time.now.to_i
     base_name = suffix ? "btrfs_workspace_#{suffix}_#{pid}_#{timestamp}" : "btrfs_workspace_#{pid}_#{timestamp}"
     File.join(@repo_dir, base_name)
-  end
-
-  # === Loop device test implementation ===
-
-  def supports_loop_device_testing?
-    false # Btrfs doesn't support loop device testing
-  end
-
-  def setup_loop_device_environment
-    # Already set up in main setup
-  end
-
-  def cleanup_loop_device_environment
-    # Handled in main teardown
   end
 
   def expected_provider_class
@@ -271,8 +254,6 @@ class TestBtrfsProvider < Minitest::Test
   end
 
   def test_btrfs_space_usage_efficiency
-    skip 'Btrfs space usage test temporarily disabled for debugging'
-
     provider = Snapshot::BtrfsProvider.new(@repo_dir)
     workspace_dir = File.join(@repo_dir, 'space_test')
 
@@ -295,8 +276,6 @@ class TestBtrfsProvider < Minitest::Test
   end
 
   def test_btrfs_snapshot_performance_scaling
-    skip 'Btrfs performance test temporarily disabled for debugging'
-
     # Create a larger repository with multiple files
     100.times do |i|
       File.write(File.join(@repo_dir, "file_#{i}.txt"), "content #{i}" * 100)
@@ -306,8 +285,9 @@ class TestBtrfsProvider < Minitest::Test
 
     # Test multiple snapshots to verify consistent performance
     times = []
+    timestamp = Time.now.to_i
     5.times do |i|
-      workspace_dir = File.join(@repo_dir, "perf_test_#{i}")
+      workspace_dir = File.join(@repo_dir, "perf_test_#{timestamp}_#{i}")
 
       start_time = Time.now
       provider.create_workspace(workspace_dir)
@@ -324,5 +304,46 @@ class TestBtrfsProvider < Minitest::Test
     # Average time should be consistent
     avg_time = times.sum / times.size
     assert avg_time < 1.0, "Average snapshot time #{avg_time}s, expected < 1s"
+  end
+
+  def test_daemon_success_error_reporting
+    skip 'Daemon not available' unless daemon_available?
+
+    provider = Snapshot::BtrfsProvider.new(@repo_dir)
+    workspace_dir = File.join(@repo_dir, 'daemon_test_workspace')
+
+    begin
+      # Test successful daemon operation
+      result_path = provider.create_workspace(workspace_dir)
+
+      # Verify workspace was created successfully
+      assert File.exist?(result_path), 'Workspace should be created'
+      assert File.exist?(File.join(result_path, 'README.md')), 'Workspace should contain files'
+
+      # Verify daemon operation succeeded (no exception should be raised)
+      pass 'Daemon operation succeeded as expected'
+
+      provider.cleanup_workspace(workspace_dir)
+    ensure
+      provider.cleanup_workspace(workspace_dir) if File.exist?(workspace_dir)
+    end
+  end
+
+  def daemon_available?
+    socket_path = '/tmp/agent-workflow/aw-fs-snapshots-daemon'
+    File.socket?(socket_path)
+  end
+
+  def cleanup_test_workspace(workspace_dir)
+    FileUtils.rm_rf(workspace_dir) if workspace_dir && File.exist?(workspace_dir)
+  end
+
+  def test_repo_content
+    'test repo content'
+  end
+
+  def verify_cleanup_behavior(workspace_dir, _result_path)
+    # For Btrfs provider, cleanup should remove the subvolume
+    refute File.exist?(workspace_dir), 'Workspace directory should not exist after cleanup'
   end
 end
