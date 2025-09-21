@@ -1,6 +1,6 @@
 # Ghostty (macOS) — Integration Guide (Draft)
 
-Status: Draft. Fill out per the [Multiplexer Description Template](Multiplexer%20Description%20Template.md).
+Status: Draft. Fill out per the [Multiplexer-Description-Template](Multiplexer-Description-Template.md).
 
 Highlights
 

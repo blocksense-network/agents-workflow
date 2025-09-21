@@ -146,7 +146,7 @@ The WebUI provides a browser-based experience for creating, monitoring, and mana
 - Call `POST /api/v1/sessions/{id}/open/ide` and display returned commands.
 - Provide copy-to-clipboard and "Try locally" hints.
 
-TODO: This has to be re-thinked. How does it work in [Local Mode](./Local%20Mode.md)? How does it work with a [Remote Server](./Remote%20Mode.md)? VS Code and Cursor have remote mode, accessible over the web, but we need to create a secure tunnel for this.
+TODO: This has to be re-thinked. How does it work in [Local-Mode](Local-Mode.md)? How does it work with a [Remote Server](Remote-Mode.md)? VS Code and Cursor have remote mode, accessible over the web, but we need to create a secure tunnel for this.
 
 ### Empty States and Errors
 

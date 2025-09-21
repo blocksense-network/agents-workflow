@@ -27,7 +27,7 @@ Paths are illustrative; the CLI prints the exact search order in `aw config --ex
 
 ### Admin‑enforced values
 
-Enterprise deployments may enforce specific keys at the System scope. Enforced values are read‑only to lower scopes. The CLI surfaces enforcement in `aw config <key> --explain` output and prevents writes with a clear error. See the initial rationale in [Configuration](../Initial%20Developer%20Input/Configuration.md).
+Enterprise deployments may enforce specific keys at the System scope. Enforced values are read‑only to lower scopes. The CLI surfaces enforcement in `aw config <key> --explain` output and prevents writes with a clear error. See the initial rationale in [Configuration](../Initial-Developer-Input/Configuration.md).
 
 Use a single key `ui` (not `ui.default`) to control the default UI.
 

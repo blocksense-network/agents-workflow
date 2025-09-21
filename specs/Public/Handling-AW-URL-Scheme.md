@@ -158,7 +158,7 @@ To open a URL in the default browser from your handler, execute `xdg-open "http:
 
 # Handling task URLs
 
-The `agents-workflow://` scheme transports task intents into the local AW system. The **AW URL Handler** performs four jobs: **validate → normalize → ensure WebUI → open**. This document specifies the required behavior; implementation plans and status tracking live in the sibling [Handling AW URL Scheme.status.md](./Handling%20AW%20URL%20Scheme.status.md) file.
+The `agents-workflow://` scheme transports task intents into the local AW system. The **AW URL Handler** performs four jobs: **validate → normalize → ensure WebUI → open**. This document specifies the required behavior; implementation plans and status tracking live in the sibling [Handling AW URL Scheme.status.md](Handling-AW-URL-Scheme.status.md) file.
 
 ## URL shapes (required)
 

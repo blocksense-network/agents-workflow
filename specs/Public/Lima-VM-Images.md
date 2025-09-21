@@ -36,7 +36,7 @@ All images include:
 - Common provisioning scripts (reused from Docker container setup)
 - Nix flake for agents-workflow tools
 
-Implementation Plan: See [Lima VM Images.status.md](./Lima%20VM%20Images.status.md) for milestones, success criteria, and CI strategy.
+Implementation Plan: See [Lima VM Images.status.md](Lima-VM-Images.status.md) for milestones, success criteria, and CI strategy.
 
 ### Deliverables
 

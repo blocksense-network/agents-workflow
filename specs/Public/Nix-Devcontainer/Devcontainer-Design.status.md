@@ -11,10 +11,10 @@ Goals:
 
 References:
 
-- [Devcontainer Design.md](./Devcontainer%20Design.md)
-- [Devcontainer Cache Guidelines.md](./Devcontainer%20Cache%20Guidelines.md)
-- [Devcontainer Test Suite.md](./Devcontainer%20Test%20Suite.md)
-- [Devcontainer User Setup.md](./Devcontainer%20User%20Setup.md)
+- [Devcontainer Design.md](Devcontainer-Design.md)
+- [Devcontainer Cache Guidelines.md](Devcontainer-Cache-Guidelines.md)
+- [Devcontainer Test Suite.md](Devcontainer-Test-Suite.md)
+- [Devcontainer User Setup.md](Devcontainer-User-Setup.md)
 
 ### Deliverables
 
@@ -112,7 +112,7 @@ M9. Documentation and examples (1–2d)
 
 ### Test strategy & automation
 
-- Follow scenarios and measurements in [Devcontainer Test Suite.md](./Devcontainer%20Test%20Suite.md).
+- Follow scenarios and measurements in [Devcontainer Test Suite.md](Devcontainer-Test-Suite.md).
 - CI matrix: Linux (ubuntu‑latest), macOS runners, Windows runners using WSL2 for Dev Containers CLI where possible.
 - Cache metrics collection; golden JSON for healthcheck; artifact upload of logs and timing tables.
 - Security hygiene checks that ensure no secrets are present in cache volumes or images.

@@ -99,7 +99,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "specs/Public/Agent Browsers/Agent Browser Profiles.md",
+                "file": "specs/Research/Supervisor-Process-for-Dynamic-File-Access-Control-on-Linux.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -114,7 +114,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Agent Browser Profiles"
+              "title": "Supervisor-Process-for-Dynamic-File-Access-Control-on-Linux"
             }
           },
           {
@@ -123,7 +123,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "specs/Research/HowTo-Persistent-SSH-Connections.md",
+                "file": "specs/Research/How-to-persistent-SSH-connections.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -138,7 +138,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "HowTo-Persistent-SSH-Connections"
+              "title": "How-to-persistent-SSH-connections"
             }
           }
         ],
@@ -199,8 +199,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 266.5,
-    "collapsed": true
+    "width": 416.5
   },
   "right": {
     "id": "6bab4bb451c2c34d",
@@ -291,44 +290,44 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "dccfea43a5379c8a",
+  "active": "37c1846f5d192ea3",
   "lastOpenFiles": [
-    "specs/Public/CLI.md~",
-    "specs/Public/Plans/CLI-Cloud-Automation.status.md",
-    "specs/Public/REST Service.md",
-    "specs/Public/Cloud-Automation.status.md",
-    "specs/Public/CLI.status.md",
-    "specs/Public/CLI-Cloud-Automation.status.md",
-    "specs/Public/Connectivity Layer.md",
-    "specs/Public/Plans/CLI-Implementation.status.md",
-    "specs/Public/Lima VM Images.status.md",
-    "specs/Public/Plans/CLI-Implementation.md",
-    "specs/Public/Plans/CLI-Cloud-Automation.md",
-    "specs/Public/Plans",
-    "specs/Public/Executor-Enrollment.md",
-    "specs/Public/CLI.md",
-    "specs/Public/Multi-OS Testing.md",
-    "specs/AGENTS.md",
-    "specs/Public/FS Snapshots/FS Snapshots Overview.md",
-    "specs/Research/Intro-to-Mutagen-Projects.md",
-    "specs/Research/HowTo-Persistent-SSH-Connections.md",
-    "specs/Public/Configuration.md",
-    "specs/Public/Agent Workflow GUI.md",
-    "specs/Public/Terminal Multiplexers/GNU Screen.md",
-    "specs/Public/Terminal Multiplexers/Zellij.md",
-    "specs/Public/Terminal Multiplexers/TUI-Multiplexers-Overview.md",
-    "specs/Initial Developer Input/Flow-Chart-Corrections.txt",
-    "specs/Initial Developer Input/Flow-Chart-Corrections.md",
-    "specs/Public/Terminal Multiplexers/Ghostty.md",
-    "specs/Public/Terminal Multiplexers/Emacs.md",
-    "specs/Public/Terminal Multiplexers",
-    "specs/Public/Schemas/session-events.ingest.schema.json",
-    "specs/Public/Schemas/session-events.schema.json",
-    "agent-task-0.1.0.gem",
-    "test/logs/temp_output_20250914_232409.log",
-    "test/temp_test_runner_1757881449.rb",
-    "test/logs/test_run_20250914_232409.log",
-    "specs/Research/Tools/SessionFileExperiments/opencode.py",
+    "specs/Research/Sandboxing-Technologies.md",
+    "specs/Research/Restricting-Guest-Internet-Access-to-a-Whitelist-of-Websites.md",
+    "specs/Research/MicroVM-Research.md",
+    "specs/Research/macOS-Local-Sandbox-Feasibility.md",
+    "specs/Research/Intercepting-Terminal-IO-with-seccomp.md",
+    "specs/Research/Intercepting-Terminal-IO-with-FsKit-on-macOS.md",
+    "specs/Research/How-to-persistent-SSH-connections.md",
+    "specs/Research/How-to-use-clap.md",
+    "specs/Research/How-to-use-Ratatui.md",
+    "specs/Research/How-to-test-TUI-apps.md",
+    "specs/Research/How-to-show-OS-notifications.md",
+    "specs/Research/Git-based Snapshots Research.md",
+    "specs/Research/Creating-macOS-Endpoint-Security-Extension.md",
+    "specs/Research/Compiling-FsKit-Extensions.md",
+    "specs/Research/CLI-Best-Practices.md",
+    "specs/Research/Can-SSH-work-over-HTTPS.md",
+    "specs/Public/Lima-VM-Images.status.md",
+    "specs/Public/Handling-AW-URL-Scheme.status.md",
+    "specs/Public/Handling-AW-URL-Scheme.md",
+    "specs/Public/Nix-Devcontainer/Devcontainer-Design.md",
+    "specs/Public/Nix-Devcontainer/Devcontainer-Design.status.md",
+    "specs/Public/Nix-Devcontainer/Devcontainer-Test-Suite.md",
+    "specs/Public/Nix-Devcontainer/Devcontainer-User-Setup.md",
+    "specs/Public/Nix-Devcontainer/Devcontainer-Cache-Guidelines.md",
+    "specs/Public/FS Snapshots/milestone_1.md",
+    "specs/Public/FS Snapshots/milestone_2.md",
+    "test_output.log",
+    "setup-tests/test-runner.sh",
+    "setup-tests/container-test.sh",
+    "setup-tests/Dockerfile",
+    "setup-tests",
+    "scripts/test-filesystems-config.sh",
+    "scripts/stop-aw-fs-snapshots-daemon.sh",
+    "scripts/run_snapshot_tests.rb",
+    "scripts/lint-specs.sh",
+    "scripts/launch-aw-fs-snapshots-daemon.sh",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_tests.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_write_page_test.png",
     "reference_projects/winfsp/doc/archive/WinFsp-Performance-Testing/rdwr_nc_read_page_test.png",

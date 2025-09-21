@@ -52,7 +52,7 @@ Design note — one shared image generation pipeline for Lima VMs, MicroVMs, and
 We can define our software set once and emit multiple formats:
 
 - Use Nix to describe the packages and system config, then build:
-  - DevContainer layers: build an OCI image from the same Nix inputs (e.g., `dockerTools.buildImage` or `nix2container`), aligning with our [DevContainer Layered Images](../Public/Nix%20Devcontainer/Devcontainer%20Design.md#Layered%20Images).
+  - DevContainer layers: build an OCI image from the same Nix inputs (e.g., `dockerTools.buildImage` or `nix2container`), aligning with our [DevContainer Layered Images](../Public/Nix-Devcontainer/Devcontainer-Design.md#Layered%20Images).
   - Lima VM images: generate raw/QCOW2 NixOS disk images with `nixos-generators` using the same config; Lima can boot them via QEMU on macOS. [nixos‑generators]
   - MicroVM images: reuse the same NixOS config to produce raw disk images for Cloud Hypervisor/QEMU microvm or a Firecracker‑ready rootfs+kernel. The `microvm.nix` project lets you target Firecracker, Cloud Hypervisor, QEMU microvm, crosvm, and kvmtool from the same Nix flake, and can build read‑only root images (squashfs/erofs) with host `/nix/store` sharing if desired. [microvm.nix intro] [microvm options]
 
@@ -63,7 +63,7 @@ References
 
 This approach satisfies the “single source of truth” requirement: the same package list and base config produce (a) layered OCI images for DevContainers, (b) Lima VM disk images, and (c) MicroVM images for Firecracker/Cloud Hypervisor/QEMU microvm.
 
-Ideally, we would have a shared image generation process allow the same list of software packages to be specified for our [Lima VM Images](../Public/Lima%20VM%20Images.md) and our [DevContainer Layered Images](../Public/Nix%20Devcontainer/Devcontainer%20Design.md#Layered%20Images).
+Ideally, we would have a shared image generation process allow the same list of software packages to be specified for our [Lima-VM-Images](../Public/Lima-VM-Images.md) and our [DevContainer Layered Images](../Public/Nix-Devcontainer/Devcontainer-Design.md#Layered%20Images).
 
 ## Are there up-to-date benchmarks showing how the start-up times of various MicroVMs compare?
 

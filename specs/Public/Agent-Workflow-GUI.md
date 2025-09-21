@@ -177,7 +177,7 @@ The GUI integrates with the layered configuration system defined in `Configurati
 
 This specification focuses on GUI-specific concerns and delegates to:
 
-- **[WebUI PRD.md](WebUI%20PRD.md)**: All WebUI functionality and user interface details
-- **[Configuration.md](../Initial%20Developer%20Input/Configuration.md)**: Configuration system and file formats
+- **[WebUI PRD.md](WebUI-PRD.md)**: All WebUI functionality and user interface details
+- **[Configuration.md](../Initial-Developer-Input/Configuration.md)**: Configuration system and file formats
 - **[CLI.md](CLI.md)**: CLI command specifications and behavior
-  - **[Handling AW URL Scheme.md](Handling%20AW%20URL%20Scheme.md)**: URL scheme desired behavior. See the `.status.md` sibling for milestones and tests.
+  - **[Handling AW URL Scheme.md](Handling-AW-URL-Scheme.md)**: URL scheme desired behavior. See the `.status.md` sibling for milestones and tests.

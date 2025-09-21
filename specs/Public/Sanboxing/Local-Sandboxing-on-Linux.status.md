@@ -1,6 +1,6 @@
 ### Overview
 
-This document tracks the implementation status of the [Local Sandboxing on Linux](./Local%20Sandboxing%20on%20Linux.md) functionality.
+This document tracks the implementation status of the [Local-Sandboxing-on-Linux](Local-Sandboxing-on-Linux.md) functionality.
 
 Goal: deliver a production‑ready local Linux sandbox with dynamic read allow‑list, static RO/overlay mode, network isolation, resource limits, and developer‑friendly UX, surfaced through `aw session audit` and automated policy enforcement.
 

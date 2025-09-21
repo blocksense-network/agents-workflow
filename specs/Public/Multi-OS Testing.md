@@ -4,7 +4,7 @@
 
 Enable agents to validate builds and tests across multiple operating systems in parallel with a simple, reliable flow:
 
-- One of the executors acts as the leader workspace (typically a Linux executor, due to the stronger support for [CoW Snapshots](FS%20Snapshots/FS%20Snapshots%20Overview.md)).
+- One of the executors acts as the leader workspace (typically a Linux executor, due to the stronger support for [CoW Snapshots](FS%20Snapshots/FS-Snapshots-Overview.md)).
 - One or more follower workspaces (macOS, Windows, Linux) mirror the leader via Mutagen high‑speed file sync.
 - Each execution cycle fences the filesystem state (FsSnapshot + sync).
 - The agent on the leader can drive the execution of arbitrary commands (typically tests) on all executors via instructions to run the `aw agent run-everywhere` command.
@@ -32,13 +32,13 @@ Enable agents to validate builds and tests across multiple operating systems in 
 ### Execution Cycle
 
 - Session start preflight (leader):
-- Establish persistent SSH masters (ControlMaster/ControlPersist) to all followers via HTTP CONNECT (see [Persistent SSH Connections](../Research/HowTo-Persistent-SSH-Connections.md)).
+- Establish persistent SSH masters (ControlMaster/ControlPersist) to all followers via HTTP CONNECT (see [Persistent SSH Connections](../Research/How-to-persistent-SSH-connections.md)).
 - Write and start a Mutagen project describing sync/forward sessions to all followers (see [Mutagen Projects](../Research/Intro-to-Mutagen-Projects.md)).
 - Sync ignores: `node_modules`, `.venv`, `target`, `build`, large caches unless explicitly needed; per‑project config supported via the standard configuration system (see `sync-ignores` in config.schema.json — string list; defaults as above; project‑specific overrides allowed in repo config).
 
 - Agent edits files on the leader.
 - Execute `fs_snapshot_and_sync`:
-- Create a leader [FsSnapshot](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Create a leader [FsSnapshot](FS%20Snapshots/FS-Snapshots-Overview.md).
 - Issue a sync fence: run `mutagen project flush` and wait until followers reflect the leader snapshot content.
 - Invoke `aw agent followers run` with the project‑specific test commands, specified in the agent instructions.
 

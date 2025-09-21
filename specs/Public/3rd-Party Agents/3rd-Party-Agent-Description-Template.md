@@ -26,7 +26,7 @@ Provide 1–3 concrete examples for this tool using code blocks.
 
 Does the agent support custom hooks or commands to be executed during its work (e.g., before/after each file modification or tool use)? Detail how this is configured.
 
-Please note that by custom hooks, we are not referring just to MCP tools, but specifically to the ability to configure certain commands to be executed after every agent step, so we can implement our [Agent Time Travel feature](../Agent%20Time%20Travel.md).
+Please note that by custom hooks, we are not referring just to MCP tools, but specifically to the ability to configure certain commands to be executed after every agent step, so we can implement our [Agent Time Travel feature](../Agent-Time-Travel.md).
 
 ### Checkpointing (point-in-time restore of chat + filesystem)
 

@@ -381,4 +381,4 @@ Expected results:
 - Provide `aw health --caches` to print configured mounts and sizes.
 - CI jobs per package manager with synthetic sample projects.
 
-Implementation Plan: See [Devcontainer Design.status.md](./Devcontainer%20Design.status.md) for milestones, success criteria, and CI strategy.
+Implementation Plan: See [Devcontainer Design.status.md](Devcontainer-Design.status.md) for milestones, success criteria, and CI strategy.

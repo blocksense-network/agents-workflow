@@ -101,7 +101,7 @@ This separation keeps the low‑level trait reusable outside Agents‑Workflow a
 
 Scope includes classic multiplexers and terminal apps with comparable capabilities (tabs, splits, focus control, programmatic command launch), and editors with built‑in terminals.
 
-- See the template: [Multiplexer Description Template](Multiplexer%20Description%20Template.md)
+- See the template: [Multiplexer-Description-Template](Multiplexer-Description-Template.md)
 - Candidate list (initial):
   - tmux
   - Zellij

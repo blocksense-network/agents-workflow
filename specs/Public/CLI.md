@@ -26,7 +26,7 @@ This architecture ensures maximum reusability - the core functionality can be us
 
 All CLI commands use Clap's derive API for type-safe argument parsing, ensuring compile-time validation of CLI structure and automatic generation of help text, usage examples, and shell completions. Help text includes examples and detailed descriptions.
 
-See the clap guide: [How to use clap](../Research/How%20to%20use%20clap.md).
+See the clap guide: [How-to-use-clap](../Research/How-to-use-clap.md).
 
 #### Documentation conventions (help text baseline)
 
@@ -54,11 +54,11 @@ Shell completions are provided via the `aw shell-completion` command group. They
 
 ### Modes of Operation
 
-- **Local vs Remote:** Local mode manages state with a local SQLite DB and runs tasks on the current machine; see [Local Mode](Local%20Mode.md). Remote mode targets an Agents‑Workflow REST service; the CLI becomes a thin client while execution/state live on the server; see [Remote Mode](Remote%20Mode.md).
-- **TUI vs WebUI:** `aw` can start either a terminal dashboard (TUI) or open the WebUI. The UIs present the same concepts (tasks, sessions, logs, time‑travel) with different affordances. See [TUI PRD](TUI%20PRD.md) and [WebUI PRD](WebUI%20PRD.md).
+- **Local vs Remote:** Local mode manages state with a local SQLite DB and runs tasks on the current machine; see [Local-Mode](Local-Mode.md). Remote mode targets an Agents‑Workflow REST service; the CLI becomes a thin client while execution/state live on the server; see [Remote-Mode](Remote-Mode.md).
+- **TUI vs WebUI:** `aw` can start either a terminal dashboard (TUI) or open the WebUI. The UIs present the same concepts (tasks, sessions, logs, time‑travel) with different affordances. See [TUI-PRD](TUI-PRD.md) and [WebUI-PRD](WebUI-PRD.md).
 - **Orthogonal choices:** UI (TUI/WebUI) and execution location (local/remote) are orthogonal. Any combination is possible; e.g., run the TUI against a remote REST service or use the WebUI locally.
 - **Fleets combine local and remote:** [Multi-OS testing fleets](Multi-OS%20Testing.md) can mix local and remote agents. For example, a local Linux container leader may have remote followers (e.g., a Windows VM on a server). The `aw` client and server may need to orchestrate together the connectivity between all the machines in the fleet.
-- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (local, container, VM, or nosandbox per policy). See [Sandbox Profiles](Sandbox%20Profiles.md) and configuration mapping below.
+- **Sandbox profiles (orthogonal):** When launching locally, sandbox profiles define the isolation level (local, container, VM, or nosandbox per policy). See [Sandbox-Profiles](Sandbox-Profiles.md) and configuration mapping below.
 
 ### Global Behavior and Flags
 
@@ -80,7 +80,7 @@ Shell completions are provided via the `aw shell-completion` command group. They
 
 #### 1) TUI
 
-- `aw` or `aw tui [--multiplexer <tmux|zellij|screen>] [--remote-server <NAME|URL>]` — See [TUI PRD](TUI%20PRD.md) for full UI details and flows.
+- `aw` or `aw tui [--multiplexer <tmux|zellij|screen>] [--remote-server <NAME|URL>]` — See [TUI-PRD](TUI-PRD.md) for full UI details and flows.
 - With `--remote-server` (or configured `remote-server`), the same dashboard is presented, but panes may attach to remote sessions over SSH. See [Multi‑OS Testing](Multi-OS%20Testing.md) for details on QUIC control plane, SSH via HTTP CONNECT, and client‑side relay in hybrid fleets.
 
 #### 2) Tasks
@@ -124,7 +124,7 @@ Notes:
 
 #### Multiple Agent Support
 
-The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
+The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS-Snapshots-Overview](FS%20Snapshots/FS-Snapshots-Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
 
 **Usage Patterns:**
 
@@ -190,7 +190,7 @@ Behavior overview:
 
 - Local vs Remote: With a configured/provided `remote-server`, AW calls the server's REST API to create/manage the task. Otherwise, AW runs locally.
 - Third‑party clouds: Some agents can run on external clouds (e.g., Google Jules, OpenAI Cloud Codex). In such cases, flags like `--instances`, `--browser-*`, or `--codex-workspace` apply only when supported by the selected agent/platform. AW surfaces capabilities via discovery and validates flags accordingly.
-- Sandbox/runtime: Local runs honor `--sandbox`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `disabled` (policy‑gated, direct host process execution). See [Sandbox Profiles](Sandbox%20Profiles.md) and [FS Snapshots Overview](FS%20Snapshots/FS%20Snapshots%20Overview.md).
+- Sandbox/runtime: Local runs honor `--sandbox`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `disabled` (policy‑gated, direct host process execution). See [Sandbox-Profiles](Sandbox-Profiles.md) and [FS-Snapshots-Overview](FS%20Snapshots/FS-Snapshots-Overview.md).
 - Target branch: `--target-branch` specifies the branch where agent results should be delivered/pushed (used with `--delivery branch` or `--delivery pr` modes).
 
 #### Preserved `agent-task` Behaviors
@@ -472,7 +472,7 @@ The `aw task` command returns the following exit codes:
 #### Notifications System
 
 The `--notifications` option (default: "yes") controls whether OS-level notifications are emitted when tasks complete.
-The behavior is defined in the [Handling AW URL Scheme](Handling%20AW%20URL%20Scheme.md) document.
+The behavior is defined in the [Handling-AW-URL-Scheme](Handling-AW-URL-Scheme.md) document.
 
 #### Agent Execution Architecture
 
@@ -589,7 +589,7 @@ Behavior:
 Remote sessions:
 
 - When a session runs on another machine (VM or remote host), the REST service returns SSH connection details. `aw attach` uses these to open a remote multiplexer session (e.g., `ssh -t host tmux attach -t <name>`), or zellij/screen equivalents.
-- Connectivity when hosts lack public IPs: SSH over HTTP CONNECT via access points, with optional client‑side relay in hybrid fleets. See [Multi‑OS Testing](Multi-OS%20Testing.md) and [Can SSH work over HTTPS?](../Research/Can%20SSH%20work%20over%20HTTPS.md).
+- Connectivity when hosts lack public IPs: SSH over HTTP CONNECT via access points, with optional client‑side relay in hybrid fleets. See [Multi‑OS Testing](Multi-OS%20Testing.md) and [Can SSH work over HTTPS?](../Research/Can-SSH-work-over-HTTPS.md).
 
 #### 5) Repositories and Projects
 
@@ -760,7 +760,7 @@ Behavior:
 
 - Validates repository state against configuration and best practices:
   - Instruction files: verify that `AGENTS.md` (or chosen source) exists and that symlinks for the configured `supported-agents` are present. Report any mismatches or missing links and suggest `aw repo instructions link` to fix.
-  - Devcontainer: check for presence of `.devcontainer/` and run its health‑check procedure (documented in [Nix Devcontainer/Devcontainer User Setup](Nix%20Devcontainer/Devcontainer%20User%20Setup.md) and [Nix Devcontainer/Devcontainer Design](Nix%20Devcontainer/Devcontainer%20Design.md)). Report status and hints to fix.
+  - Devcontainer: check for presence of `.devcontainer/` and run its health‑check procedure (documented in [Nix-Devcontainer/Devcontainer-User-Setup](Nix-Devcontainer/Devcontainer-User-Setup.md) and [Nix-Devcontainer/Devcontainer-Design](Nix-Devcontainer/Devcontainer-Design.md)). Report status and hints to fix.
   - Dev environment: check `--devenv` (from config/flags) coherence with project files (e.g., Nix flake, direnv). Report inconsistencies.
 
 Output and exit codes:
@@ -1085,7 +1085,7 @@ OPTIONS:
   --timeout <DURATION>           Auto-terminate sandbox after wall clock timeout.
 ```
 
-TODO: Verify that these align with everything described in [Sandox Profiles](./Sandbox%20Profiles.md)
+TODO: Verify that these align with everything described in [Sandox Profiles](Sandbox-Profiles.md)
 
 See also: Local Sandboxing on Linux for detailed semantics.
 

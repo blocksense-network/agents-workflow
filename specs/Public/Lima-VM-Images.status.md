@@ -1,6 +1,6 @@
 ### Overview
 
-This document tracks the implementation status of the [Lima VM Setup — Linux Images for macOS Multi-OS Testing](./Lima%20VM%20Images.md) functionality.
+This document tracks the implementation status of the [Lima VM Setup — Linux Images for macOS Multi-OS Testing](Lima-VM-Images.md) functionality.
 
 Goals:
 
@@ -11,9 +11,9 @@ Goals:
 
 References:
 
-- [Lima VM Images.md](./Lima%20VM%20Images.md)
+- [Lima VM Images.md](Lima-VM-Images.md)
 - [Multi-OS Testing.md](./Multi-OS%20Testing.md)
-- [REST Service.md](./REST%20Service.md) (for fleet planner integration)
+- [REST Service.md](REST-Service.md) (for fleet planner integration)
 
 ### Component layout (parallel tracks)
 

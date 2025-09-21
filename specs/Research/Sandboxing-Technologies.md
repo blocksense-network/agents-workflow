@@ -1,6 +1,6 @@
 ## Context
 
-The goal of this research is to identify potential sandboxing technologies that Agent Workflow might use in [Local Mode](../Public/Local%20Mode.md) (for product overview, see [Product One Pager](../../docs/Product%20One%20Pager.md)).
+The goal of this research is to identify potential sandboxing technologies that Agent Workflow might use in [Local-Mode](../Public/Local-Mode.md) (for product overview, see [Product-One-Pager](../../docs/Product-One-Pager.md)).
 
 Such sandbox may limit writes to the file system outside of few specific whitelisted VSC working copies.
 
