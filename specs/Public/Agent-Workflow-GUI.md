@@ -113,7 +113,7 @@ When CLI tools are invoked from the command line, they:
 
 ## Configuration Integration
 
-The GUI integrates with the layered configuration system defined in `Configuration.md`. GUI-specific settings are stored in GUI configuration files and accessed via `aw config` commands.
+The GUI integrates with the layered configuration system defined in [Configuration.md](Configuration.md). GUI-specific settings are stored in GUI configuration files and accessed via `aw config` commands.
 
 ## Platform-Specific Implementation
 
@@ -180,4 +180,4 @@ This specification focuses on GUI-specific concerns and delegates to:
 - **[WebUI PRD.md](WebUI-PRD.md)**: All WebUI functionality and user interface details
 - **[Configuration.md](../Initial-Developer-Input/Configuration.md)**: Configuration system and file formats
 - **[CLI.md](CLI.md)**: CLI command specifications and behavior
-  - **[Handling AW URL Scheme.md](Handling-AW-URL-Scheme.md)**: URL scheme desired behavior. See the `.status.md` sibling for milestones and tests.
+  - **[Handling-AW-URL-Scheme.md](Handling-AW-URL-Scheme.md)**: URL scheme desired behavior. See the `.status.md` sibling for milestones and tests.

@@ -47,7 +47,7 @@ Shell completions are provided via the `aw shell-completion` command group. They
 - One tool for both the TUI dashboard and automation-ready commands
 - First-class support for:
   - Local state mode (SQLite only)
-  - Remote REST service mode (on-prem/private cloud), aligned with `docs/rest-service.md`
+  - Remote REST service mode (on-prem/private cloud), aligned with [docs/rest-service.md](../docs/rest-service.md)
   - Terminal multiplexers: tmux, zellij, screen
   - Devcontainers and local runtimes (including nosandbox, policy-gated)
   - IDE integrations (VS Code, Cursor, Windsurf) and terminal-based agents
@@ -653,7 +653,7 @@ OPTIONS:
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
                                            Supported agent types (default: all)
   --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
-                                           in `.agents/dynamic-instructions.md` (default: yes)
+                                           in [.agents/dynamic-instructions.md](.agents/dynamic-instructions.md) (default: yes)
 ARGUMENTS:
   PROJECT-DESCRIPTION                      Description of the project
 ```
@@ -664,8 +664,8 @@ Behavior and defaults:
 - Project description: If omitted, launch the configured editor to collect it (uses the standard editor discovery/order; honors env and config). Aborts on empty description.
 - Agent-driven initialization: Combines the selected options and the description into a task prompt and launches a local agent in conversational mode to initialize the repo. The prompt instructs the agent to:
   - Propose testing frameworks and linters appropriate for the project; ask the user for approval.
-  - Upon approval, generate an `AGENTS.md` documenting how to run tests and lints using the selected task runner.
-- Post-initialization linking: After `AGENTS.md` exists, create symlinks for all supported agents so their instruction files resolve to `AGENTS.md` (same behavior as `aw repo instructions link --supported-agents=<...>`). Relative symlinks; add to VCS.
+  - Upon approval, generate an [AGENTS.md](../AGENTS.md) documenting how to run tests and lints using the selected task runner.
+- Post-initialization linking: After [AGENTS.md](../AGENTS.md) exists, create symlinks for all supported agents so their instruction files resolve to [AGENTS.md](../AGENTS.md) (same behavior as `aw repo instructions link --supported-agents=<...>`). Relative symlinks; add to VCS.
 - Dev environment scaffolding: Based on flags, scaffold devcontainer, direnv, and the development environment (e.g., Nix flake) using the agent flow. `--devenv no|none` skips dev env scaffolding.
 - VCS: Initializes the selected VCS if the directory is not yet a repository; for existing repos, proceeds without reinitializing.
 - When `nix` and `just` are enabled, uses the `set shell := ["./scripts/nix-env.sh", "-c"]` trick that is used by the agents-workflow repository.
@@ -703,14 +703,14 @@ aw repo instructions create [OPTIONS]
 
 OPTIONS:
   --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
-                                           in `.agents/dynamic-instructions.md` (default: yes)
+                                           in [.agents/dynamic-instructions.md](.agents/dynamic-instructions.md) (default: yes)
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
                                            Supported agent types (default: all)
 ```
 
 Behavior:
 
-- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates `dynamic-instructions.md` or `AGENTS.md` with task‑runner specific instructions and then creates agent instruction symlinks for the specified supported agents.
+- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates [dynamic-instructions.md](dynamic-instructions.md) or [AGENTS.md](../AGENTS.md) with task‑runner specific instructions and then creates agent instruction symlinks for the specified supported agents.
 
 Output and exit codes:
 
@@ -733,7 +733,7 @@ ARGUMENTS:
 
 Behavior:
 
-- Creates relative symlinks from various agent instruction locations to a single source file (default: `AGENTS.md`). Supports selecting which agent toolchains to target via `--supported-agents` (default: `all`).
+- Creates relative symlinks from various agent instruction locations to a single source file (default: [AGENTS.md](../AGENTS.md)). Supports selecting which agent toolchains to target via `--supported-agents` (default: `all`).
 - If `source-file` is not provided, and exactly one known instruction file exists in the repo, use it as the source; otherwise require `source-file` or emit a clear error.
 - On conflicts:
   - Existing identical symlink → no‑op.
@@ -746,7 +746,7 @@ JSON output and exit codes:
 
 Notes:
 
-- In `repo init` and `repo instructions create`, this symlink step is executed automatically after `AGENTS.md` exists.
+- In `repo init` and `repo instructions create`, this symlink step is executed automatically after [AGENTS.md](../AGENTS.md) exists.
 
 ```
 aw repo check [OPTIONS]
@@ -759,7 +759,7 @@ OPTIONS:
 Behavior:
 
 - Validates repository state against configuration and best practices:
-  - Instruction files: verify that `AGENTS.md` (or chosen source) exists and that symlinks for the configured `supported-agents` are present. Report any mismatches or missing links and suggest `aw repo instructions link` to fix.
+  - Instruction files: verify that [AGENTS.md](../AGENTS.md) (or chosen source) exists and that symlinks for the configured `supported-agents` are present. Report any mismatches or missing links and suggest `aw repo instructions link` to fix.
   - Devcontainer: check for presence of `.devcontainer/` and run its health‑check procedure (documented in [Nix-Devcontainer/Devcontainer-User-Setup](Nix-Devcontainer/Devcontainer-User-Setup.md) and [Nix-Devcontainer/Devcontainer-Design](Nix-Devcontainer/Devcontainer-Design.md)). Report status and hints to fix.
   - Dev environment: check `--devenv` (from config/flags) coherence with project files (e.g., Nix flake, direnv). Report inconsistencies.
 
@@ -858,7 +858,7 @@ aw config --show-origin
 aw config --user ui.theme dark
 ```
 
-Mirrors `docs/configuration.md` including provenance, precedence, and Windows behavior.
+Mirrors [docs/configuration.md](../docs/configuration.md) including provenance, precedence, and Windows behavior.
 
 #### 8) Service and WebUI (local developer convenience)
 
@@ -1032,7 +1032,7 @@ BEHAVIOR:
 - `--ssh` defaults to `enabled`; when `disabled`, CONNECT/OpenTcp to this executor is refused.
 - `--ssh-dst` specifies the exact destination enforced by the agent for `OpenTcp` (default `127.0.0.1:22`).
 
-When `--rest-api yes` and `--bind/--port` are set, the daemon also serves the REST API documented in [REST Service](REST%20Service.md). This is the same code path used by `aw agent access-point`, so enabling it effectively turns the enrolling executor into a valid `remote-server` for `aw task` clients.
+When `--rest-api yes` and `--bind/--port` are set, the daemon also serves the REST API documented in [REST-Service.md](REST-Service.md). This is the same code path used by `aw agent access-point`, so enabling it effectively turns the enrolling executor into a valid `remote-server` for `aw task` clients.
 ```
 
 ```
@@ -1085,15 +1085,15 @@ OPTIONS:
   --timeout <DURATION>           Auto-terminate sandbox after wall clock timeout.
 ```
 
-TODO: Verify that these align with everything described in [Sandox Profiles](Sandbox-Profiles.md)
+TODO: Verify that these align with everything described in [Sandbox-Profiles.md](Sandbox-Profiles.md)
 
-See also: Local Sandboxing on Linux for detailed semantics.
+See also: Local-Sandboxing-on-Linux.md for detailed semantics.
 
 ```
 aw agent instructions [OPTIONS] [SOURCE-FILE]
 
 DESCRIPTION: Process a dynamic agent instruction file into the final prompt text
-             that an agent will use. Expands workflow commands (see `Workflows.md`)
+             that an agent will use. Expands workflow commands (see [Workflows.md](Workflows.md))
              and consumes `@agents-setup` directives without printing them.
 
 OPTIONS:
@@ -1109,7 +1109,7 @@ ARGUMENTS:
 
 Behavior:
 
-- Reads the `SOURCE-FILE`, expands lines beginning with `/` using the resolution rules in `Workflows.md`.
+- Reads the `SOURCE-FILE`, expands lines beginning with `/` using the resolution rules in [Workflows.md](Workflows.md).
 - During processing, `@agents-setup` lines set environment variables for the session but are not included in the output prompt text.
 - Search path for workflow commands prepends `.agents/workflows` (if present) to the system `PATH`, so any executable in `PATH` is valid; `.agents/workflows` has highest priority.
 - If no executable for `/name` is found, include fallback contents of `.agents/workflows/name.txt` when present.
@@ -1278,7 +1278,7 @@ TODO: Use the consistent style used in the rest of the document when describing 
 
 ### Local State
 
-Local enumeration and management of running sessions is backed by the canonical state database described in `docs/state-persistence.md`. The SQLite database is authoritative; no PID files are used.
+Local enumeration and management of running sessions is backed by the canonical state database described in [docs/state-persistence.md](../docs/state-persistence.md). The SQLite database is authoritative; no PID files are used.
 
 ### Daemonization
 
@@ -1308,7 +1308,7 @@ Devcontainers:
 
 ### Runtime and Workspace Behavior
 
-- Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See `specs/Public/FS Snapshots/FS Snapshots Overview.md`.
+- Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See [specs/Public/FS Snapshots/FS-Snapshots-Overview.md](../FS%20Snapshots/FS-Snapshots-Overview.md).
 - In-place runs: `--working-copy in-place` (or `working-copy = "in-place"`) executes directly on the user’s working copy. Snapshots remain available when the selected provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). If `--fs-snapshots disable` is set, snapshots are off regardless of working-copy mode. The updated flow above reflects that `fs-snapshots` can still be enabled in in‑place mode.
 
 Commit step details:
@@ -1396,7 +1396,7 @@ OPTIONS:
   --tail <N>             Return only the most recent N entries
   --follow               Stream live audit events until interrupted
 
-See [Sanboxing/Local Sandboxing on Linux](Sanboxing/Local%20Sandboxing%20on%20Linux.md) for policy configuration and event schema details.
+See [Sanboxing/Local-Sandboxing-on-Linux.md](Sanboxing/Local-Sandboxing-on-Linux.md) for policy configuration and event schema details.
 ```
 
 Run the TUI against a REST service:

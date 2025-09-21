@@ -1,6 +1,6 @@
 # Agents‑Workflow REST Service — Status and Plan
 
-Spec: See “REST Service.md” for the API behavior. This file tracks the implementation plan, success criteria, and an automated test strategy per specs/AGENTS.md.
+Spec: See [REST-Service.md](REST-Service.md) for the API behavior. This file tracks the implementation plan, success criteria, and an automated test strategy per specs/AGENTS.md.
 
 ## Goal
 
@@ -156,8 +156,8 @@ Exit criteria
 This section elaborates concrete topologies, milestones, and automated scenarios that align with:
 
 - CLI.md (fleet orchestration, local vs remote)
-- Multi‑OS Testing.md (leader/followers, sync‑fence, run‑everywhere)
-- Multi‑OS Testing.md (QUIC control plane, SSH over CONNECT, client‑side relay)
+- [Multi-OS-Testing.md](../Multi-OS%20Testing.md) (leader/followers, sync‑fence, run‑everywhere)
+- [Multi-OS-Testing.md](../Multi-OS%20Testing.md) (QUIC control plane, SSH over CONNECT, client‑side relay)
 
 ### Topologies Under Test
 

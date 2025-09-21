@@ -2,73 +2,200 @@
 
 Goal: Deliver a minimum viable product (MVP) version of the Agents-Workflow CLI that provides core functionality for Linux users, focusing on agent time-travel capabilities with ZFS snapshots, Claude Code and Codex integration, and local mode operation. The MVP will serve as a foundation for subsequent cross-platform expansion and feature additions.
 
+Total estimated timeline: 12-16 months (broken into major phases with parallel development tracks)
+
+### Milestone Completion & Outstanding Tasks
+
+Each milestone maintains an **outstanding tasks list** that tracks specific deliverables, bugs, and improvements. When milestones are completed, their sections are expanded with:
+- Implementation details and architectural decisions
+- References to key source files for diving into the implementation
+- Test coverage reports and known limitations
+- Integration points with other milestones/tracks
+
 ### MVP Feature Set
 
 The initial MVP focuses on these core capabilities:
 
 - **Linux-only platform support** with ZFS filesystem snapshots
-- **Local Mode** with SQLite state management for single-developer workflows
+- **Local Mode** with SQLite state management for single-developer workflows:
+  - Task/session lifecycle orchestration in `aw-core` crate
+  - Filesystem snapshot management in `aw-fs-snapshots` crate hierarchy
+  - Sandbox isolation using `aw-sandbox` crate hierarchy
 - **Claude Code and Codex agents** as the primary supported agent types
 - **Agent Time Travel** with session recording, timeline navigation, and branching
 - **Basic CLI commands** for task creation, session management, and time-travel operations
 - **Repository reorganization** according to the Rust migration layout
 - **Rust reimplementation** of FS snapshots daemon and test suite
 
+### Parallel Development After Bootstrapping
+
+Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are complete, multiple development tracks can proceed in parallel:
+
+- **FS Snapshots Track**: Complete ZFS/Btrfs snapshot providers and test suite (continues from M0.5-M0.6)
+- **CLI Core Track**: Implement CLI commands with dry-run behavior validation (starts after M0.2, can proceed in parallel with other tracks)
+- **Database Track**: Build `aw-local-db` crate with comprehensive unit tests (starts after M0.2, proceeds in parallel with FS snapshots)
+- **TUI Track**: Develop TUI user journey with mocked agents for comprehensive UX testing (starts after M1 core completion, uses existing [TUI PRD](TUI-PRD.md) specifications)
+- **WebUI Track**: Implement WebUI user journey with mocked agents for end-to-end validation (starts after M1 core completion, uses existing [WebUI PRD](WebUI-PRD.md) specifications)
+- **Desktop Notifications Track**: Build cross-platform notification library per [Handling-AW-URL-Scheme.md](Handling-AW-URL-Scheme.md) specifications (starts after M0.2, enables URL scheme handling)
+
 ### Approach
 
-- **Repository Reorganization**: Restructure the codebase according to `Repository Layout.md` before implementing new features, ensuring existing codex-setup tests remain functional through path adjustments.
+- **Repository Reorganization**: Restructure the codebase according to [Repository-Layout.md](Repository-Layout.md) before implementing new features, ensuring existing codex-setup tests remain functional through path adjustments.
+- **Subcrates Pattern**: Apply the [subcrates design pattern](Subcrates-Pattern.md) for modular crate organization, following the monolith + facades approach.
 - **Incremental Rust Implementation**: Start with core Rust crates for local mode, ZFS snapshots, and Claude Code integration, building toward the full CLI surface area.
+- **Reference Existing Ruby Code**: Use the existing Ruby implementation (`lib/`, `bin/`, `test/`) as reference for API design, behavior validation, and test patterns during Rust reimplementation.
 - **Agent Time Travel Foundation**: Implement session recording with Claude Code hooks, transcript trimming, and ZFS-based filesystem snapshots as the cornerstone feature.
 - **Strong Test Coverage**: Prioritize integration tests that validate end-to-end workflows, especially time-travel branching and session resumption.
 - **Documentation Parity**: Ensure CLI help text and documentation remain synchronized through automated snapshot testing.
 
-### Milestones (automated verification)
+### Development Phases (with Parallel Tracks)
 
-**M0. Repository Reorganization & Bootstrap (1-2 weeks)**
+**Phase 0: Infrastructure Bootstrap** (2-3 weeks total, with parallel infrastructure tracks)
+
+**0.1 Repository Structure Reorganization** (3-4 days)
 
 - Deliverables:
-  - Reorganize repository structure according to `Repository Layout.md`
+  - Reorganize repository structure according to [Repository-Layout.md](Repository-Layout.md)
   - Move existing Ruby code to `legacy/ruby/` preserving all functionality
-  - Ensure `test-codex-setup-integration` tests pass with path adjustments only
-  - Create initial Rust workspace with core crate structure
-  - Basic CI pipeline for Rust crates
-  - **Rust FS snapshots daemon reimplementation** with Unix socket protocol and privileged operations
-  - **Port FS snapshots tests to Rust** with `agentfs-zfs` crate providing similar API to Ruby code
-
-- **FS Snapshots Rust Port Details**:
-  - **Daemon Reimplementation**: Port the Ruby `aw-fs-snapshots-daemon` (Unix socket server) to Rust with tokio async runtime. Maintain JSON protocol for clone/snapshot/delete operations on ZFS/Btrfs. Support privileged operations via sudo in development, container-based privilege escalation in production.
-  - **Provider API Port**: Create `agentfs-core` crate with `FsSnapshotProvider` trait matching Ruby `Snapshot::Provider` API. Implement `create_workspace(dest)` and `cleanup_workspace(dest)` methods for isolated agent execution environments.
-  - **Test Suite Port**: Port Ruby test suite (`test/snapshot/`) to Rust integration tests. Recreate loopback filesystem creation, provider behavior testing, and concurrent execution safety. Use `rstest` for parameterized tests and golden file snapshots for verification.
-  - **ZFS Provider**: Implement `agentfs-zfs` crate with dataset detection, snapshot creation, clone mounting, and cleanup. Handle daemon communication for privileged operations.
-  - **Test Infrastructure**: Port filesystem test helpers (`filesystem_test_helper.rb`) to Rust. Support loopback ZFS/Btrfs pool creation and mounting for CI environments.
+  - Update all import paths and references in moved files
+  - Create basic Rust workspace directory structure (`crates/`, `bins/`, etc.)
+  - Rename all existing just targets to have a `legacy-` prefix.
 
 - Verification:
-  - `just legacy-tests` passes for existing Ruby components (renamed from `just test`)
-  - `cargo check` succeeds for new Rust workspace
-  - `test-codex-setup-integration` passes without functional changes
-  - Rust daemon handles ZFS clone/snapshot/delete operations correctly
-  - Ported FS snapshot tests pass with same coverage as Ruby tests
+  - All Ruby files can be found at their new `legacy/ruby/` locations
+  - `just legacy-test` passes completely with no path-related failures
+  - `just legacy-test-codex-setup-integration` passes with Docker containers finding correct paths
+  - `find . -name "*.rb" | grep -v legacy/ | wc -l` returns 0 (no Ruby files in root) (this is a manual test)
 
-**M1. Core Local Mode & ZFS Snapshots (2-3 weeks)**
+**0.2 Rust Workspace & Core Crates Bootstrap** (2-3 days)
 
 - Deliverables:
-  - `aw-core` crate with local SQLite state management
-  - ZFS snapshot provider implementation (`agentfs-zfs` crate)
-  - Basic workspace preparation and cleanup
-  - Local mode task creation and session tracking
-  - `aw task` and `aw session list/logs` CLI commands
+  - Create initial `Cargo.toml` workspace configuration
+  - Implement `aw-core` crate skeleton with task/session lifecycle orchestration
+  - Set up `aw-local-db` crate skeleton for SQLite database management
+  - Set up `aw-fs-snapshots` crate with snapshot provider abstractions
+  - Create `aw-fs-snapshots-zfs` and `aw-fs-snapshots-btrfs` sub-crates
+  - Set up `aw-sandbox` crate following [subcrates pattern](Subcrates-Pattern.md):
+    - Core sandbox API with namespace orchestration and lifecycle management
+    - Create `aw-sandbox-linux` sub-crate for Linux-specific implementations
+    - Placeholder sub-crates for future platforms (macOS, Windows)
+  - Configure basic CI pipeline (GitHub Actions) for Rust crates
+  - Add essential dependencies: tokio, serde, clap, rusqlite, etc.
 
 - Verification:
-  - ZFS snapshot creation/cleanup works on test systems
-  - SQLite database operations tested with property-based testing
-  - Integration tests with temporary Git repos and ZFS volumes
-  - `aw task` creates proper branch/task file structure locally
+  - `cargo check --workspace` (`just check`) succeeds for all crates
+  - `cargo test --workspace` (`just test`) runs (may have empty test suites)
+  - CI pipeline runs successfully on push/PR
+  - Workspace structure matches [Repository-Layout.md](Repository-Layout.md)
 
-**M2. Claude Code & Codex Integration & Session Recording (4-5 weeks)**
+**0.3 Privileged FS Operations Daemon** (4-5 days, parallel with 0.4-0.6)
+
+- Deliverables:
+  - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server
+  - JSON protocol implementation matching Ruby daemon API
+  - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
+  - Async tokio runtime for concurrent request handling
+  - Proper signal handling and cleanup
+
+- Verification:
+  - Daemon starts and listens on Unix socket at expected path
+  - `{"command": "ping"}` request returns `{"success": true}`
+  - Daemon handles invalid JSON gracefully with error responses
+  - Daemon shuts down cleanly on SIGINT/SIGTERM
+  - Integration test: daemon processes basic ZFS snapshot request
+
+**0.4 FS Snapshots Core API** (3-4 days, parallel with 0.3, 0.5-0.6)
+
+- Deliverables:
+  - Complete `aw-fs-snapshots` crate with `FsSnapshotProvider` trait
+  - `create_workspace(dest)` and `cleanup_workspace(dest)` method implementations
+  - Provider auto-detection logic (`provider_for(path)`)
+  - Basic error handling and path validation
+  - Integration with daemon for privileged operations
+
+- Verification:
+  - Provider trait compiles and can be implemented by concrete providers
+  - Auto-detection returns correct provider for ZFS/Btrfs paths
+  - Path validation rejects invalid destinations (system directories, etc.)
+  - Unit tests for provider selection logic pass
+
+**0.5 ZFS Snapshot Provider** (4-5 days, parallel with 0.3-0.4, 0.6)
+
+- Deliverables:
+  - Complete `aw-fs-snapshots-zfs` crate with ZFS dataset operations
+  - Dataset detection and mount point resolution
+  - Snapshot creation, clone mounting, and cleanup
+  - Daemon communication for privileged ZFS commands
+  - Error handling for missing datasets, permissions, etc.
+  
+- Verification:
+  - ZFS provider detects available ZFS datasets correctly
+  - `create_workspace()` creates valid symlinks to ZFS clone mount points
+  - `cleanup_workspace()` destroys ZFS clones and removes symlinks
+  - Integration test: full workspace lifecycle on test ZFS pool
+  - Error cases handled: missing datasets, permission denied, etc.
+
+**0.6 FS Snapshots Test Infrastructure** (4-5 days, parallel with 0.3-0.5)
+
+- Deliverables:
+  - Port filesystem test helpers (`filesystem_test_helper.rb`) to Rust
+  - Loopback ZFS pool creation for CI/testing environments
+  - Port provider behavior tests (`provider_shared_behavior.rb`)
+  - Port quota and performance tests to Rust equivalents
+  - Integration tests using `rstest` and golden file snapshots
+  - **Reference existing Ruby test suite** (`test/snapshot/`) for test patterns and edge cases
+
+- Verification:
+  - Rust test suite creates and manages test ZFS pools automatically
+  - All provider behaviors (shared, quota, performance) ported and passing
+  - Concurrent execution tests pass without race conditions
+  - Golden file snapshots match expected outputs
+  - Test coverage equivalent to original Ruby test suite
+
+**Phase 1: Core Functionality** (2-3 weeks total, with parallel implementation tracks)
+
+**1.1 Local Mode & Database Management** (2-3 weeks, with parallel CLI/Database tracks)
+
+- Deliverables:
+  - Create `aw-local-db` crate for SQLite database management:
+    - SQLite schema definitions and models (tasks, sessions, agent recordings, etc.)
+    - Database connection management and pooling
+    - Schema migration system with version tracking
+    - CRUD operations for all entities with proper error handling
+    - Unit tests for database operations and migrations
+  - Complete `aw-core` crate with task/session lifecycle orchestration:
+    - Task creation, execution tracking, and completion handling
+    - Session state management (delegated to `aw-local-db`)
+    - Agent runner coordination and monitoring
+    - Integration with `aw-fs-snapshots` for workspace isolation
+    - Configuration management and validation
+  - Task and session state persistence with migrations
+  - Local mode configuration and workspace management
+  - Basic `aw task` and `aw session list/logs` CLI commands
+  - Integration with ZFS snapshots for workspace operations
+
+- Schema/Migration Management:
+  - Define migration framework supporting up/down migrations
+  - Versioned schema files with automatic application on startup
+  - Migration testing framework to ensure compatibility
+  - Schema validation and integrity checks
+
+- Verification:
+  - `aw-local-db` crate has comprehensive unit tests for all database operations
+  - Schema migrations work correctly (upgrade/downgrade paths)
+  - SQLite database operations tested with property-based testing
+  - Task creation and session tracking work correctly
+  - `aw task` creates proper branch/task file structure locally
+  - State persists across process restarts
+  - Integration tests with temporary Git repos and ZFS snapshots
+
+**Phase 2: Agent Integration & Session Management** (4-5 weeks)
+
+**2.1 Claude Code & Codex Agent Integration** (4-5 weeks)
 
 - Deliverables:
   - Claude Code agent wrapper with hook-based session recording (PostToolUse events)
-  - Codex agent wrapper with rollout file parsing (JSONL format from `Codex-Session-File-Format.md`)
+  - Codex agent wrapper with rollout file parsing (JSONL format from [Codex-Session-File-Format.md](../Research/Codex-Session-File-Format.md))
   - `aw-agent-runner` binary for asciinema recording of both agent types
   - Session timeline creation with SessionMoments for both agents
   - Basic session resumption via `--resume` flag for both agents
@@ -82,7 +209,9 @@ The initial MVP focuses on these core capabilities:
   - Both agents resume from interrupted sessions correctly
   - Codex rollout files can be trimmed to specific moments for time travel
 
-**M3. Agent Time Travel Foundation (4-5 weeks)**
+**Phase 3: Agent Time Travel** (4-5 weeks)
+
+**3.1 Time Travel Core Implementation** (4-5 weeks)
 
 - Deliverables:
   - Session timeline navigation and seeking
@@ -98,25 +227,29 @@ The initial MVP focuses on these core capabilities:
   - Branched sessions start Claude Code with trimmed context
   - End-to-end time travel: seek → inspect → branch → resume
 
-**M4. Local Sandboxing Integration (6-8 weeks)**
+**Phase 4: Sandboxing & Isolation** (6-8 weeks)
+
+**4.1 Sandbox Integration** (6-8 weeks)
 
 - Deliverables:
-  - Complete Linux sandboxing implementation (see `Local Sandboxing on Linux.status.md`)
+  - Complete Linux sandboxing implementation (see [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md))
   - Dynamic read allow-list with seccomp notify
   - Resource limits and audit logging
   - `aw session audit` command integration
   - Sandboxed agent execution with time travel
 
 - Verification:
-  - All sandbox milestones from `Local Sandboxing on Linux.status.md`
+  - All sandbox milestones from [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md)
   - Agents run in isolated namespaces with proper resource limits
   - Audit logs capture file access decisions and sandbox events
   - Time travel works within sandboxed environments
 
-**M5. TUI Dashboard (4-6 weeks)**
+**Phase 5: User Interface Development** (4-6 weeks, with parallel TUI/WebUI tracks)
+
+**5.1 TUI Dashboard Implementation** (4-6 weeks)
 
 - Deliverables:
-  - Ratatui-based TUI implementation following `TUI PRD.md`
+  - Ratatui-based TUI implementation following [TUI-PRD.md](TUI-PRD.md)
   - Project/Branch/Agent selectors with filtering
   - Task description editor and launch workflow
   - Time travel timeline viewer and controls
@@ -129,7 +262,9 @@ The initial MVP focuses on these core capabilities:
   - Task launch creates proper multiplexer windows
   - Footer shows context-appropriate shortcuts
 
-**M6. MVP Polish & Documentation (2-3 weeks)**
+**Phase 6: MVP Completion & Polish** (2-3 weeks)
+
+**6.1 Final Integration & Documentation** (2-3 weeks)
 
 - Deliverables:
   - Complete CLI command surface for MVP features
@@ -160,4 +295,4 @@ The initial MVP focuses on these core capabilities:
 - **Codex Rollout Complexity**: Mitigated by thorough testing of JSONL parsing and trimming logic; the rollout file format specification provides clear parsing rules to follow.
 - **Repository Reorganization**: Mitigated by preserving all existing functionality in `legacy/` during transition; `test-codex-setup-integration` tests must pass unchanged.
 - **Complex Time Travel Logic**: Mitigated by building extensive integration tests from day one; both transcript and rollout trimming logic will be thoroughly tested with synthetic session files.
-- **Sandbox Complexity**: Mitigated by following the detailed milestone plan in `Local Sandboxing on Linux.status.md`; each component tested in isolation before integration.
+- **Sandbox Complexity**: Mitigated by following the detailed milestone plan in [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md); each component tested in isolation before integration.

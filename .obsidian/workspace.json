@@ -292,6 +292,7 @@
   },
   "active": "37c1846f5d192ea3",
   "lastOpenFiles": [
+    "specs/Public/Subcrates-Pattern.md",
     "specs/Research/Sandboxing-Technologies.md",
     "specs/Research/Restricting-Guest-Internet-Access-to-a-Whitelist-of-Websites.md",
     "specs/Research/MicroVM-Research.md",
@@ -317,7 +318,6 @@
     "specs/Public/Nix-Devcontainer/Devcontainer-User-Setup.md",
     "specs/Public/Nix-Devcontainer/Devcontainer-Cache-Guidelines.md",
     "specs/Public/FS Snapshots/milestone_1.md",
-    "specs/Public/FS Snapshots/milestone_2.md",
     "test_output.log",
     "setup-tests/test-runner.sh",
     "setup-tests/container-test.sh",

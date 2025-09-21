@@ -178,7 +178,7 @@ Git provider captures the working state as a commit without mutating the user’
 
 ## Integration with Agent Time‑Travel
 
-Time‑Travel associates `SessionMoment`s with `SnapshotRef { id, provider }`. Seeking mounts the snapshot read‑only; branching calls `branch_from_snapshot`. The provider choice is opaque to the UI. See specs/Public/Agent Time Travel.md.
+Time‑Travel associates `SessionMoment`s with `SnapshotRef { id, provider }`. Seeking mounts the snapshot read‑only; branching calls `branch_from_snapshot`. The provider choice is opaque to the UI. See [specs/Public/Agent-Time-Travel.md](../Agent-Time-Travel.md).
 
 ## Platform Strategies (Updated)
 

@@ -2,7 +2,7 @@
 
 This folder contains small, tool-specific scripts to discover and document on-disk session formats, storage paths, and safe trimming techniques for supported agent tools. These experiments help us distinguish session continuation (chat history only) from checkpointing (point-in-time restore of chat + filesystem) and provide empirical notes across versions.
 
-Context: These experiments support the Agent Time Travel feature’s need for precise step boundaries and file state capture. See `../../../Public/Agent%20Time%20Travel.md` for goals and architecture.
+Context: These experiments support the Agent Time Travel feature's need for precise step boundaries and file state capture. See [../../../Public/Agent-Time-Travel.md](../../../Public/Agent-Time-Travel.md) for goals and architecture.
 
 ## Reverse-engineering policy
 
@@ -31,7 +31,7 @@ We use pexpect-only automation in the experiment scripts. When exploring a new t
   - Checkpointing vs session continuation behavior and commands
   - Hook/MCP configuration details relevant to recording and automation
   - Credentials/config paths that affect session storage
-- Each experiment should produce an edit to the corresponding file (e.g., `Claude Code.md`, `Gemini CLI.md`, `Goose.md`, `OpenCode.md`, `OpenAI Codex CLI.md`) including tool version, date, and a brief “Findings” subsection.
+- Each experiment should produce an edit to the corresponding file (e.g., `Claude-Code.md`, `Gemini-CLI.md`, `Goose.md`, `OpenCode.md`, `OpenAI-Codex-CLI.md`) including tool version, date, and a brief "Findings" subsection.
 
 ## Scripts
 

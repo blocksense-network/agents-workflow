@@ -37,7 +37,7 @@ Acceptance checklist (M1)
 M2. Core VFS skeleton and in‑memory storage (3–5d)
 
 - Implement minimal path resolver, directories, create/open/read/write/close, unlink/rmdir, getattr/set_times.
-- Provide `InMemoryBackend` storage and `FsConfig`, `OpenOptions`, `Attributes` types as specified in `AgentFS Core.md`.
+- Provide `InMemoryBackend` storage and `FsConfig`, `OpenOptions`, `Attributes` types as specified in [AgentFS-Core.md](AgentFS%20Core.md).
 - Success criteria (unit tests):
   - Create/read/write/close round‑trip works; metadata times update; readdir lists contents.
   - Unlink exhibits delete‑on‑close semantics at core level.
@@ -159,7 +159,7 @@ Acceptance checklist (M10)
 
 M11. Scenario, performance, and fault‑injection suites (4–7d)
 
-- Scenario tests for AW workflows (per `AgentFS Core Testing.md`): multi‑process branches, repo tasks, discard/keep flows.
+- Scenario tests for AW workflows (per [AgentFS-Core-Testing.md](AgentFS%20Core%20Testing.md)): multi‑process branches, repo tasks, discard/keep flows.
 - Criterion microbenchmarks; fsbench/fio macro tests; spill‑to‑disk stress; induced failures in `StorageBackend`.
 - Success criteria:
   - Latency/throughput comparable to RAM memfs baselines; bounded degradation with spill enabled.
@@ -213,5 +213,5 @@ Acceptance checklist (M12)
 
 ### References
 
-- See `specs/Public/AgentFS/AgentFS Core.md`, `AgentFS FUSE Adapter.md`, `AgentFS WinFsp Adapter.md`, `AgentFS FSKit Adapter.md`, and `AgentFS Control Messages.md`.
+- See [specs/Public/AgentFS/AgentFS-Core.md](AgentFS%20Core.md), [AgentFS-FUSE-Adapter.md](AgentFS%20FUSE%20Adapter.md), [AgentFS-WinFsp-Adapter.md](AgentFS%20WinFsp%20Adapter.md), [AgentFS-FSKit-Adapter.md](AgentFS%20FsKit%20Adapter.md), and [AgentFS-Control-Messages.md](AgentFS%20Control%20Messages.md).
 - Reference code in `reference_projects/libfuse`, `reference_projects/winfsp`, and `reference_projects/FSKitSample`.

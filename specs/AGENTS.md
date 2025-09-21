@@ -26,7 +26,7 @@ When a task is complete, the implementation plan should be updated with an imple
 
 When a task proves difficult to compete according to the plan, developers and agents will NEVER deviate significantly from the original goal. Instead, they will update the task status section to report what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. Developers and agents should provide a very detailed context in the status reports for observed problems as they may be shared with online AI agents who are not familiar with our project.
 
-The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. An existing example is [Local Sandboxing on Linux.status.md](Public/Sanboxing/Local-Sandboxing-on-Linux.status.md).
+The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. An existing example is [Local-Sandboxing-on-Linux.status.md](Public/Sanboxing/Local-Sandboxing-on-Linux.status.md).
 
 It's extremely important that the tasks are very granular and that they can be verified with automated tests. Prefer integration tests over unit tests, but apply reasonable judgment on a case-by-case basis.
 

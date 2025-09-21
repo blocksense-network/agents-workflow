@@ -5,9 +5,9 @@ This document tracks the implementation plan and status for the Devcontainer fun
 Goals:
 
 - Deliver layered images (Nix Base → Agents Base → Project) that provide a consistent developer experience across Linux, macOS (Docker Desktop), and Windows (WSL2/Hyper‑V).
-- Implement credential propagation, host↔guest cache sharing, and time‑travel hooks as specified in `Devcontainer Design.md`.
+- Implement credential propagation, host↔guest cache sharing, and time‑travel hooks as specified in [Devcontainer-Design.md](Devcontainer-Design.md).
 - Provide a standard `.devcontainer/aw-healthcheck` contract invoked by `aw repo check`.
-- Ship a robust, automated test matrix validating cache behavior, credentials, health, and hooks per `Devcontainer Test Suite.md`.
+- Ship a robust, automated test matrix validating cache behavior, credentials, health, and hooks per [Devcontainer-Test-Suite.md](Devcontainer-Test-Suite.md).
 
 References:
 
@@ -80,7 +80,7 @@ M3. Credential propagation (2–3d)
 M4. Cache sharing mounts (3–4d)
 
 - Named volumes for cargo/go/npm/pnpm/yarn/pip/maven/gradle; optional sccache/ccache.
-- Documented in `Devcontainer Cache Guidelines.md`; mount defaults and opt‑ins implemented.
+- Documented in [Devcontainer-Cache-Guidelines.md](Devcontainer-Cache-Guidelines.md); mount defaults and opt‑ins implemented.
 - Tests: per‑manager cold→warm speedups; lockfile change invalidation; concurrent builds; offline warm builds.
 
 M5. Healthcheck contract and AW integration (2–3d)

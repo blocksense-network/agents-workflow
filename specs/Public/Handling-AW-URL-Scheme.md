@@ -309,12 +309,12 @@ xdg-open "http://127.0.0.1:8787/tasks/1234" >/dev/null 2>&1 &
 
 ### Configuration and Defaults
 
-- Read AW layered config (see `Configuration.md`): `${configDirs}/agents-workflow/config.toml`.
+- Read AW layered config (see [Configuration.md](Configuration.md)): `${configDirs}/agents-workflow/config.toml`.
 - Keys used:
   - `ui`: default UI (`tui` or `webui`) when needing an auxiliary view.
   - `remote-server`: when set, prefer REST paths; otherwise local SQLite paths.
   - `service-base-url`: when running a persistent WebUI at a fixed origin (enterprise). In local mode, default to `http://127.0.0.1:<port>`.
-- Local defaults (align with `CLI.md` examples): WebUI `127.0.0.1:8080`, REST `127.0.0.1:8081` unless overridden.
+- Local defaults (align with [CLI.md](CLI.md) examples): WebUI `127.0.0.1:8080`, REST `127.0.0.1:8081` unless overridden.
 
 ### Discovery and Startup Strategy
 
@@ -361,7 +361,7 @@ xdg-open "http://127.0.0.1:8787/tasks/1234" >/dev/null 2>&1 &
 - Never include secrets in query strings. For `create` hand‑off, prefer one of:
   - Local hand‑off file: `${cacheDir}/agents-workflow/inbox/<random>.json` referenced as `${webuiBase}/create?inbox=<random>`; the WebUI reads and deletes locally via a small helper endpoint hosted by the WebUI process.
   - Or, when REST is available, POST the spec and navigate to the created task.
-- Bind all local HTTP servers to `127.0.0.1` only (see WebUI Local Mode in `WebUI PRD.md`).
+- Bind all local HTTP servers to `127.0.0.1` only (see WebUI Local Mode in [WebUI-PRD.md](WebUI-PRD.md)).
 - Use short timeouts and idempotent restarts. Avoid privilege elevation.
 
 #### Create Flow Confirmation (required)
@@ -373,7 +373,7 @@ xdg-open "http://127.0.0.1:8787/tasks/1234" >/dev/null 2>&1 &
   - Source context: browser name (when detectable) and referring host (if provided), otherwise “unknown source”.
   - Precise action summary: the prompt title or first 120 chars; agent type; where it will run (local or remote server hostname); snapshot mode; network policy; and whether files, repos, or credentials will be accessed.
   - Buttons: “Create Task” (default) and “Cancel”.
-  - A checkbox: “Always require confirmation for task creation” (default ON) and an optional per‑source trust rule (“Trust this site for 1 hour”), stored in the handler’s local trust store. Global policy toggles live in `Configuration.md`.
+  - A checkbox: "Always require confirmation for task creation" (default ON) and an optional per‑source trust rule ("Trust this site for 1 hour"), stored in the handler's local trust store. Global policy toggles live in [Configuration.md](Configuration.md).
 - Behavior:
   - If the user cancels, NO task is created and the dialog closes.
   - If confirmed, proceed with the creation flow (REST or local CLI), then navigate to the created task page.

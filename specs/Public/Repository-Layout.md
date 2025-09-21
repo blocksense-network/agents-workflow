@@ -1,6 +1,6 @@
 ## Repository Layout (post‑Rust migration)
 
-This document defines the ideal repository structure after the migration to Rust, aligning with CLI and sandbox specs in `CLI.md` and `Sandbox Profiles.md`. It emphasizes library‑first design, thin binaries, strong testability, and clear platform boundaries, while temporarily preserving the existing Ruby implementation under `legacy/` and keeping current cloud setup scripts at their present paths.
+This document defines the ideal repository structure after the migration to Rust, aligning with CLI and sandbox specs in [CLI.md](CLI.md) and [Sandbox-Profiles.md](Sandbox-Profiles.md). It emphasizes library‑first design, thin binaries, strong testability, and clear platform boundaries, while temporarily preserving the existing Ruby implementation under `legacy/` and keeping current cloud setup scripts at their present paths.
 
 ### Principles
 
@@ -90,7 +90,7 @@ agents-workflow/
 
 ### Multiplexer crates structure
 
-We adopt a monolith + facades strategy to reduce compile times while preserving optional tiny crates:
+We use the [subcrates design pattern](Subcrates-Pattern.md) with a **monolith + facades strategy** to reduce compile times while preserving optional tiny crates:
 
 - `aw-mux-core` — low‑level AW‑agnostic trait and shared types (no OS bindings).
 - `aw-mux` (monolith) — contains the high‑level AW adapter and all concrete backends as modules gated by cargo features (e.g., `tmux`, `wezterm`, `kitty`, `iterm2`, `tilix`, `winterm`, `vim`, `emacs`). Only requested features are compiled.
@@ -120,7 +120,7 @@ Extra compile‑time wins
 - Unify dependency versions/features across the workspace (consider a workspace‑hack crate).
 - Use sccache/`RUSTC_WRAPPER` and check `CARGO_BUILD_TIMINGS` to validate improvements.
 
-See `CLI.md` for command surface and `Sandbox Profiles.md` for isolation profiles and behavior.
+See [CLI.md](CLI.md) for command surface and [Sandbox-Profiles.md](Sandbox-Profiles.md) for isolation profiles and behavior.
 
 ### Cloud setup scripts (paths preserved)
 
