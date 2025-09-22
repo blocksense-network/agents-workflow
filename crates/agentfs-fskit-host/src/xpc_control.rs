@@ -2,7 +2,7 @@
 
 use super::FsKitAdapter;
 use agentfs_proto::*;
-use serde_json;
+use ssz::{Decode, Encode};
 use std::sync::Arc;
 
 #[cfg(target_os = "macos")]
@@ -45,112 +45,109 @@ impl XpcControlService {
     }
 
     /// Handle incoming XPC request
-    async fn handle_request(&self, request_json: &str) -> Result<String, Box<dyn std::error::Error>> {
-        // Parse the request
-        let envelope: MessageEnvelope<serde_json::Value> = serde_json::from_str(request_json)?;
+    async fn handle_request(&self, request_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        // Decode SSZ request
+        let request: Request = Request::from_ssz_bytes(request_data)
+            .map_err(|e| format!("SSZ decode error: {:?}", e))?;
 
-        if envelope.version != "1" {
-            let error = ErrorResponse {
-                error: format!("Unsupported version: {}", envelope.version),
-                code: Some(95), // ENOTSUP
-            };
-            return Ok(serde_json::to_string(&error)?);
+        // Validate request structure
+        if let Err(e) = validate_request(&request) {
+            let error = Response::error(format!("{}", e), Some(22)); // EINVAL
+            return Ok(error.as_ssz_bytes());
         }
 
         // Route based on operation
-        match envelope.payload.get("op").and_then(|v| v.as_str()) {
-            Some("snapshot.create") => {
-                let request: SnapshotCreateRequest = serde_json::from_value(envelope.payload)?;
-                self.handle_snapshot_create(request).await
-            }
-            Some("snapshot.list") => {
-                let request: SnapshotListRequest = serde_json::from_value(envelope.payload)?;
-                self.handle_snapshot_list(request).await
-            }
-            Some("branch.create") => {
-                let request: BranchCreateRequest = serde_json::from_value(envelope.payload)?;
-                self.handle_branch_create(request).await
-            }
-            Some("branch.bind") => {
-                let request: BranchBindRequest = serde_json::from_value(envelope.payload)?;
-                self.handle_branch_bind(request).await
-            }
-            _ => {
-                let error = ErrorResponse {
-                    error: "Unknown operation".to_string(),
-                    code: Some(22), // EINVAL
-                };
-                Ok(serde_json::to_string(&error)?)
-            }
+        match request {
+            Request::SnapshotCreate((_, req)) => self.handle_snapshot_create(req).await,
+            Request::SnapshotList(_) => self.handle_snapshot_list(SnapshotListRequest {}).await,
+            Request::BranchCreate((_, req)) => self.handle_branch_create(req).await,
+            Request::BranchBind((_, req)) => self.handle_branch_bind(req).await,
         }
     }
 
-    async fn handle_snapshot_create(&self, request: SnapshotCreateRequest) -> Result<String, Box<dyn std::error::Error>> {
-        match self.adapter.core().snapshot_create(request.name.as_deref()) {
+    async fn handle_snapshot_create(&self, request: SnapshotCreateRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let name_str = request.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
+        match self.adapter.core().snapshot_create(name_str.as_deref()) {
             Ok(snapshot_id) => {
-                let response = SnapshotCreateResponse { snapshot_id };
-                Ok(serde_json::to_string(&response)?)
+                // Get snapshot name from the list
+                let snapshots = self.adapter.core().snapshot_list();
+                let name = snapshots.iter()
+                    .find(|(id, _)| *id == snapshot_id)
+                    .and_then(|(_, name)| name.clone());
+
+                let response = Response::snapshot_create(SnapshotInfo {
+                    id: snapshot_id.to_string().into_bytes(),
+                    name: name.map(|s| s.into_bytes()),
+                });
+                Ok(response.as_ssz_bytes())
             }
             Err(e) => {
-                let error = ErrorResponse {
-                    error: e.to_string(),
-                    code: Some(self.map_error_code(&e)),
-                };
-                Ok(serde_json::to_string(&error)?)
+                let response = Response::error(format!("{:?}", e), Some(self.map_error_code(&e)));
+                Ok(response.as_ssz_bytes())
             }
         }
     }
 
-    async fn handle_snapshot_list(&self, _request: SnapshotListRequest) -> Result<String, Box<dyn std::error::Error>> {
+    async fn handle_snapshot_list(&self, _request: SnapshotListRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let snapshots = self.adapter.core().snapshot_list();
         let snapshot_infos: Vec<SnapshotInfo> = snapshots
             .into_iter()
-            .map(|(id, name)| SnapshotInfo { id, name })
+            .map(|(id, name)| SnapshotInfo {
+                id: id.to_string().into_bytes(),
+                name: name.map(|s| s.into_bytes()),
+            })
             .collect();
 
-        let response = SnapshotListResponse {
-            snapshots: snapshot_infos,
-        };
-        Ok(serde_json::to_string(&response)?)
+        let response = Response::snapshot_list(snapshot_infos);
+        Ok(response.as_ssz_bytes())
     }
 
-    async fn handle_branch_create(&self, request: BranchCreateRequest) -> Result<String, Box<dyn std::error::Error>> {
-        match self.adapter.core().branch_create_from_snapshot(request.from_snapshot, request.name.as_deref()) {
+    async fn handle_branch_create(&self, request: BranchCreateRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let from_str = String::from_utf8_lossy(&request.from).to_string();
+        let name_str = request.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
+        match self.adapter.core().branch_create_from_snapshot(
+            from_str.parse().map_err(|_| "Invalid snapshot ID")?,
+            name_str.as_deref()
+        ) {
             Ok(branch_id) => {
-                let response = BranchCreateResponse { branch_id };
-                Ok(serde_json::to_string(&response)?)
+                // Get branch info from the list
+                let branches = self.adapter.core().branch_list();
+                let info = branches.iter()
+                    .find(|b| b.id == branch_id)
+                    .ok_or("Branch not found")?;
+
+                let response = Response::branch_create(BranchInfo {
+                    id: info.id.to_string().into_bytes(),
+                    name: info.name.clone().map(|s| s.into_bytes()),
+                    parent: info.parent.map(|p| p.to_string()).unwrap_or_default().into_bytes(),
+                });
+                Ok(response.as_ssz_bytes())
             }
             Err(e) => {
-                let error = ErrorResponse {
-                    error: e.to_string(),
-                    code: Some(self.map_error_code(&e)),
-                };
-                Ok(serde_json::to_string(&error)?)
+                let response = Response::error(format!("{:?}", e), Some(self.map_error_code(&e)));
+                Ok(response.as_ssz_bytes())
             }
         }
     }
 
-    async fn handle_branch_bind(&self, request: BranchBindRequest) -> Result<String, Box<dyn std::error::Error>> {
+    async fn handle_branch_bind(&self, request: BranchBindRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let pid = request.pid.unwrap_or(std::process::id());
+        let branch_str = String::from_utf8_lossy(&request.branch).to_string();
+        let branch_id = branch_str.parse().map_err(|_| "Invalid branch ID")?;
 
-        // Note: bind_process_to_branch_with_pid doesn't exist in the current API
-        // We'll need to extend the core API for this
-        match self.adapter.core().bind_process_to_branch(request.branch_id) {
+        match self.adapter.core().bind_process_to_branch_with_pid(branch_id, pid) {
             Ok(()) => {
-                let response = BranchBindResponse {};
-                Ok(serde_json::to_string(&response)?)
+                let response = Response::branch_bind(request.branch.clone(), pid);
+                Ok(response.as_ssz_bytes())
             }
             Err(e) => {
-                let error = ErrorResponse {
-                    error: e.to_string(),
-                    code: Some(self.map_error_code(&e)),
-                };
-                Ok(serde_json::to_string(&error)?)
+                let response = Response::error(format!("{:?}", e), Some(self.map_error_code(&e)));
+                Ok(response.as_ssz_bytes())
             }
         }
     }
 
-    fn map_error_code(&self, error: &agentfs_core::FsError) -> i32 {
+    fn map_error_code(&self, error: &agentfs_core::FsError) -> u32 {
         match error {
             agentfs_core::FsError::NotFound => 2,      // ENOENT
             agentfs_core::FsError::AlreadyExists => 17, // EEXIST

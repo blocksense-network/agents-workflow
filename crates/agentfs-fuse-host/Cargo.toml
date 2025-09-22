@@ -16,6 +16,9 @@ tracing-subscriber = { workspace = true }
 fuser = { version = "0.16", optional = true }
 serde_json = { workspace = true }
 libc = "0.2"
+# SSZ serialization (matching agentfs-proto)
+ethereum_ssz = "0.8"
+ethereum_ssz_derive = "0.8"
 
 [features]
 default = []

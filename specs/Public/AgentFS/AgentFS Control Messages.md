@@ -15,17 +15,17 @@ All ops carry a `version` field. Current value: `"1"`.
 
 ### Schemas
 
-- Request JSON Schema: `specs/Public/Schemas/agentfs-control.request.schema.json`
-- Response JSON Schema: `specs/Public/Schemas/agentfs-control.response.schema.json`
+- Request SSZ Schema: `specs/Public/Schemas/agentfs-control.request.schema.json`
+- Response SSZ Schema: `specs/Public/Schemas/agentfs-control.response.schema.json`
 
-Adapters and clients MUST validate messages against these schemas. For high‑performance paths, compact structs may be used, but they MUST remain semantically equivalent to the JSON schema and include a version field.
+Adapters and clients MUST validate messages against these schemas. Messages are encoded using SSZ (Simple Serialize) format for compact, secure binary serialization. The schemas define the logical structure; implementations MUST use SSZ-compatible types that remain semantically equivalent to the schema and include a version field.
 
 ### Error Mapping
 
 - Success responses follow the op‑specific response schema.
-- Errors return `{ "error": string, "code": integer? }`:
-  - Windows: adapter maps internal status to NTSTATUS and also returns an error JSON in the output buffer when applicable.
-  - FUSE/FSKit: adapter returns `-errno`; any JSON body is optional, but recommended for diagnostics.
+- Errors return an Error struct with `error: string` and optional `code: integer`:
+  - Windows: adapter maps internal status to NTSTATUS and also returns an error SSZ in the output buffer when applicable.
+  - FUSE/FSKit: adapter returns `-errno`; any SSZ body is optional, but recommended for diagnostics.
 
 ### Transports by Platform
 
@@ -37,29 +37,29 @@ Adapters and clients MUST validate messages against these schemas. For high‑pe
   - Input/Output buffers are small and copied via the FSD.
 - Client steps:
   1. `HANDLE h = CreateFileW(L"\\\\.\\X:", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, ...)`.
-  2. Build request JSON, e.g. `{ "version":"1", "op":"snapshot.create", "name":"clean" }`.
+  2. Build request SSZ, e.g. encoded `{ "version":"1", "op":"snapshot.create", "name":"clean" }`.
   3. `DeviceIoControl(h, IOCTL_AGENTFS_SNAPSHOT_CREATE, inBuf, inLen, outBuf, outLen, &bytes, NULL)`.
 - Server behavior:
-  - Parse request, call `FsCore::{snapshot_create|snapshot_list|branch_create_from_snapshot|bind_process_to_branch}`.
-  - Write a response JSON per schema; map errors to NTSTATUS on return.
+  - Parse SSZ request, call `FsCore::{snapshot_create|snapshot_list|branch_create_from_snapshot|bind_process_to_branch}`.
+  - Write a response SSZ per schema; map errors to NTSTATUS on return.
 
 #### Linux/macOS (FUSE)
 
 - Transport: `ioctl` on a special control file inside the mount, e.g. `<MOUNT>/.agentfs/control`.
 - Client steps:
   1. `int fd = open("<MOUNT>/.agentfs/control", O_RDWR)`.
-  2. Issue `ioctl(fd, AGENTFS_IOCTL_CMD, &buffer)` where buffer contains request JSON.
-  3. On success, read response JSON from the same buffer; `ioctl` returns `0`. Errors return `-errno`.
+  2. Issue `ioctl(fd, AGENTFS_IOCTL_CMD, &buffer)` where buffer contains SSZ-encoded request.
+  3. On success, read SSZ response from the same buffer; `ioctl` returns `0`. Errors return `-errno`.
 - Server behavior:
   - Implement libfuse `.ioctl` for the control file only; ignore for other inodes.
-  - Validate requests against schema, call `FsCore` methods, and copy response JSON to user buffer.
+  - Decode SSZ requests, validate against schema, call `FsCore` methods, and encode response SSZ to user buffer.
 
 #### macOS (FSKit)
 
-- Preferred transport: XPC to the FS extension. Define a narrow XPC interface that carries the same JSON request/response as the schemas above.
+- Preferred transport: XPC to the FS extension. Define a narrow XPC interface that carries SSZ-encoded request/response per the schemas above.
 - Fallback: the control file approach identical to FUSE (`<MOUNT>/.agentfs/control`).
 - Server behavior:
-  - XPC endpoint parses request, calls `FsCore`, and returns a response JSON.
+  - XPC endpoint decodes SSZ request, calls `FsCore`, and returns SSZ-encoded response.
 
 ### Security and Access Control
 
@@ -76,6 +76,6 @@ Adapters and clients MUST validate messages against these schemas. For high‑pe
 
 ### Notes for Adapter Implementers
 
-- WinFsp: `Control` requires METHOD_BUFFERED and a `0x8000` DeviceType; see `reference_projects/winfsp/inc/winfsp/winfsp.h` for details. Keep responses small.
-- FUSE: consult `reference_projects/libfuse/example/ioctl.c` for a pattern; ensure the handler only applies to the control file inode.
-- FSKit: model XPC after `FSKitSample` structure; route through the extension’s process, not the app UI.
+- WinFsp: `Control` requires METHOD_BUFFERED and a `0x8000` DeviceType; see `reference_projects/winfsp/inc/winfsp/winfsp.h` for details. Keep SSZ responses small.
+- FUSE: consult `reference_projects/libfuse/example/ioctl.c` for a pattern; ensure the handler only applies to the control file inode. Use SSZ encoding/decoding.
+- FSKit: model XPC after `FSKitSample` structure; route through the extension’s process, not the app UI. Use SSZ encoding/decoding.

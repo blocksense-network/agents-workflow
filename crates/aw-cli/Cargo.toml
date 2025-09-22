@@ -1,0 +1,38 @@
+[package]
+name = "aw-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Agents Workflow CLI - Main command-line interface"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "aw"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# AgentFS dependencies
+agentfs-proto = { path = "../agentfs-proto" }
+# SSZ serialization (matching agentfs-proto)
+ethereum_ssz = "0.8"
+ethereum_ssz_derive = "0.8"
+
+# Platform-specific dependencies
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", features = ["fs", "ioctl"] }
+libc = "0.2"
+
+       [target.'cfg(windows)'.dependencies]
+       winapi = { version = "0.3", features = ["handleapi", "fileapi", "winioctl", "errhandlingapi"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,6 +1,6 @@
 //! Schema validation for AgentFS control messages
 
-use serde_json::Value;
+use crate::messages::*;
 use thiserror::Error;
 
 /// Validation error
@@ -8,20 +8,39 @@ use thiserror::Error;
 pub enum ValidationError {
     #[error("schema validation failed: {0}")]
     Schema(String),
-    #[error("json parsing failed: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("SSZ decoding failed: {0}")]
+    SszDecode(String),
 }
 
-/// Validate a message against its schema
-pub fn validate_message(_message: &Value, _schema_name: &str) -> Result<(), ValidationError> {
-    // TODO: Implement schema validation using JSON Schema
-    // For now, just return success
-    Ok(())
+/// Validate a decoded request against its logical schema
+pub fn validate_request(request: &Request) -> Result<(), ValidationError> {
+    match request {
+        Request::SnapshotCreate((version, _)) |
+        Request::BranchCreate((version, _)) |
+        Request::BranchBind((version, _)) => {
+            if version != b"1" {
+                return Err(ValidationError::Schema("version must be '1'".to_string()));
+            }
+            Ok(())
+        }
+        Request::SnapshotList(version) => {
+            if version != b"1" {
+                return Err(ValidationError::Schema("version must be '1'".to_string()));
+            }
+            Ok(())
+        }
+    }
 }
 
-/// Get schema for a specific operation
-pub fn get_schema(_operation: &str) -> Option<Value> {
-    // TODO: Load schemas from embedded JSON files
-    // For now, return None
-    None
+/// Validate a decoded response against its logical schema
+pub fn validate_response(response: &Response) -> Result<(), ValidationError> {
+    // For union responses, the structure is validated by the SSZ decoding itself
+    // Error responses are always valid, success responses have their structure enforced by the union
+    match response {
+        Response::SnapshotCreate(_) |
+        Response::SnapshotList(_) |
+        Response::BranchCreate(_) |
+        Response::BranchBind(_) |
+        Response::Error(_) => Ok(()),
+    }
 }

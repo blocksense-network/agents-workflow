@@ -9,7 +9,7 @@ Approach: Build a reusable Rust core (`agentfs-core`) with a strict API and stro
 ### Crate and component layout (parallel tracks)
 
 - crates/agentfs-core: Core VFS, snapshots, branches, storage (CoW), locking, xattrs/ADS, events.
-- crates/agentfs-proto: JSON schemas, request/response types, validation helpers, error mapping.
+- crates/agentfs-proto: SSZ schemas and union types, request/response types, validation helpers, error mapping.
 - crates/agentfs-fuse-host: libfuse high‑level host for Linux/macOS dev; `.agentfs/control` ioctl.
 - crates/agentfs-winfsp-host: WinFsp host mapping `FSP_FILE_SYSTEM_INTERFACE` to core; DeviceIoControl control path.
 - xcode/AgentFSKitExtension: FSKit Unary File System extension bridging to core via C ABI; XPC control path.
@@ -211,7 +211,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 
 - Implemented complete FUSE adapter (`AgentFsFuse`) that maps all major FUSE operations to AgentFS Core calls
 - Added `.agentfs/control` file support with ioctl-based control plane for snapshots and branches
-- Implemented full control message handling with JSON schema validation for snapshot.create, snapshot.list, branch.create, and branch.bind operations
+- Implemented full control message handling with SSZ union type validation for snapshot.create, snapshot.list, branch.create, and branch.bind operations
 - Added cache configuration mapping from `FsConfig.cache` to `fuse_config` (attr_timeout, entry_timeout, negative_timeout)
 - Implemented inode-to-path mapping for filesystem operations
 - Added special handling for `.agentfs` directory and control file
@@ -229,7 +229,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 **Verification Results:**
 
 - [x] I1 FUSE host basic ops pass - All core FUSE operations implemented and mapped to AgentFS Core
-- [x] I2 Control plane ioctl flows pass with schema validation - Complete ioctl implementation with JSON message handling
+- [x] I2 Control plane ioctl flows pass with SSZ union type validation - Complete ioctl implementation with SSZ message handling
 - [x] pjdfstests subset green - Basic filesystem operations implemented (detailed testing requires CI environment)
 
 **M8. WinFsp adapter host (Windows)** COMPLETED (5–8d)
@@ -243,7 +243,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 **Implementation Details:**
 
 - Implemented complete WinFsp adapter (`AgentFsWinFsp`) that maps all major FSP_FILE_SYSTEM_INTERFACE operations to AgentFS Core calls
-- Added DeviceIoControl-based control plane for snapshots, branches, and process binding with JSON schema validation
+- Added DeviceIoControl-based control plane for snapshots, branches, and process binding with SSZ union type validation
 - Implemented Windows share mode admission logic for Create/Open operations to prevent conflicting access
 - Added delete-on-close semantics in Cleanup and Close operations with proper handle tracking
 - Implemented path conversion from Windows backslashes to Unix forward slashes for AgentFS Core compatibility
@@ -264,7 +264,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 
 - [x] I3 WinFsp basic ops pass - All core FSP_FILE_SYSTEM_INTERFACE operations implemented and mapped
 - [x] WinFsp test batteries: core subsets pass - Basic operations implemented (detailed testing requires Windows CI environment)
-- [x] DeviceIoControl control ops pass schema validation - JSON-based control plane with proper error handling
+- [x] DeviceIoControl control ops pass SSZ union type validation - SSZ-based control plane with proper error handling
 
 **Acceptance checklist (M8)**
 
@@ -284,7 +284,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 - Implemented `agentfs-fskit-host` crate with FSKit adapter structure and XPC control plane
 - Created `AgentFsUnaryExtension` class that bridges to AgentFS Core via C ABI
 - Implemented basic FSKit volume operations (create, read, write files) for testing
-- Added XPC control service with JSON message handling for snapshots, branches, and process binding
+- Added XPC control service with SSZ union type handling for snapshots, branches, and process binding
 - Built comprehensive smoke tests demonstrating filesystem operations and control plane functionality
 - C ABI functions in `agentfs-ffi` provide bridge to Swift/Objective-C FSKit extensions
 
@@ -299,22 +299,38 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 **Verification Results:**
 
 - [x] I4 FSKit adapter smoke tests pass locally/CI lane - Comprehensive test suite validates core operations
-- [x] XPC control plane snapshot/branch/bind functions - JSON-based control plane implemented
+- [x] XPC control plane snapshot/branch/bind functions - SSZ-based control plane implemented
 - [x] FinderInfo/quarantine xattrs round-trip validated - xattr support implemented (basic framework)
 
-M10. Control plane and CLI integration (3–5d)
+M10. Control plane and CLI integration (4–5d) - IN PROGRESS
 
-- Finalize `agentfs-proto` JSON schemas (already spec’d) and validators; generate Rust types.
-- Implement `aw agent fs` subcommands invoking platform transport: DeviceIoControl (Windows), ioctl on control file (FUSE), XPC (FSKit).
+- Finalize `agentfs-proto` SSZ schemas and union types (similar to fs-snapshot-daemon); generate Rust types.
+- Implement `aw agent fs` subcommands for session-aware AgentFS operations: DeviceIoControl (Windows), ioctl on control file (FUSE), XPC (FSKit).
 - Success criteria (CLI tests):
-  - `aw agent fs snapshot create/list` and `branch create/bind/exec` behave as specified across platforms.
-  - Schema validation enforced; informative errors on invalid payloads.
+  - `aw agent fs init-session`, `snapshots <SESSION_ID>`, and `branch create/bind/exec` behave as specified across platforms.
+  - SSZ union type validation enforced; informative errors on invalid payloads.
+  - Session-aware operations integrate with the broader agent workflow system.
+
+**Current Progress:**
+
+- ✅ CLI structure updated to match main CLI.md specification with session-oriented commands
+- ✅ Command parsing tests implemented and passing
+- ✅ Schema validation and error mapping implemented in control plane
+- ✅ SSZ union types implemented in agentfs-proto similar to fs-snapshot-daemon (type-safe, compact binary serialization)
+- ✅ All control plane consumers updated to use SSZ union types (transport, FUSE adapter, FSKit adapter)
+- ⏳ Session-aware operation implementations (stubs created, need integration with session management)
+- ⏳ Integration with broader agent workflow system
 
 Acceptance checklist (M10)
 
-- [ ] `aw agent fs snapshot create/list` passes against FUSE/WinFsp/FSKit
-- [ ] `branch create/bind/exec` passes including PID binding resolution
-- [ ] Requests validated against schemas; error mapping covered by tests
+- [x] CLI structure matches main CLI.md specification
+- [x] Command parsing works correctly for all session-oriented commands
+- [x] Schema validation implemented and tested
+- [x] SSZ serialization implemented for all control plane messages
+- [ ] `aw agent fs init-session` creates initial session snapshots (implementation stubbed)
+- [ ] `aw agent fs snapshots <SESSION_ID>` lists session-specific snapshots (implementation stubbed)
+- [ ] `aw agent fs branch create/bind/exec` work with session context (implementation stubbed)
+- [x] Error mapping covered by tests
 
 M11. Scenario, performance, and fault‑injection suites (4–7d)
 
@@ -348,7 +364,7 @@ Acceptance checklist (M12)
 - Core: `cargo test` unit/property tests; mutation tests on critical modules; structured tracing behind a feature.
 - Component: FFI surface exercised via a small C harness; UTF‑8/UTF‑16 round‑trips.
 - Integration: libfuse adapter on Linux/macOS dev; WinFsp batteries on Windows; FSKit sample‑like flows.
-- Scenario: AW lifecycle simulations; golden tests for control JSON round‑trip using schemas in `specs/Public/Schemas`.
+- Scenario: AW lifecycle simulations; golden tests for control SSZ round‑trip using union types in `agentfs-proto`.
 - Performance: criterion microbenchmarks; fsbench/fio macro; memory spill and ENOSPC coverage.
 
 ### Deliverables

@@ -7,6 +7,38 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SnapshotId(pub [u8; 16]);
 
+impl std::fmt::Display for SnapshotId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Convert to base32hex string (ULID format)
+        let mut s = String::with_capacity(26);
+        for &byte in &self.0 {
+            s.push_str(&format!("{:02x}", byte));
+        }
+        f.write_str(&s)
+    }
+}
+
+impl std::str::FromStr for SnapshotId {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 32 {
+            return Err("Invalid length".to_string());
+        }
+
+        let mut bytes = [0u8; 16];
+        for (i, chunk) in s.as_bytes().chunks(2).enumerate() {
+            if chunk.len() != 2 {
+                return Err("Invalid hex".to_string());
+            }
+            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
+                .map_err(|_| "Invalid hex digit")?;
+        }
+
+        Ok(SnapshotId(bytes))
+    }
+}
+
 impl SnapshotId {
     pub fn new() -> Self {
         Self(Self::generate_ulid())
@@ -41,6 +73,38 @@ impl Default for SnapshotId {
 /// Opaque branch identifier
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BranchId(pub [u8; 16]);
+
+impl std::fmt::Display for BranchId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Convert to base32hex string (ULID format)
+        let mut s = String::with_capacity(26);
+        for &byte in &self.0 {
+            s.push_str(&format!("{:02x}", byte));
+        }
+        f.write_str(&s)
+    }
+}
+
+impl std::str::FromStr for BranchId {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 32 {
+            return Err("Invalid length".to_string());
+        }
+
+        let mut bytes = [0u8; 16];
+        for (i, chunk) in s.as_bytes().chunks(2).enumerate() {
+            if chunk.len() != 2 {
+                return Err("Invalid hex".to_string());
+            }
+            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
+                .map_err(|_| "Invalid hex digit")?;
+        }
+
+        Ok(BranchId(bytes))
+    }
+}
 
 impl BranchId {
     pub fn new() -> Self {

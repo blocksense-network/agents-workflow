@@ -9,11 +9,7 @@ use agentfs_core::{
     Attributes, DirEntry, FsConfig, FsCore, FsResult, HandleId, LockRange, OpenOptions,
     ShareMode, FileTimes, FsError
 };
-use agentfs_proto::{
-    MessageEnvelope, SnapshotCreateRequest, SnapshotCreateResponse, SnapshotListRequest,
-    SnapshotListResponse, BranchCreateRequest, BranchCreateResponse, BranchBindRequest,
-    BranchBindResponse, ErrorResponse,
-};
+use agentfs_proto::*;
 use fuser::{
     FileAttr, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyBMap, ReplyCreate, ReplyData,
     ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyLock, ReplyLSeek, ReplyOpen, ReplyStatfs, ReplyWrite,
@@ -132,93 +128,98 @@ impl AgentFsFuse {
 
     /// Handle control plane operations via ioctl
     fn handle_control_ioctl(&self, data: &[u8]) -> Result<Vec<u8>, c_int> {
-        let request: serde_json::Value = serde_json::from_slice(data)
+        use agentfs_proto::*;
+
+        let request: Request = Request::from_ssz_bytes(data)
             .map_err(|e| {
-                error!("Failed to parse control request: {}", e);
+                error!("Failed to decode SSZ control request: {:?}", e);
                 EINVAL
             })?;
 
-        let op = request.get("op").and_then(|v| v.as_str()).ok_or(EINVAL)?;
+        // Validate request structure
+        if let Err(e) = validate_request(&request) {
+            error!("Request validation failed: {}", e);
+            let response = Response::error(format!("{}", e), Some(EINVAL as u32));
+            return response.as_ssz_bytes().map_err(|_| EIO);
+        }
 
-        match op {
-            "snapshot.create" => {
-                let req: MessageEnvelope<SnapshotCreateRequest> = serde_json::from_value(request)
-                    .map_err(|_| EINVAL)?;
-                match self.core.snapshot_create(req.payload.name.as_deref()) {
+        match request {
+            Request::SnapshotCreate((_, req)) => {
+                let name_str = req.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
+                match self.core.snapshot_create(name_str.as_deref()) {
                     Ok(snapshot_id) => {
-                        let response = MessageEnvelope {
-                            version: "1".to_string(),
-                            payload: SnapshotCreateResponse { snapshot_id },
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        // Get snapshot name from the list (inefficient but works for now)
+                        let snapshots = self.core.snapshot_list();
+                        let name = snapshots.iter()
+                            .find(|(id, _)| *id == snapshot_id)
+                            .and_then(|(_, name)| name.clone());
+
+                        let response = Response::snapshot_create(SnapshotInfo {
+                            id: snapshot_id.to_string().into_bytes(),
+                            name: name.map(|s| s.into_bytes()),
+                        });
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                     Err(e) => {
-                        let response = ErrorResponse {
-                            error: format!("{:?}", e),
-                            code: Some(e as i32),
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        let response = Response::error(format!("{:?}", e), Some(e as u32));
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                 }
             }
-            "snapshot.list" => {
-                let _req: MessageEnvelope<SnapshotListRequest> = serde_json::from_value(request)
-                    .map_err(|_| EINVAL)?;
+            Request::SnapshotList(_) => {
                 let snapshots = self.core.snapshot_list();
-                let response = MessageEnvelope {
-                    version: "1".to_string(),
-                    payload: SnapshotListResponse {
-                        snapshots: snapshots.into_iter()
-                            .map(|(id, name)| agentfs_proto::SnapshotInfo { id, name })
-                            .collect(),
-                    },
-                };
-                serde_json::to_vec(&response).map_err(|_| EIO)
+                let snapshot_infos: Vec<SnapshotInfo> = snapshots.into_iter()
+                    .map(|(id, name)| SnapshotInfo {
+                        id: id.to_string().into_bytes(),
+                        name: name.map(|s| s.into_bytes()),
+                    })
+                    .collect();
+
+                let response = Response::snapshot_list(snapshot_infos);
+                response.as_ssz_bytes().map_err(|_| EIO)
             }
-            "branch.create" => {
-                let req: MessageEnvelope<BranchCreateRequest> = serde_json::from_value(request)
-                    .map_err(|_| EINVAL)?;
-                match self.core.branch_create_from_snapshot(req.payload.from_snapshot, req.payload.name.as_deref()) {
+            Request::BranchCreate((_, req)) => {
+                let from_str = String::from_utf8_lossy(&req.from).to_string();
+                let name_str = req.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
+                match self.core.branch_create_from_snapshot(
+                    from_str.parse().map_err(|_| EINVAL)?,
+                    name_str.as_deref()
+                ) {
                     Ok(branch_id) => {
-                        let response = MessageEnvelope {
-                            version: "1".to_string(),
-                            payload: BranchCreateResponse { branch_id },
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        // Get branch info from the list
+                        let branches = self.core.branch_list();
+                        let info = branches.iter()
+                            .find(|b| b.id == branch_id)
+                            .ok_or(EIO)?;
+
+                        let response = Response::branch_create(BranchInfo {
+                            id: info.id.to_string().into_bytes(),
+                            name: info.name.clone().map(|s| s.into_bytes()),
+                            parent: info.parent.map(|p| p.to_string()).unwrap_or_default().into_bytes(),
+                        });
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                     Err(e) => {
-                        let response = ErrorResponse {
-                            error: format!("{:?}", e),
-                            code: Some(e as i32),
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        let response = Response::error(format!("{:?}", e), Some(e as u32));
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                 }
             }
-            "branch.bind" => {
-                let req: MessageEnvelope<BranchBindRequest> = serde_json::from_value(request)
-                    .map_err(|_| EINVAL)?;
-                let pid = req.payload.pid.unwrap_or_else(|| std::process::id());
-                match self.core.bind_process_to_branch_with_pid(req.payload.branch_id, pid) {
+            Request::BranchBind((_, req)) => {
+                let pid = req.pid.unwrap_or_else(|| std::process::id());
+                let branch_str = String::from_utf8_lossy(&req.branch).to_string();
+                let branch_id = branch_str.parse().map_err(|_| EINVAL)?;
+
+                match self.core.bind_process_to_branch_with_pid(branch_id, pid) {
                     Ok(()) => {
-                        let response = MessageEnvelope {
-                            version: "1".to_string(),
-                            payload: BranchBindResponse {},
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        let response = Response::branch_bind(req.branch.clone(), pid);
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                     Err(e) => {
-                        let response = ErrorResponse {
-                            error: format!("{:?}", e),
-                            code: Some(e as i32),
-                        };
-                        serde_json::to_vec(&response).map_err(|_| EIO)
+                        let response = Response::error(format!("{:?}", e), Some(e as u32));
+                        response.as_ssz_bytes().map_err(|_| EIO)
                     }
                 }
-            }
-            _ => {
-                error!("Unknown control operation: {}", op);
-                Err(EINVAL)
             }
         }
     }

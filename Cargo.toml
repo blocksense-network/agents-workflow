@@ -24,6 +24,8 @@ members = [
   "crates/agentfs-winfsp-host",
   "crates/agentfs-fskit-host",
   "crates/agentfs-ffi",
+  # CLI
+  "crates/aw-cli",
   # Integration tests
   "tests/sandbox-integration",
   "tests/cgroup-enforcement",
