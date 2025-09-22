@@ -14,5 +14,5 @@ thiserror.workspace = true
 async-trait.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 
-[dependencies.aw-fs-snapshots]
-path = "../aw-fs-snapshots"
+[dependencies.aw-fs-snapshots-traits]
+path = "../aw-fs-snapshots-traits"

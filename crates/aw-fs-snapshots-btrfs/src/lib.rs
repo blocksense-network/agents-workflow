@@ -1,7 +1,7 @@
 //! Btrfs snapshot provider implementation for Agents Workflow.
 
 use async_trait::async_trait;
-use aw_fs_snapshots::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
+use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -44,7 +44,7 @@ impl BtrfsProvider {
             .output()?;
 
         if !output.status.success() {
-            return Err(aw_fs_snapshots::Error::provider("Failed to determine filesystem type"));
+            return Err(aw_fs_snapshots_traits::Error::provider("Failed to determine filesystem type"));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -60,9 +60,7 @@ impl BtrfsProvider {
             .output()?;
 
         if !output.status.success() {
-            return Err(aw_fs_snapshots::Error::UnsupportedFilesystem {
-                path: path.to_path_buf(),
-            });
+            return Err(aw_fs_snapshots_traits::Error::provider(format!("Path is not in a Btrfs subvolume: {}", path.display())));
         }
 
         // The first line should contain the subvolume path
@@ -70,7 +68,7 @@ impl BtrfsProvider {
         if let Some(first_line) = output_str.lines().next() {
             Ok(first_line.trim().to_string())
         } else {
-            Err(aw_fs_snapshots::Error::provider("Failed to parse btrfs subvolume show output"))
+            Err(aw_fs_snapshots_traits::Error::provider("Failed to parse btrfs subvolume show output"))
         }
     }
 
@@ -85,7 +83,7 @@ impl BtrfsProvider {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(aw_fs_snapshots::Error::provider(format!(
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
                 "Btrfs command failed: {}",
                 stderr
             )));
@@ -185,7 +183,7 @@ impl FsSnapshotProvider for BtrfsProvider {
             }
             WorkingCopyMode::Worktree | WorkingCopyMode::Auto => {
                 // Fall back to worktree mode for Btrfs (simpler implementation)
-                Err(aw_fs_snapshots::Error::provider("Btrfs worktree mode not implemented - use CowOverlay"))
+                Err(aw_fs_snapshots_traits::Error::provider("Btrfs worktree mode not implemented - use CowOverlay"))
             }
         }
     }
@@ -217,10 +215,10 @@ impl FsSnapshotProvider for BtrfsProvider {
             if path.exists() {
                 Ok(path)
             } else {
-                Err(aw_fs_snapshots::Error::provider("Btrfs snapshot path does not exist"))
+                Err(aw_fs_snapshots_traits::Error::provider("Btrfs snapshot path does not exist"))
             }
         } else {
-            Err(aw_fs_snapshots::Error::provider("Btrfs snapshot missing path metadata"))
+            Err(aw_fs_snapshots_traits::Error::provider("Btrfs snapshot missing path metadata"))
         }
     }
 
@@ -246,7 +244,7 @@ impl FsSnapshotProvider for BtrfsProvider {
                     cleanup_token: format!("btrfs:branch:{}", branch_path.display()),
                 })
             }
-            _ => Err(aw_fs_snapshots::Error::provider("Btrfs branching only supports CowOverlay mode")),
+            _ => Err(aw_fs_snapshots_traits::Error::provider("Btrfs branching only supports CowOverlay mode")),
         }
     }
 
@@ -275,7 +273,7 @@ impl FsSnapshotProvider for BtrfsProvider {
             }
             Ok(())
         } else {
-            Err(aw_fs_snapshots::Error::provider(format!("Invalid Btrfs cleanup token: {}", token)))
+            Err(aw_fs_snapshots_traits::Error::provider(format!("Invalid Btrfs cleanup token: {}", token)))
         }
     }
 }

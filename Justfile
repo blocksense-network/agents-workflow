@@ -140,6 +140,14 @@ check-aw-fs-snapshots-daemon:
 test-daemon-integration:
     cargo test --package aw-fs-snapshots-daemon -- --nocapture integration
 
+# Run filesystem snapshot provider integration tests (requires root for ZFS/Btrfs operations)
+test-fs-snapshots:
+    cargo test --package aw-fs-snapshots -- --nocapture integration
+
+# Run filesystem snapshot provider unit tests only (no root required)
+test-fs-snapshots-unit:
+    cargo test --package aw-fs-snapshots
+
 # Run all spec linting/validation in one go
 lint-specs:
     scripts/lint-specs.sh

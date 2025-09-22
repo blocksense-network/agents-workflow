@@ -31,7 +31,7 @@ pub fn provider_for(path: &Path) -> Result<Box<dyn FsSnapshotProvider>> {
     // Check Btrfs provider if feature is enabled
     #[cfg(feature = "btrfs")]
     {
-        let btrfs_provider = crate::btrfs::BtrfsProvider::new();
+        let btrfs_provider = aw_fs_snapshots_btrfs::BtrfsProvider::new();
         let capabilities = btrfs_provider.detect_capabilities(path);
         if capabilities.score > best_score {
             best_score = capabilities.score;
@@ -203,10 +203,6 @@ impl FsSnapshotProvider for CopyProvider {
     }
 }
 
-#[cfg(feature = "btrfs")]
-pub mod btrfs {
-    include!("../btrfs_stub.rs");
-}
 
 #[cfg(test)]
 mod tests {

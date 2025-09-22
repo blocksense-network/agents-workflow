@@ -13,10 +13,19 @@ anyhow.workspace = true
 thiserror.workspace = true
 async-trait = "0.1"
 
+[dev-dependencies]
+tempfile = "3.8"
+regex = "1.10"
+libc = "0.2"
+
 [features]
-default = ["zfs"]
+default = ["zfs", "btrfs"]
 zfs = ["dep:aw-fs-snapshots-zfs"]
-btrfs = []
+btrfs = ["dep:aw-fs-snapshots-btrfs"]
+
+[dependencies.aw-fs-snapshots-btrfs]
+path = "../aw-fs-snapshots-btrfs"
+optional = true
 
 [dependencies.aw-core]
 path = "../aw-core"
