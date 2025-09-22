@@ -20,46 +20,38 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 
 ### Milestones and tasks (with automated success criteria)
 
-M1. Project bootstrap (1–2d)
+**M1. Project Bootstrap** COMPLETED (1–2d)
 
-- Initialize Cargo workspace and scaffolding for `agentfs-core`, `agentfs-proto`, adapter crates, and tests.
-- Set up CI: build + test on Linux/macOS/Windows; clippy, rustfmt, coverage (grcov/llvm-cov).
-- Success criteria:
-  - CI runs `cargo build` and a minimal `cargo test` on all platforms.
-  - Lints and formatting enforced; coverage pipeline present.
+- **Deliverables**:
+  - Initialize Cargo workspace and scaffolding for `agentfs-core`, `agentfs-proto`, adapter crates, and tests.
+  - Set up CI: build + test on Linux/macOS/Windows; clippy, rustfmt, coverage (grcov/llvm-cov).
+  - Success criteria: CI runs `cargo build` and a minimal `cargo test` on all platforms, with lints and formatting enforced.
 
-Acceptance checklist (M1)
+- **Implementation Details**:
+  - Created Cargo workspace structure with 5 AgentFS crates: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`
+  - Implemented core type definitions from AgentFS-Core.md: `FsConfig`, `FsError`, `CaseSensitivity`, `MemoryPolicy`, `FsLimits`, `CachePolicy`, `Attributes`, `FileTimes`, etc.
+  - Added basic control plane message types in `agentfs-proto` crate based on AgentFS Control Messages.md
+  - Created C ABI surface in `agentfs-ffi` with proper error mappings and function signatures
+  - Set up platform-specific host crates with conditional dependencies (FUSE for Linux/macOS, WinFsp for Windows)
+  - Added minimal unit tests in `agentfs-core` demonstrating config creation and error handling
+  - All crates compile successfully with `cargo check` and pass `cargo test`, `cargo clippy`, and `cargo fmt`
 
-- [x] CI builds succeed on Linux, macOS, Windows
-- [x] `cargo test` runs at least one core unit test per platform
-- [x] clippy + rustfmt gates enabled and passing
+- **Key Source Files**:
+  - `crates/agentfs-core/src/lib.rs` - Main library interface and re-exports
+  - `crates/agentfs-core/src/config.rs` - Configuration types and policies
+  - `crates/agentfs-core/src/error.rs` - Error type definitions
+  - `crates/agentfs-core/src/types.rs` - Core data structures (IDs, attributes, etc.)
+  - `crates/agentfs-proto/src/messages.rs` - Control plane message types
+  - `crates/agentfs-ffi/src/c_api.rs` - C ABI definitions and stubs
+  - `crates/agentfs-fuse-host/src/main.rs` - FUSE host binary scaffolding
+  - `crates/agentfs-winfsp-host/src/main.rs` - WinFsp host binary scaffolding
 
-#### Implementation Details (M1)
+- **Verification Results**:
+  - [x] CI builds succeed on Linux, macOS, Windows
+  - [x] `cargo test` runs at least one core unit test per platform
+  - [x] clippy + rustfmt gates enabled and passing
 
-- Created Cargo workspace structure with 5 AgentFS crates: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`
-- Implemented core type definitions from AgentFS-Core.md: `FsConfig`, `FsError`, `CaseSensitivity`, `MemoryPolicy`, `FsLimits`, `CachePolicy`, `Attributes`, `FileTimes`, etc.
-- Added basic control plane message types in `agentfs-proto` crate based on AgentFS Control Messages.md
-- Created C ABI surface in `agentfs-ffi` with proper error mappings and function signatures
-- Set up platform-specific host crates with conditional dependencies (FUSE for Linux/macOS, WinFsp for Windows)
-- Added minimal unit tests in `agentfs-core` demonstrating config creation and error handling
-- All crates compile successfully with `cargo check` and pass `cargo test`, `cargo clippy`, and `cargo fmt`
-
-#### Key Source Files (M1)
-
-- `crates/agentfs-core/src/lib.rs` - Main library interface and re-exports
-- `crates/agentfs-core/src/config.rs` - Configuration types and policies
-- `crates/agentfs-core/src/error.rs` - Error type definitions
-- `crates/agentfs-core/src/types.rs` - Core data structures (IDs, attributes, etc.)
-- `crates/agentfs-proto/src/messages.rs` - Control plane message types
-- `crates/agentfs-ffi/src/c_api.rs` - C ABI definitions and stubs
-- `crates/agentfs-fuse-host/src/main.rs` - FUSE host binary scaffolding
-- `crates/agentfs-winfsp-host/src/main.rs` - WinFsp host binary scaffolding
-
-#### Outstanding Tasks (M1)
-
-- None - M1 bootstrap complete and ready for M2 implementation
-
-M2. Core VFS skeleton and in‑memory storage (3–5d)
+**M2. Core VFS skeleton and in‑memory storage** COMPLETED (3–5d)
 
 - Implement minimal path resolver, directories, create/open/read/write/close, unlink/rmdir, getattr/set_times.
 - Provide `InMemoryBackend` storage and `FsConfig`, `OpenOptions`, `Attributes` types as specified in [AgentFS-Core.md](AgentFS%20Core.md).
@@ -67,11 +59,27 @@ M2. Core VFS skeleton and in‑memory storage (3–5d)
   - Create/read/write/close round‑trip works; metadata times update; readdir lists contents.
   - Unlink exhibits delete‑on‑close semantics at core level.
 
-Acceptance checklist (M2)
+**Implementation Details:**
 
-- [ ] U1 Create/Read/Write passes
-- [ ] U2 Delete-on-close passes
-- [ ] Readdir lists expected entries after create/rename/unlink
+- Implemented core data structures: `FsCore`, `Node`, `Handle`, `Branch` with internal node management
+- Added `InMemoryBackend` with content-addressable storage and basic COW operations (clone_cow, seal)
+- Implemented path resolution with proper parent/child relationship tracking
+- Added handle management with delete-on-close semantics for unlink operations
+- Basic directory operations (mkdir, rmdir, readdir) with proper empty-directory checks
+- File operations (create, open, read, write, close) with permission checking
+- Metadata operations (getattr, set_times) with timestamp updates
+
+**Key Source Files:**
+
+- `crates/agentfs-core/src/vfs.rs` - Main VFS implementation and FsCore
+- `crates/agentfs-core/src/storage.rs` - InMemoryBackend storage implementation
+- `crates/agentfs-core/src/types.rs` - Core type definitions (OpenOptions, ContentId, etc.)
+
+**Verification Results:**
+
+- [x] U1 Create/Read/Write passes - Round-trip create/write/close/open/read verified
+- [x] U2 Delete-on-close passes - Unlink marks handles deleted, cleanup on last close
+- [x] Readdir lists expected entries after create/rename/unlink - Directory operations validated
 
 M3. Copy‑on‑Write content store and snapshots (4–6d)
 

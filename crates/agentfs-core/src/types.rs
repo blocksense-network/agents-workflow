@@ -4,15 +4,33 @@ use serde::{Deserialize, Serialize};
 
 /// Opaque snapshot identifier
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SnapshotId([u8; 16]);
+pub struct SnapshotId(pub [u8; 16]);
+
+impl SnapshotId {
+    pub fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+}
 
 /// Opaque branch identifier
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct BranchId([u8; 16]);
+pub struct BranchId(pub [u8; 16]);
+
+impl BranchId {
+    pub fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+}
 
 /// Opaque handle identifier
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HandleId(u64);
+pub struct HandleId(pub u64);
+
+impl HandleId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
 
 /// File timestamps
 #[derive(Clone, Copy, Debug)]
@@ -63,4 +81,56 @@ pub struct XattrEntry {
 #[derive(Clone, Debug)]
 pub struct StreamSpec {
     pub name: String,
+}
+
+/// File open options
+#[derive(Clone, Debug)]
+pub struct OpenOptions {
+    pub read: bool,
+    pub write: bool,
+    pub create: bool,
+    pub truncate: bool,
+    pub append: bool,
+    pub share: Vec<ShareMode>,
+    pub stream: Option<String>,
+}
+
+/// Share mode for Windows compatibility
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShareMode {
+    Read,
+    Write,
+    Delete,
+}
+
+/// Lock kind for byte-range locking
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LockKind {
+    Shared,
+    Exclusive,
+}
+
+/// Byte range lock specification
+#[derive(Clone, Copy, Debug)]
+pub struct LockRange {
+    pub offset: u64,
+    pub len: u64,
+    pub kind: LockKind,
+}
+
+/// Fallocate mode (optional operation)
+#[derive(Clone, Copy, Debug)]
+pub enum FallocateMode {
+    Allocate,
+    PunchHole,
+}
+
+/// Content identifier for storage backend
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ContentId(pub u64);
+
+impl ContentId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
 }
