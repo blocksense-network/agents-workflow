@@ -14,9 +14,16 @@ thiserror.workspace = true
 async-trait = "0.1"
 
 [features]
-default = []
-zfs = []
+default = ["zfs"]
+zfs = ["dep:aw-fs-snapshots-zfs"]
 btrfs = []
 
 [dependencies.aw-core]
 path = "../aw-core"
+
+[dependencies.aw-fs-snapshots-traits]
+path = "../aw-fs-snapshots-traits"
+
+[dependencies.aw-fs-snapshots-zfs]
+path = "../aw-fs-snapshots-zfs"
+optional = true

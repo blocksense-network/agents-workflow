@@ -3,144 +3,48 @@
 //! This crate provides abstractions for different filesystem snapshot technologies
 //! (ZFS, Btrfs, etc.) to enable time travel capabilities in the AW system.
 
+// Re-export all types from the traits crate
+pub use aw_fs_snapshots_traits::*;
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-pub mod error;
-
-/// Result type for filesystem snapshot operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// Error type for filesystem snapshot operations.
-pub use error::Error;
-
-/// Provider kinds for filesystem snapshot operations.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SnapshotProviderKind {
-    /// Auto-detect the best provider for the given path.
-    Auto,
-    /// ZFS snapshot provider.
-    Zfs,
-    /// Btrfs snapshot provider.
-    Btrfs,
-    /// AgentFS user-space filesystem provider.
-    AgentFs,
-    /// Git-based snapshot provider.
-    Git,
-    /// Disable snapshotting entirely.
-    Disable,
-}
-
-/// Working copy modes for prepared workspaces.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum WorkingCopyMode {
-    /// Auto-detect the best working copy mode.
-    Auto,
-    /// Use copy-on-write overlay mounting to preserve path stability.
-    CowOverlay,
-    /// Use a separate worktree directory.
-    Worktree,
-    /// Execute directly in the original working copy (no isolation).
-    InPlace,
-}
-
-/// Capabilities detected for a provider on a given repository path.
-#[derive(Clone, Debug)]
-pub struct ProviderCapabilities {
-    /// The kind of provider.
-    pub kind: SnapshotProviderKind,
-    /// Capability score (higher is better, 0-100).
-    pub score: u8,
-    /// Whether this provider supports copy-on-write overlay mode.
-    pub supports_cow_overlay: bool,
-    /// Detection notes shown in diagnostics.
-    pub notes: Vec<String>,
-}
-
-/// A prepared workspace ready for agent execution.
-#[derive(Clone, Debug)]
-pub struct PreparedWorkspace {
-    /// Path where agent processes should run.
-    pub exec_path: PathBuf,
-    /// The working copy mode used.
-    pub working_copy: WorkingCopyMode,
-    /// The provider kind used.
-    pub provider: SnapshotProviderKind,
-    /// Opaque handle for idempotent teardown across crashes/process boundaries.
-    pub cleanup_token: String,
-}
-
-/// Reference to a snapshot created by a provider.
-#[derive(Clone, Debug)]
-pub struct SnapshotRef {
-    /// Provider-opaque snapshot identifier.
-    pub id: String,
-    /// Optional user-visible label.
-    pub label: Option<String>,
-    /// Provider kind that created this snapshot.
-    pub provider: SnapshotProviderKind,
-    /// Additional metadata.
-    pub meta: HashMap<String, String>,
-}
-
-/// Core trait for filesystem snapshot providers.
-#[async_trait]
-pub trait FsSnapshotProvider: Send + Sync {
-    /// Return the kind of this provider.
-    fn kind(&self) -> SnapshotProviderKind;
-
-    /// Detect capabilities for the current host/repo.
-    fn detect_capabilities(&self, repo: &Path) -> ProviderCapabilities;
-
-    /// Create a session workspace (independent or in-place) for the selected working-copy mode.
-    async fn prepare_writable_workspace(
-        &self,
-        repo: &Path,
-        mode: WorkingCopyMode,
-    ) -> Result<PreparedWorkspace>;
-
-    /// Snapshot current workspace state; label is optional UI hint.
-    async fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef>;
-
-    /// Read-only inspection mount for a snapshot (optional).
-    async fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf>;
-
-    /// Create a new writable workspace (branch) from a snapshot.
-    async fn branch_from_snapshot(
-        &self,
-        snap: &SnapshotRef,
-        mode: WorkingCopyMode,
-    ) -> Result<PreparedWorkspace>;
-
-    /// Cleanup/destroy any resources created by this provider (workspaces, mounts).
-    async fn cleanup(&self, token: &str) -> Result<()>;
-}
 
 /// Auto-detect and return the appropriate provider for a given path.
 pub fn provider_for(path: &Path) -> Result<Box<dyn FsSnapshotProvider>> {
     // Validate the path first
     validate_destination_path(path)?;
 
-    // Detect available providers in order of preference
-    let providers: Vec<Box<dyn FsSnapshotProvider>> = vec![
-        #[cfg(feature = "zfs")]
-        Box::new(crate::zfs::ZfsProvider::new()),
-        #[cfg(feature = "btrfs")]
-        Box::new(crate::btrfs::BtrfsProvider::new()),
-        Box::new(CopyProvider::new()),
-    ];
-
     // Find the provider with the highest capability score
-    let mut best_provider = None;
+    let mut best_provider: Option<Box<dyn FsSnapshotProvider>> = None;
     let mut best_score = 0;
 
-    for provider in providers {
-        let capabilities = provider.detect_capabilities(path);
+    // Check ZFS provider if feature is enabled
+    #[cfg(feature = "zfs")]
+    {
+        let zfs_provider = aw_fs_snapshots_zfs::ZfsProvider::new();
+        let capabilities = zfs_provider.detect_capabilities(path);
         if capabilities.score > best_score {
             best_score = capabilities.score;
-            best_provider = Some(provider);
+            best_provider = Some(Box::new(zfs_provider));
         }
+    }
+
+    // Check Btrfs provider if feature is enabled
+    #[cfg(feature = "btrfs")]
+    {
+        let btrfs_provider = crate::btrfs::BtrfsProvider::new();
+        let capabilities = btrfs_provider.detect_capabilities(path);
+        if capabilities.score > best_score {
+            best_score = capabilities.score;
+            best_provider = Some(Box::new(btrfs_provider));
+        }
+    }
+
+    // Always check copy provider as fallback
+    let copy_provider = CopyProvider::new();
+    let capabilities = copy_provider.detect_capabilities(path);
+    if capabilities.score > best_score {
+        best_score = capabilities.score;
+        best_provider = Some(Box::new(copy_provider));
     }
 
     best_provider.ok_or_else(|| Error::provider("No suitable provider found"))
@@ -297,11 +201,6 @@ impl FsSnapshotProvider for CopyProvider {
             Err(Error::provider(format!("Invalid cleanup token: {}", token)))
         }
     }
-}
-
-#[cfg(feature = "zfs")]
-pub mod zfs {
-    include!("../zfs_stub.rs");
 }
 
 #[cfg(feature = "btrfs")]

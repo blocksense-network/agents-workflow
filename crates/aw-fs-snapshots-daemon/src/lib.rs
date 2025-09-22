@@ -6,6 +6,7 @@
 pub mod types;
 pub mod operations;
 pub mod server;
+pub mod client;
 
 #[cfg(test)]
 mod tests {
