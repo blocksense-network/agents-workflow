@@ -1,6 +1,5 @@
-import { hydrate } from 'solid-js/web';
-import App from './App';
+import { hydrate } from "solid-js/web";
+import App from "./App";
 
 // Hydrate the server-rendered content
-hydrate(() => App(), document.getElementById('app')!);
-
+hydrate(() => App(), document.getElementById("app")!);

@@ -1,7 +1,7 @@
 export const ssrMiddleware = async (req: any, res: any, next: any) => {
   try {
     // Skip SSR for API routes and static assets
-    if (req.url.startsWith('/api') || req.url.includes('.')) {
+    if (req.url.startsWith("/api") || req.url.includes(".")) {
       return next();
     }
 
@@ -63,9 +63,9 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
 </body>
 </html>`;
 
-    res.status(200).set('Content-Type', 'text/html').send(html);
+    res.status(200).set("Content-Type", "text/html").send(html);
   } catch (error) {
-    console.error('SSR Error:', error);
+    console.error("SSR Error:", error);
     next(error);
   }
 };
