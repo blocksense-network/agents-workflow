@@ -28,9 +28,7 @@ impl MigrationManager {
 
     /// Get the current schema version.
     pub fn current_version(conn: &Connection) -> crate::Result<Option<u32>> {
-        let mut stmt = conn.prepare(
-            "SELECT MAX(version) FROM schema_migrations",
-        )?;
+        let mut stmt = conn.prepare("SELECT MAX(version) FROM schema_migrations")?;
 
         let version: Option<u32> = stmt.query_row(params![], |row| row.get(0)).ok();
 

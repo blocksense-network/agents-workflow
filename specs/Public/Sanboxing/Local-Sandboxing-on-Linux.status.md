@@ -1,6 +1,7 @@
 ### Overview
 
 This document tracks the implementation status of the [Local-Sandboxing-on-Linux](Local-Sandboxing-on-Linux.md) functionality.
+Please also read [Sandboxing Strategies](Agents-Workflow-Sandboxing-Strategies.md) for a wider context.
 
 Goal: deliver a production‑ready local Linux sandbox with dynamic read allow‑list, static RO/overlay mode, network isolation, resource limits, and developer‑friendly UX, surfaced through `aw session audit` and automated policy enforcement.
 
@@ -67,7 +68,7 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
 **M1. Project bootstrap** (1–2d)
 
 - Deliverables:
-  - Scaffolding for crates, workspace, linting (clippy), formatting (rustfmt), CI (GitHub Actions, Ubuntu runners).
+  - Scaffolding for crates, workspace, linting (clippy), formatting (rustfmt), CI (GitHub Actions, Ubuntu runners). See [Repository Layout](../Repository-Layout.md) for reference.
   - Smoke test: cargo build + unit test skeletons.
 
 - Verification:
