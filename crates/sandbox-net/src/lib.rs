@@ -193,7 +193,7 @@ mod tests {
         let config = NetworkConfig::default();
         let mut manager = NetworkManager::new(config);
         assert!(manager.setup_isolation().await.is_ok());
-        assert!(manager.cleanup().await.is_ok());
+        assert!(manager.cleanup().is_ok());
     }
 
     #[tokio::test]
@@ -204,7 +204,7 @@ mod tests {
         };
         let mut manager = NetworkManager::new(config);
         assert!(manager.setup_isolation().await.is_ok());
-        assert!(manager.cleanup().await.is_ok());
+        assert!(manager.cleanup().is_ok());
     }
 
     #[tokio::test]

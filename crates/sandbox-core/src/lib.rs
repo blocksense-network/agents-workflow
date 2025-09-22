@@ -8,7 +8,6 @@ pub mod process;
 
 pub use namespaces::{NamespaceConfig, NamespaceManager};
 pub use process::{ProcessConfig, ProcessManager};
-pub use Sandbox;
 
 #[cfg(feature = "cgroups")]
 pub use sandbox_cgroups::{

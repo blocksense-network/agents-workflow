@@ -11,10 +11,6 @@ pub mod error;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-// Re-export main types
-pub use FilesystemConfig;
-pub use FilesystemManager;
-
 use crate::error::Error;
 
 /// Configuration for filesystem isolation
