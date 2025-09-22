@@ -148,12 +148,19 @@ lint-specs:
 build-cgroup-test-binaries:
     cargo build --bin fork_bomb --bin memory_hog --bin cpu_burner --bin test_orchestrator
 
+# Build overlay enforcement test binaries (overlay_test_orchestrator, blacklist_tester, overlay_writer)
+build-overlay-test-binaries:
+    cargo build --bin overlay_test_orchestrator --bin blacklist_tester --bin overlay_writer
+
 # Build sbx-helper binary
 build-sbx-helper:
     cargo build --bin sbx-helper
 
 # Build all test binaries needed for cgroup enforcement tests
 build-cgroup-tests: build-sbx-helper build-cgroup-test-binaries
+
+# Build all test binaries needed for overlay enforcement tests
+build-overlay-tests: build-sbx-helper build-overlay-test-binaries
 
 # Run cgroup tests with E2E enforcement verification
 test-cgroups:
@@ -234,3 +241,8 @@ webui-check:
     just webui-build
     just webui-build-mock
     just webui-test
+
+# Run overlay tests with E2E enforcement verification
+test-overlays:
+    just build-overlay-tests
+    cargo test -p sandbox-integration-tests --verbose

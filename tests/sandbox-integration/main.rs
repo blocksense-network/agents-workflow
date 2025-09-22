@@ -29,6 +29,10 @@ async fn test_sandbox_integration() {
         readonly_paths: vec!["/etc".to_string()],
         bind_mounts: vec![],
         working_dir: Some("/tmp".to_string()),
+        overlay_paths: vec![],
+        blacklist_paths: vec![],
+        session_state_dir: None,
+        static_mode: false,
     };
 
     // Initialize components
@@ -194,6 +198,83 @@ fn test_cgroups_enforcement_e2e() {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn test_overlay_enforcement_e2e() {
+    // This test runs the full E2E overlay enforcement test suite
+    // It requires the test binaries to be built and available
+    // Note: This test requires privileges to create namespaces and mount filesystems
+
+    use std::process::Command;
+
+    // Build paths relative to the project root (not the test directory)
+    let project_root = std::env::current_dir()
+        .unwrap_or_default()
+        .parent() // Go up from tests/sandbox-integration to tests/
+        .unwrap_or(&std::env::current_dir().unwrap_or_default())
+        .parent() // Go up from tests/ to project root
+        .unwrap_or(&std::env::current_dir().unwrap_or_default())
+        .to_path_buf();
+
+    let orchestrator_path = project_root.join("target/debug/overlay_test_orchestrator");
+    let sbx_helper_path = project_root.join("target/debug/sbx-helper");
+
+    println!("Looking for overlay orchestrator at: {:?}", orchestrator_path);
+    println!(
+        "Current working directory: {:?}",
+        std::env::current_dir().unwrap_or_default()
+    );
+
+    if !orchestrator_path.exists() {
+        println!("⚠️  Skipping E2E overlay enforcement test - overlay_test_orchestrator binary not found");
+        println!("   Build with: cargo build --bin overlay_test_orchestrator");
+        println!("   Looking in: {:?}", orchestrator_path);
+        return;
+    }
+
+    if !sbx_helper_path.exists() {
+        println!("⚠️  Skipping E2E overlay enforcement test - sbx-helper binary not found");
+        println!("   Build with: cargo build --bin sbx-helper");
+        return;
+    }
+
+    // Check if we have the necessary privileges to run sandbox tests
+    // Try a simple namespace creation to see if we have privileges
+    let can_create_namespaces = std::fs::read_to_string("/proc/sys/user/max_user_namespaces")
+        .map(|s| s.trim().parse::<i32>().unwrap_or(0) > 0)
+        .unwrap_or(false);
+
+    if !can_create_namespaces {
+        println!("⚠️  Skipping E2E overlay enforcement test - no namespace privileges available");
+        println!("   This test requires privileges to create user namespaces and mount filesystems");
+        println!("   Run with appropriate privileges (e.g., sudo) or in a privileged environment");
+        return;
+    }
+
+    // Run the overlay test orchestrator
+    println!("🧪 Running E2E overlay enforcement tests...");
+    let output = Command::new(orchestrator_path)
+        .output()
+        .expect("Failed to run overlay test orchestrator");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("Overlay test orchestrator stdout:\n{}", stdout);
+    if !stderr.is_empty() {
+        eprintln!("Overlay test orchestrator stderr:\n{}", stderr);
+    }
+
+    // Check if the orchestrator succeeded
+    if output.status.success() {
+        println!("✅ E2E overlay enforcement tests PASSED");
+    } else {
+        println!("❌ E2E overlay enforcement tests FAILED");
+        println!("Exit code: {:?}", output.status.code());
+        panic!("Overlay enforcement E2E tests failed");
+    }
+}
+
 #[test]
 fn test_filesystem_config_defaults() {
     let config = FilesystemConfig::default();
@@ -204,4 +285,8 @@ fn test_filesystem_config_defaults() {
     assert!(config.readonly_paths.contains(&"/bin".to_string()));
     assert!(config.bind_mounts.is_empty());
     assert!(config.working_dir.is_none());
+    assert!(config.overlay_paths.is_empty());
+    assert!(!config.blacklist_paths.is_empty()); // Should have default blacklisted paths
+    assert!(config.session_state_dir.is_none());
+    assert!(!config.static_mode);
 }

@@ -19,6 +19,7 @@ members = [
   # Integration tests
   "tests/sandbox-integration",
   "tests/cgroup-enforcement",
+  "tests/overlay-enforcement",
 ]
 resolver = "2"
 

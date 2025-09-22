@@ -46,6 +46,18 @@ struct Args {
     /// Read-write directory to allow in sandbox
     #[arg(long)]
     rw_dir: Option<String>,
+
+    /// Enable static mode (blacklist + overlays) instead of dynamic mode
+    #[arg(long)]
+    static_mode: bool,
+
+    /// Path to make writable via overlay filesystem (can be specified multiple times)
+    #[arg(long)]
+    overlay: Vec<String>,
+
+    /// Path to blacklist in static mode (can be specified multiple times)
+    #[arg(long)]
+    blacklist: Vec<String>,
 }
 
 #[tokio::main]
@@ -99,6 +111,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(rw_dir) = &args.rw_dir {
         fs_config.working_dir = Some(rw_dir.clone());
     }
+    fs_config.static_mode = args.static_mode;
+    fs_config.overlay_paths = args.overlay.clone();
+    fs_config.blacklist_paths = args.blacklist.clone();
 
     // Initialize sandbox with cgroups enabled
     let mut sandbox = Sandbox::with_namespace_config(namespace_config)

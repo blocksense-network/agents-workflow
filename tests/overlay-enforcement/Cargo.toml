@@ -1,0 +1,24 @@
+[package]
+name = "overlay-enforcement-tests"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "overlay_test_orchestrator"
+path = "src/test_orchestrator.rs"
+
+[[bin]]
+name = "blacklist_tester"
+path = "src/blacklist_tester.rs"
+
+[[bin]]
+name = "overlay_writer"
+path = "src/overlay_writer.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }

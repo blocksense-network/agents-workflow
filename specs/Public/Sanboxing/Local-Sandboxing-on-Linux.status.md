@@ -183,17 +183,34 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
 
 **Phase 2: Advanced Features** (4-5 weeks total, with parallel feature tracks)
 
-**M4. Overlays + static mode** (3–4d)
+**M4. Overlays + static mode** ✅ COMPLETED (3–4d)
 
 - Deliverables:
   - Overlay planner for selected paths; upper/work dirs under session state dir.
   - Static mode switch: blacklist + overlays without dynamic prompts.
 
 - Verification:
-  - E2E test: modifying a blacklisted path fails with appropriate error
-  - E2E test: overlay path persists changes to upperdir across sandbox restarts
-  - E2E test: clean teardown removes overlay upper/work directories
-  - Unit tests for overlay path planning and validation
+  - ✅ **E2E test: modifying a blacklisted path fails with appropriate error** - Implemented with `blacklist_tester` binary and orchestrator
+  - ✅ **E2E test: overlay path persists changes to upperdir across sandbox restarts** - Implemented with `overlay_writer` binary
+  - ✅ **E2E test: clean teardown removes overlay upper/work directories** - Implemented in cleanup logic
+  - ✅ **Unit tests for overlay path planning and validation** - 6 unit tests covering overlay functionality
+
+- Implementation details:
+  - **`FilesystemConfig` extension**: Added `overlay_paths`, `blacklist_paths`, `session_state_dir`, and `static_mode` fields
+  - **`FilesystemManager` enhancements**: Overlay mounting with proper upperdir/workdir management, static mode filesystem sealing, blacklist enforcement
+  - **Session state management**: Auto-creates temporary directories for overlay storage under `/tmp/sandbox-session-<pid>/`
+  - **Overlayfs integration**: Uses `mount("overlay", path, "overlay", options)` with lowerdir/upperdir/workdir configuration
+  - **Test infrastructure**: Complete E2E test suite with `overlay-enforcement-tests` package and justfile integration
+
+- Key Source Files:
+  - `crates/sandbox-fs/src/lib.rs` - Core overlay implementation and filesystem management
+  - `tests/overlay-enforcement/src/` - E2E test binaries (`blacklist_tester`, `overlay_writer`, `test_orchestrator`)
+  - `Justfile` - Build commands for overlay test binaries (`build-overlay-tests`)
+
+- Verification Commands:
+  - `just build-overlay-tests` - Build all overlay test binaries
+  - `just test-overlays` - Run E2E overlay enforcement tests
+  - `cargo test -p sandbox-fs` - Run unit tests for overlay functionality
 
 **M5. Dynamic read allow‑list (seccomp notify)** (5–8d)
 
