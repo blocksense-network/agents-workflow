@@ -63,10 +63,8 @@ impl ProcessManager {
         }
 
         let program = &self.config.command[0];
-        let args: Vec<CString> = self.config.command
-            .iter()
-            .map(|s| CString::new(s.as_str()).unwrap())
-            .collect();
+        let args: Vec<CString> =
+            self.config.command.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
 
         // Set working directory if specified
         if let Some(dir) = &self.config.working_dir {
@@ -104,7 +102,8 @@ impl ProcessManager {
             Some("proc"),
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             None::<&str>,
-        ).map_err(|e| {
+        )
+        .map_err(|e| {
             warn!("Failed to mount /proc: {}", e);
             Error::Execution(format!("Failed to mount /proc: {}", e))
         })?;
@@ -128,9 +127,7 @@ impl ProcessManager {
                 }
                 unreachable!();
             }
-            Err(e) => {
-                Err(Error::Execution(format!("Failed to fork: {}", e)))
-            }
+            Err(e) => Err(Error::Execution(format!("Failed to fork: {}", e))),
         }
     }
 
@@ -151,9 +148,9 @@ impl ProcessManager {
             cmd.env(key, value);
         }
 
-        let child = cmd.spawn().map_err(|e| {
-            Error::Execution(format!("Failed to spawn command: {}", e))
-        })?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| Error::Execution(format!("Failed to spawn command: {}", e)))?;
 
         // For testing purposes, we return the child's stdout
         // In a real implementation, we'd handle the process lifecycle

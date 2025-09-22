@@ -66,7 +66,10 @@ impl FilesystemManager {
 
     /// Plan and execute filesystem mounts for sandboxing
     pub async fn setup_mounts(&self) -> Result<()> {
-        info!("Setting up filesystem isolation with config: {:?}", self.config);
+        info!(
+            "Setting up filesystem isolation with config: {:?}",
+            self.config
+        );
 
         // Make specified paths read-only - this may fail in test environments
         for path in &self.config.readonly_paths {
@@ -74,7 +77,10 @@ impl FilesystemManager {
                 Ok(()) => debug!("Made {} read-only", path),
                 Err(e) => {
                     // In test environments, mount operations may fail due to permissions
-                    debug!("Failed to make {} read-only (expected in test environment): {}", path, e);
+                    debug!(
+                        "Failed to make {} read-only (expected in test environment): {}",
+                        path, e
+                    );
                 }
             }
         }
@@ -84,7 +90,10 @@ impl FilesystemManager {
             match self.bind_mount(source, target) {
                 Ok(()) => debug!("Created bind mount: {} -> {}", source, target),
                 Err(e) => {
-                    debug!("Failed to create bind mount (expected in test environment): {}", e);
+                    debug!(
+                        "Failed to create bind mount (expected in test environment): {}",
+                        e
+                    );
                 }
             }
         }
@@ -94,7 +103,10 @@ impl FilesystemManager {
             match self.ensure_writable(work_dir) {
                 Ok(()) => debug!("Ensured {} is writable", work_dir),
                 Err(e) => {
-                    debug!("Failed to ensure {} is writable (expected in test environment): {}", work_dir, e);
+                    debug!(
+                        "Failed to ensure {} is writable (expected in test environment): {}",
+                        work_dir, e
+                    );
                 }
             }
         }
@@ -129,7 +141,8 @@ impl FilesystemManager {
             None::<&str>,
             MsFlags::MS_BIND,
             None::<&str>,
-        ).map_err(|e| {
+        )
+        .map_err(|e| {
             warn!("Failed to bind mount {}: {}", path, e);
             Error::Mount(format!("Failed to bind mount {}: {}", path, e))
         })?;
@@ -141,7 +154,8 @@ impl FilesystemManager {
             None::<&str>,
             MsFlags::MS_BIND | MsFlags::MS_REMOUNT | MsFlags::MS_RDONLY,
             None::<&str>,
-        ).map_err(|e| {
+        )
+        .map_err(|e| {
             warn!("Failed to remount {} as readonly: {}", path, e);
             Error::Mount(format!("Failed to remount {} as readonly: {}", path, e))
         })?;
@@ -156,13 +170,20 @@ impl FilesystemManager {
         let target_path = Path::new(target);
 
         if !source_path.exists() {
-            return Err(Error::Mount(format!("Source path {} does not exist", source)));
+            return Err(Error::Mount(format!(
+                "Source path {} does not exist",
+                source
+            )));
         }
 
         // Ensure target directory exists
         if let Some(parent) = target_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                Error::Mount(format!("Failed to create target directory {}: {}", parent.display(), e))
+                Error::Mount(format!(
+                    "Failed to create target directory {}: {}",
+                    parent.display(),
+                    e
+                ))
             })?;
         }
 
@@ -174,9 +195,13 @@ impl FilesystemManager {
             None::<&str>,
             MsFlags::MS_BIND,
             None::<&str>,
-        ).map_err(|e| {
+        )
+        .map_err(|e| {
             warn!("Failed to bind mount {} to {}: {}", source, target, e);
-            Error::Mount(format!("Failed to bind mount {} to {}: {}", source, target, e))
+            Error::Mount(format!(
+                "Failed to bind mount {} to {}: {}",
+                source, target, e
+            ))
         })?;
 
         debug!("Successfully created bind mount: {} -> {}", source, target);
@@ -189,7 +214,10 @@ impl FilesystemManager {
 
         if !path_obj.exists() {
             std::fs::create_dir_all(path_obj).map_err(|e| {
-                Error::Mount(format!("Failed to create writable directory {}: {}", path, e))
+                Error::Mount(format!(
+                    "Failed to create writable directory {}: {}",
+                    path, e
+                ))
             })?;
         }
 

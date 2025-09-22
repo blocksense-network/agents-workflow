@@ -9,6 +9,11 @@ pub mod process;
 pub use namespaces::{NamespaceConfig, NamespaceManager};
 pub use process::{ProcessConfig, ProcessManager};
 
+#[cfg(feature = "cgroups")]
+pub use sandbox_cgroups::{
+    CgroupConfig, CgroupManager, CgroupMetrics, CpuLimits, MemoryLimits, PidLimits,
+};
+
 use tracing::{debug, info};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
@@ -19,6 +24,10 @@ pub struct Sandbox {
     namespace_manager: namespaces::NamespaceManager,
     process_config: process::ProcessConfig,
     process_manager: process::ProcessManager,
+    #[cfg(feature = "cgroups")]
+    cgroup_config: Option<sandbox_cgroups::CgroupConfig>,
+    #[cfg(feature = "cgroups")]
+    cgroup_manager: Option<sandbox_cgroups::CgroupManager>,
 }
 
 impl Default for Sandbox {
@@ -35,7 +44,7 @@ impl Sandbox {
     /// same unshare() call. This is the standard approach for sandboxing.
     pub fn new() -> Self {
         let namespace_config = namespaces::NamespaceConfig {
-            user_ns: true,  // Enables unprivileged namespace creation where supported
+            user_ns: true, // Enables unprivileged namespace creation where supported
             mount_ns: true,
             pid_ns: true,
             uts_ns: true,
@@ -54,6 +63,10 @@ impl Sandbox {
             namespace_manager,
             process_config,
             process_manager,
+            #[cfg(feature = "cgroups")]
+            cgroup_config: None,
+            #[cfg(feature = "cgroups")]
+            cgroup_manager: None,
         }
     }
 
@@ -67,6 +80,10 @@ impl Sandbox {
             namespace_manager,
             process_config,
             process_manager,
+            #[cfg(feature = "cgroups")]
+            cgroup_config: None,
+            #[cfg(feature = "cgroups")]
+            cgroup_manager: None,
         }
     }
 
@@ -77,24 +94,61 @@ impl Sandbox {
         self
     }
 
+    /// Enable cgroup resource limits for this sandbox
+    #[cfg(feature = "cgroups")]
+    pub fn with_cgroups(mut self, config: sandbox_cgroups::CgroupConfig) -> Self {
+        self.cgroup_config = Some(config.clone());
+        self.cgroup_manager = Some(sandbox_cgroups::CgroupManager::new(config));
+        self
+    }
+
+    /// Enable cgroup resource limits with default configuration
+    #[cfg(feature = "cgroups")]
+    pub fn with_default_cgroups(mut self) -> Self {
+        let config = sandbox_cgroups::CgroupConfig::default();
+        self.cgroup_config = Some(config.clone());
+        self.cgroup_manager = Some(sandbox_cgroups::CgroupManager::new(config));
+        self
+    }
+
     /// Start the sandbox with the given configuration
-    pub async fn start(&self) -> Result<()> {
-        info!("Starting sandbox with namespaces: {:?}", self.namespace_config);
+    pub fn start(&mut self) -> Result<()> {
+        info!(
+            "Starting sandbox with namespaces: {:?}",
+            self.namespace_config
+        );
 
         // Enter namespaces - this will fail in test environments without root
         match self.namespace_manager.enter_namespaces() {
             Ok(()) => {
                 self.namespace_manager.verify_namespaces()?;
                 debug!("Sandbox namespaces initialized successfully");
-                Ok(())
             }
             Err(e) => {
                 // In test environments, namespace operations may fail due to permissions
                 // This is expected behavior - we still consider the sandbox "started"
-                debug!("Namespace operations failed (expected in test environment): {}", e);
-                Ok(())
+                debug!(
+                    "Namespace operations failed (expected in test environment): {}",
+                    e
+                );
             }
         }
+
+        // Set up cgroups if enabled
+        #[cfg(feature = "cgroups")]
+        if let Some(ref mut cgroup_manager) = self.cgroup_manager {
+            match cgroup_manager.setup_limits() {
+                Ok(()) => {
+                    debug!("Sandbox cgroups initialized successfully");
+                }
+                Err(e) => {
+                    // In test environments or systems without cgroup v2, this may fail
+                    debug!("Cgroup setup failed (expected in some environments): {}", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Execute the configured process as PID 1 in the sandbox
@@ -104,9 +158,36 @@ impl Sandbox {
     }
 
     /// Stop the sandbox
-    pub async fn stop(&self) -> Result<()> {
-        // TODO: Implement sandbox shutdown
+    pub fn stop(&mut self) -> Result<()> {
+        // Clean up cgroups
+        #[cfg(feature = "cgroups")]
+        if let Some(ref cgroup_manager) = self.cgroup_manager {
+            if let Err(e) = cgroup_manager.cleanup() {
+                debug!("Cgroup cleanup failed: {}", e);
+            }
+        }
+
+        // TODO: Implement additional sandbox shutdown logic
         Ok(())
+    }
+
+    /// Add a process to the cgroup (if cgroups are enabled)
+    #[cfg(feature = "cgroups")]
+    pub fn add_process_to_cgroup(&self, pid: u32) -> Result<()> {
+        if let Some(ref cgroup_manager) = self.cgroup_manager {
+            cgroup_manager.add_process(pid)?;
+        }
+        Ok(())
+    }
+
+    /// Collect resource usage metrics (if cgroups are enabled)
+    #[cfg(feature = "cgroups")]
+    pub fn collect_metrics(&self) -> Result<Option<sandbox_cgroups::CgroupMetrics>> {
+        if let Some(ref cgroup_manager) = self.cgroup_manager {
+            Ok(Some(cgroup_manager.collect_metrics()?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get the current namespace configuration
@@ -119,10 +200,10 @@ impl Sandbox {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_sandbox_creation() {
-        let sandbox = Sandbox::new();
-        assert!(sandbox.start().await.is_ok());
-        assert!(sandbox.stop().await.is_ok());
+    #[test]
+    fn test_sandbox_creation() {
+        let mut sandbox = Sandbox::new();
+        assert!(sandbox.start().is_ok());
+        assert!(sandbox.stop().is_ok());
     }
 }

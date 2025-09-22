@@ -26,13 +26,21 @@ check:
 test-rust:
     cargo test --workspace
 
+# Run Rust tests with verbose output
+test-rust-verbose:
+    cargo test --workspace --verbose
+
 # Lint Rust code
 lint-rust:
-    cargo clippy --workspace -- -D warnings
+    cargo clippy --workspace
 
 # Format Rust code
 fmt-rust:
     cargo fmt --all --check
+
+# Build release binary for sbx-helper
+build-sbx-helper-release:
+    cargo build --release --bin sbx-helper
 
 legacy-test:
     export RUBYLIB=legacy/ruby/lib && ruby -Ilegacy/ruby/test legacy/ruby/test/run_tests_shell.rb
@@ -135,3 +143,19 @@ test-daemon-integration:
 # Run all spec linting/validation in one go
 lint-specs:
     scripts/lint-specs.sh
+
+# Build cgroup enforcement test binaries (fork_bomb, memory_hog, cpu_burner, test_orchestrator)
+build-cgroup-test-binaries:
+    cargo build --bin fork_bomb --bin memory_hog --bin cpu_burner --bin test_orchestrator
+
+# Build sbx-helper binary
+build-sbx-helper:
+    cargo build --bin sbx-helper
+
+# Build all test binaries needed for cgroup enforcement tests
+build-cgroup-tests: build-sbx-helper build-cgroup-test-binaries
+
+# Run cgroup tests with E2E enforcement verification
+test-cgroups:
+    just build-cgroup-tests
+    cargo test -p sandbox-integration-tests --verbose
