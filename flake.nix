@@ -153,6 +153,7 @@
             pkgs.gemini-cli
             pkgs.codex
             pkgs.opencode
+            pkgs.asciinema
           ]}:$PATH
           exec ruby ${./bin/agent-task} "$@"
         '';
@@ -240,9 +241,9 @@
           pkgs.gemini-cli # Gemini CLI
           pkgs.codex # OpenAI Codex CLI (Rust implementation)
           pkgs.opencode # OpenCode AI coding assistant
-          
           # Terminal recording and sharing
           pkgs.asciinema # Terminal session recorder
+          pkgs.fzf
         ]
         ++ self.checks.${system}.pre-commit-check.enabledPackages
         # Optional schema/validation tooling (only if available in this nixpkgs)

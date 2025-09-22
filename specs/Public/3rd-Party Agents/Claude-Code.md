@@ -219,6 +219,65 @@ The configuration system supports hierarchical settings (global → local → co
 - **MCP compatibility**: Not all MCP servers may be fully compatible
 - **Platform limitations**: Some features (like Claude Desktop import) are platform-specific
 
+## Custom API Server Support
+
+**YES, Claude Code supports custom API servers** via environment variables, contrary to some outdated assumptions. This enables testing integrations and using Claude Code with alternative LLM providers.
+
+### Environment Variables for Custom API Servers
+
+Claude Code respects these environment variables to redirect API calls to custom servers:
+
+```bash
+# Point Claude Code to your custom API server
+export ANTHROPIC_BASE_URL="http://127.0.0.1:18080"  # Base URL without /v1 suffix
+export ANTHROPIC_API_KEY="mock-key"                   # API key for authentication
+
+# Alternative for Bearer token authentication
+export ANTHROPIC_AUTH_TOKEN="your-bearer-token"
+
+# Launch Claude Code
+claude "Create hello.py that prints Hello, World!"
+```
+
+### Windows Setup
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:18080"
+$env:ANTHROPIC_API_KEY = "mock-key"
+claude "Create hello.py that prints Hello, World!"
+```
+
+### API Compatibility Requirements
+
+Your custom server should implement Anthropic's Messages API:
+
+- **Endpoint**: `POST /v1/messages`
+- **Headers**: `anthropic-version`, `x-api-key` or `Authorization: Bearer`
+- **Request/Response**: Anthropic Messages API format with role/content blocks and usage counters
+
+### Testing with Mock Servers
+
+The agents-workflow project includes a mock API server that can be used for testing Claude Code integrations:
+
+```bash
+# Start the mock server
+python tests/tools/mock-agent/start_test_server.py --host 127.0.0.1 --port 18080
+
+# In another terminal, set environment and run Claude Code
+export ANTHROPIC_BASE_URL="http://127.0.0.1:18080"
+export ANTHROPIC_API_KEY="mock-key"
+claude "Create hello.py"
+```
+
+### Enterprise Gateway Support
+
+Claude Code also supports enterprise gateways via additional environment variables:
+
+- **AWS Bedrock**: `CLAUDE_CODE_USE_BEDROCK=1`, `ANTHROPIC_BEDROCK_BASE_URL`, `CLAUDE_CODE_SKIP_BEDROCK_AUTH=1`
+- **Google Vertex**: Similar flags available for Vertex AI gateways
+
+This makes Claude Code highly flexible for enterprise deployments with custom LLM infrastructure.
+
 ## Findings — Session File Experiments (2025-09-10)
 
 - Tooling: `specs/Research/Tools/SessionFileExperiments/claude.py` runs a minimal session (pexpect‑only) and sets up a temporary `PostToolUse` hook. It also includes a filesystem fallback to discover transcripts without relying on hooks.

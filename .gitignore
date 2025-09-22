@@ -28,6 +28,9 @@ Cargo.lock
 .vscode/
 .idea/
 
+# Obsidian workspace configuration
+.obsidian/workspace.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -41,6 +44,16 @@ Thumbs.db
 *.tmp
 *.swp
 *.swo
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Mock agent recordings
+tests/tools/mock-agent/recordings/
 
 repomix.md
 reference_projects/

@@ -397,10 +397,88 @@ The current test suite provides:
 4. Use `assert_true()` for validation
 5. Include cleanup in `finally` blocks
 
+### Interactive Testing Tips
+
+When developing interactive tests with pexpect, use these techniques for rapid iteration:
+
+#### Fast Test Cycles
+
+- **Set very low timeouts**: Interactive tests should complete in seconds, not minutes. Use timeouts of 5-10 seconds instead of 30-60.
+- **Fail fast**: Let tests fail quickly so you can iterate rapidly rather than waiting for long timeouts.
+
+#### Debugging Interactive Sessions
+
+- **Capture terminal output**: Use pexpect's logging or capture all output to understand what's happening:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Or capture output manually
+child = pexpect.spawn(...)
+print(f"Buffer: {repr(child.before)}")
+print(f"After: {repr(child.after)}")
+```
+
+- **Examine asciinema recordings**: Recordings capture the exact terminal session. Use them to debug what the agent actually displays:
+
+```bash
+# View the latest recording
+just replay-last-mock-agent-codex-session
+just replay-last-mock-agent-claude-session
+
+# Check recording file contents
+cat tests/tools/mock-agent/recordings/*.json | jq '.stdout' | head -20
+```
+
+- **Manual testing first**: Before writing automated tests, run the commands manually to understand the exact prompts and responses:
+
+```bash
+# Test Claude manually
+export ANTHROPIC_BASE_URL=http://127.0.0.1:18080
+export ANTHROPIC_API_KEY=mock-key
+claude "Create hello.py"
+```
+
+#### Common Interactive Patterns
+
+- **Claude Code**: Shows complex multi-step API key confirmation (menu selection + confirmation)
+- **Codex**: May show different prompts based on repository state and flags
+- **Timeout handling**: Use short timeouts (5-10 seconds) to fail fast during development
+- **Input simulation**: Use `sendline()` for menu selections, `send("\n")` for confirmations
+
+#### Claude Code Dialog Flow
+
+Claude Code presents a challenging interactive flow:
+
+1. "Do you want to use this API key?" → Shows menu with "1. Yes" / "2. No (recommended)"
+2. "Enter to confirm • Esc to cancel" → Requires confirmation after selection
+3. Process the prompt and exit
+
+**Current Status**: Interactive testing framework is implemented and working. Tests run Claude and Codex in standard interactive modes (without --print or other output-formatting flags) and verify that expected side effects occur through proper API interaction and tool execution.
+
+**Framework Capabilities**:
+
+- **Full workflow testing**: Commands run in standard interactive mode with complete API request/response cycles
+- **Side effect verification**: Tests confirm files are created, modified, and contain expected content
+- **Workspace isolation**: Each test uses clean temporary workspaces
+- **Recording support**: Sessions can be recorded with asciinema for demonstration
+- **Fallback handling**: Graceful degradation when tools aren't available
+
+The framework ensures **comprehensive testing** of coding agent functionality, verifying not just command execution but actual workspace modifications and API-driven tool usage.
+
+#### Test Structure Best Practices
+
+- **Standard execution**: Tests run in normal interactive modes to verify complete workflows
+- **Pattern matching**: Use flexible regex patterns that can handle slight UI variations
+- **State validation**: Check file system state, not just process exit codes
+- **Error recovery**: Handle both success and failure paths gracefully
+- **Fast iteration**: Short timeouts + debug output for rapid development
+
 ### Test Guidelines
 
 - **Isolation**: Each test should be independent
 - **Cleanup**: Always clean up temporary resources
 - **Assertions**: Use descriptive assertion messages
-- **Timeouts**: Set reasonable timeouts for pexpect tests
+- **Timeouts**: Set reasonable timeouts for pexpect tests (5-10 seconds for interactive tests)
 - **Documentation**: Include docstrings explaining test purpose

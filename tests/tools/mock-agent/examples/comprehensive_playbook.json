@@ -1,0 +1,180 @@
+{
+  "rules": [
+    {
+      "if_contains": ["create", "hello.py"],
+      "response": {
+        "assistant": "I'll create hello.py with a print statement.",
+        "tool_calls": [
+          {
+            "name": "write_file", 
+            "args": {
+              "path": "hello.py", 
+              "text": "print('Hello, World!')\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["read", "hello.py"],
+      "response": {
+        "assistant": "Reading the contents of hello.py",
+        "tool_calls": [
+          {
+            "name": "read_file",
+            "args": {"path": "hello.py"}
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["modify", "hello.py", "add", "comment"],
+      "response": {
+        "assistant": "I'll add a comment to hello.py",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "hello.py",
+              "text": "# This is a simple hello world program\nprint('Hello, World!')\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["create", "calculator.py"],
+      "response": {
+        "assistant": "I'll create a simple calculator program with basic arithmetic functions.",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "calculator.py",
+              "text": "def add(a, b):\n    \"\"\"Add two numbers.\"\"\"\n    return a + b\n\ndef subtract(a, b):\n    \"\"\"Subtract two numbers.\"\"\"\n    return a - b\n\ndef multiply(a, b):\n    \"\"\"Multiply two numbers.\"\"\"\n    return a * b\n\ndef divide(a, b):\n    \"\"\"Divide two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b\n\nif __name__ == '__main__':\n    print('Calculator ready')\n    print('Available functions: add, subtract, multiply, divide')\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["test", "calculator"],
+      "response": {
+        "assistant": "I'll create comprehensive unit tests for the calculator.",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "test_calculator.py",
+              "text": "import unittest\nfrom calculator import add, subtract, multiply, divide\n\nclass TestCalculator(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(2, 3), 5)\n        self.assertEqual(add(-1, 1), 0)\n        self.assertEqual(add(0, 0), 0)\n    \n    def test_subtract(self):\n        self.assertEqual(subtract(5, 3), 2)\n        self.assertEqual(subtract(1, 1), 0)\n        self.assertEqual(subtract(0, 5), -5)\n    \n    def test_multiply(self):\n        self.assertEqual(multiply(3, 4), 12)\n        self.assertEqual(multiply(-2, 3), -6)\n        self.assertEqual(multiply(0, 10), 0)\n    \n    def test_divide(self):\n        self.assertEqual(divide(10, 2), 5)\n        self.assertEqual(divide(7, 2), 3.5)\n        \n        # Test division by zero\n        with self.assertRaises(ValueError):\n            divide(5, 0)\n\nif __name__ == '__main__':\n    unittest.main()\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["run", "test"],
+      "response": {
+        "assistant": "I'll run the tests for you.",
+        "tool_calls": [
+          {
+            "name": "run_command",
+            "args": {"command": "python test_calculator.py -v"}
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["create", "web", "server"],
+      "response": {
+        "assistant": "I'll create a simple web server using Python's built-in HTTP server.",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "web_server.py",
+              "text": "#!/usr/bin/env python3\nimport http.server\nimport socketserver\nimport os\nfrom datetime import datetime\n\nclass CustomHandler(http.server.SimpleHTTPRequestHandler):\n    def do_GET(self):\n        if self.path == '/':\n            self.send_response(200)\n            self.send_header('Content-type', 'text/html')\n            self.end_headers()\n            html = f'''\n<!DOCTYPE html>\n<html>\n<head><title>Mock Server</title></head>\n<body>\n    <h1>Welcome to the Mock Server</h1>\n    <p>Current time: {datetime.now()}</p>\n    <p>Working directory: {os.getcwd()}</p>\n</body>\n</html>\n'''\n            self.wfile.write(html.encode())\n        else:\n            super().do_GET()\n\ndef start_server(port=8000):\n    with socketserver.TCPServer((\"\", port), CustomHandler) as httpd:\n        print(f\"Server running at http://localhost:{port}\")\n        httpd.serve_forever()\n\nif __name__ == '__main__':\n    start_server()\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["create", "readme", "documentation"],
+      "response": {
+        "assistant": "I'll create a comprehensive README file for the project.",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "README.md",
+              "text": "# Project Demo\n\nThis is a demonstration project created by a mock coding agent.\n\n## Files\n\n- `calculator.py` - A simple calculator with basic arithmetic operations\n- `test_calculator.py` - Unit tests for the calculator\n- `hello.py` - A simple \"Hello, World!\" program\n- `web_server.py` - A basic web server (if created)\n\n## Usage\n\n### Calculator\n\n```python\nfrom calculator import add, subtract, multiply, divide\n\nresult = add(5, 3)  # Returns 8\nresult = subtract(10, 4)  # Returns 6\nresult = multiply(3, 7)  # Returns 21\nresult = divide(15, 3)  # Returns 5.0\n```\n\n### Running Tests\n\n```bash\npython test_calculator.py\n```\n\n### Hello World\n\n```bash\npython hello.py\n```\n\n## Features\n\n- ✅ Basic arithmetic operations\n- ✅ Comprehensive unit tests\n- ✅ Error handling for division by zero\n- ✅ Clean, documented code\n\n## Development\n\nThis project demonstrates automated code generation and testing workflows.\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["list", "files", "show", "directory"],
+      "response": {
+        "assistant": "I'll list the files in the current directory.",
+        "tool_calls": [
+          {
+            "name": "run_command",
+            "args": {"command": "ls -la"}
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["git", "init", "repository"],
+      "response": {
+        "assistant": "I'll initialize a git repository and create an initial commit.",
+        "tool_calls": [
+          {
+            "name": "run_command",
+            "args": {"command": "git init"}
+          },
+          {
+            "name": "write_file",
+            "args": {
+              "path": ".gitignore",
+              "text": "# Python\n__pycache__/\n*.pyc\n*.pyo\n*.pyd\n.Python\n*.so\n\n# Testing\n.pytest_cache/\n.coverage\n\n# IDE\n.vscode/\n.idea/\n*.swp\n*.swo\n\n# OS\n.DS_Store\nThumbs.db\n"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["commit", "changes"],
+      "response": {
+        "assistant": "I'll add all files and create a commit.",
+        "tool_calls": [
+          {
+            "name": "run_command",
+            "args": {"command": "git add ."}
+          },
+          {
+            "name": "run_command", 
+            "args": {"command": "git commit -m 'Initial commit: Add calculator, tests, and documentation'"}
+          }
+        ]
+      }
+    },
+    {
+      "if_contains": ["refactor", "improve", "calculator"],
+      "response": {
+        "assistant": "I'll refactor the calculator to use a class-based approach with better error handling.",
+        "tool_calls": [
+          {
+            "name": "write_file",
+            "args": {
+              "path": "calculator.py",
+              "text": "class Calculator:\n    \"\"\"A simple calculator class with basic arithmetic operations.\"\"\"\n    \n    @staticmethod\n    def add(a, b):\n        \"\"\"Add two numbers.\"\"\"\n        return a + b\n    \n    @staticmethod\n    def subtract(a, b):\n        \"\"\"Subtract two numbers.\"\"\"\n        return a - b\n    \n    @staticmethod\n    def multiply(a, b):\n        \"\"\"Multiply two numbers.\"\"\"\n        return a * b\n    \n    @staticmethod\n    def divide(a, b):\n        \"\"\"Divide two numbers.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b\n    \n    @staticmethod\n    def power(a, b):\n        \"\"\"Raise a to the power of b.\"\"\"\n        return a ** b\n    \n    @staticmethod\n    def sqrt(a):\n        \"\"\"Calculate square root of a number.\"\"\"\n        if a < 0:\n            raise ValueError(\"Cannot calculate square root of negative number\")\n        return a ** 0.5\n\n# Maintain backward compatibility\nadd = Calculator.add\nsubtract = Calculator.subtract\nmultiply = Calculator.multiply\ndivide = Calculator.divide\n\nif __name__ == '__main__':\n    calc = Calculator()\n    print('Enhanced Calculator ready')\n    print('Available functions: add, subtract, multiply, divide, power, sqrt')\n    print('Examples:')\n    print(f'  add(5, 3) = {calc.add(5, 3)}')\n    print(f'  sqrt(16) = {calc.sqrt(16)}')\n    print(f'  power(2, 3) = {calc.power(2, 3)}')\n"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

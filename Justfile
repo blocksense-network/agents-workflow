@@ -246,3 +246,19 @@ webui-check:
 test-overlays:
     just build-overlay-tests
     cargo test -p sandbox-integration-tests --verbose
+
+# Run mock-agent integration tests
+test-mock-agent-integration:
+    cd tests/tools/mock-agent && python3 tests/test_agent_integration.py
+
+# Replay mock-agent session recordings (shows menu)
+replay-mock-agent-sessions:
+    tests/tools/mock-agent/replay-recording.sh
+
+# Replay the most recent mock-agent session recording
+replay-last-mock-agent-session:
+    tests/tools/mock-agent/replay-recording.sh --latest
+
+# Clear all mock-agent session recordings
+clear-mock-agent-recordings:
+    rm -rf tests/tools/mock-agent/recordings/*.json

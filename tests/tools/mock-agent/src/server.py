@@ -1,10 +1,18 @@
 import json
 import os
 import uuid
+import importlib.util
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 from typing import Dict, Any
-from .session_io import RolloutRecorder, SessionLogger
+try:
+    from .session_io import RolloutRecorder, SessionLogger
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from session_io import RolloutRecorder, SessionLogger
 
 class Playbook:
     """
@@ -49,6 +57,8 @@ class MockAPIHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/v1/messages":
             self._handle_anthropic_messages()
         else:
+            # Debug: log unknown endpoints
+            print(f"DEBUG: Unknown POST endpoint: {parsed.path}", file=sys.stderr)
             self._send_json(404, {"error":"not found"})
 
     def _infer_text_from_messages(self, messages) -> str:
@@ -56,10 +66,16 @@ class MockAPIHandler(BaseHTTPRequestHandler):
             if m.get("role") == "user":
                 content = m.get("content")
                 if isinstance(content, list):
+                    # For Claude Code, collect all text content blocks, excluding system reminders
+                    text_parts = []
                     for b in content:
                         if b.get("type") == "text":
-                            return b.get("text", "")
-                    return ""
+                            text = b.get("text", "")
+                            # Skip system reminders
+                            if not text.startswith("<system-reminder>"):
+                                text_parts.append(text)
+                    # Return the concatenated text (excluding system reminders)
+                    return " ".join(text_parts)
                 return str(content)
         return ""
 
@@ -69,6 +85,46 @@ class MockAPIHandler(BaseHTTPRequestHandler):
         assistant_text = resp.get("assistant", "")
         tool_calls = resp.get("tool_calls", [])
 
+        # Execute tools immediately for mock server
+        executed_tools = []
+        for tc in tool_calls:
+            tool_name = tc["name"]
+            tool_args = tc.get("args", {})
+            try:
+                # Import tools directly to avoid relative import issues
+                import sys
+                import os
+                tools_path = os.path.join(os.path.dirname(__file__), 'tools.py')
+                spec = importlib.util.spec_from_file_location("tools", tools_path)
+                tools_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(tools_module)
+
+                if hasattr(tools_module, tool_name):
+                    tool_func = getattr(tools_module, tool_name)
+                    # Get workspace from server or from a file set by the test
+                    workspace = self.server.workspace
+                    if not workspace:
+                        # Try to read workspace from a file
+                        workspace_file = os.path.join(os.path.dirname(__file__), "..", "MOCK_AGENT_WORKSPACE.txt")
+                        try:
+                            with open(workspace_file, "r") as f:
+                                workspace = f.read().strip()
+                        except FileNotFoundError:
+                            workspace = "/tmp"
+
+                    # Add workspace to tool args
+                    tool_args_with_workspace = {"workspace": workspace, **tool_args}
+                    result = tool_func(**tool_args_with_workspace)
+                    executed_tools.append({
+                        "name": tool_name,
+                        "args": tool_args,
+                        "result": result
+                    })
+                else:
+                    print(f"DEBUG: Tool {tool_name} not found in tools module", file=sys.stderr)
+            except Exception as e:
+                print(f"DEBUG: Tool execution failed: {e}", file=sys.stderr)
+
         recorder: RolloutRecorder = self.server.recorder  # type: ignore
         recorder.record_message("user", user_text)
         if assistant_text:
@@ -76,13 +132,13 @@ class MockAPIHandler(BaseHTTPRequestHandler):
             recorder.record_message("assistant", assistant_text)
         for tc in tool_calls:
             recorder.record_function_call(name=tc["name"], arguments=json.dumps(tc.get("args", {})))
-        return assistant_text, tool_calls
+        return assistant_text, tool_calls, executed_tools
 
     def _handle_openai_chat_completions(self):
         body = _json_body(self)
         messages = body.get("messages", [])
         user_text = self._infer_text_from_messages(messages)
-        assistant_text, tool_calls = self._respond_with(user_text, provider="openai")
+        assistant_text, tool_calls, executed_tools = self._respond_with(user_text, provider="openai")
 
         tc = []
         for _idx, t in enumerate(tool_calls):
@@ -118,7 +174,7 @@ class MockAPIHandler(BaseHTTPRequestHandler):
         body = _json_body(self)
         messages = body.get("messages", [])
         user_text = self._infer_text_from_messages(messages)
-        assistant_text, tool_calls = self._respond_with(user_text, provider="anthropic")
+        assistant_text, tool_calls, executed_tools = self._respond_with(user_text, provider="anthropic")
 
         content = []
         if assistant_text:
@@ -142,13 +198,14 @@ class MockAPIHandler(BaseHTTPRequestHandler):
         self._send_json(200, obj)
 
 class MockAPIServer(HTTPServer):
-    def __init__(self, server_address, RequestHandlerClass, codex_home, playbook_path):
+    def __init__(self, server_address, RequestHandlerClass, codex_home, playbook_path, workspace=None):
         super().__init__(server_address, RequestHandlerClass)
         self.playbook = Playbook(playbook_path)
         self.recorder = RolloutRecorder(codex_home=codex_home, originator="mock-api-server")
+        self.workspace = workspace
 
-def serve(host: str, port: int, playbook: str, codex_home: str, format: str = "codex"):
-    httpd = MockAPIServer((host, port), MockAPIHandler, codex_home=codex_home, playbook_path=playbook)
+def serve(host: str, port: int, playbook: str, codex_home: str, format: str = "codex", workspace: str = None):
+    httpd = MockAPIServer((host, port), MockAPIHandler, codex_home=codex_home, playbook_path=playbook, workspace=workspace)
     print(f"Mock API server listening on http://{host}:{port}")
     try:
         httpd.serve_forever()
