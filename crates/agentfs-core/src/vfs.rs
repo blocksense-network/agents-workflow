@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::os::unix::process::parent_id;
 
 use crate::{
-    Attributes, BranchId, BranchInfo, ContentId, DirEntry, FileMode, FileTimes, FsConfig, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec,
+    Attributes, BranchId, BranchInfo, ContentId, DirEntry, EventKind, EventSink, FileMode, FileTimes, FsConfig, FsStats, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec, SubscriptionId,
 };
 use crate::error::{FsError, FsResult};
 use crate::storage::StorageBackend;
@@ -86,8 +86,10 @@ pub struct FsCore {
     handles: Mutex<HashMap<HandleId, Handle>>,
     next_node_id: Mutex<u64>,
     next_handle_id: Mutex<u64>,
+    next_subscription_id: Mutex<u64>,
     pub(crate) process_branches: Mutex<HashMap<u32, BranchId>>, // Process ID -> Branch ID mapping
     locks: Mutex<LockManager>, // Byte-range lock manager
+    event_subscriptions: Mutex<HashMap<SubscriptionId, Arc<dyn EventSink>>>,
 }
 
 impl FsCore {
@@ -103,10 +105,12 @@ impl FsCore {
             handles: Mutex::new(HashMap::new()),
             next_node_id: Mutex::new(1),
             next_handle_id: Mutex::new(1),
+            next_subscription_id: Mutex::new(1),
             process_branches: Mutex::new(HashMap::new()), // No processes initially bound
             locks: Mutex::new(LockManager {
                 locks: HashMap::new(),
             }),
+            event_subscriptions: Mutex::new(HashMap::new()),
         };
 
         // Create root directory
@@ -410,6 +414,13 @@ impl FsCore {
         };
 
         self.snapshots.lock().unwrap().insert(snapshot_id, snapshot);
+
+        // Emit event
+        self.emit_event(EventKind::SnapshotCreated {
+            id: snapshot_id,
+            name: name.map(|s| s.to_string()),
+        });
+
         Ok(snapshot_id)
     }
 
@@ -453,6 +464,13 @@ impl FsCore {
         };
 
         self.branches.lock().unwrap().insert(branch_id, branch);
+
+        // Emit event
+        self.emit_event(EventKind::BranchCreated {
+            id: branch_id,
+            name: name.map(|s| s.to_string()),
+        });
+
         Ok(branch_id)
     }
 
@@ -515,6 +533,56 @@ impl FsCore {
         Ok(())
     }
 
+    // Event subscription operations
+    pub fn subscribe_events(&self, cb: Arc<dyn EventSink>) -> FsResult<SubscriptionId> {
+        let mut subscriptions = self.event_subscriptions.lock().unwrap();
+        let mut next_id = self.next_subscription_id.lock().unwrap();
+        let subscription_id = SubscriptionId::new(*next_id);
+        *next_id += 1;
+        subscriptions.insert(subscription_id, cb);
+        Ok(subscription_id)
+    }
+
+    pub fn unsubscribe_events(&self, sub: SubscriptionId) -> FsResult<()> {
+        let mut subscriptions = self.event_subscriptions.lock().unwrap();
+        if subscriptions.remove(&sub).is_none() {
+            return Err(FsError::NotFound);
+        }
+        Ok(())
+    }
+
+    // Statistics
+    pub fn stats(&self) -> FsStats {
+        let branches = self.branches.lock().unwrap();
+        let snapshots = self.snapshots.lock().unwrap();
+        let handles = self.handles.lock().unwrap();
+
+        // For now, we only track in-memory storage
+        // TODO: Add actual byte counting when storage backend supports it
+        let bytes_in_memory = 0; // Placeholder
+        let bytes_spilled = 0; // Placeholder
+
+        FsStats {
+            branches: branches.len() as u32,
+            snapshots: snapshots.len() as u32,
+            open_handles: handles.len() as u32,
+            bytes_in_memory,
+            bytes_spilled,
+        }
+    }
+
+    // Helper method to emit events to all subscribers
+    fn emit_event(&self, event: EventKind) {
+        if !self.config.track_events {
+            return;
+        }
+
+        let subscriptions = self.event_subscriptions.lock().unwrap();
+        for sink in subscriptions.values() {
+            sink.on_event(&event);
+        }
+    }
+
     // File operations
     pub fn create(&self, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
         // Check if the path already exists
@@ -567,6 +635,11 @@ impl FsCore {
         };
 
         self.handles.lock().unwrap().insert(handle_id, handle);
+
+        // Emit event
+        let path_str = path.to_string_lossy().to_string();
+        self.emit_event(EventKind::Created { path: path_str });
+
         Ok(handle_id)
     }
 
@@ -868,6 +941,10 @@ impl FsCore {
             }
         }
 
+        // Emit event
+        let path_str = path.to_string_lossy().to_string();
+        self.emit_event(EventKind::Created { path: path_str });
+
         Ok(())
     }
 
@@ -931,6 +1008,51 @@ impl FsCore {
                         is_symlink: false, // TODO: Implement symlinks
                         len,
                     });
+                }
+                Ok(entries)
+            }
+            NodeKind::File { .. } => Err(FsError::NotADirectory),
+        }
+    }
+
+    // Optional readdir+ that includes attributes without extra getattr calls (libfuse pattern)
+    pub fn readdir_plus(&self, path: &Path) -> FsResult<Vec<(DirEntry, Attributes)>> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+
+        match &node.kind {
+            NodeKind::Directory { children } => {
+                let mut entries = Vec::new();
+                for (name, child_id) in children {
+                    let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
+                    let (is_dir, len) = match &child_node.kind {
+                        NodeKind::Directory { .. } => (true, 0),
+                        NodeKind::File { streams } => {
+                            // Size is the size of the unnamed stream
+                            let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
+                            (false, size)
+                        }
+                    };
+
+                    let dir_entry = DirEntry {
+                        name: name.clone(),
+                        is_dir,
+                        is_symlink: false, // TODO: Implement symlinks
+                        len,
+                    };
+
+                    let attributes = Attributes {
+                        len,
+                        times: child_node.times,
+                        is_dir,
+                        is_symlink: false, // TODO: Implement symlinks
+                        mode_user: FileMode { read: true, write: true, exec: is_dir },
+                        mode_group: FileMode { read: true, write: false, exec: is_dir },
+                        mode_other: FileMode { read: true, write: false, exec: false },
+                    };
+
+                    entries.push((dir_entry, attributes));
                 }
                 Ok(entries)
             }
@@ -1029,6 +1151,10 @@ impl FsCore {
                 }
             }
         }
+
+        // Emit event
+        let path_str = path.to_string_lossy().to_string();
+        self.emit_event(EventKind::Removed { path: path_str });
 
         Ok(())
     }

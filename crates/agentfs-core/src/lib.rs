@@ -549,4 +549,245 @@ mod tests {
         assert_eq!(&buf_main, b"main data");
         core.close(h_main).unwrap();
     }
+
+    #[test]
+    fn test_event_subscription_and_emission() {
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone)]
+        struct TestEventSink {
+            events: Arc<Mutex<Vec<EventKind>>>,
+        }
+
+        impl TestEventSink {
+            fn new() -> Self {
+                Self {
+                    events: Arc::new(Mutex::new(Vec::new())),
+                }
+            }
+
+            fn get_events(&self) -> Vec<EventKind> {
+                self.events.lock().unwrap().clone()
+            }
+        }
+
+        impl EventSink for TestEventSink {
+            fn on_event(&self, evt: &EventKind) {
+                self.events.lock().unwrap().push(evt.clone());
+            }
+        }
+
+        let core = test_core();
+        let sink = Arc::new(TestEventSink::new());
+
+        // Subscribe to events
+        let sub_id = core.subscribe_events(sink.clone()).unwrap();
+
+        // Test snapshot creation event
+        let snap = core.snapshot_create(Some("test_snap")).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            EventKind::SnapshotCreated { id, name } => {
+                assert_eq!(*id, snap);
+                assert_eq!(name.as_ref().unwrap(), "test_snap");
+            }
+            _ => panic!("Expected SnapshotCreated event"),
+        }
+
+        // Clear events
+        sink.events.lock().unwrap().clear();
+
+        // Test branch creation event
+        let branch = core.branch_create_from_snapshot(snap, Some("test_branch")).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            EventKind::BranchCreated { id, name } => {
+                assert_eq!(*id, branch);
+                assert_eq!(name.as_ref().unwrap(), "test_branch");
+            }
+            _ => panic!("Expected BranchCreated event"),
+        }
+
+        // Clear events
+        sink.events.lock().unwrap().clear();
+
+        // Test file creation event
+        core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            EventKind::Created { path } => {
+                assert_eq!(path, "/test.txt");
+            }
+            _ => panic!("Expected Created event"),
+        }
+
+        // Clear events
+        sink.events.lock().unwrap().clear();
+
+        // Test directory creation event
+        core.mkdir("/testdir".as_ref(), 0o755).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            EventKind::Created { path } => {
+                assert_eq!(path, "/testdir");
+            }
+            _ => panic!("Expected Created event"),
+        }
+
+        // Clear events
+        sink.events.lock().unwrap().clear();
+
+        // Test file removal event
+        core.unlink("/test.txt".as_ref()).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            EventKind::Removed { path } => {
+                assert_eq!(path, "/test.txt");
+            }
+            _ => panic!("Expected Removed event"),
+        }
+
+        // Unsubscribe
+        core.unsubscribe_events(sub_id).unwrap();
+
+        // Clear events
+        sink.events.lock().unwrap().clear();
+
+        // Create another file - should not emit events since unsubscribed
+        core.create("/test2.txt".as_ref(), &rw_create()).unwrap();
+        let events = sink.get_events();
+        assert_eq!(events.len(), 0);
+    }
+
+    #[test]
+    fn test_stats_reporting() {
+        let core = test_core();
+
+        // Initially should have the default branch and no snapshots
+        let stats = core.stats();
+        assert_eq!(stats.branches, 1); // Default branch
+        assert_eq!(stats.snapshots, 0); // No snapshots initially
+        assert_eq!(stats.open_handles, 0); // No open handles initially
+
+        // Create a snapshot
+        core.snapshot_create(Some("test")).unwrap();
+        let stats = core.stats();
+        assert_eq!(stats.snapshots, 1); // Test snapshot
+
+        // Create a branch
+        let snap = core.snapshot_list()[0].0; // Get the test snapshot
+        core.branch_create_from_snapshot(snap, Some("test_branch")).unwrap();
+        let stats = core.stats();
+        assert_eq!(stats.branches, 2); // Default + test branch
+
+        // Open a handle
+        let h = core.create("/file.txt".as_ref(), &rw_create()).unwrap();
+        let stats = core.stats();
+        assert_eq!(stats.open_handles, 1);
+
+        // Close handle
+        core.close(h).unwrap();
+        let stats = core.stats();
+        assert_eq!(stats.open_handles, 0);
+    }
+
+    #[test]
+    fn test_readdir_plus() {
+        let core = test_core();
+
+        // Create a file and directory
+        core.create("/file.txt".as_ref(), &rw_create()).unwrap();
+        core.mkdir("/subdir".as_ref(), 0o755).unwrap();
+
+        // Test readdir_plus returns entries with attributes
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+
+        // Should have at least file.txt and subdir
+        assert!(entries.len() >= 2);
+
+        let file_entry = entries.iter().find(|(e, _)| e.name == "file.txt").unwrap();
+        assert!(!file_entry.0.is_dir);
+        assert_eq!(file_entry.0.len, 0); // Empty file
+        assert!(!file_entry.1.is_dir);
+        assert_eq!(file_entry.1.len, 0);
+
+        let dir_entry = entries.iter().find(|(e, _)| e.name == "subdir").unwrap();
+        assert!(dir_entry.0.is_dir);
+        assert_eq!(dir_entry.0.len, 0); // Directories have 0 length
+        assert!(dir_entry.1.is_dir);
+        assert_eq!(dir_entry.1.len, 0);
+
+        // Test readdir_plus on non-existent path
+        assert!(core.readdir_plus("/nonexistent".as_ref()).is_err());
+    }
+
+    #[test]
+    fn test_events_disabled_when_track_events_false() {
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone)]
+        struct TestEventSink {
+            events: Arc<Mutex<Vec<EventKind>>>,
+        }
+
+        impl TestEventSink {
+            fn new() -> Self {
+                Self {
+                    events: Arc::new(Mutex::new(Vec::new())),
+                }
+            }
+        }
+
+        impl EventSink for TestEventSink {
+            fn on_event(&self, evt: &EventKind) {
+                self.events.lock().unwrap().push(evt.clone());
+            }
+        }
+
+        // Create core with track_events = false
+        let config = FsConfig {
+            case_sensitivity: CaseSensitivity::Sensitive,
+            memory: MemoryPolicy {
+                max_bytes_in_memory: Some(1024 * 1024),
+                spill_directory: None,
+            },
+            limits: FsLimits {
+                max_open_handles: 1000,
+                max_branches: 100,
+                max_snapshots: 1000,
+            },
+            cache: CachePolicy {
+                attr_ttl_ms: 1000,
+                entry_ttl_ms: 1000,
+                negative_ttl_ms: 1000,
+                enable_readdir_plus: true,
+                auto_cache: true,
+                writeback_cache: false,
+            },
+            enable_xattrs: true,
+            enable_ads: false,
+            track_events: false, // Events disabled
+        };
+
+        let core = FsCore::new(config).unwrap();
+        let sink = Arc::new(TestEventSink::new());
+
+        // Subscribe to events
+        let sub_id = core.subscribe_events(sink.clone()).unwrap();
+
+        // Create a file - should not emit events
+        core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+
+        // Check that no events were emitted
+        let events = sink.events.lock().unwrap();
+        assert_eq!(events.len(), 0);
+
+        // Unsubscribe should still work
+        core.unsubscribe_events(sub_id).unwrap();
+    }
 }

@@ -196,3 +196,39 @@ impl ContentId {
         Self(id)
     }
 }
+
+/// Event kinds for filesystem change notifications
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EventKind {
+    Created { path: String },
+    Removed { path: String },
+    Modified { path: String },
+    Renamed { from: String, to: String },
+    BranchCreated { id: BranchId, name: Option<String> },
+    SnapshotCreated { id: SnapshotId, name: Option<String> },
+}
+
+/// Event sink trait for receiving filesystem change notifications
+pub trait EventSink: Send + Sync {
+    fn on_event(&self, evt: &EventKind);
+}
+
+/// Opaque event subscription identifier
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SubscriptionId(pub u64);
+
+impl SubscriptionId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+/// Filesystem statistics
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FsStats {
+    pub branches: u32,
+    pub snapshots: u32,
+    pub open_handles: u32,
+    pub bytes_in_memory: u64,
+    pub bytes_spilled: u64,
+}
