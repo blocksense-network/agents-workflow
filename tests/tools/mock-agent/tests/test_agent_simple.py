@@ -230,6 +230,15 @@ class TestRunner:
         assert_true("run" in result.stdout, "Help missing 'run' command")
         assert_true("demo" in result.stdout, "Help missing 'demo' command")
         assert_true("server" in result.stdout, "Help missing 'server' command")
+        
+        # Test run command help to verify format flag
+        result = subprocess.run([
+            sys.executable, "-m", "src.cli", "run", "--help"
+        ], cwd=self.project_root, capture_output=True, text=True)
+        
+        assert_true(result.returncode == 0, f"Run help command failed: {result.stderr}")
+        assert_true("--format" in result.stdout, "Help missing --format flag")
+        assert_true("{codex,claude}" in result.stdout, "Help missing format choices")
     
     def test_file_operations(self):
         """Test various file operations in scenarios."""
@@ -278,6 +287,66 @@ class TestRunner:
         finally:
             self.cleanup(workspace, codex_home)
     
+    def test_claude_format_session_files(self):
+        """Test that Claude format creates proper session files."""
+        workspace = self.create_temp_workspace()
+        codex_home = self.create_temp_codex_home()
+        
+        try:
+            scenario_path = self.project_root / "examples" / "hello_scenario.json"
+            
+            result = subprocess.run([
+                sys.executable, "-m", "src.cli", "run",
+                "--scenario", str(scenario_path),
+                "--workspace", workspace,
+                "--codex-home", codex_home,
+                "--format", "claude"
+            ], cwd=self.project_root, capture_output=True, text=True)
+            
+            assert_true(result.returncode == 0, f"Claude format command failed: {result.stderr}")
+            
+            # Check that session files were created in Claude format location
+            projects_dir = Path(codex_home) / "projects"
+            assert_true(projects_dir.exists(), "Projects directory was not created")
+            
+            # Find session files (should be in project subdirectory)
+            session_files = list(projects_dir.rglob("*.jsonl"))
+            assert_true(len(session_files) > 0, "No Claude session files were created")
+            
+            # Verify session file structure
+            session_file = session_files[0]
+            with open(session_file) as f:
+                lines = f.readlines()
+            
+            assert_true(len(lines) > 0, "Claude session file is empty")
+            
+            # Verify first entry has Claude session format
+            first_entry = json.loads(lines[0].strip())
+            expected_fields = ["parentUuid", "isSidechain", "userType", "cwd", "sessionId", "version", "gitBranch", "type", "message", "uuid", "timestamp"]
+            
+            for field in expected_fields:
+                assert_true(field in first_entry, f"Missing required field: {field}")
+            
+            assert_true(first_entry["userType"] == "external", "Incorrect userType")
+            assert_true(first_entry["version"] == "1.0.98", "Incorrect version")
+            assert_true("uuid" in first_entry, "Missing UUID field")
+            
+            # Check for tool usage entries (should have tool_use in message content)
+            tool_entries = []
+            for line in lines:
+                entry = json.loads(line.strip())
+                if (entry.get("type") == "assistant" and 
+                    entry.get("message", {}).get("content") and
+                    any(c.get("type") == "tool_use" for c in entry["message"]["content"])):
+                    tool_entries.append(entry)
+            
+            assert_true(len(tool_entries) > 0, "No tool use entries found in Claude format")
+            
+            log(f"✓ Claude format test passed with {len(lines)} session entries")
+            
+        finally:
+            self.cleanup(workspace, codex_home)
+    
     def run_all_tests(self):
         """Run all tests and report results."""
         log("Starting mock agent test suite")
@@ -291,6 +360,7 @@ class TestRunner:
             ("Demo Scenario", self.test_demo_scenario),
             ("Rollout File Creation", self.test_rollout_file_creation),
             ("File Operations", self.test_file_operations),
+            ("Claude Format Session Files", self.test_claude_format_session_files),
         ]
         
         # Run all tests

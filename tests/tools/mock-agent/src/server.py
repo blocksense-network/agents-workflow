@@ -147,7 +147,7 @@ class MockAPIServer(HTTPServer):
         self.playbook = Playbook(playbook_path)
         self.recorder = RolloutRecorder(codex_home=codex_home, originator="mock-api-server")
 
-def serve(host: str, port: int, playbook: str, codex_home: str):
+def serve(host: str, port: int, playbook: str, codex_home: str, format: str = "codex"):
     httpd = MockAPIServer((host, port), MockAPIHandler, codex_home=codex_home, playbook_path=playbook)
     print(f"Mock API server listening on http://{host}:{port}")
     try:

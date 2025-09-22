@@ -210,6 +210,7 @@
           pkgs.just
           pkgs.python3
           pkgs.python3Packages.pexpect
+          pkgs.python3Packages.pytest
           pkgs.ruby
           pkgs.bundler
           pkgs.rubocop

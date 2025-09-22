@@ -13,32 +13,38 @@ def main():
     runp.add_argument("--scenario", required=True, help="Path to scenario JSON")
     runp.add_argument("--workspace", required=True, help="Workspace directory")
     runp.add_argument("--codex-home", default=os.path.expanduser("~/.codex"))
+    runp.add_argument("--format", choices=["codex", "claude"], default="codex", 
+                     help="Session file format to use (codex or claude)")
 
     demop = sub.add_parser("demo", help="Run built-in demo scenario")
     demop.add_argument("--workspace", required=True)
     demop.add_argument("--codex-home", default=os.path.expanduser("~/.codex"))
+    demop.add_argument("--format", choices=["codex", "claude"], default="codex",
+                      help="Session file format to use (codex or claude)")
 
     srv = sub.add_parser("server", help="Run mock OpenAI/Anthropic API server")
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8080)
     srv.add_argument("--playbook", required=True, help="Playbook JSON with rules")
     srv.add_argument("--codex-home", default=os.path.expanduser("~/.codex"))
+    srv.add_argument("--format", choices=["codex", "claude"], default="codex",
+                    help="Session file format to use (codex or claude)")
 
     args = ap.parse_args()
 
     if args.cmd == "run":
-        path = run_scenario(args.scenario, args.workspace, codex_home=args.codex_home)
-        print(f"Rollout file written to: {path}")
+        path = run_scenario(args.scenario, args.workspace, codex_home=args.codex_home, format=args.format)
+        print(f"Session file written to: {path}")
     elif args.cmd == "demo":
         scen = demo_scenario(args.workspace)
         scen_path = os.path.join(args.workspace, "_demo_scenario.json")
         os.makedirs(args.workspace, exist_ok=True)
         with open(scen_path, "w", encoding="utf-8") as f:
             json.dump(scen, f, indent=2)
-        path = run_scenario(scen_path, args.workspace, codex_home=args.codex_home)
-        print(f"Rollout file written to: {path}")
+        path = run_scenario(scen_path, args.workspace, codex_home=args.codex_home, format=args.format)
+        print(f"Session file written to: {path}")
     elif args.cmd == "server":
-        serve(args.host, args.port, args.playbook, codex_home=args.codex_home)
+        serve(args.host, args.port, args.playbook, codex_home=args.codex_home, format=args.format)
     else:
         ap.print_help()
         return 1

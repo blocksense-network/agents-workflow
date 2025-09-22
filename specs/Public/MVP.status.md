@@ -68,6 +68,22 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - `just legacy-test-codex-setup-integration` passes with Docker containers finding correct paths
   - `find . -name "*.rb" | grep -v legacy/ | wc -l` returns 0 (no Ruby files in root) (this is a manual test)
 
+**0.1.5 Mock Agent Verification** (2-3 days, parallel with 0.2-0.6)
+
+- Deliverables:
+  - Verify mock agent implementation (`tests/tools/mock-agent/`) works as expected
+  - Test file editing capabilities (create/overwrite/append/replace operations)
+  - Validate thinking trace and tool-use message streaming
+  - Confirm Codex-compatible rollout and session log JSONL file writing
+  - Test mock API server functionality for driving IDE agents
+
+- Verification:
+  - Mock agent can run demo scenarios and produce expected outputs
+  - Session files match [Codex Session File Format](../../specs/Research/Codex-Session-File-Format.md) specification
+  - Mock API server responds correctly to Claude Code/Codex CLI requests
+  - File workspace operations work correctly (create, modify, delete files)
+  - Integration tests can use mock agent for deterministic testing
+
 **0.2 Rust Workspace & Core Crates Bootstrap** (2-3 days)
 
 - Deliverables:
@@ -194,43 +210,86 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - State persists across process restarts
   - Integration tests with temporary Git repos and ZFS snapshots
 
-**Phase 2: Agent Integration & Session Management** (4-5 weeks)
+**Phase 2: Agent Integration & Session Management** (4-5 weeks, with parallel agent tracks)
 
-**2.1 Claude Code & Codex Agent Integration** (4-5 weeks)
+**2.1 Claude Code Agent Integration** (2-3 weeks, parallel with 2.2)
 
 - Deliverables:
   - Claude Code agent wrapper with hook-based session recording (PostToolUse events)
-  - Codex agent wrapper with rollout file parsing (JSONL format from [Codex-Session-File-Format.md](../Research/Codex-Session-File-Format.md))
-  - `aw-agent-runner` binary for asciinema recording of both agent types
-  - Session timeline creation with SessionMoments for both agents
-  - Basic session resumption via `--resume` flag for both agents
-  - Codex rollout file parsing and trimming for time travel
+  - `aw-agent-runner` binary for asciinema recording of Claude sessions
+  - Session timeline creation with SessionMoments for Claude Code
+  - Basic session resumption via `--resume` flag for Claude Code
+  - Claude transcript parsing and trimming for time travel
 
 - Verification:
   - Claude Code hooks emit SessionMoments at tool boundaries
-  - Codex rollout files parsed correctly from `~/.codex/sessions/` directory structure
-  - Session recordings captured and stored in SQLite for both agents
-  - Transcript/rollout path detection and session ID mapping
-  - Both agents resume from interrupted sessions correctly
-  - Codex rollout files can be trimmed to specific moments for time travel
+  - Session recordings captured and stored in SQLite for Claude Code
+  - Transcript path detection and session ID mapping works
+  - Claude Code resumes from interrupted sessions correctly
+  - Transcript files can be trimmed to specific moments for time travel
 
-**Phase 3: Agent Time Travel** (4-5 weeks)
-
-**3.1 Time Travel Core Implementation** (4-5 weeks)
+**2.2 Codex Agent Integration** (2-3 weeks, parallel with 2.1)
 
 - Deliverables:
-  - Session timeline navigation and seeking
-  - Read-only snapshot mounting for inspection
-  - Session branching with injected messages
-  - Claude Code transcript trimming for precise time travel
-  - `aw session seek` and `aw session branch` commands
+  - Codex agent wrapper with rollout file parsing (JSONL format from [Codex-Session-File-Format.md](../Research/Codex-Session-File-Format.md))
+  - `aw-agent-runner` binary support for asciinema recording of Codex sessions
+  - Session timeline creation with SessionMoments for Codex
+  - Basic session resumption via `--resume` flag for Codex
+  - Codex rollout file parsing and trimming for time travel
 
 - Verification:
-  - Timeline navigation shows correct SessionMoments/FsSnapshots
+  - Codex rollout files parsed correctly from `~/.codex/sessions/` directory structure
+  - Session recordings captured and stored in SQLite for Codex
+  - Rollout path detection and session ID mapping works
+  - Codex resumes from interrupted sessions correctly
+  - Rollout files can be trimmed to specific moments for time travel
+
+**2.3 Agent Runner & Session Management** (1-2 weeks, depends on 2.1 & 2.2)
+
+- Deliverables:
+  - Unified `aw-agent-runner` binary supporting both Claude Code and Codex
+  - Session management coordination between different agent types
+  - Integration with mock agent for testing (`tests/tools/mock-agent/`)
+  - Agent process monitoring and lifecycle management
+
+- Verification:
+  - Both Claude Code and Codex work with unified agent runner
+  - Session management handles multiple concurrent agent types
+  - Mock agent integration enables deterministic testing
+  - Agent process monitoring detects completion/failure correctly
+
+**Phase 3: Agent Time Travel** (4-5 weeks, with incremental implementation)
+
+**3.1 Session Timeline Infrastructure** (2-3 weeks)
+
+- Deliverables:
+  - Session timeline data structures and storage in SQLite
+  - SessionMoment creation and indexing for both Claude Code and Codex
+  - Timeline navigation and seeking APIs
+  - FsSnapshot integration for timestamp-to-filesystem mapping
+  - Basic `aw session seek` command for timeline inspection
+
+- Verification:
+  - Session timelines build correctly from agent recordings
+  - SessionMoments indexed and searchable by timestamp
+  - Timeline navigation works for both agent types
+  - FsSnapshot references correctly link moments to filesystem state
+
+**3.2 Time Travel Commands & UI** (2-3 weeks, depends on 3.1)
+
+- Deliverables:
+  - Read-only snapshot mounting for inspection at specific moments
+  - Session branching with injected messages
+  - Transcript/rollout trimming for precise time travel resumption
+  - `aw session branch` command with message injection
+  - Time travel UI components for timeline visualization
+
+- Verification:
   - ZFS snapshots mount read-only at specific timestamps
-  - Transcript trimming preserves conversation up to target moment
-  - Branched sessions start Claude Code with trimmed context
+  - Transcript/rollout trimming preserves conversation up to target moment
+  - Branched sessions start agents with trimmed context
   - End-to-end time travel: seek → inspect → branch → resume
+  - UI shows clear timeline with branching points
 
 **Phase 4: Sandboxing & Isolation** (6-8 weeks)
 
@@ -288,8 +347,8 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 
 - **MVP-Focused Testing**: Prioritize end-to-end integration tests that validate complete user workflows (task creation → agent execution → time travel → branching) over comprehensive unit test coverage in early milestones.
 - **ZFS Integration Testing**: Use loopback ZFS pools in CI for snapshot testing; provide developer setup scripts for local ZFS testing environments.
-- **Agent Mock Testing**: Develop mock Claude Code and Codex servers for deterministic testing of hook-based session recording and transcript/rollout trimming without external API dependencies.
-- **Time Travel E2E Tests**: Automated tests that create sessions, seek to specific moments, create branches, and verify resumed agents have correct context.
+- **Mock Agent Testing**: Use the mock agent implementation (`tests/tools/mock-agent/`) for deterministic testing of agent integrations, session recording, and time travel functionality without external API dependencies. The mock agent simulates Claude Code/Codex behavior by editing files, streaming thinking traces, and writing session files in the correct [Codex Session File Format](../../specs/Research/Codex-Session-File-Format.md).
+- **Time Travel E2E Tests**: Automated tests that create sessions with mock agents, seek to specific moments, create branches, and verify resumed agents have correct context.
 - **Snapshot Testing**: Use `cargo insta` for CLI help text and generated documentation to ensure spec parity.
 - **CI Pipeline**: Maintain separate pipelines for `just legacy-tests` (Ruby), Rust MVP development, and integration tests requiring ZFS/sandboxes. Ensure `test-codex-setup-integration` continues to pass during reorganization.
 
