@@ -159,3 +159,78 @@ build-cgroup-tests: build-sbx-helper build-cgroup-test-binaries
 test-cgroups:
     just build-cgroup-tests
     cargo test -p sandbox-integration-tests --verbose
+
+# WebUI Development Targets
+# ========================
+
+# Install dependencies for all WebUI projects
+webui-install:
+    cd webui/shared && npm ci
+    cd ../app && npm ci
+    cd ../mock-server && npm ci
+    cd ../e2e-tests && npm ci
+
+# Build WebUI application
+webui-build:
+    cd webui/app && npm run build
+
+# Build mock server
+webui-build-mock:
+    cd webui/mock-server && npm run build
+
+# Run WebUI development server
+webui-dev:
+    cd webui/app && npm run dev
+
+# Run mock REST API server
+webui-mock-server:
+    cd webui/mock-server && npm run dev
+
+# Lint all WebUI projects
+webui-lint:
+    cd webui/app && npm run lint
+    cd ../mock-server && npm run lint
+    cd ../e2e-tests && npm run lint
+
+# Type check all WebUI projects
+webui-type-check:
+    cd webui/app && npm run type-check
+    cd ../mock-server && npm run type-check
+
+# Format all WebUI projects
+webui-format:
+    cd webui/app && npm run format
+    cd ../mock-server && npm run format
+    cd ../e2e-tests && npm run format
+
+# Run WebUI E2E tests
+webui-test:
+    cd webui/e2e-tests && npm test
+
+# Run WebUI E2E tests in headed mode (visible browser)
+webui-test-headed:
+    cd webui/e2e-tests && npm run test:headed
+
+# Run WebUI E2E tests in debug mode
+webui-test-debug:
+    cd webui/e2e-tests && npm run test:debug
+
+# Run WebUI E2E tests in UI mode
+webui-test-ui:
+    cd webui/e2e-tests && npm run test:ui
+
+# Show WebUI test reports
+webui-test-report:
+    cd webui/e2e-tests && npm run report
+
+# Install Playwright browsers for E2E tests
+webui-install-browsers:
+    cd webui/e2e-tests && npm run install-browsers
+
+# Run all WebUI checks (lint, type-check, build, test)
+webui-check:
+    just webui-lint
+    just webui-type-check
+    just webui-build
+    just webui-build-mock
+    just webui-test

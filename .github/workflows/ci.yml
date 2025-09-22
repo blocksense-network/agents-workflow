@@ -101,37 +101,24 @@ jobs:
           ${{ runner.os }}-node-
 
     - name: Install dependencies
-      run: |
-        cd webui/shared && npm ci
-        cd ../app && npm ci
-        cd ../mock-server && npm ci
-        cd ../e2e-tests && npm ci
+      run: just webui-install
 
     - name: Lint WebUI code
-      run: |
-        cd webui/app && npm run lint
-        cd ../mock-server && npm run lint
-        cd ../e2e-tests && npm run lint
+      run: just webui-lint
 
     - name: Type check WebUI code
-      run: |
-        cd webui/app && npm run type-check
-        cd ../mock-server && npm run type-check
+      run: just webui-type-check
 
     - name: Build WebUI app
-      run: |
-        cd webui/app && npm run build
+      run: just webui-build
 
     - name: Build mock server
-      run: |
-        cd webui/mock-server && npm run build
+      run: just webui-build-mock
 
     - name: Install Playwright browsers
-      run: |
-        cd webui/e2e-tests && npx playwright install --with-deps
+      run: just webui-install-browsers
 
     - name: Run Playwright tests
-      run: |
-        cd webui/e2e-tests && npm test
+      run: just webui-test
       env:
         BASE_URL: http://localhost:3000

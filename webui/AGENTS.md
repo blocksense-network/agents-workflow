@@ -5,36 +5,31 @@
 ### Local Development Testing
 
 **WebUI App:**
+
 ```bash
-cd webui/app
-npm run lint          # ESLint code quality checks
-npm run format        # Prettier code formatting
-npm run type-check    # TypeScript type checking
-npm run build         # Production build verification
-npm run dev           # Start development server (http://localhost:3000)
+just webui-lint          # ESLint code quality checks
+just webui-format        # Prettier code formatting
+just webui-type-check    # TypeScript type checking
+just webui-build         # Production build verification
+just webui-dev           # Start development server (http://localhost:3000)
 ```
 
 **Mock Server:**
+
 ```bash
-cd webui/mock-server
-npm run lint          # ESLint code quality checks
-npm run format        # Prettier code formatting
-npm run type-check    # TypeScript type checking
-npm run build         # Production build verification
-npm run dev           # Start mock API server (http://localhost:3001)
+just webui-build-mock    # Production build verification
+just webui-mock-server   # Start mock API server (http://localhost:3001)
 ```
 
 **E2E Tests:**
+
 ```bash
-cd webui/e2e-tests
-npm run lint                    # ESLint code quality checks
-npm run format                  # Prettier code formatting
-npm run install-browsers        # Install Playwright browsers
-npm test                        # Run all E2E tests
-npm run test:headed             # Run tests in headed mode (visible browser)
-npm run test:debug              # Debug tests step-by-step
-npm run test:ui                 # Interactive test runner UI
-npm run report                  # View test reports after runs
+just webui-install-browsers   # Install Playwright browsers
+just webui-test               # Run all E2E tests
+just webui-test-headed        # Run tests in headed mode (visible browser)
+just webui-test-debug         # Debug tests step-by-step
+just webui-test-ui            # Interactive test runner UI
+just webui-test-report        # View test reports after runs
 ```
 
 ### Full WebUI Test Suite
@@ -43,13 +38,13 @@ Run all WebUI components together for integration testing:
 
 ```bash
 # Terminal 1: Start mock server
-cd webui/mock-server && npm run dev
+just webui-mock-server
 
 # Terminal 2: Start WebUI app
-cd webui/app && npm run dev
+just webui-dev
 
 # Terminal 3: Run E2E tests
-cd webui/e2e-tests && npm test
+just webui-test
 ```
 
 ### Repository-wide Testing
@@ -59,31 +54,39 @@ Use the project's just targets for comprehensive testing:
 ```bash
 just test              # Run all Rust tests
 just lint-specs        # Lint markdown files
+just webui-check       # Run all WebUI checks (lint, type-check, build, test)
 ```
 
 ## Development Workflow
 
-1. **Start development servers:**
+1. **Install dependencies:**
+
+   ```bash
+   just webui-install
+   ```
+
+2. **Start development servers:**
+
    ```bash
    # Terminal 1: Mock API server
-   cd webui/mock-server && npm run dev
+   just webui-mock-server
 
    # Terminal 2: WebUI app
-   cd webui/app && npm run dev
+   just webui-dev
    ```
 
-2. **Run tests continuously:**
+3. **Run tests continuously:**
+
    ```bash
    # Terminal 3: E2E tests
-   cd webui/e2e-tests && npm test
+   just webui-test
    ```
 
-3. **Code quality checks:**
+4. **Code quality checks:**
    ```bash
-   # Lint all WebUI projects
-   cd webui/app && npm run lint
-   cd ../mock-server && npm run lint
-   cd ../e2e-tests && npm run lint
+   just webui-lint
+   just webui-type-check
+   just webui-format
    ```
 
 ## Architecture
