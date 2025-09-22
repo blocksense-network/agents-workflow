@@ -92,7 +92,7 @@ mod tests {
             create: true,
             truncate: true,
             append: false,
-            share: vec![],
+            share: vec![ShareMode::Read, ShareMode::Write],
             stream: None,
         }
     }
@@ -104,7 +104,7 @@ mod tests {
             create: false,
             truncate: false,
             append: false,
-            share: vec![],
+            share: vec![ShareMode::Read, ShareMode::Write], // Allow others to read/write
             stream: None,
         }
     }
@@ -116,7 +116,7 @@ mod tests {
             create: false,
             truncate: false,
             append: false,
-            share: vec![],
+            share: vec![ShareMode::Read, ShareMode::Write],
             stream: None,
         }
     }
@@ -412,5 +412,141 @@ mod tests {
         // Close handles
         core.close(h).unwrap();
         core.close(h2).unwrap();
+    }
+
+    #[test]
+    fn test_posix_byte_range_locks() {
+        let core = test_core();
+
+        // Create a file
+        let h = core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+
+        // Test exclusive lock
+        let lock_range = LockRange {
+            offset: 0,
+            len: 10,
+            kind: LockKind::Exclusive,
+        };
+        core.lock(h, lock_range).unwrap();
+
+        // Try to lock overlapping range - should fail
+        let overlapping_lock = LockRange {
+            offset: 5,
+            len: 10,
+            kind: LockKind::Exclusive,
+        };
+        assert!(core.lock(h, overlapping_lock).is_err()); // Same handle can't lock overlapping
+
+        // Unlock the first lock
+        core.unlock(h, lock_range).unwrap();
+
+        // Now the overlapping lock should work
+        core.lock(h, overlapping_lock).unwrap();
+
+        // Test shared locks
+        let shared_lock1 = LockRange {
+            offset: 20,
+            len: 10,
+            kind: LockKind::Shared,
+        };
+        let shared_lock2 = LockRange {
+            offset: 25,
+            len: 10,
+            kind: LockKind::Shared,
+        };
+
+        // Multiple shared locks on overlapping ranges should work
+        core.lock(h, shared_lock1).unwrap();
+        core.lock(h, shared_lock2).unwrap();
+
+        // But exclusive lock on overlapping range should fail
+        let exclusive_overlapping = LockRange {
+            offset: 22,
+            len: 5,
+            kind: LockKind::Exclusive,
+        };
+        assert!(core.lock(h, exclusive_overlapping).is_err());
+
+        // Clean up
+        core.unlock(h, overlapping_lock).unwrap();
+        core.unlock(h, shared_lock1).unwrap();
+        core.unlock(h, shared_lock2).unwrap();
+        core.close(h).unwrap();
+    }
+
+    #[test]
+    fn test_xattr_operations() {
+        let core = test_core();
+
+        // Create a file
+        core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+
+        // Set an xattr
+        core.xattr_set("/test.txt".as_ref(), "user.test", b"value").unwrap();
+
+        // Get the xattr
+        let value = core.xattr_get("/test.txt".as_ref(), "user.test").unwrap();
+        assert_eq!(value, b"value");
+
+        // List xattrs
+        let attrs = core.xattr_list("/test.txt".as_ref()).unwrap();
+        assert!(attrs.contains(&"user.test".to_string()));
+
+        // Try to get non-existent xattr
+        assert!(core.xattr_get("/test.txt".as_ref(), "user.missing").is_err());
+
+        // Set another xattr
+        core.xattr_set("/test.txt".as_ref(), "user.other", b"othervalue").unwrap();
+        let attrs2 = core.xattr_list("/test.txt".as_ref()).unwrap();
+        assert_eq!(attrs2.len(), 2);
+        assert!(attrs2.contains(&"user.test".to_string()));
+        assert!(attrs2.contains(&"user.other".to_string()));
+    }
+
+    #[test]
+    fn test_ads_operations() {
+        let core = test_core();
+
+        // Create a file
+        let h = core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+        core.write(h, 0, b"main data").unwrap();
+        core.close(h).unwrap();
+
+        // Create a handle for an ADS
+        let ads_opts = OpenOptions {
+            read: true,
+            write: true,
+            create: true,
+            truncate: false,
+            append: false,
+            share: vec![],
+            stream: Some("ads1".to_string()),
+        };
+        let h_ads = core.open("/test.txt".as_ref(), &ads_opts).unwrap();
+
+        // Write to the ADS
+        core.write(h_ads, 0, b"ads data").unwrap();
+        core.close(h_ads).unwrap();
+
+        // List streams
+        let streams = core.streams_list("/test.txt".as_ref()).unwrap();
+        assert_eq!(streams.len(), 1);
+        assert_eq!(streams[0].name, "ads1");
+
+        // Read from the ADS
+        let h_ads_read = core.open("/test.txt".as_ref(), &ads_opts).unwrap();
+        let mut buf = [0u8; 8];
+        let n = core.read(h_ads_read, 0, &mut buf).unwrap();
+        assert_eq!(n, 8);
+        assert_eq!(&buf, b"ads data");
+        core.close(h_ads_read).unwrap();
+
+        // Main data stream should still be accessible
+        let h_main = core.open("/test.txt".as_ref(), &ro()).unwrap();
+        let mut buf_main = [0u8; 9];
+        let n_main = core.read(h_main, 0, &mut buf_main).unwrap();
+        assert_eq!(n_main, 9);
+        assert_eq!(&buf_main, b"main data");
+        core.close(h_main).unwrap();
     }
 }

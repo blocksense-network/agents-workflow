@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::os::unix::process::parent_id;
 
 use crate::{
-    Attributes, BranchId, BranchInfo, ContentId, DirEntry, FileMode, FileTimes, FsConfig, HandleId, OpenOptions, SnapshotId,
+    Attributes, BranchId, BranchInfo, ContentId, DirEntry, FileMode, FileTimes, FsConfig, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec,
 };
 use crate::error::{FsError, FsResult};
 use crate::storage::StorageBackend;
@@ -20,7 +20,9 @@ pub(crate) struct NodeId(u64);
 /// Filesystem node types
 #[derive(Clone, Debug)]
 pub(crate) enum NodeKind {
-    File { content_id: ContentId, size: u64 },
+    File {
+        streams: HashMap<String, (ContentId, u64)>, // stream_name -> (content_id, size)
+    },
     Directory { children: HashMap<String, NodeId> },
 }
 
@@ -31,6 +33,7 @@ pub(crate) struct Node {
     pub kind: NodeKind,
     pub times: FileTimes,
     pub mode: u32,
+    pub xattrs: HashMap<String, Vec<u8>>, // Extended attributes
 }
 
 /// Open file handle
@@ -60,6 +63,19 @@ pub(crate) struct Branch {
     pub name: Option<String>,
 }
 
+/// Active byte-range lock
+#[derive(Clone, Debug)]
+pub(crate) struct ActiveLock {
+    pub handle_id: HandleId,
+    pub range: LockRange,
+}
+
+/// Lock manager for tracking byte-range locks per node
+#[derive(Clone, Debug)]
+pub(crate) struct LockManager {
+    pub locks: HashMap<NodeId, Vec<ActiveLock>>,
+}
+
 /// The main filesystem core implementation
 pub struct FsCore {
     config: FsConfig,
@@ -71,6 +87,7 @@ pub struct FsCore {
     next_node_id: Mutex<u64>,
     next_handle_id: Mutex<u64>,
     pub(crate) process_branches: Mutex<HashMap<u32, BranchId>>, // Process ID -> Branch ID mapping
+    locks: Mutex<LockManager>, // Byte-range lock manager
 }
 
 impl FsCore {
@@ -87,6 +104,9 @@ impl FsCore {
             next_node_id: Mutex::new(1),
             next_handle_id: Mutex::new(1),
             process_branches: Mutex::new(HashMap::new()), // No processes initially bound
+            locks: Mutex::new(LockManager {
+                locks: HashMap::new(),
+            }),
         };
 
         // Create root directory
@@ -110,6 +130,7 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o755,
+            xattrs: HashMap::new(),
         };
 
         let default_branch = Branch {
@@ -218,12 +239,12 @@ impl FsCore {
         let node_id = self.allocate_node_id();
         let now = Self::current_timestamp();
 
+        let mut streams = HashMap::new();
+        streams.insert("".to_string(), (content_id, 0)); // Default unnamed stream
+
         let node = Node {
             id: node_id,
-            kind: NodeKind::File {
-                content_id,
-                size: 0,
-            },
+            kind: NodeKind::File { streams },
             times: FileTimes {
                 atime: now,
                 mtime: now,
@@ -231,6 +252,7 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o644,
+            xattrs: HashMap::new(),
         };
 
         self.nodes.lock().unwrap().insert(node_id, node);
@@ -254,6 +276,7 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o755,
+            xattrs: HashMap::new(),
         };
 
         self.nodes.lock().unwrap().insert(node_id, node);
@@ -274,14 +297,18 @@ impl FsCore {
         };
 
         let new_node_id = self.allocate_node_id();
-        let mut new_node = node;
+        let mut new_node = node.clone();
+        // xattrs are already cloned by the derive(Clone) on Node
 
-        // For files, we need to clone the content in storage
-        if let NodeKind::File { content_id, size } = &new_node.kind {
-            let new_content_id = self.storage.clone_cow(*content_id)?;
+        // For files, we need to clone all streams in storage
+        if let NodeKind::File { streams } = &new_node.kind {
+            let mut new_streams = HashMap::new();
+            for (stream_name, (content_id, size)) in streams {
+                let new_content_id = self.storage.clone_cow(*content_id)?;
+                new_streams.insert(stream_name.clone(), (new_content_id, *size));
+            }
             new_node.kind = NodeKind::File {
-                content_id: new_content_id,
-                size: *size,
+                streams: new_streams,
             };
         }
         // For directories, we recursively clone all children
@@ -338,7 +365,11 @@ impl FsCore {
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
         let (len, is_dir) = match &node.kind {
-            NodeKind::File { size, .. } => (*size, false),
+            NodeKind::File { streams } => {
+                // Size is the size of the unnamed stream (default data stream)
+                let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
+                (size, false)
+            }
             NodeKind::Directory { .. } => (0, true),
         };
 
@@ -542,6 +573,11 @@ impl FsCore {
     pub fn open(&self, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
         let (node_id, _) = self.resolve_path(path)?;
 
+        // Check share mode conflicts with existing handles
+        if self.share_mode_conflicts(node_id, opts) {
+            return Err(FsError::AccessDenied);
+        }
+
         // Create handle
         let handle_id = self.allocate_handle_id();
         let handle = Handle {
@@ -570,12 +606,17 @@ impl FsCore {
             return Err(FsError::AccessDenied);
         }
 
+        let stream_name = Self::get_stream_name(handle);
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&handle.node_id).ok_or(FsError::NotFound)?;
 
         match &node.kind {
-            NodeKind::File { content_id, .. } => {
-                self.storage.read(*content_id, offset, buf)
+            NodeKind::File { streams } => {
+                if let Some((content_id, _)) = streams.get(stream_name) {
+                    self.storage.read(*content_id, offset, buf)
+                } else {
+                    Err(FsError::NotFound) // Stream doesn't exist
+                }
             }
             NodeKind::Directory { .. } => Err(FsError::IsADirectory),
         }
@@ -589,18 +630,26 @@ impl FsCore {
             return Err(FsError::AccessDenied);
         }
 
+        let stream_name = Self::get_stream_name(handle);
         let current_branch_id = self.current_branch_for_process();
-        let branches = self.branches.lock().unwrap();
-        let branch = branches.get(&current_branch_id).ok_or(FsError::NotFound)?;
+        let _branches = self.branches.lock().unwrap();
+        let _branch = _branches.get(&current_branch_id).ok_or(FsError::NotFound)?;
 
         let mut nodes = self.nodes.lock().unwrap();
         let node = nodes.get_mut(&handle.node_id).ok_or(FsError::NotFound)?;
 
         match &mut node.kind {
-            NodeKind::File { content_id, size } => {
+            NodeKind::File { streams } => {
+                // Get or create the stream
+                let (content_id, size) = streams.entry(stream_name.to_string()).or_insert_with(|| {
+                    // Create new stream if it doesn't exist
+                    let new_content_id = self.storage.allocate(&[]).unwrap();
+                    (new_content_id, 0)
+                });
+
                 let content_to_write = if self.is_content_shared(*content_id) {
                     // Clone the content for this branch
-                    let new_content_id = self.storage.clone_cow(*content_id)?;
+                    let new_content_id = self.storage.clone_cow(*content_id).unwrap();
                     *content_id = new_content_id;
                     new_content_id
                 } else {
@@ -625,6 +674,67 @@ impl FsCore {
         true
     }
 
+    /// Check if two lock ranges overlap
+    fn ranges_overlap(r1: &LockRange, r2: &LockRange) -> bool {
+        r1.offset < (r2.offset + r2.len) && r2.offset < (r1.offset + r1.len)
+    }
+
+    /// Check if a lock conflicts with existing locks
+    fn lock_conflicts(&self, node_id: NodeId, new_lock: &LockRange, handle_id: HandleId) -> bool {
+        let locks = self.locks.lock().unwrap();
+        if let Some(node_locks) = locks.locks.get(&node_id) {
+            for existing_lock in node_locks {
+                // For POSIX semantics, same handle cannot have conflicting locks
+                if existing_lock.handle_id == handle_id &&
+                   Self::ranges_overlap(&existing_lock.range, new_lock) {
+                    // Same handle: exclusive locks cannot overlap with anything
+                    // Shared locks cannot overlap with exclusive locks from same handle
+                    if existing_lock.range.kind == LockKind::Exclusive || new_lock.kind == LockKind::Exclusive {
+                        return true;
+                    }
+                }
+
+                // Different handles: check standard conflict rules
+                if existing_lock.handle_id != handle_id &&
+                   Self::ranges_overlap(&existing_lock.range, new_lock) {
+                    // Exclusive locks conflict with any overlapping lock
+                    // Shared locks only conflict with exclusive locks
+                    if existing_lock.range.kind == LockKind::Exclusive || new_lock.kind == LockKind::Exclusive {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if opening with given options would conflict with existing handles (Windows share modes)
+    fn share_mode_conflicts(&self, node_id: NodeId, options: &OpenOptions) -> bool {
+        let handles = self.handles.lock().unwrap();
+
+        for handle in handles.values() {
+            if handle.node_id != node_id || handle.deleted {
+                continue;
+            }
+
+            // Check each requested access type against existing handle's share modes
+            if options.read && !handle.options.share.contains(&ShareMode::Read) {
+                return true;
+            }
+            if options.write && !handle.options.share.contains(&ShareMode::Write) {
+                return true;
+            }
+            // Note: Delete access conflicts are typically checked at delete time, not open time
+        }
+
+        false
+    }
+
+    /// Get the stream name for a handle (empty string for unnamed/default stream)
+    fn get_stream_name(handle: &Handle) -> &str {
+        handle.options.stream.as_deref().unwrap_or("")
+    }
+
     pub fn close(&self, handle_id: HandleId) -> FsResult<()> {
         let mut handles = self.handles.lock().unwrap();
         let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
@@ -632,6 +742,16 @@ impl FsCore {
         let was_deleted = handle.deleted;
 
         handles.remove(&handle_id);
+
+        // Clean up any locks held by this handle
+        let mut locks = self.locks.lock().unwrap();
+        if let Some(node_locks) = locks.locks.get_mut(&node_id) {
+            node_locks.retain(|lock| lock.handle_id != handle_id);
+            if node_locks.is_empty() {
+                locks.locks.remove(&node_id);
+            }
+        }
+        drop(locks);
 
         // If this was the last handle to a deleted file, remove the node
         if was_deleted {
@@ -642,6 +762,55 @@ impl FsCore {
             if remaining_handles.is_empty() {
                 let mut nodes = self.nodes.lock().unwrap();
                 nodes.remove(&node_id);
+            }
+        }
+
+        Ok(())
+    }
+
+    // Lock operations
+    pub fn lock(&self, handle_id: HandleId, range: LockRange) -> FsResult<()> {
+        let handles = self.handles.lock().unwrap();
+        let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
+        let node_id = handle.node_id;
+        drop(handles);
+
+        // Check for conflicts
+        if self.lock_conflicts(node_id, &range, handle_id) {
+            return Err(FsError::Busy); // Lock conflict
+        }
+
+        // Add the lock
+        let mut locks = self.locks.lock().unwrap();
+        let node_locks = locks.locks.entry(node_id).or_insert_with(Vec::new);
+        node_locks.push(ActiveLock {
+            handle_id,
+            range,
+        });
+
+        Ok(())
+    }
+
+    pub fn unlock(&self, handle_id: HandleId, range: LockRange) -> FsResult<()> {
+        let handles = self.handles.lock().unwrap();
+        let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
+        let node_id = handle.node_id;
+        drop(handles);
+
+        // Find and remove matching locks
+        let mut locks = self.locks.lock().unwrap();
+        if let Some(node_locks) = locks.locks.get_mut(&node_id) {
+            // Remove locks that match the handle and range
+            node_locks.retain(|lock| {
+                !(lock.handle_id == handle_id &&
+                  lock.range.offset == range.offset &&
+                  lock.range.len == range.len &&
+                  lock.range.kind == range.kind)
+            });
+
+            // Clean up empty lock lists
+            if node_locks.is_empty() {
+                locks.locks.remove(&node_id);
             }
         }
 
@@ -750,7 +919,11 @@ impl FsCore {
                     let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
                     let (is_dir, len) = match &child_node.kind {
                         NodeKind::Directory { .. } => (true, 0),
-                        NodeKind::File { size, .. } => (false, *size),
+                        NodeKind::File { streams } => {
+                            // Size is the size of the unnamed stream
+                            let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
+                            (false, size)
+                        }
                     };
                     entries.push(DirEntry {
                         name: name.clone(),
@@ -762,6 +935,54 @@ impl FsCore {
                 Ok(entries)
             }
             NodeKind::File { .. } => Err(FsError::NotADirectory),
+        }
+    }
+
+    // Extended attributes operations
+    pub fn xattr_get(&self, path: &Path, name: &str) -> FsResult<Vec<u8>> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+        node.xattrs.get(name).cloned().ok_or(FsError::NotFound)
+    }
+
+    pub fn xattr_set(&self, path: &Path, name: &str, value: &[u8]) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let mut nodes = self.nodes.lock().unwrap();
+        if let Some(node) = nodes.get_mut(&node_id) {
+            node.xattrs.insert(name.to_string(), value.to_vec());
+            Ok(())
+        } else {
+            Err(FsError::NotFound)
+        }
+    }
+
+    pub fn xattr_list(&self, path: &Path) -> FsResult<Vec<String>> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+        Ok(node.xattrs.keys().cloned().collect())
+    }
+
+    // Alternate Data Streams operations
+    pub fn streams_list(&self, path: &Path) -> FsResult<Vec<StreamSpec>> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+
+        match &node.kind {
+            NodeKind::File { streams } => {
+                let mut stream_specs = Vec::new();
+                for stream_name in streams.keys() {
+                    if !stream_name.is_empty() { // Skip the unnamed default stream
+                        stream_specs.push(StreamSpec {
+                            name: stream_name.clone(),
+                        });
+                    }
+                }
+                Ok(stream_specs)
+            }
+            NodeKind::Directory { .. } => Err(FsError::IsADirectory),
         }
     }
 
