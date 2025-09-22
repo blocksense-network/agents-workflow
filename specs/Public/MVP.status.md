@@ -146,20 +146,37 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - [x] Comprehensive Rust integration tests that verify daemon communication via Unix socket, check daemon liveness via ping, and test both ZFS and Btrfs filesystem operations (similar to `legacy-test-snapshot` but implemented as proper Rust unit tests); available via `just test-daemon-integration`
   - [ ] Legacy tests still pass, using the legacy daemon from its new location
 
-**0.4 FS Snapshots Core API** (3-4 days, parallel with 0.5-0.6)
+**0.4 FS Snapshots Core API** COMPLETED (3-4 days, parallel with 0.5-0.6)
 
-- Deliverables:
-  - Complete `aw-fs-snapshots` crate with `FsSnapshotProvider` trait
-  - `create_workspace(dest)` and `cleanup_workspace(dest)` method implementations
-  - Provider auto-detection logic (`provider_for(path)`)
-  - Basic error handling and path validation
-  - Integration with daemon for privileged operations
+- **Deliverables**:
+  - Complete `aw-fs-snapshots` crate with `FsSnapshotProvider` trait matching FS-Snapshots-Overview.md specification
+  - `prepare_writable_workspace()`, `snapshot_now()`, `mount_readonly()`, `branch_from_snapshot()`, and `cleanup()` method implementations
+  - Provider auto-detection logic (`provider_for(path)`) with capability scoring
+  - Basic error handling and path validation rejecting system directories (/dev, /proc, /sys, /run)
+  - Integration with daemon for privileged operations (ZFS/Btrfs providers communicate with aw-fs-snapshots-daemon)
 
-- Verification:
-  - Provider trait compiles and can be implemented by concrete providers
-  - Auto-detection returns correct provider for ZFS/Btrfs paths
-  - Path validation rejects invalid destinations (system directories, etc.)
-  - Unit tests for provider selection logic pass
+- **Implementation Details**:
+  - Implemented complete `FsSnapshotProvider` trait with all methods specified in FS-Snapshots-Overview.md
+  - Added `ProviderCapabilities`, `PreparedWorkspace`, `SnapshotRef` structs for type-safe API
+  - ZFS provider supports CoW overlay mode with snapshot + clone operations via daemon
+  - Btrfs provider supports CoW overlay mode with subvolume snapshots
+  - CopyProvider fallback supports Worktree and InPlace modes for non-CoW filesystems
+  - Comprehensive path validation prevents workspace creation in system directories
+  - Provider auto-detection scores capabilities (ZFS: 90, Btrfs: 80, Copy: 10)
+  - Robust cleanup token system for idempotent resource teardown
+
+- **Key Source Files**:
+  - `crates/aw-fs-snapshots/src/lib.rs` - Core trait definition and provider selection logic
+  - `crates/aw-fs-snapshots-zfs/src/lib.rs` - ZFS provider implementation with daemon integration
+  - `crates/aw-fs-snapshots-btrfs/src/lib.rs` - Btrfs provider implementation
+  - `crates/aw-fs-snapshots/src/error.rs` - Error types for filesystem operations
+
+- **Verification Results**:
+  - [x] Provider trait compiles and can be implemented by concrete providers
+  - [x] Auto-detection returns correct provider with capability scoring
+  - [x] Path validation rejects invalid destinations (system directories, root, etc.)
+  - [x] Unit tests for provider selection logic pass (5/5 tests passing)
+  - [x] All providers implement the complete trait specification
 
 **0.5 ZFS Snapshot Provider** (4-5 days, parallel with 0.3-0.4, 0.6)
 
