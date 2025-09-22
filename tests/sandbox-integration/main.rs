@@ -1,13 +1,11 @@
 //! Integration tests for sandbox functionality
 
 #[cfg(target_os = "linux")]
-use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
-#[cfg(target_os = "linux")]
-use sandbox_fs::{FilesystemConfig, FilesystemManager};
-
-#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn test_sandbox_integration() {
+    use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
+    use sandbox_fs::{FilesystemConfig, FilesystemManager};
+
     // Create namespace configuration
     let namespace_config = NamespaceConfig {
         user_ns: true,
@@ -59,6 +57,8 @@ async fn test_sandbox_integration() {
 #[cfg(target_os = "linux")]
 #[tokio::test]
 async fn test_cgroups_integration() {
+    use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
+
     // Create custom cgroup configuration for testing
     let cgroup_config = sandbox_core::CgroupConfig {
         cgroup_root: std::path::PathBuf::from("/sys/fs/cgroup"),
@@ -281,6 +281,8 @@ fn test_overlay_enforcement_e2e() {
 #[cfg(target_os = "linux")]
 #[test]
 fn test_filesystem_config_defaults() {
+    use sandbox_fs::FilesystemConfig;
+
     let config = FilesystemConfig::default();
 
     // Verify default readonly paths include common system directories

@@ -278,4 +278,139 @@ mod tests {
         // Delete the branch first
         // Note: branch deletion not implemented yet, so skip
     }
+
+    #[test]
+    fn test_branch_process_isolation() {
+        let core = test_core();
+
+        // Create a file with initial content
+        let h = core.create("/shared.txt".as_ref(), &rw_create()).unwrap();
+        core.write(h, 0, b"original").unwrap();
+        core.close(h).unwrap();
+
+        // Create snapshot
+        let snap = core.snapshot_create(Some("base")).unwrap();
+
+        // Create a branch from snapshot
+        let branch = core.branch_create_from_snapshot(snap, Some("test")).unwrap();
+
+        // Verify that the branch has a different root than the snapshot
+        {
+            let snapshots = core.snapshots.lock().unwrap();
+            let snapshot = snapshots.get(&snap).unwrap();
+            let branches = core.branches.lock().unwrap();
+            let branch_info = branches.get(&branch).unwrap();
+            assert_ne!(snapshot.root_id, branch_info.root_id, "Branch should have different root than snapshot");
+        }
+
+        // Simulate two different processes with different PIDs
+        let pid1 = 1001;
+        let pid2 = 1002;
+
+        // Bind process 1 to default branch (should see original content)
+        core.bind_process_to_branch_with_pid(BranchId::DEFAULT, pid1).unwrap();
+
+        // Bind process 2 to the snapshot branch
+        core.bind_process_to_branch_with_pid(branch, pid2).unwrap();
+
+        // Test what process 1 would see (by temporarily binding current process to pid1's branch)
+        {
+            let original_pid = std::process::id();
+            let pid1_branch = core.process_branches.lock().unwrap().get(&pid1).cloned().unwrap();
+            core.bind_process_to_branch_with_pid(pid1_branch, original_pid).unwrap();
+
+            let h1 = core.open("/shared.txt".as_ref(), &ro()).unwrap();
+            let mut buf = [0u8; 8];
+            let n = core.read(h1, 0, &mut buf).unwrap();
+            assert_eq!(n, 8);
+            assert_eq!(&buf, b"original");
+            core.close(h1).unwrap();
+        }
+
+        // Test what process 2 would see initially (should also see "original" since branch cloned snapshot)
+        {
+            let original_pid = std::process::id();
+            let pid2_branch = core.process_branches.lock().unwrap().get(&pid2).cloned().unwrap();
+            core.bind_process_to_branch_with_pid(pid2_branch, original_pid).unwrap();
+
+            let h2 = core.open("/shared.txt".as_ref(), &ro()).unwrap();
+            let mut buf = [0u8; 8];
+            let n = core.read(h2, 0, &mut buf).unwrap();
+            assert_eq!(n, 8);
+            assert_eq!(&buf, b"original");
+            core.close(h2).unwrap();
+
+            // Modify the file in the branch (this should trigger content CoW)
+            let h3 = core.open("/shared.txt".as_ref(), &rw()).unwrap();
+            core.write(h3, 0, b"modified").unwrap();
+            core.close(h3).unwrap();
+
+            // Verify the branch now sees modified content
+            let h_check = core.open("/shared.txt".as_ref(), &ro()).unwrap();
+            let mut buf_check = [0u8; 8];
+            let n_check = core.read(h_check, 0, &mut buf_check).unwrap();
+            assert_eq!(n_check, 8);
+            assert_eq!(&buf_check, b"modified");
+            core.close(h_check).unwrap();
+        }
+
+        // Now process 1 should still see "original" (default branch unchanged)
+        {
+            let original_pid = std::process::id();
+            let pid1_branch = core.process_branches.lock().unwrap().get(&pid1).cloned().unwrap();
+            core.bind_process_to_branch_with_pid(pid1_branch, original_pid).unwrap();
+
+            let h4 = core.open("/shared.txt".as_ref(), &ro()).unwrap();
+            let mut buf = [0u8; 8];
+            let n = core.read(h4, 0, &mut buf).unwrap();
+            assert_eq!(n, 8);
+            assert_eq!(&buf, b"original");
+            core.close(h4).unwrap();
+        }
+
+        // And process 2's branch should see "modified"
+        {
+            let original_pid = std::process::id();
+            let pid2_branch = core.process_branches.lock().unwrap().get(&pid2).cloned().unwrap();
+            core.bind_process_to_branch_with_pid(pid2_branch, original_pid).unwrap();
+
+            let h5 = core.open("/shared.txt".as_ref(), &ro()).unwrap();
+            let mut buf = [0u8; 8];
+            let n = core.read(h5, 0, &mut buf).unwrap();
+            assert_eq!(n, 8);
+            assert_eq!(&buf, b"modified");
+            core.close(h5).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_handle_stability_across_binding_changes() {
+        let core = test_core();
+
+        // Create a file
+        let h = core.create("/test.txt".as_ref(), &rw_create()).unwrap();
+        core.write(h, 0, b"initial").unwrap();
+
+        // Open another handle to the same file (simulating a handle opened before binding)
+        let h2 = core.open("/test.txt".as_ref(), &rw()).unwrap();
+
+        // Create a branch and bind to it
+        let snap = core.snapshot_create(Some("base")).unwrap();
+        let branch = core.branch_create_from_snapshot(snap, Some("test")).unwrap();
+        core.bind_process_to_branch(branch).unwrap();
+
+        // Modify the file through the first handle (this should trigger CoW)
+        core.write(h, 0, b"modified").unwrap();
+
+        // The second handle should still work and see the modified content
+        // (both handles reference the same node in the branch after CoW)
+        let mut buf = [0u8; 8];
+        let n = core.read(h2, 0, &mut buf).unwrap();
+        assert_eq!(n, 8);
+        assert_eq!(&buf, b"modified");
+
+        // Close handles
+        core.close(h).unwrap();
+        core.close(h2).unwrap();
+    }
 }

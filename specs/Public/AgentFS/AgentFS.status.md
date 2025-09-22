@@ -112,7 +112,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 - [x] Basic CoW invariants pass - Content is cloned on write for snapshot branches
 - [x] Branch and snapshot operations work correctly
 
-M4. Branching and process‑scoped binding (3–4d)
+**M4. Branching and process‑scoped binding** COMPLETED (4–5d)
 
 - Implement `branch_create_from_snapshot`, `branch_create_from_current`, branch listing, and process→branch map.
 - Expose `bind_process_to_branch` and `unbind_process` with PID‑aware context.
@@ -120,10 +120,23 @@ M4. Branching and process‑scoped binding (3–4d)
   - Two bound processes see divergent contents for identical absolute paths.
   - Handles opened before binding switch remain stable per invariants.
 
-Acceptance checklist (M4)
+**Implementation Details:**
 
-- [ ] U4 Branch process isolation passes
-- [ ] Handle stability verified by opening pre-bind and post-bind
+- Implemented per-process branch binding with `process_branches: HashMap<u32, BranchId>` mapping PIDs to branches
+- Modified all filesystem operations (`resolve_path`, `write`, `snapshot_create`, `branch_create_from_current`) to use `current_branch_for_process()` instead of global branch state
+- Implemented recursive CoW cloning for branch creation to ensure complete isolation between branches and snapshots
+- Added `bind_process_to_branch_with_pid` and `unbind_process_with_pid` methods for explicit PID-based binding
+- Ensured handles remain stable by referencing specific `node_id`s independent of branch context
+
+**Key Source Files:**
+
+- `crates/agentfs-core/src/vfs.rs` - Process binding implementation and branch isolation
+- `crates/agentfs-core/src/lib.rs` - Unit tests for process isolation and handle stability
+
+**Verification Results:**
+
+- [x] U4 Branch process isolation passes - Different processes bound to different branches see different content for same paths
+- [x] Handle stability verified by opening pre-bind and post-bind - Handles maintain correct node references across binding changes
 
 M5. Locking, share modes, xattrs, and ADS (5–8d)
 
