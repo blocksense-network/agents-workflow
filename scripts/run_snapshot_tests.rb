@@ -22,7 +22,7 @@ end
 Minitest.reporter = VerboseProgressReporter.new
 
 # Load only snapshot test files
-snapshot_test_files = Dir['test/snapshot/test_*.rb'].sort
+snapshot_test_files = Dir['legacy/ruby/test/snapshot/test_*.rb'].sort
 snapshot_test_files.each do |test_file|
   puts "Loading: #{File.basename(test_file)}"
   require File.expand_path(test_file)
