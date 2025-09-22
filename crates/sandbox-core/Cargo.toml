@@ -18,10 +18,13 @@ nix = { version = "0.27", features = [
   "fs",
 ] }
 sandbox-cgroups = { path = "../sandbox-cgroups", optional = true }
+sandbox-seccomp = { path = "../sandbox-seccomp", optional = true }
+sandbox-proto = { path = "../sandbox-proto" }
 
 [features]
-default = ["cgroups"]
+default = ["cgroups", "seccomp"]
 cgroups = ["sandbox-cgroups"]
+seccomp = ["sandbox-seccomp"]
 
 [dev-dependencies]
 tempfile = { workspace = true }

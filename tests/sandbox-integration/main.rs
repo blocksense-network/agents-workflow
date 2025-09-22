@@ -42,7 +42,7 @@ async fn test_sandbox_integration() {
     let fs_manager = FilesystemManager::with_config(fs_config);
 
     // Test that components can be created and configured
-    assert!(sandbox.start().is_ok());
+    assert!(sandbox.start().await.is_ok());
     assert!(fs_manager.setup_mounts().await.is_ok());
 
     // Verify configurations
@@ -94,7 +94,7 @@ async fn test_cgroups_integration() {
         .with_cgroups(cgroup_config);
 
     // Test cgroup setup and cleanup
-    assert!(sandbox.start().is_ok());
+    assert!(sandbox.start().await.is_ok());
 
     // Test metrics collection
     let metrics = sandbox.collect_metrics().unwrap();

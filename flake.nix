@@ -258,6 +258,9 @@
           pkgs.docker
           # System monitoring tools for performance tests
           pkgs.procps # ps, top, etc. for memory monitoring
+          # Seccomp library for sandboxing functionality
+          pkgs.libseccomp # Required for seccomp-based sandboxing
+          pkgs.pkg-config # Required for libseccomp-sys to find libseccomp
         ] ++ pkgs.lib.optionals isDarwin [
           # macOS-only VM manager
           pkgs.lima # Linux virtual machines on macOS

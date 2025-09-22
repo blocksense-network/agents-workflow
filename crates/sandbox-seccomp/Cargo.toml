@@ -10,6 +10,11 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+libc = "0.2"
+libseccomp-sys = "0.2"
+nix = { version = "0.27", features = ["fs", "process", "socket"] }
+async-trait = { workspace = true }
+sandbox-proto = { path = "../sandbox-proto" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

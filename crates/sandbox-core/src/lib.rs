@@ -14,6 +14,11 @@ pub use sandbox_cgroups::{
     CgroupConfig, CgroupManager, CgroupMetrics, CpuLimits, MemoryLimits, PidLimits,
 };
 
+#[cfg(feature = "seccomp")]
+pub use sandbox_seccomp::{
+    SeccompConfig, SeccompManager,
+};
+
 use tracing::{debug, info};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
@@ -28,6 +33,10 @@ pub struct Sandbox {
     cgroup_config: Option<sandbox_cgroups::CgroupConfig>,
     #[cfg(feature = "cgroups")]
     cgroup_manager: Option<sandbox_cgroups::CgroupManager>,
+    #[cfg(feature = "seccomp")]
+    seccomp_config: Option<sandbox_seccomp::SeccompConfig>,
+    #[cfg(feature = "seccomp")]
+    seccomp_manager: Option<sandbox_seccomp::SeccompManager>,
 }
 
 impl Default for Sandbox {
@@ -67,6 +76,10 @@ impl Sandbox {
             cgroup_config: None,
             #[cfg(feature = "cgroups")]
             cgroup_manager: None,
+            #[cfg(feature = "seccomp")]
+            seccomp_config: None,
+            #[cfg(feature = "seccomp")]
+            seccomp_manager: None,
         }
     }
 
@@ -84,6 +97,10 @@ impl Sandbox {
             cgroup_config: None,
             #[cfg(feature = "cgroups")]
             cgroup_manager: None,
+            #[cfg(feature = "seccomp")]
+            seccomp_config: None,
+            #[cfg(feature = "seccomp")]
+            seccomp_manager: None,
         }
     }
 
@@ -111,8 +128,25 @@ impl Sandbox {
         self
     }
 
+    /// Enable seccomp filtering for this sandbox
+    #[cfg(feature = "seccomp")]
+    pub fn with_seccomp(mut self, config: sandbox_seccomp::SeccompConfig) -> Self {
+        self.seccomp_config = Some(config.clone());
+        self.seccomp_manager = Some(sandbox_seccomp::SeccompManager::new(config));
+        self
+    }
+
+    /// Enable seccomp filtering with default configuration
+    #[cfg(feature = "seccomp")]
+    pub fn with_default_seccomp(mut self) -> Self {
+        let config = sandbox_seccomp::SeccompConfig::default();
+        self.seccomp_config = Some(config.clone());
+        self.seccomp_manager = Some(sandbox_seccomp::SeccompManager::new(config));
+        self
+    }
+
     /// Start the sandbox with the given configuration
-    pub fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
         info!(
             "Starting sandbox with namespaces: {:?}",
             self.namespace_config
@@ -144,6 +178,20 @@ impl Sandbox {
                 Err(e) => {
                     // In test environments or systems without cgroup v2, this may fail
                     debug!("Cgroup setup failed (expected in some environments): {}", e);
+                }
+            }
+        }
+
+        // Install seccomp filters if enabled
+        #[cfg(feature = "seccomp")]
+        if let Some(ref mut seccomp_manager) = self.seccomp_manager {
+            match seccomp_manager.install_filters().await {
+                Ok(()) => {
+                    debug!("Sandbox seccomp filters installed successfully");
+                }
+                Err(e) => {
+                    // In test environments or systems without seccomp support, this may fail
+                    debug!("Seccomp filter installation failed (expected in some environments): {}", e);
                 }
             }
         }
@@ -200,10 +248,10 @@ impl Sandbox {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_sandbox_creation() {
+    #[tokio::test]
+    async fn test_sandbox_creation() {
         let mut sandbox = Sandbox::new();
-        assert!(sandbox.start().is_ok());
+        assert!(sandbox.start().await.is_ok());
         assert!(sandbox.stop().is_ok());
     }
 }

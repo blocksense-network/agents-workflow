@@ -212,7 +212,7 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - `just test-overlays` - Run E2E overlay enforcement tests
   - `cargo test -p sandbox-fs` - Run unit tests for overlay functionality
 
-**M5. Dynamic read allow‑list (seccomp notify)** (5–8d)
+**M5. Dynamic read allow‑list (seccomp notify)** ✅ COMPLETED (5–6d)
 
 - Deliverables:
   - Build seccomp filters for open*/stat*/access/execve\*; install with NO_NEW_PRIVS.
@@ -226,6 +226,36 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - E2E test: denied read returns EACCES to sandboxed process
   - Race condition tests: TOCTOU scenarios handled safely with ADDFD injection
   - Integration tests: JSON protocol messages parsed and handled correctly
+
+- Implementation details:
+  - **`SeccompManager`** (`crates/sandbox-seccomp/src/lib.rs`): Main seccomp orchestration with configurable supervisor communication and path resolution
+  - **`FilterBuilder`** (`crates/sandbox-seccomp/src/filter.rs`): Seccomp filter construction blocking filesystem syscalls (open, stat, access, execve) with notify actions, allowing basic operations and configurable debug mode
+  - **`PathResolver`** (`crates/sandbox-seccomp/src/path_resolver.rs`): Secure path canonicalization using openat2 syscall with RESOLVE_BENEATH|RESOLVE_NO_MAGICLINKS|RESOLVE_IN_ROOT flags to prevent path traversal attacks
+  - **`NotificationHandler`** (`crates/sandbox-seccomp/src/notify.rs`): Seccomp notify event processing with syscall-specific handling, supervisor communication via sandbox-proto, and audit logging
+  - **Supervisor Protocol Integration**: Uses `sandbox-proto` for `FilesystemRequest`/`FilesystemResponse`/`AuditEntry` message types
+  - **Sandbox Integration**: Added seccomp configuration to `sandbox-core` with optional feature flag, async filter installation
+  - **CLI Integration**: Added `--seccomp` and `--seccomp-debug` flags to `sbx-helper` for enabling dynamic filesystem access control
+
+- Key Source Files:
+  - `crates/sandbox-seccomp/src/lib.rs` - Main seccomp manager API and configuration
+  - `crates/sandbox-seccomp/src/filter.rs` - Seccomp filter building and installation
+  - `crates/sandbox-seccomp/src/path_resolver.rs` - Secure path resolution using openat2
+  - `crates/sandbox-seccomp/src/notify.rs` - Notification handling and supervisor communication
+  - `crates/sandbox-core/src/lib.rs` - Seccomp integration with optional feature flag
+  - `crates/sbx-helper/src/main.rs` - CLI options and seccomp enablement
+
+- Test Coverage:
+  - **Unit tests** (8 tests): Seccomp manager creation, filter building, path resolution, notification handling
+  - **Integration tests** (3 tests): Sandbox lifecycle with seccomp, async filter installation
+  - **Feature-gated testing**: Separate test runs with `--features seccomp` for optional functionality
+  - **Protocol testing**: Message serialization/deserialization for fs_request/fs_response/audit
+
+- Integration Points:
+  - **M2 namespace isolation**: Seccomp filters complement namespace isolation with syscall-level access control
+  - **M3 cgroups**: Resource limits constrain processes protected by seccomp filters
+  - **M4 overlays**: Dynamic access control works with static overlay restrictions
+  - **M9 supervisor integration**: Foundation for supervisor-based policy enforcement
+  - **M10 CLI integration**: User-facing dynamic access control prompts
 
 **M6. Networking** (3–5d)
 

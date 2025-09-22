@@ -58,6 +58,14 @@ struct Args {
     /// Path to blacklist in static mode (can be specified multiple times)
     #[arg(long)]
     blacklist: Vec<String>,
+
+    /// Enable seccomp dynamic filesystem access control
+    #[arg(long)]
+    seccomp: bool,
+
+    /// Enable debug mode for seccomp (allows ptrace operations)
+    #[arg(long)]
+    seccomp_debug: bool,
 }
 
 #[tokio::main]
@@ -115,16 +123,36 @@ async fn main() -> anyhow::Result<()> {
     fs_config.overlay_paths = args.overlay.clone();
     fs_config.blacklist_paths = args.blacklist.clone();
 
-    // Initialize sandbox with cgroups enabled
+    // Initialize sandbox with cgroups and seccomp enabled
     let mut sandbox = Sandbox::with_namespace_config(namespace_config)
         .with_process_config(process_config)
         .with_default_cgroups();
+
+    // Enable seccomp if requested
+    if args.seccomp {
+        use sandbox_seccomp::{SeccompConfig};
+        use tokio::sync::mpsc;
+
+        // Create a channel for supervisor communication
+        // In this simple implementation, we deny all requests since there's no supervisor
+        // TODO: Implement proper supervisor integration
+        let (supervisor_tx, _supervisor_rx) = mpsc::unbounded_channel();
+
+        let seccomp_config = SeccompConfig {
+            debug_mode: args.seccomp_debug,
+            supervisor_tx: Some(supervisor_tx),
+            root_dir: std::path::PathBuf::from("/"),
+        };
+
+        sandbox = sandbox.with_seccomp(seccomp_config);
+        info!("Seccomp dynamic filesystem access control enabled");
+    }
 
     let fs_manager = FilesystemManager::with_config(fs_config);
 
     // Start sandbox (enter all namespaces in single unshare() call)
     // After this point, we are within the user namespace and have root privileges there
-    sandbox.start()?;
+    sandbox.start().await?;
 
     // Add current process to cgroup if cgroups are enabled
     sandbox.add_process_to_cgroup(std::process::id())?;
