@@ -1,0 +1,20 @@
+[package]
+name = "cgroup-enforcement-tests"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fork_bomb"
+path = "src/fork_bomb.rs"
+
+[[bin]]
+name = "memory_hog"
+path = "src/memory_hog.rs"
+
+[[bin]]
+name = "cpu_burner"
+path = "src/cpu_burner.rs"
+
+[[bin]]
+name = "test_orchestrator"
+path = "src/test_orchestrator.rs"

@@ -19,4 +19,8 @@ pub enum Error {
 
     #[error("Configuration error: {0}")]
     Config(String),
+
+    #[cfg(feature = "cgroups")]
+    #[error("Cgroup error: {0}")]
+    Cgroup(#[from] sandbox_cgroups::error::Error),
 }

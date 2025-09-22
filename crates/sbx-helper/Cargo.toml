@@ -15,7 +15,7 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 
 # Sandbox crates
-sandbox-core = { path = "../sandbox-core" }
+sandbox-core = { path = "../sandbox-core", features = ["cgroups"] }
 sandbox-fs = { path = "../sandbox-fs" }
 sandbox-seccomp = { path = "../sandbox-seccomp" }
 sandbox-cgroups = { path = "../sandbox-cgroups" }

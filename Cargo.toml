@@ -17,6 +17,7 @@ members = [
   "crates/sbx-helper",
   # Integration tests
   "tests/sandbox-integration",
+  "tests/cgroup-enforcement",
 ]
 resolver = "2"
 

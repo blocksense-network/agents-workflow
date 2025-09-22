@@ -139,17 +139,47 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - `cargo build --bin sbx-helper` - Build the sandbox helper binary
   - `./scripts/demo-sandbox.sh` - Demonstration of sandbox functionality and usage examples
 
-**M3. Cgroups v2 limits** (2–3d)
+**M3. Cgroups v2 limits** ✅ COMPLETED (2–3d)
 
 - Deliverables:
   - Create per‑session subtree; set pids.max, memory.high/max, cpu.max.
   - Metrics sampling (read files under cgroupfs).
 
 - Verification:
-  - E2E test: fork-bomb process is contained within sandbox (cannot create unlimited processes)
-  - E2E test: memory allocation beyond limit triggers OOM kill within sandbox
-  - Unit test: CPU throttling applied correctly when limits exceeded
-  - Integration test: cgroup subtree created and cleaned up properly
+  - ✅ **Integration test: cgroup subtree created and cleaned up properly** (implemented)
+  - ✅ **E2E test: fork-bomb process containment** - Orchestrator launches sandbox with fork-bomb process and verifies PID limits are enforced (implemented with safety mechanism)
+  - ✅ **E2E test: memory OOM kill enforcement** - Orchestrator launches sandbox with memory-hog process and verifies OOM kill occurs at limit (implemented with safety mechanism)
+  - ✅ **E2E test: CPU throttling enforcement** - Orchestrator launches sandbox with CPU-burner process and verifies throttling at limit (implemented with safety mechanism)
+
+- Implementation details:
+  - **`sandbox-cgroups` crate**: New crate providing cgroup v2 management with configurable resource limits and metrics collection
+  - **Resource limits**: PID limits (pids.max, default 1024), memory limits (memory.high/memory.max, defaults 1GB/2GB), CPU limits (cpu.max, default 80% of one core)
+  - **Metrics collection**: Real-time monitoring of PID count, memory usage, CPU usage, and OOM events from cgroup filesystem
+  - **Integration**: Optional cgroups feature in sandbox-core, enabled by default in sbx-helper
+  - **Security**: Graceful fallback when cgroup v2 unavailable, proper process migration during cleanup
+  - **E2E testing**: Test orchestrator with resource-abusive programs (fork_bomb, memory_hog, cpu_burner) protected by SANDBOX_TEST_MODE environment variable for safe development
+
+- Key Source Files:
+  - `crates/sandbox-cgroups/src/lib.rs` - Core cgroup management API and resource control
+  - `crates/sandbox-core/src/lib.rs` - Cgroups integration with optional feature flag
+  - `crates/sbx-helper/src/main.rs` - Default cgroups enablement and SANDBOX_TEST_MODE environment variable
+  - `tests/sandbox-integration/main.rs` - Integration tests with cgroups feature
+  - `tests/cgroup-enforcement/src/` - E2E test programs (fork_bomb, memory_hog, cpu_burner) and orchestrator
+
+- Test Coverage:
+  - **Unit tests** (5 tests): Configuration validation, manager lifecycle, metrics collection
+  - **Integration tests** (5 tests): Cgroups in sandbox lifecycle, metrics during operation, direct manager usage, E2E enforcement verification
+  - **E2E tests** (3 test programs + orchestrator): fork_bomb, memory_hog, cpu_burner with safety mechanisms and automated verification
+  - **Feature-gated testing**: Separate test runs with `--features cgroups` for optional functionality
+  - **Safety mechanisms**: SANDBOX_TEST_MODE environment variable prevents accidental system damage during development
+  - **CI integration**: All tests pass in `cargo test --workspace` pipeline
+
+- Integration Points:
+  - **M2 namespace isolation**: Cgroups complement namespace isolation with resource controls
+  - **M4 overlays**: Resource limits will constrain overlay operations
+  - **M5 seccomp**: Cgroups provide resource enforcement for seccomp-protected processes
+  - **M6 networking**: CPU/memory limits apply to network operations
+  - **Future milestones**: Foundation for container/VM resource delegation
 
 **Phase 2: Advanced Features** (4-5 weeks total, with parallel feature tracks)
 

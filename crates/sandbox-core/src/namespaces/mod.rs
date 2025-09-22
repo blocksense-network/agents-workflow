@@ -1,7 +1,7 @@
 //! Linux namespace management for sandbox isolation.
 
 use nix::sched::{unshare, CloneFlags};
-use nix::unistd::{getuid, setgroups, setresgid, setresuid, Uid, Gid};
+use nix::unistd::{getuid, setgroups, setresgid, setresuid, Gid, Uid};
 use tracing::{debug, info, warn};
 
 use crate::error::Error;
@@ -153,13 +153,10 @@ impl NamespaceManager {
         use std::fs::OpenOptions;
         use std::io::Write;
 
-        let mut file = OpenOptions::new()
-            .write(true)
-            .open(path)
-            .map_err(|e| {
-                warn!("Failed to open {}: {}", path, e);
-                Error::Namespace(format!("Failed to open {}: {}", path, e))
-            })?;
+        let mut file = OpenOptions::new().write(true).open(path).map_err(|e| {
+            warn!("Failed to open {}: {}", path, e);
+            Error::Namespace(format!("Failed to open {}: {}", path, e))
+        })?;
 
         file.write_all(content.as_bytes()).map_err(|e| {
             warn!("Failed to write to {}: {}", path, e);

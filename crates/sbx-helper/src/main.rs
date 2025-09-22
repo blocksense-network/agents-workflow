@@ -5,7 +5,7 @@
 use clap::Parser;
 use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
 use sandbox_fs::{FilesystemConfig, FilesystemManager};
-use tracing::{info, error};
+use tracing::{error, info};
 
 /// Command line arguments for sbx-helper
 #[derive(Parser, Debug)]
@@ -82,10 +82,16 @@ async fn main() -> anyhow::Result<()> {
         args.command.clone()
     };
 
+    // Prepare environment variables for the sandboxed process
+    let mut env_vars = std::env::vars().collect::<Vec<(String, String)>>();
+    // Set environment variable to indicate we're running in a sandboxed test environment
+    // This allows test programs to safely perform resource-intensive operations
+    env_vars.push(("SANDBOX_TEST_MODE".to_string(), "1".to_string()));
+
     let process_config = ProcessConfig {
         command,
         working_dir: args.working_dir.clone(),
-        env: std::env::vars().collect(),
+        env: env_vars,
     };
 
     // Create filesystem configuration
@@ -94,15 +100,19 @@ async fn main() -> anyhow::Result<()> {
         fs_config.working_dir = Some(rw_dir.clone());
     }
 
-    // Initialize sandbox
-    let sandbox = Sandbox::with_namespace_config(namespace_config)
-        .with_process_config(process_config);
+    // Initialize sandbox with cgroups enabled
+    let mut sandbox = Sandbox::with_namespace_config(namespace_config)
+        .with_process_config(process_config)
+        .with_default_cgroups();
 
     let fs_manager = FilesystemManager::with_config(fs_config);
 
     // Start sandbox (enter all namespaces in single unshare() call)
     // After this point, we are within the user namespace and have root privileges there
-    sandbox.start().await?;
+    sandbox.start()?;
+
+    // Add current process to cgroup if cgroups are enabled
+    sandbox.add_process_to_cgroup(std::process::id())?;
 
     // Set up filesystem isolation (executed within user namespace context)
     fs_manager.setup_mounts().await?;
