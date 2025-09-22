@@ -41,6 +41,93 @@ This allows you to:
 - Demonstrate agent capabilities with recorded sessions
 - Validate enterprise gateway configurations
 
+### Claude Code Hooks Configuration
+
+For testing Agent Time-Travel functionality with real Claude Code, the integration tests automatically configure hooks in temporary directories to avoid polluting your home folder.
+
+**Test Configuration**:
+- Claude Code hooks are configured in a temporary `~/.claude/settings.json` within the test environment
+- The `HOME` environment variable is set to point to a temporary directory during test execution
+- This ensures your real `~/.claude` directory remains untouched
+
+**Manual Configuration** (for development/testing):
+If you need to manually configure Claude Code hooks, create the settings files:
+
+**Project-specific hooks** (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "write_file|read_file|append_file|replace_in_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/hooks/simulate_snapshot.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Global hooks** (`~/.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/global/snapshot/hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook script will be executed after each file operation, allowing you to test filesystem snapshot creation and Agent Time-Travel branching functionality.
+
+### Codex CLI Hooks Configuration
+
+For testing Agent Time-Travel functionality with real Codex CLI, the integration tests automatically configure hooks and verify execution.
+
+**Test Configuration**:
+- Codex CLI hooks are configured using the `--rollout-hook` command-line option
+- The `CODEX_HOME` environment variable is set to point to a temporary directory during test execution
+- Hook execution is verified through evidence files created during testing
+- This ensures your real `~/.codex` directory remains untouched
+
+**Manual Configuration** (for development/testing):
+If you need to manually configure Codex CLI hooks, use the `--rollout-hook` option:
+
+```bash
+# Run Codex with a hook that executes after each rollout entry
+codex --rollout-hook "/path/to/snapshot/hook.py" "Create hello.py"
+
+# Multiple arguments can be passed to the hook
+codex --rollout-hook "my-hook-script.sh" "arg1" "arg2" "Create hello.py"
+```
+
+The hook command receives the JSON rollout entry as its last argument. The hook script should process this JSON to extract tool information and create filesystem snapshots.
+
+**Example Hook Script**:
+```bash
+#!/bin/bash
+# Last argument is the JSON rollout entry
+json_entry="${@: -1}"
+echo "Processing rollout entry: $json_entry" >&2
+# Parse JSON and create snapshot...
+```
+
+For the mock agent testing, the hook format remains the same as Claude Code, but when testing with real Codex CLI, use the `--rollout-hook` command-line option.
+
 ## Quickstart
 
 ### Installation
@@ -203,6 +290,86 @@ Create custom scenarios using JSON files. Example structure:
 - `assistant`: Assistant response
 - `shell`: Shell command execution
 
+## Hooks Support
+
+The mock agent supports hooks similar to Claude Code hooks, enabling testing of Agent Time-Travel functionality and filesystem snapshot integration.
+
+### Hook Configuration
+
+Hooks are configured in scenario JSON files under the `hooks` key. The configuration follows the Claude Code hooks format:
+
+```json
+{
+  "hooks": {
+    "session_id": "test-session-123",
+    "PostToolUse": [
+      {
+        "matcher": "write_file|read_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/hooks/simulate_snapshot.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Supported Hook Events:**
+- `PostToolUse`: Executed after successful or failed tool execution
+
+**Hook Input Format:**
+Hooks receive JSON input via stdin containing:
+```json
+{
+  "session_id": "test-session-123",
+  "transcript_path": "/tmp/mock-transcript.jsonl",
+  "cwd": "/workspace/path",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "write_file",
+  "tool_input": {"path": "file.txt", "text": "content"},
+  "tool_response": {"success": true}
+}
+```
+
+### Filesystem Snapshot Testing
+
+The mock agent includes built-in support for testing filesystem snapshot functionality through hooks. A sample hook script `hooks/simulate_snapshot.py` simulates taking snapshots by appending evidence to `.aw/snapshots/evidence.log`.
+
+**Running Snapshot Tests:**
+
+```bash
+# Run the snapshot test scenario
+python -m src.cli run --scenario examples/snapshot_test_scenario.json --workspace /tmp/snapshot-test --format claude
+
+# Check that snapshots were taken
+cat /tmp/snapshot-test/.aw/snapshots/evidence.log
+```
+
+**Current Status**: Hook verification infrastructure is complete:
+- ✅ **Codex CLI**: Hooks are enabled and verified in integration tests using `--rollout-hook`
+- ⚠️ **Claude Code**: Hooks work in interactive mode but are bypassed in API client mode
+- 🏗️ **Infrastructure**: Complete hook execution verification with evidence logging
+- 📁 **Isolation**: Temporary directories prevent pollution of user home directories
+
+**Evidence File Format:**
+Each snapshot creates a JSON line in the evidence file:
+```json
+{
+  "timestamp": "2025-09-22T10:30:45.123456",
+  "session_id": "test-session-snapshots-123",
+  "tool_name": "write_file",
+  "tool_input": {"path": "hello.py", "text": "..."},
+  "tool_response": {"success": true},
+  "event": "PostToolUse",
+  "snapshot_id": "snapshot-2025-09-22T10-30-45-123456",
+  "provider": "mock-fs-snapshot"
+}
+```
+
 ## Tool Support
 
 The mock agent supports these file operation tools:
@@ -325,6 +492,7 @@ The integration tests verify:
 - **UI interaction handling**: Menu selections, prompt responses, error recovery
 - **API integration**: Proper request formatting, response parsing, tool execution
 - **File system operations**: Correct workspace usage, file creation/modification
+- **Hook execution**: Filesystem snapshot hooks are triggered and create evidence files
 - **Session management**: Recording, state persistence, cleanup
 
 ### Files Created During Testing
@@ -346,6 +514,11 @@ The integration tests create the following files (automatically cleaned up after
 **Temporary Files** (cleaned up after each test):
 
 - `MOCK_AGENT_WORKSPACE.txt` - Inter-process communication file for workspace paths
+
+**Hook Evidence Files** (created during hook testing):
+
+- `.aw/snapshots/evidence.log` - JSONL file containing snapshot evidence entries
+- Each entry proves a hook was executed with tool details and timestamps
 
 **Interactive Scenarios** (in `tests/tools/mock-agent/scenarios/`):
 

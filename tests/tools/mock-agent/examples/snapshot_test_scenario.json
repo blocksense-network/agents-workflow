@@ -1,0 +1,30 @@
+{
+    "meta": {
+        "instructions": "You are a helpful coding agent that takes filesystem snapshots after file operations."
+    },
+    "hooks": {
+        "session_id": "test-session-snapshots-123",
+        "PostToolUse": [
+            {
+                "matcher": "write_file|read_file|append_file",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "./hooks/simulate_snapshot.py",
+                        "timeout": 30
+                    }
+                ]
+            }
+        ]
+    },
+    "turns": [
+        {"user": "Create a hello.py file that prints Hello, World!"},
+        {"think": "I need to create a Python file with a print statement and a filesystem snapshot should be taken."},
+        {"tool": {"name": "write_file", "args": {"path": "hello.py", "text": "print('Hello, World!')\nprint('Snapshot test complete!')\n"}}},
+        {"assistant": "Created hello.py successfully. A filesystem snapshot should have been taken after this operation."},
+        {"tool": {"name": "read_file", "args": {"path": "hello.py"}}},
+        {"assistant": "Read the file and another snapshot should have been taken. Let me also append to the file."},
+        {"tool": {"name": "append_file", "args": {"path": "hello.py", "text": "print('Additional line added!')\n"}}},
+        {"assistant": "Appended to hello.py. This should have triggered another snapshot. The integration test can verify that all three snapshots were taken."}
+    ]
+}

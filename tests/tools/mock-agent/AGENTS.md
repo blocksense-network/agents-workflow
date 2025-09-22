@@ -11,6 +11,7 @@ The mock agent includes a full test suite that verifies:
 - Session file creation in both Codex and Claude formats
 - Tool execution and result handling
 - Terminal output validation with pexpect
+- **Hook execution and filesystem snapshot simulation** (integration tests)
 
 ## Quick Start
 
@@ -466,6 +467,54 @@ Claude Code presents a challenging interactive flow:
 - **Fallback handling**: Graceful degradation when tools aren't available
 
 The framework ensures **comprehensive testing** of coding agent functionality, verifying not just command execution but actual workspace modifications and API-driven tool usage.
+
+### Hook Execution Verification
+
+The integration tests include infrastructure for **filesystem snapshot hook verification**:
+
+- **Home Directory Isolation**: Tests set `HOME` (Claude) and `CODEX_HOME` (Codex) to temporary directories to avoid polluting your real home folder
+- **Real Agent Configuration**: Tests configure hooks on actual Claude Code and Codex CLI agents using temporary config files
+- **Hook Execution**: Infrastructure is in place to verify that hooks are triggered after file operations
+- **Snapshot Evidence**: Hook scripts create evidence files proving snapshots were taken
+- **Multi-Agent Support**: Supports both Claude Code (PostToolUse hooks) and Codex CLI (`--rollout-hook`)
+
+**Current Status**: Hook verification varies by agent and mode:
+- ✅ **Codex hooks**: Enabled and working in API mode - hooks are called and execution evidence is verified
+- ❌ **Claude Code hooks**: Do not work in API client mode (with ANTHROPIC_BASE_URL set) - hooks are bypassed
+- 🔍 **Confirmed**: Claude hooks work in interactive mode but are bypassed when running as API client
+- Hook infrastructure creates execution evidence without requiring JSON parsing
+
+**Evidence Files** (when hooks are active):
+
+**Hook Execution Log** (`hook_executions.log`):
+```json
+{
+  "timestamp": "2025-09-23T00:04:15.052273",
+  "hook_type": "claude_posttool|codex_rollout",
+  "agent_type": "claude|codex",
+  "session_id": "session-123",
+  "working_directory": "/path/to/workspace",
+  "command_line": "stdin|hook args",
+  "execution_id": "exec-2025-09-23T00-04-15-052273"
+}
+```
+
+**Snapshot Evidence** (`evidence.log`) - for Agent Time-Travel compatibility:
+```json
+{
+  "timestamp": "2025-09-23T00:04:15.052273",
+  "session_id": "session-123",
+  "tool_name": "hook_execution",
+  "tool_input": {},
+  "tool_response": {"success": true},
+  "event": "claude_posttool|codex_rollout",
+  "snapshot_id": "snapshot-2025-09-23T00-04-15-052273",
+  "provider": "integration-test-fs-snapshot",
+  "agent_type": "claude|codex"
+}
+```
+
+**To Enable Hook Verification**: Hook verification is enabled for Codex tests and prepared for Claude interactive tests. Uncomment Claude hook verification lines in `tests/test_agent_integration.py` if needed for interactive testing.
 
 #### Test Structure Best Practices
 

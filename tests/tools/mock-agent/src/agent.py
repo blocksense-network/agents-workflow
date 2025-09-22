@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import uuid
+import subprocess
 from typing import Dict, Any, List
 from .session_io import RolloutRecorder, SessionLogger, ClaudeSessionRecorder, _now_iso_ms
 from .tools import call_tool, ToolError
@@ -13,18 +14,80 @@ def _print_trace(kind: str, msg: str) -> None:
 def _as_json(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
+def _execute_hooks(hooks_config: Dict[str, Any], event_name: str, hook_input: Dict[str, Any], workspace: str) -> None:
+    """Execute hooks for a given event."""
+    if not hooks_config or event_name not in hooks_config:
+        return
+
+    session_id = hooks_config.get("session_id", "mock-session-123")
+    cwd = workspace
+
+    for matcher_config in hooks_config[event_name]:
+        matcher = matcher_config.get("matcher", "*")
+        hooks = matcher_config.get("hooks", [])
+
+        # For simplicity, we'll execute hooks for all matchers in this mock implementation
+        # In a real implementation, you'd check the matcher against the tool name
+        for hook in hooks:
+            if hook.get("type") == "command":
+                command = hook.get("command", "")
+                timeout = hook.get("timeout", 60)
+
+                # Prepare hook input JSON
+                hook_input_data = {
+                    "session_id": session_id,
+                    "transcript_path": "/tmp/mock-transcript.jsonl",  # Mock path
+                    "cwd": cwd,
+                    "hook_event_name": event_name,
+                    **hook_input
+                }
+
+                try:
+                    # Execute the hook command with JSON input via stdin
+                    process = subprocess.Popen(
+                        command,
+                        shell=True,
+                        cwd=cwd,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        env={**os.environ, "CLAUDE_PROJECT_DIR": workspace}
+                    )
+
+                    # Send JSON input
+                    stdout, stderr = process.communicate(
+                        input=json.dumps(hook_input_data),
+                        timeout=timeout
+                    )
+
+                    _print_trace("hook", f"Executed {event_name} hook: {command}")
+                    if stdout.strip():
+                        _print_trace("hook", f"Hook stdout: {stdout.strip()}")
+                    if stderr.strip():
+                        _print_trace("hook", f"Hook stderr: {stderr.strip()}")
+
+                except subprocess.TimeoutExpired:
+                    _print_trace("hook", f"Hook timeout: {command}")
+                    process.kill()
+                except Exception as e:
+                    _print_trace("hook", f"Hook execution failed: {command} - {e}")
+
 def run_scenario(scenario_path: str, workspace: str, codex_home: str = os.path.expanduser("~/.codex"), format: str = "codex") -> str:
     os.makedirs(workspace, exist_ok=True)
     with open(scenario_path, "r", encoding="utf-8") as f:
         scenario = json.load(f)
 
+    # Extract hooks configuration
+    hooks_config = scenario.get("hooks", {})
+
     if format == "claude":
-        return _run_scenario_claude(scenario, workspace, codex_home)
+        return _run_scenario_claude(scenario, workspace, codex_home, hooks_config)
     else:
-        return _run_scenario_codex(scenario, workspace, codex_home)
+        return _run_scenario_codex(scenario, workspace, codex_home, hooks_config)
 
 
-def _run_scenario_codex(scenario: Dict[str, Any], workspace: str, codex_home: str) -> str:
+def _run_scenario_codex(scenario: Dict[str, Any], workspace: str, codex_home: str, hooks_config: Dict[str, Any]) -> str:
     """Run scenario using Codex format."""
     recorder = RolloutRecorder(codex_home=codex_home, cwd=workspace, instructions=scenario.get("meta",{}).get("instructions"))
     logger = SessionLogger(codex_home=codex_home)
@@ -62,9 +125,26 @@ def _run_scenario_codex(scenario: Dict[str, Any], workspace: str, codex_home: st
                 result = call_tool(name, workspace, **args)
                 _print_trace("tool", f"{name} -> ok {result}")
                 recorder.record_event("agent_message", {"message": f"tool {name} ok", "id": call_id})
+
+                # Execute PostToolUse hooks
+                hook_input = {
+                    "tool_name": name,
+                    "tool_input": args,
+                    "tool_response": {"success": True}
+                }
+                _execute_hooks(hooks_config, "PostToolUse", hook_input, workspace)
+
             except ToolError as e:
                 _print_trace("tool", f"{name} -> error {e}")
                 recorder.record_event("agent_message", {"message": f"tool {name} error: {e}", "id": call_id})
+
+                # Execute PostToolUse hooks for failed tools too
+                hook_input = {
+                    "tool_name": name,
+                    "tool_input": args,
+                    "tool_response": {"success": False, "error": str(e)}
+                }
+                _execute_hooks(hooks_config, "PostToolUse", hook_input, workspace)
         elif "assistant" in step:
             text = step["assistant"]
             _print_trace("assistant", text)
@@ -88,7 +168,7 @@ def _run_scenario_codex(scenario: Dict[str, Any], workspace: str, codex_home: st
     return recorder.rollout_path
 
 
-def _run_scenario_claude(scenario: Dict[str, Any], workspace: str, codex_home: str) -> str:
+def _run_scenario_claude(scenario: Dict[str, Any], workspace: str, codex_home: str, hooks_config: Dict[str, Any]) -> str:
     """Run scenario using Claude format."""
     recorder = ClaudeSessionRecorder(codex_home=codex_home, cwd=workspace)
     
@@ -120,14 +200,30 @@ def _run_scenario_claude(scenario: Dict[str, Any], workspace: str, codex_home: s
             try:
                 result = call_tool(name, workspace, **args)
                 _print_trace("tool", f"{name} -> ok {result}")
-                
+
                 # Create tool result data based on the tool type
                 tool_result_data = _create_tool_result_data(name, result, args)
                 recorder.record_tool_result(tool_call_id, str(result), is_error=False, tool_result_data=tool_result_data)
-                
+
+                # Execute PostToolUse hooks
+                hook_input = {
+                    "tool_name": name,
+                    "tool_input": args,
+                    "tool_response": {"success": True}
+                }
+                _execute_hooks(hooks_config, "PostToolUse", hook_input, workspace)
+
             except ToolError as e:
                 _print_trace("tool", f"{name} -> error {e}")
                 recorder.record_tool_result(tool_call_id, str(e), is_error=True, tool_result_data=f"Error: {e}")
+
+                # Execute PostToolUse hooks for failed tools too
+                hook_input = {
+                    "tool_name": name,
+                    "tool_input": args,
+                    "tool_response": {"success": False, "error": str(e)}
+                }
+                _execute_hooks(hooks_config, "PostToolUse", hook_input, workspace)
                 
         elif "assistant" in step:
             text = step["assistant"]
