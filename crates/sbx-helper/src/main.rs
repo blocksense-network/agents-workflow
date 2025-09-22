@@ -3,19 +3,49 @@
 #![cfg(target_os = "linux")]
 
 use clap::Parser;
-use tracing::info;
+use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
+use sandbox_fs::{FilesystemConfig, FilesystemManager};
+use tracing::{info, error};
 
 /// Command line arguments for sbx-helper
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Configuration file path
-    #[arg(short, long)]
-    config: Option<String>,
+    /// Command to execute in sandbox
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    command: Vec<String>,
+
+    /// Working directory for the command
+    #[arg(short = 'C', long)]
+    working_dir: Option<String>,
 
     /// Enable debug mode
     #[arg(long)]
     debug: bool,
+
+    /// Disable user namespace isolation
+    ///
+    /// Note: Disabling user namespaces may require CAP_SYS_ADMIN for other namespaces.
+    /// User namespaces allow unprivileged creation of other namespace types.
+    #[arg(long)]
+    no_user_ns: bool,
+
+    /// Disable mount namespace isolation
+    ///
+    /// Note: Mount operations require CAP_SYS_ADMIN (typically root privileges).
+    #[arg(long)]
+    no_mount_ns: bool,
+
+    /// Disable PID namespace isolation
+    ///
+    /// Note: Creating PID namespaces requires CAP_SYS_ADMIN unless done within
+    /// a user namespace created in the same unshare() call.
+    #[arg(long)]
+    no_pid_ns: bool,
+
+    /// Read-write directory to allow in sandbox
+    #[arg(long)]
+    rw_dir: Option<String>,
 }
 
 #[tokio::main]
@@ -31,18 +61,59 @@ async fn main() -> anyhow::Result<()> {
         })
         .init();
 
-    info!("Starting sandbox helper");
+    info!("Starting sandbox helper with args: {:?}", args);
 
-    // TODO: Initialize sandbox components
-    // - Load configuration
-    // - Set up namespaces
-    // - Configure filesystem
-    // - Install seccomp filters
-    // - Set up cgroups
-    // - Configure networking
-    // - Execute entrypoint
+    // Create sandbox configuration
+    let namespace_config = NamespaceConfig {
+        user_ns: !args.no_user_ns,
+        mount_ns: !args.no_mount_ns,
+        pid_ns: !args.no_pid_ns,
+        uts_ns: true,
+        ipc_ns: true,
+        time_ns: false,
+        uid_map: None,
+        gid_map: None,
+    };
 
-    info!("Sandbox helper initialized successfully");
+    // Create process configuration
+    let command = if args.command.is_empty() {
+        vec!["/bin/sh".to_string()]
+    } else {
+        args.command.clone()
+    };
 
-    Ok(())
+    let process_config = ProcessConfig {
+        command,
+        working_dir: args.working_dir.clone(),
+        env: std::env::vars().collect(),
+    };
+
+    // Create filesystem configuration
+    let mut fs_config = FilesystemConfig::default();
+    if let Some(rw_dir) = &args.rw_dir {
+        fs_config.working_dir = Some(rw_dir.clone());
+    }
+
+    // Initialize sandbox
+    let sandbox = Sandbox::with_namespace_config(namespace_config)
+        .with_process_config(process_config);
+
+    let fs_manager = FilesystemManager::with_config(fs_config);
+
+    // Start sandbox (enter all namespaces in single unshare() call)
+    // After this point, we are within the user namespace and have root privileges there
+    sandbox.start().await?;
+
+    // Set up filesystem isolation (executed within user namespace context)
+    fs_manager.setup_mounts().await?;
+
+    // Execute the process as PID 1
+    // This will replace the current process
+    match sandbox.exec_process() {
+        Ok(_) => unreachable!("exec_process should not return"),
+        Err(e) => {
+            error!("Failed to execute process: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
