@@ -46,7 +46,14 @@ class ShellTestRunner
       escaped_output = Shellwords.escape(@temp_output)
 
       # Use shell redirection to capture stdout and stderr
-      command = "ruby #{escaped_script} > #{escaped_output} 2>&1"
+      # Run the script from the test directory since that's where the test files are
+      test_dir = File.dirname(test_script)
+      # Use the same ruby executable and preserve environment
+      ruby_executable = RbConfig.ruby
+      # Pass through any test filtering arguments
+      args = ARGV.map { |arg| Shellwords.escape(arg) }.join(' ')
+      command = "cd #{Shellwords.escape(test_dir)} && RUBYLIB=#{ENV.fetch('RUBYLIB',
+                                                                          nil)} #{ruby_executable} #{escaped_script} #{args} > #{escaped_output} 2>&1"
 
       success = system(command)
       exit_code = $CHILD_STATUS.exitstatus
@@ -71,11 +78,22 @@ class ShellTestRunner
   def create_test_script
     script_path = File.join(__dir__, "temp_test_runner_#{Time.now.to_i}.rb")
 
+    # Get test files from the test directory
+    test_files = []
+    test_dir = __dir__
+    test_files.concat(Dir[File.join(test_dir, 'test_*.rb')])
+    test_files.concat(Dir[File.join(test_dir, 'snapshot', 'test_*.rb')])
+
+    # Make paths relative to the test directory for the temporary script
+    test_files.map! { |f| f.sub(%r{^#{Regexp.escape(test_dir)}/}, '') }
+
     script_content = <<~RUBY
       #!/usr/bin/env ruby
       # frozen_string_literal: true
 
       # Stay in the project root directory to maintain load paths
+      # Set up the load path for legacy Ruby code
+      $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
       require 'minitest/autorun'
 
@@ -100,12 +118,9 @@ class ShellTestRunner
       Minitest.reporter = VerboseProgressReporter.new
 
       # Load all test files
-      test_files = []
-      test_files.concat(Dir["test/test_*.rb"].sort)
-      test_files.concat(Dir["test/snapshot/test_*.rb"].sort)
+      test_files = #{test_files.inspect}
 
       test_files.each do |test_file|
-        puts "Loading: \#{File.basename(test_file)}"
         require File.expand_path(test_file)
       end
     RUBY

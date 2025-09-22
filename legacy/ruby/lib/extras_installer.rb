@@ -20,7 +20,7 @@ class ExtrasInstaller
   NIX_DEPENDENT_COMPONENTS = %w[direnv cachix].freeze
 
   # Path configuration relative to the project root
-  AGENTS_WORKFLOW_DIR = File.expand_path('..', __dir__)
+  AGENTS_WORKFLOW_DIR = File.expand_path('../../..', __dir__)
   INSTALL_DIR = File.join(AGENTS_WORKFLOW_DIR, 'install')
   MARKER_DIR = File.join(AGENTS_WORKFLOW_DIR, '.install-markers')
 

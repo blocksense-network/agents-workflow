@@ -55,9 +55,12 @@ fi
 
 SETUP_ENV="$("$AGENTS_WORKFLOW_DIR/bin/get-task" --get-setup-env 2>/dev/null)"
 if [ -n "$SETUP_ENV" ]; then
-  printf '%s\n' "$SETUP_ENV" | while IFS= read -r line; do
+  # Export each line as an environment variable
+  while IFS= read -r line; do
     export "$line"
-  done
+  done <<EOF
+$SETUP_ENV
+EOF
 fi
 
 if [ -f .agents/codex-setup ]; then

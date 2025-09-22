@@ -1,17 +1,46 @@
+# Nix environment
 .direnv/
 
+# Ruby/Rails
 .install-markers/
 test/logs/
+legacy/ruby/test/logs/
 
 # Debugger temp files
 .rdbgrc.breakpoints
 
-# linter cache
+# Ruby linter cache
 .rubocop-cache/
 .pre-commit-config.yaml
 
+# Spell check cache
 .cspellcache
 .lycheecache
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Rust backup files
+*.rs.bk
+
+# IDE files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
 
 repomix.md
 reference_projects/

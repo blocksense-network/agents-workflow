@@ -3,12 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
     git-hooks.url = "github:cachix/git-hooks.nix";
   };
 
   outputs = {
     self,
     nixpkgs,
+    rust-overlay,
     git-hooks,
   }: let
     systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
@@ -181,6 +183,7 @@
     devShells = forAllSystems (system: let
       pkgs = import nixpkgs {
         inherit system;
+        overlays = [ rust-overlay.overlays.default ];
         config.allowUnfree = true; # Allow unfree packages like claude-code
       };
       isLinux = pkgs.stdenv.isLinux;
@@ -188,6 +191,22 @@
     in {
       default = pkgs.mkShell {
         buildInputs = [
+          # Rust toolchain
+          (pkgs.rust-bin.stable.latest.default.override {
+            extensions = ["rustfmt" "clippy"];
+            targets = [
+              # Linux
+              "x86_64-unknown-linux-gnu"
+              "aarch64-unknown-linux-gnu"
+              # macOS
+              "x86_64-apple-darwin"
+              "aarch64-apple-darwin"
+              # Windows (GNU)
+              "x86_64-pc-windows-gnu"
+              "aarch64-pc-windows-gnullvm"
+            ];
+          })
+
           pkgs.just
           pkgs.python3
           pkgs.python3Packages.pexpect

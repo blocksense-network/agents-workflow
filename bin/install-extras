@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative '../lib/extras_task/cli'
+require_relative '../legacy/ruby/lib/extras_task/cli'
 
 ExtrasTask::CLI.install_extras(ARGV)

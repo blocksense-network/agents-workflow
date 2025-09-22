@@ -135,14 +135,6 @@ The execution of tests can be accelerated by adding more followers.
 
 `aw agent followers run` accepts multiple `--command` entries and shards them across all matching executors. The scheduler builds a job queue and assigns tasks round-robin while respecting per-host concurrency=1 to avoid oversubscription. Each command is scheduled on exactly one executor per operating system. All outputs are collected before being returned to the agent.
 
-[^agent-forwarding]: <https://mikebarkas.dev/configure-ssh-agent-forwarding-security/>
-[^check-by-ssh]: <https://nagios-plugins.org/doc/man/check_by_ssh.html>
-[^systemctl]: <https://linux-audit.com/systemd/faq/how-to-show-failed-units-with-systemctl/>
-[^df-command]: <https://www.redhat.com/sysadmin/Linux-df-command>
-[^get-computerinfo]: <https://www.pdq.com/powershell/get-computerinfo/>
-[^test-netconnection]: <https://www.pdq.com/powershell/test-netconnection/>
-[^pslurp]: <https://www.mankier.com/1/pslurp>
-[^pssh]: <https://parallel-ssh.readthedocs.io/en/stable/quickstart.html>
 
 ## Connectivity Layer — QUIC Control + SSH over CONNECT
 

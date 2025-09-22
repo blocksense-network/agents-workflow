@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative '../lib/agent_task/cli'
+require_relative '../legacy/ruby/lib/agent_task/cli'
 
 if ARGV.first == 'setup'
   ARGV.shift

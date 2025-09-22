@@ -75,7 +75,7 @@ module Snapshot
 
       # Clone is not properly accessible - this indicates ZFS mounting permissions issue
       raise 'ZFS clone created but not accessible - check ZFS mounting permissions ' \
-            'or start the AW filesystem snapshots daemon with `just launch-aw-fs-snapshots-daemon`'
+            'or start the AW filesystem snapshots daemon with `just legacy-start-aw-fs-snapshots-daemon`'
     end
 
     def cleanup_workspace(dest)

@@ -14,28 +14,44 @@
 
 set shell := ["./scripts/nix-env.sh", "-c"]
 
-test:
-    RUBYLIB=lib ruby -Itest test/run_tests_shell.rb
+# Check Rust code for compilation errors
+check:
+    cargo check --workspace
+
+# Run Rust tests
+test-rust:
+    cargo test --workspace
+
+# Lint Rust code
+lint-rust:
+    cargo clippy --workspace -- -D warnings
+
+# Format Rust code
+fmt-rust:
+    cargo fmt --all --check
+
+legacy-test:
+    export RUBYLIB=legacy/ruby/lib && ruby -Ilegacy/ruby/test legacy/ruby/test/run_tests_shell.rb
 
 # Run codex-setup integration tests (Docker-based)
-test-codex-setup-integration:
+legacy-test-codex-setup-integration:
     ./setup-tests/test-runner.sh
 
 # Run only snapshot-related tests (ZFS, Btrfs, and Copy providers)
-test-snapshot:
-    RUBYLIB=lib ruby scripts/run_snapshot_tests.rb
+legacy-test-snapshot:
+    RUBYLIB=legacy/ruby/lib ruby scripts/run_snapshot_tests.rb
 
 # Lint the Ruby codebase
-lint:
-    rubocop
+legacy-lint:
+    rubocop legacy/ruby
 
 # Auto-fix lint issues where possible
-lint-fix:
-    rubocop --autocorrect-all
+legacy-lint-fix:
+    rubocop --autocorrect-all legacy/ruby
 
 # Build and publish the gem
-publish-gem:
-    gem build agent-task.gemspec && gem push agent-task-*.gem
+legacy-publish-gem:
+    gem build legacy/ruby/agent-task.gemspec && gem push agent-task-*.gem
 
 # Validate all JSON Schemas with ajv (meta-schema compile)
 conf-schema-validate:
@@ -85,16 +101,16 @@ cleanup-test-filesystems:
     scripts/cleanup-test-filesystems.sh
 
 # Launch the AW filesystem snapshots daemon for testing (requires sudo)
-launch-aw-fs-snapshots-daemon:
+legacy-start-aw-fs-snapshots-daemon:
     scripts/launch-aw-fs-snapshots-daemon.sh
 
 # Stop the AW filesystem snapshots daemon
-stop-aw-fs-snapshots-daemon:
+legacy-stop-aw-fs-snapshots-daemon:
     scripts/stop-aw-fs-snapshots-daemon.sh
 
 # Check status of AW filesystem snapshots daemon
-check-aw-fs-snapshots-daemon:
-    scripts/check-aw-fs-snapshots-daemon.sh
+legacy-check-aw-fs-snapshots-daemon:
+    scripts/check-aw-fs-snapshots-daemon.rb
 
 # Run all spec linting/validation in one go
 lint-specs:

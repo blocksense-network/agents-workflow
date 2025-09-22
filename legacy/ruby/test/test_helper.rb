@@ -15,7 +15,7 @@ end
 module RepoTestHelper # rubocop:disable Metrics/ModuleLength
   include PlatformHelpers
 
-  ROOT = File.expand_path('..', __dir__)
+  ROOT = File.expand_path('../../..', __dir__)
   AGENT_TASK = File.join(ROOT, 'bin', 'agent-task')
   GET_TASK = File.join(ROOT, 'bin', 'get-task')
 

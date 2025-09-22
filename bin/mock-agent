@@ -7,7 +7,7 @@
 
 require 'optparse'
 require 'json'
-require_relative '../lib/mock_agent'
+require_relative '../legacy/ruby/lib/mock_agent'
 
 # Parse command line options
 options = {

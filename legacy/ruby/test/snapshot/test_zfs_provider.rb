@@ -327,7 +327,7 @@ class TestZfsProvider < Minitest::Test
 
   def test_zfs_snapshot_and_clone_operations
     unless zfs_mounting_available?
-      skip 'ZFS mounting not available for regular users. Start the daemon with `just launch-aw-fs-snapshots-daemon`'
+      skip 'ZFS mounting not available for regular users. Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
     end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
     workspace_dir = create_workspace_destination('clone_test')
@@ -371,7 +371,7 @@ class TestZfsProvider < Minitest::Test
 
   def test_zfs_error_conditions
     unless zfs_mounting_available?
-      skip 'ZFS mounting not available for regular users. Start the daemon with `just launch-aw-fs-snapshots-daemon`'
+      skip 'ZFS mounting not available for regular users. Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
     end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
 
