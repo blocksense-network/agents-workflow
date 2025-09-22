@@ -92,20 +92,23 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.3 Privileged FS Operations Daemon** (4-5 days, parallel with 0.4-0.6)
 
 - Deliverables:
-  - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server
+  - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server (the implementation should operate similarly to the reference implementation `bin/aw-fs-snapshots-daemon` which should be moved to the legacy/ruby folder; The new implementation should be made production-ready)
   - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../../Research/Using-SSZ.md) for implementation reference)
   - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
   - Async tokio runtime for concurrent request handling
   - Tracing library for structured logging
   - Proper signal handling and cleanup
   - **Daemon should not assume presence of any ZFS datasets or subvolumes** - all filesystem operations should be validated dynamically
+  - **Stdin-driven mode**: daemon should provide option to accept SSZ-encoded commands from stdin as alternative to Unix socket communication
 
 - Verification:
   - Daemon starts and listens on Unix socket at expected path
-  - Length-prefixed SSZ ping request returns success response
+  - Length-prefixed SSZ ping request returns success response via Unix socket
+  - Length-prefixed SSZ ping request returns success response via stdin mode
   - Daemon handles invalid SSZ data gracefully with error responses
   - Daemon shuts down cleanly on SIGINT/SIGTERM
   - Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
+  - Legacy tests still pass, using the legacy daemon from its new location.
 
 **0.4 FS Snapshots Core API** (3-4 days, parallel with 0.3, 0.5-0.6)
 
