@@ -105,9 +105,9 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - CI pipeline runs successfully on push/PR
   - Workspace structure matches [Repository-Layout.md](Repository-Layout.md)
 
-**0.3 Privileged FS Operations Daemon** (4-5 days, parallel with 0.4-0.6)
+**0.3 Privileged FS Operations Daemon** IN PROGRESS (5 days)
 
-- Deliverables:
+- **Deliverables**:
   - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server (the implementation should operate similarly to the reference implementation `bin/aw-fs-snapshots-daemon` which should be moved to the legacy/ruby folder; The new implementation should be made production-ready)
   - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../../Research/Using-SSZ.md) for implementation reference)
   - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
@@ -117,14 +117,37 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - **Daemon should not assume presence of any ZFS datasets or subvolumes** - all filesystem operations should be validated dynamically
   - **Stdin-driven mode**: daemon should provide option to accept SSZ-encoded commands from stdin as alternative to Unix socket communication
 
-- Verification:
-  - Daemon starts and listens on Unix socket at expected path
-  - Length-prefixed SSZ ping request returns success response via Unix socket
-  - Length-prefixed SSZ ping request returns success response via stdin mode
-  - Daemon handles invalid SSZ data gracefully with error responses
-  - Daemon shuts down cleanly on SIGINT/SIGTERM
-  - Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
-  - Legacy tests still pass, using the legacy daemon from its new location.
+- **Implementation Details**:
+  - Created new Rust crate `aw-fs-snapshots-daemon` with async Tokio-based Unix socket server
+  - Implemented length-prefixed JSON marshaling (temporary solution until proper SSZ support is available)
+  - Added comprehensive ZFS and Btrfs operations (snapshot, clone, delete) with sudo privilege escalation
+  - Dynamic validation ensures ZFS datasets/snapshots and Btrfs subvolumes exist before operations
+  - Proper signal handling (SIGINT/SIGTERM) with graceful shutdown and socket cleanup
+  - Stdin-driven mode for testing and integration with existing scripts
+  - Structured logging with tracing library for production monitoring
+  - Concurrent request handling with async/await patterns
+
+- **Key Source Files**:
+  - `crates/aw-fs-snapshots-daemon/src/main.rs` - Main binary entry point
+  - `crates/aw-fs-snapshots-daemon/src/server.rs` - Unix socket server implementation
+  - `crates/aw-fs-snapshots-daemon/src/operations.rs` - Filesystem operations with validation
+  - `crates/aw-fs-snapshots-daemon/src/types.rs` - Request/response type definitions
+  - `Justfile` - Added `start-aw-fs-snapshots-daemon`, `stop-aw-fs-snapshots-daemon`, `check-aw-fs-snapshots-daemon` targets
+
+- **Outstanding Tasks**:
+  - Implement proper SSZ marshaling format (currently uses length-prefixed JSON)
+  - Fix SSZ derive macros compatibility issues
+  - Add comprehensive Btrfs snapshot testing (currently ZFS-focused)
+  - Consider alternatives to sudo requirement for privileged operations
+
+- **Verification Results**:
+  - [x] Daemon starts and listens on Unix socket at expected path
+  - [ ] Length-prefixed SSZ ping request returns success response via Unix socket
+  - [ ] Length-prefixed SSZ ping request returns success response via stdin mode
+  - [ ] Daemon handles invalid SSZ data gracefully with error responses
+  - [x] Daemon shuts down cleanly on SIGINT/SIGTERM
+  - [ ] Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
+  - [ ] Legacy tests still pass, using the legacy daemon from its new location
 
 **0.4 FS Snapshots Core API** (3-4 days, parallel with 0.3, 0.5-0.6)
 

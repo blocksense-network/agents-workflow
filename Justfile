@@ -14,6 +14,10 @@
 
 set shell := ["./scripts/nix-env.sh", "-c"]
 
+# IMPORTANT: Never use long scripts in Justfile recipes!
+# Long scripts set a custom shell, overriding our nix-env.sh setting.
+# Move complex scripts to the scripts/ folder instead.
+
 # Check Rust code for compilation errors
 check:
     cargo check --workspace
@@ -102,15 +106,27 @@ cleanup-test-filesystems:
 
 # Launch the AW filesystem snapshots daemon for testing (requires sudo)
 legacy-start-aw-fs-snapshots-daemon:
-    scripts/launch-aw-fs-snapshots-daemon.sh
+    legacy/scripts/launch-aw-fs-snapshots-daemon.sh
 
 # Stop the AW filesystem snapshots daemon
 legacy-stop-aw-fs-snapshots-daemon:
-    scripts/stop-aw-fs-snapshots-daemon.sh
+    legacy/scripts/stop-aw-fs-snapshots-daemon.sh
 
 # Check status of AW filesystem snapshots daemon
 legacy-check-aw-fs-snapshots-daemon:
-    scripts/check-aw-fs-snapshots-daemon.rb
+    ruby legacy/scripts/check-aw-fs-snapshots-daemon.rb
+
+# Launch the new Rust AW filesystem snapshots daemon for testing (requires sudo)
+start-aw-fs-snapshots-daemon:
+    scripts/start-aw-fs-snapshots-daemon.sh
+
+# Stop the new Rust AW filesystem snapshots daemon
+stop-aw-fs-snapshots-daemon:
+    scripts/stop-aw-fs-snapshots-daemon.sh
+
+# Check status of the new Rust AW filesystem snapshots daemon
+check-aw-fs-snapshots-daemon:
+    scripts/check-aw-fs-snapshots-daemon.sh
 
 # Run all spec linting/validation in one go
 lint-specs:
