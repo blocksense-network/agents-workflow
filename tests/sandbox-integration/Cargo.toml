@@ -1,0 +1,13 @@
+[package]
+name = "sandbox-integration-tests"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sandbox_integration_tests"
+path = "main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+sandbox-core = { path = "../../crates/sandbox-core" }
+sandbox-fs = { path = "../../crates/sandbox-fs" }

@@ -233,7 +233,9 @@
 
 ## 16) Namespace bootstrap (step‑by‑step)
 
-1. **Userns**: `clone3(CLONE_NEWUSER)` → write UID/GID maps (using `newuidmap/newgidmap` if required). Set `no_new_privs` early.
+**Note:** User namespaces are created first and enable unprivileged processes to become "root" within the namespace, allowing subsequent privileged operations (mounts, etc.) without requiring CAP_SYS_ADMIN in the parent namespace.
+
+1. **Userns**: `clone3(CLONE_NEWUSER)` → write UID/GID maps (using `newuidmap/newgidmap` if required). Set `no_new_privs` early. **The process now has root privileges within this namespace.**
 
 2. **Mount ns**: `unshare(CLONE_NEWNS)` → mark `/` **private** (no propagation).
 
@@ -249,14 +251,14 @@
 
 8. **tmpfs**: mount tmpfs for `/tmp` and `/run` (per‑session private state).
 
-9. **Filesystem sealing**:
+9. **Filesystem sealing** (executed within user namespace context):
    - Make the existing mount tree **read‑only** recursively using `mount_setattr(AT_RECURSIVE, MS_RDONLY)` if available; otherwise bind‑remount each subtree RO.
 
    - Apply `nodev,nosuid,noexec` broadly (except where toolchains require exec).
 
-10. **Writable carve‑outs**: bind‑mount project dirs and caches **read‑write**; create optional **overlayfs** upperdirs for paths that need in‑place writes (e.g., `/usr/local`, `~/.local/share`).
+10. **Writable carve‑outs** (executed within user namespace context): bind‑mount project dirs and caches **read‑write**; create optional **overlayfs** upperdirs for paths that need in‑place writes (e.g., `/usr/local`, `~/.local/share`).
 
-11. **Cgroup v2**: create a per‑session subtree; set `pids.max`, `memory.high/max`, `cpu.max`, optional IO throttles. If `--containers`, delegate controllers to allow rootless runtimes to create children.
+11. **Cgroup v2** (executed within user namespace context): create a per‑session subtree; set `pids.max`, `memory.high/max`, `cpu.max`, optional IO throttles. If `--containers`, delegate controllers to allow rootless runtimes to create children.
 
 12. **Drop privileges**: clear ambient caps; tighten bounding set; set securebits (keep caps off across exec); remain root‑in‑ns only if needed.
 

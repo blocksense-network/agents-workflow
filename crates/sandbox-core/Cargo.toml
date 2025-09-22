@@ -10,6 +10,13 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+nix = { version = "0.27", features = [
+  "sched",
+  "mount",
+  "user",
+  "process",
+  "fs",
+] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

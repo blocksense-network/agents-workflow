@@ -65,7 +65,7 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
 
 **Phase 1: Core Sandbox Infrastructure** (2-3 weeks total, with parallel implementation tracks)
 
-**M1. Project bootstrap** (1–2d)
+**M1. Project bootstrap** ✅ COMPLETED (1–2d)
 
 - Deliverables:
   - Scaffolding for crates, workspace, linting (clippy), formatting (rustfmt), CI (GitHub Actions, Ubuntu runners). See [Repository Layout](../Repository-Layout.md) for reference.
@@ -76,7 +76,32 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - `cargo test --workspace` runs successfully (may have empty test suites)
   - CI pipeline runs successfully on push/PR for sandbox crates
 
-**M2. Minimal sandbox run (namespaces + RO sealing)** (3–5d)
+- Implementation details:
+  - Created 7 sandbox crates with modular architecture for different isolation concerns
+  - Added Linux-specific compilation gates using `#[cfg(target_os = "linux")]` attributes for cross-platform compatibility
+  - Configured consistent development tooling: `rust-toolchain.toml`, `rustfmt.toml`, and `clippy.toml`
+  - Updated CI workflow (`.github/workflows/ci.yml`) to include sandbox crates and binary builds
+  - All crates include basic unit test skeletons and pass `cargo clippy` linting
+
+- Key Source Files:
+  - `crates/sandbox-core/src/lib.rs` - Main sandbox orchestration API
+  - `crates/sandbox-fs/src/lib.rs` - Filesystem isolation management
+  - `crates/sandbox-seccomp/src/lib.rs` - Seccomp filtering framework
+  - `crates/sandbox-cgroups/src/lib.rs` - Cgroup resource control framework
+  - `crates/sandbox-net/src/lib.rs` - Network isolation framework
+  - `crates/sandbox-proto/src/lib.rs` - Protocol definitions for helper-supervisor communication
+  - `crates/sbx-helper/src/main.rs` - Command-line interface and sandbox launcher
+  - `Cargo.toml` - Workspace configuration with sandbox crate dependencies
+  - `rustfmt.toml`, `clippy.toml` - Code formatting and linting configuration
+
+- Verification Commands:
+  - `cargo check --workspace` - Verify all crates compile successfully
+  - `cargo test --workspace` - Run unit tests for all crates
+  - `cargo clippy --workspace -- -D warnings` - Lint code for quality issues
+  - `cargo fmt --all --check` - Verify code formatting
+  - `cargo build --bin sbx-helper` - Build the sandbox helper binary
+
+**M2. Minimal sandbox run (namespaces + RO sealing)** ✅ COMPLETED (3–5d)
 
 - Deliverables:
   - Implement userns + mount ns + pid ns + uts/ipc/time (opt).
@@ -89,6 +114,30 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - E2E test that inside sandbox can write to project directory
   - E2E test that inside sandbox sees isolated PIDs (different from host)
   - Unit tests for namespace creation and cleanup
+
+- Implementation details:
+  - **`NamespaceManager`** (`crates/sandbox-core/src/namespaces/mod.rs`): Comprehensive Linux namespace management supporting user, mount, PID, UTS, IPC, and time namespaces with automatic UID/GID mapping for user namespaces
+  - **`FilesystemManager`** (`crates/sandbox-fs/src/lib.rs`): Bind-mount based read-only sealing with configurable RW carve-outs for working directories; graceful fallback for test environments
+  - **`ProcessManager`** (`crates/sandbox-core/src/process/mod.rs`): PID 1 execution with proper `/proc` filesystem mounting and signal handling
+  - **`sbx-helper`** binary (`crates/sbx-helper/src/main.rs`): Command-line interface that orchestrates complete sandbox lifecycle - namespace entry, filesystem setup, and process execution
+  - **Configuration-driven architecture**: `NamespaceConfig`, `FilesystemConfig`, `ProcessConfig` structs provide declarative sandbox configuration
+  - **Security-first design**: Multiple isolation layers (namespaces, filesystem restrictions, capability dropping) with fail-safe defaults
+  - **Test environment compatibility**: All privileged operations handle permission failures gracefully in CI/test environments
+
+- Key Source Files:
+  - `crates/sandbox-core/src/lib.rs` - Main `Sandbox` struct and public API
+  - `crates/sandbox-core/src/namespaces/mod.rs` - Namespace creation and management
+  - `crates/sandbox-core/src/process/mod.rs` - Process execution and PID 1 handling
+  - `crates/sandbox-fs/src/lib.rs` - Filesystem isolation and mount operations
+  - `crates/sbx-helper/src/main.rs` - CLI binary and sandbox orchestration
+  - `tests/sandbox-integration/main.rs` - Integration tests demonstrating end-to-end functionality
+
+- Verification Commands:
+  - `cargo test -p sandbox-core` - Unit tests for namespace and process management
+  - `cargo test -p sandbox-fs` - Unit tests for filesystem isolation
+  - `cargo test -p sandbox-integration-tests` - Integration tests for component orchestration
+  - `cargo build --bin sbx-helper` - Build the sandbox helper binary
+  - `./scripts/demo-sandbox.sh` - Demonstration of sandbox functionality and usage examples
 
 **M3. Cgroups v2 limits** (2–3d)
 
