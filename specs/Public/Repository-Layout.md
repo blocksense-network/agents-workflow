@@ -49,8 +49,9 @@ agents-workflow/
 │  ├─ aw-config/               # Layered config + flag mapping
 │  ├─ aw-state/                # Local state (SQLite models, migrations)
 │  ├─ aw-repo/                 # VCS operations (Git/Hg/Bzr/Fossil)
-│  ├─ aw-rest-api-contract/    # Schema types, input validation, etc (also used by mock servers)
+│  ├─ aw-rest-api-contract/    # Schema types, input validation, etc (shared between mock servers and production server)
 │  ├─ aw-rest-client/          # Client for remote REST mode
+│  ├─ aw-rest-mock-server/     # Mock REST API server for development and testing
 │  ├─ aw-rest-server/          # Optional local REST service (lib + bin)
 │  ├─ aw-connectivity/         # SSH, relays, followers, rendezvous
 │  ├─ aw-notify/               # Cross-platform notifications

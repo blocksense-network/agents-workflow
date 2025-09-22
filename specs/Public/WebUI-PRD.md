@@ -169,8 +169,12 @@ TODO: This has to be re-thinked. How does it work in [Local-Mode](Local-Mode.md)
 
 ### Tech Notes (non-binding)
 
-- SPA built with React + Vite + TypeScript (non‑binding default), SSE for events, OpenAPI client for REST.
+- SPA built with SolidJS + Vite + TypeScript + Tailwind CSS, SSE for events, OpenAPI client for REST.
 - State normalized by session id; optimistic UI for pause/stop/resume.
+
+### Implementation Plan
+
+Planning and status tracking for this WebUI implementation live in [WebUI.status.md](WebUI.status.md). That document defines milestones, success criteria, and a precise, automated test plan per specs/AGENTS.md.
 
 ### Local Mode (--local)
 
