@@ -103,7 +103,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 
 - **Implementation Details**:
   - Created new Rust crate `aw-fs-snapshots-daemon` with async Tokio-based Unix socket server
-  - Implemented length-prefixed JSON marshaling (temporary solution until proper SSZ support is available)
+  - Implemented proper SSZ union types for type-safe daemon communication (using `ethereum-ssz` with union behavior)
   - Added comprehensive ZFS and Btrfs operations (snapshot, clone, delete) with sudo privilege escalation
   - Dynamic validation ensures ZFS datasets/snapshots and Btrfs subvolumes exist before operations
   - Proper signal handling (SIGINT/SIGTERM) with graceful shutdown and socket cleanup
@@ -119,16 +119,14 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - `Justfile` - Added `start-aw-fs-snapshots-daemon`, `stop-aw-fs-snapshots-daemon`, `check-aw-fs-snapshots-daemon` targets
 
 - **Outstanding Tasks**:
-  - Implement proper SSZ marshaling format (currently uses length-prefixed JSON)
-  - Fix SSZ derive macros compatibility issues
   - Add comprehensive Btrfs snapshot testing (currently ZFS-focused)
   - Consider alternatives to sudo requirement for privileged operations
 
 - **Verification Results**:
   - [x] Daemon starts and listens on Unix socket at expected path
-  - [ ] Length-prefixed SSZ ping request returns success response via Unix socket
-  - [ ] Length-prefixed SSZ ping request returns success response via stdin mode
-  - [ ] Daemon handles invalid SSZ data gracefully with error responses
+  - [x] Length-prefixed SSZ ping request returns success response via Unix socket
+  - [x] Length-prefixed SSZ ping request returns success response via stdin mode
+  - [x] Daemon handles invalid SSZ data gracefully with error responses
   - [x] Daemon shuts down cleanly on SIGINT/SIGTERM
   - [ ] Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
   - [ ] Legacy tests still pass, using the legacy daemon from its new location

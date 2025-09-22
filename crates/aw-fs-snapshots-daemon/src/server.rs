@@ -1,32 +1,20 @@
 use crate::operations::process_request;
 use crate::types::{Request, Response};
 use anyhow::{anyhow, Result};
+use ssz::{Encode, Decode};
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::{wrappers::UnixListenerStream, StreamExt};
 use tracing::{debug, error, info, warn};
 
-// TODO: Replace with proper SSZ encoding/decoding
-pub fn encode_length_prefixed_json<T: serde::Serialize>(data: &T) -> Result<Vec<u8>> {
-    let json_bytes = serde_json::to_vec(data)?;
-    let len = json_bytes.len() as u32;
-    let mut result = Vec::with_capacity(4 + json_bytes.len());
-    result.extend_from_slice(&len.to_le_bytes());
-    result.extend_from_slice(&json_bytes);
-    Ok(result)
+// SSZ encoding/decoding functions for daemon communication
+fn encode_ssz(data: &impl ssz::Encode) -> Vec<u8> {
+    data.as_ssz_bytes()
 }
 
-pub fn decode_length_prefixed_json<T: serde::de::DeserializeOwned>(data: &[u8]) -> Result<T> {
-    if data.len() < 4 {
-        return Err(anyhow!("Data too short for length prefix"));
-    }
-    let len = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-    if data.len() < 4 + len {
-        return Err(anyhow!("Data too short for payload"));
-    }
-    let json_data = &data[4..4 + len];
-    Ok(serde_json::from_slice(json_data)?)
+fn decode_ssz<T: ssz::Decode>(data: &[u8]) -> Result<T> {
+    T::from_ssz_bytes(data).map_err(|e| anyhow!("SSZ decode error: {:?}", e))
 }
 
 pub struct DaemonServer {
@@ -115,15 +103,15 @@ async fn handle_client(mut socket: UnixStream) -> Result<()> {
         return Ok(());
     }
 
-    // Parse length-prefixed JSON request from hex string
+    // Parse SSZ-encoded request from hex string
     let request_bytes = hex::decode(line.trim())?;
-    let request: Request = decode_length_prefixed_json(&request_bytes)?;
+    let request: Request = decode_ssz(&request_bytes)?;
 
     // Process the request
     let response = process_request(request).await;
 
-    // Encode response as length-prefixed JSON and send as hex
-    let response_bytes = encode_length_prefixed_json(&response)?;
+    // Encode response as SSZ and send as hex
+    let response_bytes = encode_ssz(&response);
     let response_hex = hex::encode(&response_bytes);
 
     // Write response followed by newline
