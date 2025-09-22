@@ -14,3 +14,7 @@ cgroups = []
 tokio = { workspace = true }
 sandbox-core = { path = "../../crates/sandbox-core", features = ["cgroups"] }
 sandbox-fs = { path = "../../crates/sandbox-fs" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sandbox-core = { path = "../../crates/sandbox-core", features = ["cgroups"] }
+sandbox-fs = { path = "../../crates/sandbox-fs" }

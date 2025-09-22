@@ -1,0 +1,17 @@
+[package]
+name = "agentfs-ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+agentfs-core = { path = "../agentfs-core" }
+agentfs-proto = { path = "../agentfs-proto" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

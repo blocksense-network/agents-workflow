@@ -17,6 +17,12 @@ members = [
   "crates/sandbox-net",
   "crates/sandbox-proto",
   "crates/sbx-helper",
+  # AgentFS crates
+  "crates/agentfs-core",
+  "crates/agentfs-proto",
+  "crates/agentfs-fuse-host",
+  "crates/agentfs-winfsp-host",
+  "crates/agentfs-ffi",
   # Integration tests
   "tests/sandbox-integration",
   "tests/cgroup-enforcement",

@@ -1,0 +1,18 @@
+[package]
+name = "agentfs-fuse-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agentfs-core = { path = "../agentfs-core" }
+agentfs-proto = { path = "../agentfs-proto" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true }
+
+# FUSE dependencies (Linux/macOS) - optional for bootstrap
+fuser = { version = "0.16", optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,0 +1,19 @@
+[package]
+name = "agentfs-winfsp-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agentfs-core = { path = "../agentfs-core" }
+agentfs-proto = { path = "../agentfs-proto" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true }
+
+# WinFsp dependencies (Windows only) - optional for bootstrap
+[target.'cfg(target_os = "windows")'.dependencies]
+winfsp = { version = "0.11", optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

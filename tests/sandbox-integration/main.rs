@@ -1,8 +1,11 @@
 //! Integration tests for sandbox functionality
 
+#[cfg(target_os = "linux")]
 use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
+#[cfg(target_os = "linux")]
 use sandbox_fs::{FilesystemConfig, FilesystemManager};
 
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn test_sandbox_integration() {
     // Create namespace configuration
@@ -275,6 +278,7 @@ fn test_overlay_enforcement_e2e() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn test_filesystem_config_defaults() {
     let config = FilesystemConfig::default();

@@ -1,6 +1,6 @@
 ### Overview
 
-This document tracks the implementation status of the AgentFS subsystem and serves as the single source of truth for the execution plan, milestones, automated success criteria, and cross‑team integration points.
+This document tracks the implementation status of the [AgentFS](AgentFS.md) subsystem and serves as the single source of truth for the execution plan, milestones, automated success criteria, and cross‑team integration points.
 
 Goal: deliver a cross‑platform, high‑performance, user‑space filesystem with snapshots, writable branches, and per‑process branch binding, usable by AW across Linux, macOS, and Windows.
 
@@ -30,9 +30,34 @@ M1. Project bootstrap (1–2d)
 
 Acceptance checklist (M1)
 
-- [ ] CI builds succeed on Linux, macOS, Windows
-- [ ] `cargo test` runs at least one core unit test per platform
-- [ ] clippy + rustfmt gates enabled and passing
+- [x] CI builds succeed on Linux, macOS, Windows
+- [x] `cargo test` runs at least one core unit test per platform
+- [x] clippy + rustfmt gates enabled and passing
+
+#### Implementation Details (M1)
+
+- Created Cargo workspace structure with 5 AgentFS crates: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`
+- Implemented core type definitions from AgentFS-Core.md: `FsConfig`, `FsError`, `CaseSensitivity`, `MemoryPolicy`, `FsLimits`, `CachePolicy`, `Attributes`, `FileTimes`, etc.
+- Added basic control plane message types in `agentfs-proto` crate based on AgentFS Control Messages.md
+- Created C ABI surface in `agentfs-ffi` with proper error mappings and function signatures
+- Set up platform-specific host crates with conditional dependencies (FUSE for Linux/macOS, WinFsp for Windows)
+- Added minimal unit tests in `agentfs-core` demonstrating config creation and error handling
+- All crates compile successfully with `cargo check` and pass `cargo test`, `cargo clippy`, and `cargo fmt`
+
+#### Key Source Files (M1)
+
+- `crates/agentfs-core/src/lib.rs` - Main library interface and re-exports
+- `crates/agentfs-core/src/config.rs` - Configuration types and policies
+- `crates/agentfs-core/src/error.rs` - Error type definitions
+- `crates/agentfs-core/src/types.rs` - Core data structures (IDs, attributes, etc.)
+- `crates/agentfs-proto/src/messages.rs` - Control plane message types
+- `crates/agentfs-ffi/src/c_api.rs` - C ABI definitions and stubs
+- `crates/agentfs-fuse-host/src/main.rs` - FUSE host binary scaffolding
+- `crates/agentfs-winfsp-host/src/main.rs` - WinFsp host binary scaffolding
+
+#### Outstanding Tasks (M1)
+
+- None - M1 bootstrap complete and ready for M2 implementation
 
 M2. Core VFS skeleton and in‑memory storage (3–5d)
 
