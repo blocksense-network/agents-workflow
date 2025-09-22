@@ -63,6 +63,12 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Development tooling configuration (ESLint, Prettier, testing framework)
   - CI/CD pipeline setup with automated testing
 
+- **Test Coverage** (Planned):
+  - [ ] Infrastructure tests: SSR sidecar serves HTML correctly, health endpoint works
+  - [ ] API contract tests: Mock server responds to all REST-Service.md endpoints with correct schemas
+  - [ ] Build tests: All projects compile successfully with TypeScript strict mode
+  - [ ] Tooling tests: ESLint and Prettier configurations work across all projects
+
 - **Implementation Details**:
   - Created complete WebUI directory structure with `app/`, `mock-server/`, `e2e-tests/`, and `shared/` subdirectories
   - Set up SolidJS application with SolidStart for SSR support, Tailwind CSS for styling, and TypeScript for type safety
@@ -105,6 +111,13 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Server-side HTML template serving for initial page loads with progressive enhancement
   - Development and production build configurations using Vite bundler
   - Client-side hydration with SolidJS for enhanced interactivity
+
+- **Test Coverage** (Planned):
+  - [ ] SSR tests: Server-side rendering produces correct HTML structure
+  - [ ] Progressive enhancement tests: Basic functionality works without JavaScript
+  - [ ] API proxy tests: Requests are correctly forwarded to backend services
+  - [ ] Hydration tests: Client-side JavaScript properly takes over from server-rendered content
+  - [ ] Build configuration tests: Both client and server bundles build successfully
 
 - **Implementation Details**:
   - Created `app-ssr-server/` directory with complete Node.js Express server implementation
@@ -149,6 +162,15 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Client-side URL routing using Solid Router for different views
   - Basic state management for UI preferences (pane collapse states)
 
+- **Test Coverage** (Planned):
+  - [ ] Layout tests: Three-pane layout renders correctly on desktop and mobile
+  - [ ] Navigation tests: All navigation links work and highlight active routes
+  - [ ] Collapsible pane tests: Panes collapse/expand with button clicks and persist state
+  - [ ] Responsive tests: Layout adapts correctly to different screen sizes
+  - [ ] Accessibility tests: Basic axe-core checks for keyboard navigation and ARIA landmarks
+  - [ ] localStorage tests: UI preferences persist across browser sessions
+  - [ ] Routing tests: URL changes correctly when navigating between sections
+
 - **Implementation Details**:
   - Enhanced `ThreePaneLayout` component with responsive flexbox layout and collapsible functionality
   - Added `collapsed` state management with localStorage persistence for user preferences
@@ -186,118 +208,192 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 
 **W3. Task Creation and Session Management** (2 weeks)
 
-- Deliverables:
+- **Deliverables**:
   - Task creation form with repository selection and validation
   - Session list with filtering, sorting, and pagination
   - Session detail view with status display and basic controls
   - Form validation with policy-aware defaults and error handling
   - Integration with mock server for CRUD operations
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] Form validation tests: All required fields validated, error messages displayed
+  - [ ] Repository selection tests: Dropdown works, search/filtering functions
+  - [ ] Session CRUD tests: Create, read, update, delete operations work via API
+  - [ ] Session list tests: Filtering, sorting, pagination work correctly
+  - [ ] Session detail tests: Status display, controls (pause/resume/stop) functional
+  - [ ] Error handling tests: API errors displayed appropriately to user
+  - [ ] Data persistence tests: Form drafts saved locally, session state persists
+  - [ ] Accessibility tests: Forms keyboard navigable, screen reader compatible
+
+- **Verification**:
   - Playwright tests verify task creation form validates all required fields
   - Playwright tests confirm repository selection works with search and filtering
   - Playwright tests ensure session list displays correctly with pagination
   - Playwright tests validate form submission creates tasks via mock API
   - Playwright tests check error states display appropriate user feedback
+  - API contract tests verify all CRUD operations match REST-Service.md specs
 
 **W4. Real-time Features and Live Updates** (2 weeks, parallel with W3)
 
-- Deliverables:
+- **Deliverables**:
   - SSE event stream integration for live session updates
   - Real-time log streaming in session detail view
   - Optimistic UI updates for pause/stop/resume actions
   - Event-driven status updates across the application
   - Connection error handling and reconnection logic
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] SSE connection tests: Event streams connect and receive data correctly
+  - [ ] Real-time update tests: UI updates automatically when events arrive
+  - [ ] Log streaming tests: New log entries appear in real-time without refresh
+  - [ ] Optimistic UI tests: Actions show immediate feedback, revert on errors
+  - [ ] Connection resilience tests: Network disconnections handled gracefully
+  - [ ] Reconnection tests: Automatic reconnection when connection restored
+  - [ ] Event filtering tests: Only relevant events update appropriate UI components
+  - [ ] Performance tests: Real-time updates don't cause UI lag or memory leaks
+
+- **Verification**:
   - Playwright tests verify SSE events update UI in real-time without page refresh
   - Playwright tests confirm log streaming displays new entries as they arrive
   - Playwright tests ensure optimistic updates revert correctly on API errors
   - Playwright tests validate network disconnection shows appropriate error states
   - Playwright tests check reconnection works automatically when connection restored
+  - Mock server tests verify SSE event broadcasting works correctly
 
 **Phase 3: Advanced Features and Polish** (3-4 weeks total)
 
 **W5. IDE Integration and Launch Helpers** (1-2 weeks)
 
-- Deliverables:
+- **Deliverables**:
   - IDE launch button implementation for VS Code, Cursor, Windsurf
   - Workspace path resolution and IDE protocol handling
   - Platform-specific launch command generation
   - Launch success/failure feedback and error handling
   - Integration with operating system URL schemes
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] IDE detection tests: Correct IDE detected based on platform and availability
+  - [ ] Launch button tests: Buttons appear only for active sessions with valid workspaces
+  - [ ] URL scheme tests: Proper URL schemes generated for each supported IDE
+  - [ ] Platform detection tests: Windows/macOS/Linux platform detection works
+  - [ ] Launch feedback tests: Success/failure states displayed appropriately
+  - [ ] Error handling tests: Invalid workspace paths handled gracefully
+  - [ ] Command generation tests: Correct command-line arguments generated
+  - [ ] Integration tests: End-to-end launch workflow from UI to IDE opening
+
+- **Verification**:
   - Playwright tests verify IDE launch buttons appear for active sessions
   - Playwright tests confirm clicking launch opens correct IDE with workspace
   - Playwright tests ensure platform detection works for Windows/macOS/Linux
   - Playwright tests validate error handling shows clear feedback for launch failures
   - Playwright tests check URL scheme handling works across different IDEs
+  - API contract tests verify workspace path resolution works correctly
 
 **W6. Governance and Multi-tenancy** (2 weeks, parallel with W5)
 
-- Deliverables:
+- **Deliverables**:
   - RBAC implementation with role-based feature visibility
   - Tenant/project selection and scoping
   - Admin panels for user and executor management
   - Audit trail display and filtering
   - Settings management with validation
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] RBAC tests: UI elements show/hide based on user roles and permissions
+  - [ ] Tenant isolation tests: Data scoped correctly per tenant/project
+  - [ ] Admin panel tests: CRUD operations for users, executors, policies
+  - [ ] Audit trail tests: Actions logged correctly with proper filtering
+  - [ ] Settings validation tests: Form validation and persistence work
+  - [ ] Permission enforcement tests: Unauthorized actions blocked at UI level
+  - [ ] Multi-tenant data tests: Users see only their tenant's data
+  - [ ] Role transition tests: UI updates correctly when user roles change
+
+- **Verification**:
   - Role-based UI elements show/hide appropriately
   - Tenant switching updates all data correctly
   - Admin panels work with proper permissions
   - Audit logs display with filtering and search
   - Settings persistence works across sessions
+  - Security tests verify proper access controls and data isolation
 
 **Phase 4: Testing and Optimization** (2 weeks total)
 
-**W7. Playwright E2E Testing** (2 weeks)
+**W7. Comprehensive Integration Testing** (2 weeks)
 
-- Deliverables:
-  - Comprehensive Playwright test suite covering all user journeys
-  - Accessibility testing with axe-core integration
-  - Performance testing with Lighthouse CI integration
+- **Deliverables**:
+  - Full user journey E2E test coverage across all features
+  - Accessibility testing with axe-core (WCAG AA compliance)
+  - Performance testing and optimization validation
   - Visual regression testing for UI consistency
-  - Cross-browser testing (Chrome, Firefox, Safari, Edge)
+  - Cross-browser compatibility testing
+  - End-to-end workflow validation (create → monitor → complete)
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] Complete user journey tests: Full workflows from task creation to completion
+  - [ ] Accessibility compliance tests: axe-core checks across all pages/components
+  - [ ] Performance regression tests: TTI, bundle size, and runtime performance
+  - [ ] Visual regression tests: Screenshot comparison for UI consistency
+  - [ ] Cross-browser tests: Chrome, Firefox, Safari, Edge compatibility
+  - [ ] Integration tests: API + UI interactions work end-to-end
+  - [ ] Edge case tests: Error conditions, network failures, invalid inputs
+  - [ ] Mobile/responsive tests: Touch interactions and mobile layouts
+
+- **Verification**:
   - All user journeys pass Playwright tests
   - Accessibility score meets WCAG AA standards
   - Performance benchmarks meet TTI < 2s target
   - Visual regression tests catch UI changes
   - Cross-browser compatibility verified
+  - Integration tests validate complete workflows function correctly
 
 **W8. Production Readiness and Local Mode** (1 week, parallel with W7)
 
-- Deliverables:
+- **Deliverables**:
   - Local mode implementation with localhost-only binding
   - Production build optimization and bundle analysis
   - Error boundary implementation and crash reporting
   - Documentation and deployment guides
   - Final performance optimizations
 
-- Verification:
+- **Test Coverage** (Planned):
+  - [ ] Local mode tests: Server binds only to localhost, no external access
+  - [ ] Production build tests: Bundle size within targets, builds successfully
+  - [ ] Error boundary tests: JavaScript errors contained, app remains functional
+  - [ ] Crash reporting tests: Errors logged appropriately (in production mode)
+  - [ ] Deployment tests: Installation and startup procedures work correctly
+  - [ ] Performance optimization tests: Final TTI and bundle size validations
+  - [ ] Security tests: Local mode doesn't expose sensitive endpoints
+  - [ ] Documentation tests: Setup guides enable successful deployment
+
+- **Verification**:
   - Playwright tests verify local mode binds only to localhost addresses
   - Production build achieves target bundle sizes
   - Playwright tests confirm error boundaries prevent full app crashes
   - Deployment documentation enables successful setup
   - Performance tests validate optimizations meet all targets
+  - Security tests verify local mode doesn't expose sensitive data
 
 ### Test strategy & tooling
 
+- **Distributed Test Coverage**: Each milestone includes specific tests verifying its deliverables, preventing regressions and ensuring quality incrementally
 - **Playwright E2E Testing**: Primary testing approach with comprehensive coverage of user journeys, accessibility, and cross-browser compatibility
 - **Mock Server Development**: Start with full REST-Service.md mock implementation for isolated feature development
 - **Component Testing**: Unit tests for reusable components with SolidJS testing library
-- **Visual Testing**: Automated screenshot comparison for UI consistency across releases
-- **Performance Testing**: Lighthouse CI integration with custom performance budgets
-- **Accessibility Testing**: Automated axe-core checks integrated into E2E test suite
+- **API Contract Testing**: Verify REST API endpoints match specifications and handle edge cases
+- **Accessibility Testing**: Automated axe-core checks integrated into E2E test suite from W2 onward
+- **Visual Regression Testing**: Screenshot comparison for UI consistency across releases
+- **Performance Testing**: Lighthouse CI integration with custom performance budgets in later milestones
 
 ### Deliverables
 
 - Production-ready WebUI application built with SolidJS + Tailwind CSS
 - Comprehensive mock server for development and testing
-- Full Playwright test suite with CI integration
+- Distributed test coverage across all milestones with CI integration
+- Full Playwright E2E test suite covering all user journeys
+- Accessibility testing (WCAG AA compliance) with axe-core
+- Performance testing and optimization validation
+- Visual regression testing for UI consistency
+- Cross-browser compatibility testing
 - Local mode for zero-setup single-developer usage
 - Deployment guides and performance optimizations
 
