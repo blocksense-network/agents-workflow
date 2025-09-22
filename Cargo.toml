@@ -7,6 +7,7 @@ members = [
   "crates/aw-fs-snapshots-btrfs",
   "crates/aw-sandbox",
   "crates/aw-sandbox-linux",
+  "crates/aw-fs-snapshots-daemon",
 ]
 resolver = "2"
 
@@ -37,6 +38,10 @@ async-trait = "0.1"
 
 # Testing
 tempfile = "3.0"
+
+# SSZ serialization for daemon
+ethereum_ssz = "0.8"
+ethereum_ssz_derive = "0.8"
 
 [profile.release]
 lto = true
