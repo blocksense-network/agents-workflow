@@ -5,6 +5,11 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     git-hooks.url = "github:cachix/git-hooks.nix";
+    codex = {
+      url = "git+file:./third-party/codex";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-overlay.follows = "rust-overlay";
+    };
   };
 
   outputs = {
@@ -12,6 +17,7 @@
     nixpkgs,
     rust-overlay,
     git-hooks,
+    codex,
   }: let
     systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
     forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -143,15 +149,16 @@
       system: let
         pkgs = import nixpkgs {
           inherit system;
+          overlays = [ rust-overlay.overlays.default ];
           config.allowUnfree = true; # Allow unfree packages like claude-code
         };
-        agent-task-script = pkgs.writeShellScriptBin "agent-task" ''
+        aw-script = pkgs.writeShellScriptBin "aw" ''
           PATH=${pkgs.lib.makeBinPath [
             pkgs.ruby
             pkgs.goose-cli
             pkgs.claude-code
             pkgs.gemini-cli
-            pkgs.codex
+            codex.packages.${system}.codex-rs
             pkgs.opencode
             pkgs.asciinema
           ]}:$PATH
@@ -168,17 +175,18 @@
           paths = [get-task start-work];
         };
       in {
-        agent-task = agent-task-script;
+        aw = aw-script;
         agent-utils = agent-utils;
+        default = aw-script;
       }
     );
 
     apps = forAllSystems (system: {
-      agent-task = {
+      aw = {
         type = "app";
-        program = "${self.packages.${system}.agent-task}/bin/agent-task";
+        program = "${self.packages.${system}.aw}/bin/aw";
       };
-      default = self.apps.${system}.agent-task;
+      default = self.apps.${system}.aw;
     });
 
     devShells = forAllSystems (system: let
@@ -239,7 +247,7 @@
           pkgs.goose-cli # Goose AI coding assistant
           pkgs.claude-code # Claude Code - agentic coding tool
           pkgs.gemini-cli # Gemini CLI
-          pkgs.codex # OpenAI Codex CLI (Rust implementation)
+          codex.packages.${system}.codex-rs # OpenAI Codex CLI (local submodule)
           pkgs.opencode # OpenCode AI coding assistant
           # Terminal recording and sharing
           pkgs.asciinema # Terminal session recorder
