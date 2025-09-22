@@ -14,6 +14,13 @@ pub trait StorageBackend: Send + Sync {
     fn allocate(&self, initial: &[u8]) -> FsResult<ContentId>;
     fn clone_cow(&self, base: ContentId) -> FsResult<ContentId>;
     fn seal(&self, id: ContentId) -> FsResult<()>; // for snapshot immutability
+
+    /// Seal an entire content tree (recursive sealing for snapshots)
+    fn seal_content_tree(&self, _root_content_id: ContentId) -> FsResult<()> {
+        // For now, this is a no-op. In a real implementation, this would
+        // recursively seal all content IDs in the tree
+        Ok(())
+    }
 }
 
 /// In-memory storage backend implementation

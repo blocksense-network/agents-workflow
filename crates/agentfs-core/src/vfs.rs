@@ -1,12 +1,12 @@
 //! Virtual filesystem implementation for AgentFS Core
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    Attributes, BranchId, ContentId, DirEntry, FileMode, FileTimes, FsConfig, HandleId, OpenOptions,
+    Attributes, BranchId, BranchInfo, ContentId, DirEntry, FileMode, FileTimes, FsConfig, HandleId, OpenOptions, SnapshotId,
 };
 use crate::error::{FsError, FsResult};
 use crate::storage::StorageBackend;
@@ -41,11 +41,20 @@ pub(crate) struct Handle {
     pub deleted: bool, // For delete-on-close semantics
 }
 
-/// Branch state containing a tree of nodes
+/// Snapshot containing immutable tree state
+#[derive(Clone, Debug)]
+pub(crate) struct Snapshot {
+    pub id: SnapshotId,
+    pub root_id: NodeId,
+    pub name: Option<String>,
+}
+
+/// Branch state containing a tree of nodes (writable clone of a snapshot)
 #[derive(Clone, Debug)]
 pub(crate) struct Branch {
     pub id: BranchId,
     pub root_id: NodeId,
+    pub parent_snapshot: Option<SnapshotId>,
     pub name: Option<String>,
 }
 
@@ -54,6 +63,7 @@ pub struct FsCore {
     config: FsConfig,
     storage: Arc<dyn StorageBackend>,
     nodes: Mutex<HashMap<NodeId, Node>>,
+    snapshots: Mutex<HashMap<SnapshotId, Snapshot>>,
     branches: Mutex<HashMap<BranchId, Branch>>,
     handles: Mutex<HashMap<HandleId, Handle>>,
     next_node_id: Mutex<u64>,
@@ -69,11 +79,12 @@ impl FsCore {
             config,
             storage,
             nodes: Mutex::new(HashMap::new()),
+            snapshots: Mutex::new(HashMap::new()),
             branches: Mutex::new(HashMap::new()),
             handles: Mutex::new(HashMap::new()),
             next_node_id: Mutex::new(1),
             next_handle_id: Mutex::new(1),
-            current_branch: Mutex::new(BranchId::new([0u8; 16])), // Default branch
+            current_branch: Mutex::new(BranchId::DEFAULT), // Default branch
         };
 
         // Create root directory
@@ -100,8 +111,9 @@ impl FsCore {
         };
 
         let default_branch = Branch {
-            id: BranchId::new([0u8; 16]),
+            id: BranchId::DEFAULT,
             root_id: root_node_id,
+            parent_snapshot: None, // Default branch has no parent snapshot
             name: Some("default".to_string()),
         };
 
@@ -132,7 +144,7 @@ impl FsCore {
             .as_secs() as i64
     }
 
-    /// Resolve a path to a node ID and parent information
+    /// Resolve a path to a node ID and parent information (read-only)
     fn resolve_path(&self, path: &Path) -> FsResult<(NodeId, Option<(NodeId, String)>)> {
         let current_branch = *self.current_branch.lock().unwrap();
         let branches = self.branches.lock().unwrap();
@@ -188,6 +200,7 @@ impl FsCore {
         Ok((current_node_id, parent_node_id.zip(parent_name)))
     }
 
+
     /// Create a new file node
     fn create_file_node(&self, content_id: ContentId) -> FsResult<NodeId> {
         let node_id = self.allocate_node_id();
@@ -235,6 +248,34 @@ impl FsCore {
         Ok(node_id)
     }
 
+    /// Clone a node for copy-on-write (creates a new node with the same content)
+    fn clone_node_cow(&self, node_id: NodeId) -> FsResult<NodeId> {
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+
+        let new_node_id = self.allocate_node_id();
+        let mut new_node = node.clone();
+
+        // For files, we need to clone the content in storage
+        if let NodeKind::File { content_id, size } = &node.kind {
+            let new_content_id = self.storage.clone_cow(*content_id)?;
+            new_node.kind = NodeKind::File {
+                content_id: new_content_id,
+                size: *size,
+            };
+        }
+        // For directories, we clone the children map
+        else if let NodeKind::Directory { children } = &node.kind {
+            new_node.kind = NodeKind::Directory {
+                children: children.clone(),
+            };
+        }
+
+        drop(nodes);
+        self.nodes.lock().unwrap().insert(new_node_id, new_node);
+        Ok(new_node_id)
+    }
+
     /// Update node timestamps
     fn update_node_times(&self, node_id: NodeId, times: FileTimes) {
         let mut nodes = self.nodes.lock().unwrap();
@@ -276,14 +317,106 @@ impl FsCore {
         })
     }
 
-    // Stub implementations for process binding (to be implemented later)
-    pub fn bind_process_to_branch(&self, _branch: BranchId) -> FsResult<()> {
-        // TODO: Implement process binding
+    // Snapshot operations
+    pub fn snapshot_create(&self, name: Option<&str>) -> FsResult<SnapshotId> {
+        let current_branch = *self.current_branch.lock().unwrap();
+        let branches = self.branches.lock().unwrap();
+        let branch = branches.get(&current_branch).ok_or(FsError::NotFound)?;
+
+        let snapshot_id = SnapshotId::new();
+        let snapshot = Snapshot {
+            id: snapshot_id,
+            root_id: branch.root_id,
+            name: name.map(|s| s.to_string()),
+        };
+
+        self.snapshots.lock().unwrap().insert(snapshot_id, snapshot);
+        Ok(snapshot_id)
+    }
+
+    pub fn snapshot_list(&self) -> Vec<(SnapshotId, Option<String>)> {
+        let snapshots = self.snapshots.lock().unwrap();
+        snapshots.values()
+            .map(|s| (s.id, s.name.clone()))
+            .collect()
+    }
+
+    pub fn snapshot_delete(&self, snapshot_id: SnapshotId) -> FsResult<()> {
+        let mut snapshots = self.snapshots.lock().unwrap();
+        let branches = self.branches.lock().unwrap();
+
+        // Check if any branches depend on this snapshot
+        let has_dependents = branches.values()
+            .any(|b| b.parent_snapshot == Some(snapshot_id));
+
+        if has_dependents {
+            return Err(FsError::Busy); // Cannot delete snapshot with dependent branches
+        }
+
+        snapshots.remove(&snapshot_id);
+        Ok(())
+    }
+
+    // Branch operations
+    pub fn branch_create_from_snapshot(&self, snapshot_id: SnapshotId, name: Option<&str>) -> FsResult<BranchId> {
+        let snapshots = self.snapshots.lock().unwrap();
+        let snapshot = snapshots.get(&snapshot_id).ok_or(FsError::NotFound)?;
+
+        let branch_id = BranchId::new();
+        let branch = Branch {
+            id: branch_id,
+            root_id: snapshot.root_id, // Initially shares the snapshot's root
+            parent_snapshot: Some(snapshot_id),
+            name: name.map(|s| s.to_string()),
+        };
+
+        self.branches.lock().unwrap().insert(branch_id, branch);
+        Ok(branch_id)
+    }
+
+    pub fn branch_create_from_current(&self, name: Option<&str>) -> FsResult<BranchId> {
+        let current_branch = *self.current_branch.lock().unwrap();
+        let branches = self.branches.lock().unwrap();
+        let branch = branches.get(&current_branch).ok_or(FsError::NotFound)?;
+
+        let branch_id = BranchId::new();
+        let new_branch = Branch {
+            id: branch_id,
+            root_id: branch.root_id, // Initially shares the current branch's root
+            parent_snapshot: None, // Not based on a snapshot
+            name: name.map(|s| s.to_string()),
+        };
+
+        drop(branches);
+        self.branches.lock().unwrap().insert(branch_id, new_branch);
+        Ok(branch_id)
+    }
+
+    pub fn branch_list(&self) -> Vec<BranchInfo> {
+        let branches = self.branches.lock().unwrap();
+        branches.values()
+            .map(|b| BranchInfo {
+                id: b.id,
+                parent: b.parent_snapshot,
+                name: b.name.clone(),
+            })
+            .collect()
+    }
+
+    // Process binding operations
+    pub fn bind_process_to_branch(&self, branch_id: BranchId) -> FsResult<()> {
+        let branches = self.branches.lock().unwrap();
+        if !branches.contains_key(&branch_id) {
+            return Err(FsError::NotFound);
+        }
+        *self.current_branch.lock().unwrap() = branch_id;
         Ok(())
     }
 
     pub fn unbind_process(&self) -> FsResult<()> {
-        // TODO: Implement process unbinding
+        // For now, just reset to default branch
+        // In a real implementation, this would track per-process state
+        *self.current_branch.lock().unwrap() = BranchId::DEFAULT;
         Ok(())
     }
 
@@ -344,14 +477,6 @@ impl FsCore {
 
     pub fn open(&self, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
         let (node_id, _) = self.resolve_path(path)?;
-        let nodes = self.nodes.lock().unwrap();
-        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
-
-        // Check if it's a file (for now, we don't support opening directories)
-        match &node.kind {
-            NodeKind::File { .. } => {},
-            NodeKind::Directory { .. } => return Err(FsError::IsADirectory),
-        }
 
         // Create handle
         let handle_id = self.allocate_handle_id();
@@ -365,6 +490,12 @@ impl FsCore {
 
         self.handles.lock().unwrap().insert(handle_id, handle);
         Ok(handle_id)
+    }
+
+    /// Check if a node is shared between branches/snapshots
+    fn is_node_shared(&self, _node_id: NodeId) -> bool {
+        // For simplicity, assume all nodes need CoW for now
+        true
     }
 
     pub fn read(&self, handle_id: HandleId, offset: u64, buf: &mut [u8]) -> FsResult<usize> {
@@ -387,19 +518,45 @@ impl FsCore {
     }
 
     pub fn write(&self, handle_id: HandleId, offset: u64, data: &[u8]) -> FsResult<usize> {
-        let handles = self.handles.lock().unwrap();
-        let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
+        let mut handles = self.handles.lock().unwrap();
+        let handle = handles.get_mut(&handle_id).ok_or(FsError::InvalidArgument)?;
 
         if !handle.options.write {
             return Err(FsError::AccessDenied);
         }
+
+        let current_branch_id = *self.current_branch.lock().unwrap();
+        let branches = self.branches.lock().unwrap();
+        let branch = branches.get(&current_branch_id).ok_or(FsError::NotFound)?;
+
+        // Check if this node is shared with a snapshot (needs CoW)
+        let needs_cow = if let Some(snapshot_id) = branch.parent_snapshot {
+            let snapshots = self.snapshots.lock().unwrap();
+            if let Some(snapshot) = snapshots.get(&snapshot_id) {
+                // If the branch shares the root with the snapshot, we need CoW
+                branch.root_id == snapshot.root_id
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         let mut nodes = self.nodes.lock().unwrap();
         let node = nodes.get_mut(&handle.node_id).ok_or(FsError::NotFound)?;
 
         match &mut node.kind {
             NodeKind::File { content_id, size } => {
-                let written = self.storage.write(*content_id, offset, data)?;
+                let content_to_write = if needs_cow && self.is_content_shared(*content_id) {
+                    // Clone the content for this branch
+                    let new_content_id = self.storage.clone_cow(*content_id)?;
+                    *content_id = new_content_id;
+                    new_content_id
+                } else {
+                    *content_id
+                };
+
+                let written = self.storage.write(content_to_write, offset, data)?;
                 let new_size = std::cmp::max(*size, offset + written as u64);
                 *size = new_size;
                 node.times.mtime = Self::current_timestamp();
@@ -408,6 +565,13 @@ impl FsCore {
             }
             NodeKind::Directory { .. } => Err(FsError::IsADirectory),
         }
+    }
+
+    /// Check if content is shared between branches/snapshots
+    fn is_content_shared(&self, _content_id: ContentId) -> bool {
+        // For simplicity, assume all content needs CoW for now
+        // In a real implementation, this would track reference counts
+        true
     }
 
     pub fn close(&self, handle_id: HandleId) -> FsResult<()> {

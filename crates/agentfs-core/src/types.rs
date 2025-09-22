@@ -1,14 +1,40 @@
 //! Core type definitions for AgentFS
 
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Opaque snapshot identifier
+/// Opaque snapshot identifier (ULID-like)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SnapshotId(pub [u8; 16]);
 
 impl SnapshotId {
-    pub fn new(bytes: [u8; 16]) -> Self {
-        Self(bytes)
+    pub fn new() -> Self {
+        Self(Self::generate_ulid())
+    }
+
+    fn generate_ulid() -> [u8; 16] {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        // Simple ULID-like generation: timestamp + random bytes
+        let mut bytes = [0u8; 16];
+        bytes[0..8].copy_from_slice(&now.to_be_bytes());
+        // For simplicity, use a counter for the remaining bytes
+        // In production, this should use proper randomness
+        static mut COUNTER: u64 = 0;
+        unsafe {
+            COUNTER += 1;
+            bytes[8..16].copy_from_slice(&COUNTER.to_be_bytes());
+        }
+        bytes
+    }
+}
+
+impl Default for SnapshotId {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -17,9 +43,45 @@ impl SnapshotId {
 pub struct BranchId(pub [u8; 16]);
 
 impl BranchId {
-    pub fn new(bytes: [u8; 16]) -> Self {
-        Self(bytes)
+    pub fn new() -> Self {
+        Self(Self::generate_ulid())
     }
+
+    fn generate_ulid() -> [u8; 16] {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        // Simple ULID-like generation: timestamp + random bytes
+        let mut bytes = [0u8; 16];
+        bytes[0..8].copy_from_slice(&now.to_be_bytes());
+        // For simplicity, use a counter for the remaining bytes
+        // In production, this should use proper randomness
+        static mut COUNTER: u64 = 0;
+        unsafe {
+            COUNTER += 1;
+            bytes[8..16].copy_from_slice(&COUNTER.to_be_bytes());
+        }
+        bytes
+    }
+
+    /// Special default branch ID for the initial branch
+    pub const DEFAULT: BranchId = BranchId([0u8; 16]);
+}
+
+impl Default for BranchId {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Branch information
+#[derive(Clone, Debug)]
+pub struct BranchInfo {
+    pub id: BranchId,
+    pub parent: Option<SnapshotId>,
+    pub name: Option<String>,
 }
 
 /// Opaque handle identifier
