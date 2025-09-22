@@ -3,8 +3,6 @@
 use nix::mount::{mount, MsFlags};
 use nix::unistd::{execvp, fork, ForkResult, Pid};
 use std::ffi::CString;
-use std::os::unix::process::CommandExt;
-use std::process::Command;
 use tokio::process::Command as TokioCommand;
 use tracing::{debug, info, warn};
 
@@ -35,6 +33,12 @@ impl Default for ProcessConfig {
 /// Process manager for executing commands in sandboxed environment
 pub struct ProcessManager {
     config: ProcessConfig,
+}
+
+impl Default for ProcessManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProcessManager {
@@ -121,7 +125,7 @@ impl ProcessManager {
             }
             Ok(ForkResult::Child) => {
                 // In child process, execute the command
-                if let Err(e) = self.exec_as_pid1() {
+                if let Err(_e) = self.exec_as_pid1() {
                     // If execution fails, exit with error
                     std::process::exit(1);
                 }
@@ -148,7 +152,7 @@ impl ProcessManager {
             cmd.env(key, value);
         }
 
-        let child = cmd
+        let _child = cmd
             .spawn()
             .map_err(|e| Error::Execution(format!("Failed to spawn command: {}", e)))?;
 

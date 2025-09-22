@@ -10,6 +10,8 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+nix = { workspace = true, features = ["net"] }
+
 
 [dev-dependencies]
 tempfile = { workspace = true }

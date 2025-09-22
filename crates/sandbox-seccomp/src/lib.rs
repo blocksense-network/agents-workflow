@@ -15,7 +15,7 @@ pub type Result<T> = std::result::Result<T, error::Error>;
 
 use std::path::PathBuf;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Configuration for seccomp manager
 #[derive(Debug, Clone)]

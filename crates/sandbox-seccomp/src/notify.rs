@@ -24,6 +24,7 @@ pub trait SupervisorClient: Send + Sync {
 /// Default supervisor client using mpsc channel
 pub struct ChannelSupervisorClient {
     tx: mpsc::UnboundedSender<Message>,
+    #[allow(dead_code)]
     rx: Mutex<mpsc::UnboundedReceiver<Message>>,
 }
 
@@ -208,7 +209,7 @@ impl NotificationHandler {
         path_resolver: &PathResolver,
     ) -> Result<seccomp_notif_resp> {
         // Extract path from arguments
-        let (dirfd, pathname_ptr) = if req.data.nr == libc::SYS_openat as i32 {
+        let (_dirfd, pathname_ptr) = if req.data.nr == libc::SYS_openat as i32 {
             (req.data.args[0] as i32, req.data.args[1] as *const i8)
         } else {
             (libc::AT_FDCWD, req.data.args[0] as *const i8)
@@ -236,7 +237,7 @@ impl NotificationHandler {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
             event: "fs_access".to_string(),
             details: serde_json::json!({
                 "path": pathname,
@@ -286,14 +287,14 @@ impl NotificationHandler {
                 .map_err(|_| Error::Notification("Invalid pathname in stat syscall".into()))?
         };
 
-        let resolved_path = path_resolver.resolve_path(std::path::Path::new(pathname))?;
+        let _resolved_path = path_resolver.resolve_path(std::path::Path::new(pathname))?;
 
         // For now, allow stat operations but audit them
         let audit_entry = AuditEntry {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
             event: "fs_access".to_string(),
             details: serde_json::json!({
                 "path": pathname,
@@ -331,13 +332,13 @@ impl NotificationHandler {
                 .map_err(|_| Error::Notification("Invalid pathname in access syscall".into()))?
         };
 
-        let resolved_path = path_resolver.resolve_path(std::path::Path::new(pathname))?;
+        let _resolved_path = path_resolver.resolve_path(std::path::Path::new(pathname))?;
 
         let audit_entry = AuditEntry {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
             event: "fs_access".to_string(),
             details: serde_json::json!({
                 "path": pathname,
@@ -382,7 +383,7 @@ impl NotificationHandler {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as u64,
+                .as_secs(),
             event: "fs_access".to_string(),
             details: serde_json::json!({
                 "path": pathname,

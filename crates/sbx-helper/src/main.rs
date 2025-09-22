@@ -66,6 +66,10 @@ struct Args {
     /// Enable debug mode for seccomp (allows ptrace operations)
     #[arg(long)]
     seccomp_debug: bool,
+
+    /// Allow network access via slirp4netns
+    #[arg(long)]
+    allow_network: bool,
 }
 
 #[tokio::main]
@@ -123,10 +127,16 @@ async fn main() -> anyhow::Result<()> {
     fs_config.overlay_paths = args.overlay.clone();
     fs_config.blacklist_paths = args.blacklist.clone();
 
-    // Initialize sandbox with cgroups and seccomp enabled
+    // Initialize sandbox with cgroups, seccomp, and networking enabled
     let mut sandbox = Sandbox::with_namespace_config(namespace_config)
         .with_process_config(process_config)
         .with_default_cgroups();
+
+    // Enable networking if requested
+    if args.allow_network {
+        sandbox = sandbox.with_default_network();
+        info!("Network access enabled via slirp4netns");
+    }
 
     // Enable seccomp if requested
     if args.seccomp {
@@ -159,6 +169,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Set up filesystem isolation (executed within user namespace context)
     fs_manager.setup_mounts().await?;
+
+    // Set network target PID if networking is enabled
+    if args.allow_network {
+        let current_pid = std::process::id();
+        sandbox.set_network_target_pid(current_pid)?;
+        info!("Set network target PID to {}", current_pid);
+    }
 
     // Execute the process as PID 1
     // This will replace the current process

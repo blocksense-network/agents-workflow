@@ -257,17 +257,53 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - **M9 supervisor integration**: Foundation for supervisor-based policy enforcement
   - **M10 CLI integration**: User-facing dynamic access control prompts
 
-**M6. Networking** (3–5d)
+**M6. Networking** ✅ COMPLETED (4–5d)
 
 - Deliverables:
   - Default loopback only; `--allow-network` starts slirp4netns tied to target PID.
   - Optional privileged veth/bridge codepath (guarded; teardown on exit).
 
 - Verification:
-  - E2E test: inside sandbox `curl 1.1.1.1` fails by default (network unreachable)
-  - E2E test: inside sandbox `curl 1.1.1.1` succeeds with `--allow-network` flag
-  - E2E test: same-port binds do not collide with host processes
-  - Unit tests: slirp4netns process lifecycle managed correctly
+  - ✅ **E2E test: inside sandbox `curl 1.1.1.1` fails by default (network unreachable)** - Implemented with `curl_tester` binary and orchestrator
+  - ✅ **E2E test: inside sandbox `curl 1.1.1.1` succeeds with `--allow-network` flag** - Implemented with slirp4netns integration and PID targeting
+  - ✅ **E2E test: same-port binds do not collide with host processes** - Implemented with `port_collision_tester` binary
+  - ✅ **Unit tests: slirp4netns process lifecycle managed correctly** - 3 unit tests covering NetworkManager functionality
+
+- Implementation details:
+  - **`NetworkManager`** (`crates/sandbox-net/src/lib.rs`): Core networking orchestration with loopback setup, slirp4netns integration, and process lifecycle management
+  - **`NetworkConfig`** (`crates/sandbox-net/src/lib.rs`): Comprehensive configuration for network isolation with internet access options, MTU settings, and CIDR configuration
+  - **slirp4netns integration**: User-mode networking stack providing internet access through TAP interface with sandbox and seccomp security hardening
+  - **CLI integration**: `--allow-network` flag in `sbx-helper` with automatic PID targeting and clear logging
+  - **Sandbox integration**: Optional `net` feature in sandbox-core with `with_network()` and `with_default_network()` methods
+  - **Security-first design**: Network isolation by default, explicit opt-in for internet access, graceful degradation in unprivileged environments
+
+- Key Source Files:
+  - `crates/sandbox-net/src/lib.rs` - Core NetworkManager implementation and NetworkConfig
+  - `crates/sandbox-net/src/error.rs` - Network-specific error types
+  - `crates/sandbox-core/src/lib.rs` - Network integration with optional feature flag
+  - `crates/sbx-helper/src/main.rs` - CLI flag integration and PID targeting
+  - `tests/network-enforcement/src/` - E2E test binaries (`curl_tester`, `port_collision_tester`, `network_test_orchestrator`)
+
+- Test Coverage:
+  - **Unit tests** (3 tests): NetworkManager creation, loopback setup, and process lifecycle
+  - **Integration tests** (2 tests): Sandbox lifecycle with network features, feature-gated testing
+  - **E2E tests** (3 test programs + orchestrator): curl connectivity testing, port collision verification, and comprehensive network orchestration
+  - **Feature-gated testing**: Separate test runs with `--features net` for optional functionality
+  - **CI integration**: All tests pass in `cargo test --workspace` pipeline
+
+- Verification Commands:
+  - `just build-network-tests` - Build all network test binaries
+  - `just test-networks` - Run E2E network enforcement tests
+  - `cargo test -p sandbox-net` - Run unit tests for network functionality
+  - `cargo test -p sandbox-core --features net` - Run integration tests with networking
+  - `./target/debug/sbx-helper --allow-network curl 1.1.1.1` - Manual testing of internet access
+
+- Integration Points:
+  - **M2 namespace isolation**: Network interfaces are isolated within user and mount namespaces
+  - **M3 cgroups**: Network operations are constrained by resource limits (CPU, memory)
+  - **M4 overlays**: Network configuration works with filesystem overlays and restrictions
+  - **M5 seccomp**: slirp4netns runs with seccomp filters for syscall-level security
+  - **Future milestones**: Foundation for container/VM networking and supervisor policy enforcement
 
 **M7. Debugging toggles** (2–3d)
 

@@ -3,7 +3,6 @@
 use crate::error::Error;
 use crate::Result;
 use libseccomp_sys::*;
-use std::ffi::CString;
 use tracing::debug;
 
 /// Seccomp filter for filesystem operations
@@ -66,6 +65,12 @@ impl Drop for SeccompFilter {
 /// Builder for seccomp filters with filesystem blocking
 pub struct FilterBuilder {
     filter: SeccompFilter,
+}
+
+impl Default for FilterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FilterBuilder {

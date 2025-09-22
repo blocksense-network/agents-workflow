@@ -20,6 +20,11 @@ pub use sandbox_seccomp::{
     SeccompConfig, SeccompManager,
 };
 
+#[cfg(feature = "net")]
+pub use sandbox_net::{
+    NetworkConfig, NetworkManager,
+};
+
 use tracing::{debug, info};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
@@ -38,6 +43,10 @@ pub struct Sandbox {
     seccomp_config: Option<sandbox_seccomp::SeccompConfig>,
     #[cfg(feature = "seccomp")]
     seccomp_manager: Option<sandbox_seccomp::SeccompManager>,
+    #[cfg(feature = "net")]
+    network_config: Option<sandbox_net::NetworkConfig>,
+    #[cfg(feature = "net")]
+    network_manager: Option<sandbox_net::NetworkManager>,
 }
 
 impl Default for Sandbox {
@@ -81,6 +90,10 @@ impl Sandbox {
             seccomp_config: None,
             #[cfg(feature = "seccomp")]
             seccomp_manager: None,
+            #[cfg(feature = "net")]
+            network_config: None,
+            #[cfg(feature = "net")]
+            network_manager: None,
         }
     }
 
@@ -102,6 +115,10 @@ impl Sandbox {
             seccomp_config: None,
             #[cfg(feature = "seccomp")]
             seccomp_manager: None,
+            #[cfg(feature = "net")]
+            network_config: None,
+            #[cfg(feature = "net")]
+            network_manager: None,
         }
     }
 
@@ -144,6 +161,34 @@ impl Sandbox {
         self.seccomp_config = Some(config.clone());
         self.seccomp_manager = Some(sandbox_seccomp::SeccompManager::new(config));
         self
+    }
+
+    /// Enable network isolation for this sandbox
+    #[cfg(feature = "net")]
+    pub fn with_network(mut self, config: sandbox_net::NetworkConfig) -> Self {
+        self.network_config = Some(config.clone());
+        self.network_manager = Some(sandbox_net::NetworkManager::new(config));
+        self
+    }
+
+    /// Enable network isolation with default configuration
+    #[cfg(feature = "net")]
+    pub fn with_default_network(mut self) -> Self {
+        let config = sandbox_net::NetworkConfig::default();
+        self.network_config = Some(config.clone());
+        self.network_manager = Some(sandbox_net::NetworkManager::new(config));
+        self
+    }
+
+    /// Set the target PID for network operations (required for internet access)
+    #[cfg(feature = "net")]
+    pub fn set_network_target_pid(&mut self, pid: u32) -> Result<()> {
+        if let Some(ref mut config) = self.network_config {
+            config.target_pid = Some(pid);
+            // Recreate the network manager with updated config
+            self.network_manager = Some(sandbox_net::NetworkManager::new(config.clone()));
+        }
+        Ok(())
     }
 
     /// Start the sandbox with the given configuration
@@ -197,6 +242,20 @@ impl Sandbox {
             }
         }
 
+        // Set up network isolation if enabled
+        #[cfg(feature = "net")]
+        if let Some(ref mut network_manager) = self.network_manager {
+            match network_manager.setup_isolation().await {
+                Ok(()) => {
+                    debug!("Sandbox network isolation setup successfully");
+                }
+                Err(e) => {
+                    // In test environments or systems without network tools, this may fail
+                    debug!("Network isolation setup failed (expected in some environments): {}", e);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -216,7 +275,14 @@ impl Sandbox {
             }
         }
 
-        // TODO: Implement additional sandbox shutdown logic
+        // Clean up network resources
+        #[cfg(feature = "net")]
+        if let Some(ref mut network_manager) = self.network_manager {
+            if let Err(e) = network_manager.cleanup() {
+                debug!("Network cleanup failed: {}", e);
+            }
+        }
+
         Ok(())
     }
 

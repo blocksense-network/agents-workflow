@@ -162,6 +162,13 @@ build-cgroup-tests: build-sbx-helper build-cgroup-test-binaries
 # Build all test binaries needed for overlay enforcement tests
 build-overlay-tests: build-sbx-helper build-overlay-test-binaries
 
+# Build network enforcement test binaries (network_test_orchestrator, curl_tester, port_collision_tester)
+build-network-test-binaries:
+    cargo build --bin network_test_orchestrator --bin curl_tester --bin port_collision_tester
+
+# Build all test binaries needed for network enforcement tests
+build-network-tests: build-sbx-helper build-network-test-binaries
+
 # Run cgroup tests with E2E enforcement verification
 test-cgroups:
     just build-cgroup-tests
@@ -262,3 +269,8 @@ replay-last-mock-agent-session:
 # Clear all mock-agent session recordings
 clear-mock-agent-recordings:
     rm -rf tests/tools/mock-agent/recordings/*.json
+
+# Run network tests with E2E enforcement verification
+test-networks:
+    just build-network-tests
+    cargo test -p sandbox-integration-tests --verbose

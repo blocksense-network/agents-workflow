@@ -323,8 +323,7 @@ impl FilesystemManager {
 
         if !session_dir.exists() {
             fs::create_dir_all(&session_dir).map_err(|e| {
-                Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                Error::Io(std::io::Error::other(
                     format!("Failed to create session state directory {}: {}", session_dir.display(), e)
                 ))
             })?;
