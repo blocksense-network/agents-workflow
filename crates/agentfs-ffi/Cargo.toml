@@ -12,6 +12,8 @@ agentfs-proto = { path = "../agentfs-proto" }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+lazy_static = "1.4"
+serde_json = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

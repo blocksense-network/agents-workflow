@@ -22,6 +22,7 @@ members = [
   "crates/agentfs-proto",
   "crates/agentfs-fuse-host",
   "crates/agentfs-winfsp-host",
+  "crates/agentfs-fskit-host",
   "crates/agentfs-ffi",
   # Integration tests
   "tests/sandbox-integration",
