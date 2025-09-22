@@ -1,146 +1,74 @@
-use serde::{Deserialize, Serialize};
+use ssz_derive::{Encode, Decode};
 
-// TODO: Implement proper SSZ encoding/decoding
-// For now using serde for compatibility
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Request {
-    pub command: String,
-    pub filesystem: Option<String>,
-    pub snapshot: Option<String>,
-    pub clone: Option<String>,
-    pub source: Option<String>,
-    pub target: Option<String>,
-    pub destination: Option<String>,
+// SSZ Union-based request/response types for type-safe daemon communication
+// Using Vec<u8> for strings as SSZ supports variable-length byte vectors
+
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode)]
+#[ssz(enum_behaviour = "union")]
+pub enum Request {
+    Ping(Vec<u8>),                     // empty vec for ping
+    CloneZfs((Vec<u8>, Vec<u8>)),       // (snapshot, clone)
+    SnapshotZfs((Vec<u8>, Vec<u8>)),    // (source, snapshot)
+    DeleteZfs(Vec<u8>),                 // target
+    CloneBtrfs((Vec<u8>, Vec<u8>)),     // (source, destination)
+    SnapshotBtrfs((Vec<u8>, Vec<u8>)),  // (source, destination)
+    DeleteBtrfs(Vec<u8>),               // target
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Response {
-    pub success: bool,
-    pub mountpoint: Option<String>,
-    pub path: Option<String>,
-    pub error: Option<String>,
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode)]
+#[ssz(enum_behaviour = "union")]
+pub enum Response {
+    Success(Vec<u8>),                  // empty vec for success
+    SuccessWithMountpoint(Vec<u8>),    // mountpoint
+    SuccessWithPath(Vec<u8>),          // path
+    Error(Vec<u8>),                    // message
 }
 
+// Constructors for SSZ union variants (convert String to Vec<u8>)
 impl Request {
     pub fn ping() -> Self {
-        Self {
-            command: "ping".to_string(),
-            filesystem: None,
-            snapshot: None,
-            clone: None,
-            source: None,
-            target: None,
-            destination: None,
-        }
+        Self::Ping(vec![])
     }
 
     pub fn clone_zfs(snapshot: String, clone: String) -> Self {
-        Self {
-            command: "clone".to_string(),
-            filesystem: Some("zfs".to_string()),
-            snapshot: Some(snapshot),
-            clone: Some(clone),
-            source: None,
-            target: None,
-            destination: None,
-        }
+        Self::CloneZfs((snapshot.into_bytes(), clone.into_bytes()))
     }
 
     pub fn snapshot_zfs(source: String, snapshot: String) -> Self {
-        Self {
-            command: "snapshot".to_string(),
-            filesystem: Some("zfs".to_string()),
-            snapshot: Some(snapshot),
-            clone: None,
-            source: Some(source),
-            target: None,
-            destination: None,
-        }
+        Self::SnapshotZfs((source.into_bytes(), snapshot.into_bytes()))
     }
 
     pub fn delete_zfs(target: String) -> Self {
-        Self {
-            command: "delete".to_string(),
-            filesystem: Some("zfs".to_string()),
-            snapshot: None,
-            clone: None,
-            source: None,
-            target: Some(target),
-            destination: None,
-        }
+        Self::DeleteZfs(target.into_bytes())
     }
 
     pub fn clone_btrfs(source: String, destination: String) -> Self {
-        Self {
-            command: "clone".to_string(),
-            filesystem: Some("btrfs".to_string()),
-            snapshot: None,
-            clone: None,
-            source: Some(source),
-            target: None,
-            destination: Some(destination),
-        }
+        Self::CloneBtrfs((source.into_bytes(), destination.into_bytes()))
     }
 
     pub fn snapshot_btrfs(source: String, destination: String) -> Self {
-        Self {
-            command: "snapshot".to_string(),
-            filesystem: Some("btrfs".to_string()),
-            snapshot: None,
-            clone: None,
-            source: Some(source),
-            target: None,
-            destination: Some(destination),
-        }
+        Self::SnapshotBtrfs((source.into_bytes(), destination.into_bytes()))
     }
 
     pub fn delete_btrfs(target: String) -> Self {
-        Self {
-            command: "delete".to_string(),
-            filesystem: Some("btrfs".to_string()),
-            snapshot: None,
-            clone: None,
-            source: None,
-            target: Some(target),
-            destination: None,
-        }
+        Self::DeleteBtrfs(target.into_bytes())
     }
 }
 
 impl Response {
     pub fn success() -> Self {
-        Self {
-            success: true,
-            mountpoint: None,
-            path: None,
-            error: None,
-        }
+        Self::Success(vec![])
     }
 
     pub fn success_with_mountpoint(mountpoint: String) -> Self {
-        Self {
-            success: true,
-            mountpoint: Some(mountpoint),
-            path: None,
-            error: None,
-        }
+        Self::SuccessWithMountpoint(mountpoint.into_bytes())
     }
 
     pub fn success_with_path(path: String) -> Self {
-        Self {
-            success: true,
-            mountpoint: None,
-            path: Some(path),
-            error: None,
-        }
+        Self::SuccessWithPath(path.into_bytes())
     }
 
     pub fn error(message: String) -> Self {
-        Self {
-            success: false,
-            mountpoint: None,
-            path: None,
-            error: Some(message),
-        }
+        Self::Error(message.into_bytes())
     }
 }

@@ -115,6 +115,67 @@ fn main() {
   ```
 - **Advanced Decoding**: Use `SszDecoder` for parsing multiple items from a single byte slice, built via `SszDecoderBuilder`.
 
+### Using SSZ Unions
+
+The `ethereum-ssz` library supports SSZ unions through its derive macros in the companion `ethereum-ssz-derive` crate. Specifically, you can define an enum and apply the `#[ssz(enum_behaviour = "union")]` attribute to treat it as an SSZ union, where each variant is encoded with a one-byte selector (indicating the variant index) followed by the serialized data of that variant. This aligns with the SSZ specification for unions, which are tagged variants without field names.
+
+#### Key Details
+- **Requirements**: The enum must derive `Encode` and `Decode` from `ethereum-ssz-derive`. Variants should be newtype-style (e.g., `Foo(T)`) or unit, but not structs with named fields, as SSZ unions serialize only the inner data.
+- **Selector**: The first byte is the variant index (starting from 0). The library enforces a maximum selector value (typically 127 for extensions).
+- **Encoding/Decoding**: Use the standard `as_ssz_bytes()` for encoding and `from_ssz_bytes(&bytes)` for decoding, just like other SSZ types. Invalid selectors or malformed data will return a `DecodeError`.
+- **Dependencies**: Ensure `ethereum-ssz` and `ethereum-ssz-derive` are in your `Cargo.toml`. If using variable-length types (e.g., `Vec`), they must implement `Encode`/`Decode`.
+
+#### Example: Defining, Encoding, and Decoding a Union
+
+Here's a complete, self-contained Rust example. Assume you've added the dependencies as mentioned earlier.
+
+```rust
+use ssz_derive::{Decode, Encode};
+use ssz::{Decode, Encode};  // From ethereum-ssz
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[ssz(enum_behaviour = "union")]
+enum Message {
+    Ping(u32),          // Selector 0: A simple fixed-size value
+    Data(Vec<u8>),      // Selector 1: A variable-length list
+    Empty,              // Selector 2: A unit variant (zero-length)
+}
+
+fn main() {
+    // Create instances of each variant
+    let ping = Message::Ping(42);
+    let data = Message::Data(vec![1, 2, 3]);
+    let empty = Message::Empty;
+
+    // Encoding
+    let ping_bytes = ping.as_ssz_bytes();
+    let data_bytes = data.as_ssz_bytes();
+    let empty_bytes = empty.as_ssz_bytes();
+
+    println!("Ping encoded: {:?}", ping_bytes);    // e.g., [0, 42, 0, 0, 0] (selector + u32 little-endian)
+    println!("Data encoded: {:?}", data_bytes);    // e.g., [1, 3, 0, 0, 0, 1, 2, 3] (selector + offset/length + data)
+    println!("Empty encoded: {:?}", empty_bytes);  // [2] (just the selector, no data)
+
+    // Decoding
+    let decoded_ping = Message::from_ssz_bytes(&ping_bytes).unwrap();
+    let decoded_data = Message::from_ssz_bytes(&data_bytes).unwrap();
+    let decoded_empty = Message::from_ssz_bytes(&empty_bytes).unwrap();
+
+    assert_eq!(decoded_ping, ping);
+    assert_eq!(decoded_data, data);
+    assert_eq!(decoded_empty, empty);
+
+    // Error handling example (invalid selector)
+    let invalid_bytes = vec![3];  // Selector 3 doesn't exist
+    match Message::from_ssz_bytes(&invalid_bytes) {
+        Ok(_) => println!("Unexpected success"),
+        Err(e) => println!("Error: {:?}", e),  // e.g., DecodeError::UnionSelectorInvalid(3)
+    }
+}
+```
+
+This example demonstrates basic usage. For more complex unions (e.g., with nested structs), ensure inner types also derive `Encode`/`Decode`. If the enum doesn't fit the union model (e.g., has multiple fields per variant), you may need a custom implementation using the library's lower-level APIs like `UnionSelector` and `split_union_bytes` for manual handling. If this doesn't meet your needs, alternative crates like `ssz-rs` offer similar support with potentially different syntax.
+
 ### Best Practices and Considerations
 
 - **Performance**: Benchmarks show `ethereum-ssz` outperforms alternatives in speed for Ethereum workloads. Use it for high-throughput daemons.

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use ssz::{Encode, Decode};
 use std::path::PathBuf;
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{info, warn, error};
@@ -8,7 +9,7 @@ mod server;
 mod types;
 mod operations;
 
-use server::{DaemonServer, decode_length_prefixed_json, encode_length_prefixed_json};
+use server::DaemonServer;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -97,15 +98,16 @@ async fn run_stdin_mode() -> Result<()> {
             continue;
         }
 
-        // Parse length-prefixed JSON request from hex string
+        // Parse SSZ-encoded request from hex string
         let request_bytes = hex::decode(&line)?;
-        let request: Request = decode_length_prefixed_json(&request_bytes)?;
+        let request: Request = Request::from_ssz_bytes(&request_bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("SSZ decode error: {:?}", e)))?;
 
         // Process the request
         let response = operations::process_request(request).await;
 
-        // Encode response as length-prefixed JSON and output as hex
-        let response_bytes = encode_length_prefixed_json(&response)?;
+        // Encode response as SSZ and output as hex
+        let response_bytes = Encode::as_ssz_bytes(&response);
         println!("{}", hex::encode(&response_bytes));
     }
 

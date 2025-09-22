@@ -4,59 +4,42 @@ use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 pub async fn process_request(request: Request) -> Response {
-    info!("Processing request: command={}, filesystem={:?}",
-          request.command, request.filesystem);
+    info!("Processing request: {:?}", request);
 
-    match request.command.as_str() {
-        "ping" => Response::success(),
-        "clone" => handle_clone(request).await,
-        "snapshot" => handle_snapshot(request).await,
-        "delete" => handle_delete(request).await,
-        _ => Response::error(format!("Unknown command: {}", request.command)),
+    match request {
+        Request::Ping(_) => Response::success(),
+        Request::CloneZfs((snapshot, clone)) => {
+            let snapshot_str = String::from_utf8_lossy(&snapshot).to_string();
+            let clone_str = String::from_utf8_lossy(&clone).to_string();
+            handle_zfs_clone(snapshot_str, clone_str).await
+        },
+        Request::SnapshotZfs((source, snapshot)) => {
+            let source_str = String::from_utf8_lossy(&source).to_string();
+            let snapshot_str = String::from_utf8_lossy(&snapshot).to_string();
+            handle_zfs_snapshot(source_str, snapshot_str).await
+        },
+        Request::DeleteZfs(target) => {
+            let target_str = String::from_utf8_lossy(&target).to_string();
+            handle_zfs_delete(target_str).await
+        },
+        Request::CloneBtrfs((source, destination)) => {
+            let source_str = String::from_utf8_lossy(&source).to_string();
+            let destination_str = String::from_utf8_lossy(&destination).to_string();
+            handle_btrfs_clone(source_str, destination_str).await
+        },
+        Request::SnapshotBtrfs((source, destination)) => {
+            let source_str = String::from_utf8_lossy(&source).to_string();
+            let destination_str = String::from_utf8_lossy(&destination).to_string();
+            handle_btrfs_snapshot(source_str, destination_str).await
+        },
+        Request::DeleteBtrfs(target) => {
+            let target_str = String::from_utf8_lossy(&target).to_string();
+            handle_btrfs_delete(target_str).await
+        },
     }
 }
 
-async fn handle_clone(request: Request) -> Response {
-    let filesystem = request.filesystem.clone().unwrap_or_else(|| "zfs".to_string());
-
-    match filesystem.as_str() {
-        "zfs" => handle_zfs_clone(request).await,
-        "btrfs" => handle_btrfs_clone(request).await,
-        _ => Response::error(format!("Unsupported filesystem: {}", filesystem)),
-    }
-}
-
-async fn handle_snapshot(request: Request) -> Response {
-    let filesystem = request.filesystem.clone().unwrap_or_else(|| "zfs".to_string());
-
-    match filesystem.as_str() {
-        "zfs" => handle_zfs_snapshot(request).await,
-        "btrfs" => handle_btrfs_snapshot(request).await,
-        _ => Response::error(format!("Unsupported filesystem: {}", filesystem)),
-    }
-}
-
-async fn handle_delete(request: Request) -> Response {
-    let filesystem = request.filesystem.clone().unwrap_or_else(|| "zfs".to_string());
-
-    match filesystem.as_str() {
-        "zfs" => handle_zfs_delete(request).await,
-        "btrfs" => handle_btrfs_delete(request).await,
-        _ => Response::error(format!("Unsupported filesystem: {}", filesystem)),
-    }
-}
-
-async fn handle_zfs_clone(request: Request) -> Response {
-    let snapshot = match request.snapshot {
-        Some(s) => s,
-        None => return Response::error("Missing snapshot parameter".to_string()),
-    };
-
-    let clone = match request.clone {
-        Some(c) => c,
-        None => return Response::error("Missing clone parameter".to_string()),
-    };
-
+async fn handle_zfs_clone(snapshot: String, clone: String) -> Response {
     debug!("Creating ZFS clone {} from {}", clone, snapshot);
 
     // Validate that the snapshot exists
@@ -98,17 +81,7 @@ async fn handle_zfs_clone(request: Request) -> Response {
     }
 }
 
-async fn handle_zfs_snapshot(request: Request) -> Response {
-    let source = match request.source {
-        Some(s) => s,
-        None => return Response::error("Missing source parameter".to_string()),
-    };
-
-    let snapshot = match request.snapshot {
-        Some(s) => s,
-        None => return Response::error("Missing snapshot parameter".to_string()),
-    };
-
+async fn handle_zfs_snapshot(source: String, snapshot: String) -> Response {
     debug!("Creating ZFS snapshot {} from {}", snapshot, source);
 
     // Validate that the source dataset exists
@@ -131,12 +104,7 @@ async fn handle_zfs_snapshot(request: Request) -> Response {
     }
 }
 
-async fn handle_zfs_delete(request: Request) -> Response {
-    let target = match request.target {
-        Some(t) => t,
-        None => return Response::error("Missing target parameter".to_string()),
-    };
-
+async fn handle_zfs_delete(target: String) -> Response {
     debug!("Deleting ZFS dataset {}", target);
 
     // Validate that the target dataset exists
@@ -154,17 +122,7 @@ async fn handle_zfs_delete(request: Request) -> Response {
     }
 }
 
-async fn handle_btrfs_clone(request: Request) -> Response {
-    let source = match request.source {
-        Some(s) => s,
-        None => return Response::error("Missing source parameter".to_string()),
-    };
-
-    let destination = match request.destination {
-        Some(d) => d,
-        None => return Response::error("Missing destination parameter".to_string()),
-    };
-
+async fn handle_btrfs_clone(source: String, destination: String) -> Response {
     debug!("Creating Btrfs subvolume snapshot {} from {}", destination, source);
 
     // Validate that the source subvolume exists
@@ -193,17 +151,12 @@ async fn handle_btrfs_clone(request: Request) -> Response {
     }
 }
 
-async fn handle_btrfs_snapshot(request: Request) -> Response {
+async fn handle_btrfs_snapshot(source: String, destination: String) -> Response {
     // For Btrfs, clone and snapshot are the same operation (subvolume snapshot)
-    handle_btrfs_clone(request).await
+    handle_btrfs_clone(source, destination).await
 }
 
-async fn handle_btrfs_delete(request: Request) -> Response {
-    let target = match request.target {
-        Some(t) => t,
-        None => return Response::error("Missing target parameter".to_string()),
-    };
-
+async fn handle_btrfs_delete(target: String) -> Response {
     debug!("Deleting Btrfs subvolume {}", target);
 
     // Validate that the target subvolume exists
