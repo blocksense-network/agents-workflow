@@ -173,9 +173,9 @@ test-cgroups:
 # Install dependencies for all WebUI projects
 webui-install:
     cd webui/shared && npm ci
-    cd ../app && npm ci
-    cd ../mock-server && npm ci
-    cd ../e2e-tests && npm ci
+    cd webui/app && npm ci
+    cd webui/mock-server && npm ci
+    cd webui/e2e-tests && npm ci
 
 # Build WebUI application
 webui-build:

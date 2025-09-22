@@ -231,6 +231,9 @@
           pkgs.shfmt
           pkgs.taplo
 
+          # WebUI testing
+          # Note: playwright and tsx are installed via npm in individual packages
+
           # AI Coding Assistants (latest versions from nixpkgs-unstable)
           pkgs.goose-cli # Goose AI coding assistant
           pkgs.claude-code # Claude Code - agentic coding tool
