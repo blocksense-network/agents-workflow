@@ -18,15 +18,29 @@ Some of the markdown files have standardized Obsidian headers indicating their c
 
 ## Planning the implementation and tracking progress
 
-Even though, we haven't started implementing the spec yet, we are now starting to define implementation plans that will break down the work in tasks and milestones.
+Implementation efforts have now started on the Agents-Workflow MVP. Implementation plans break down the work into granular tasks and milestones, each with well-defined success criteria that can be tested with fully automated tests.
 
-Each task and milestone should have a well defined success criteria that can be tested will fully automated tests.
+The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. The [MVP.status.md](Public/MVP.status.md) file serves as the primary example for other status.md files, demonstrating the expected structure with clearly specified deliverables and verification criteria based on automated tests.
 
 When a task is complete, the implementation plan should be updated with an implementation status section featuring references to key files that can serve as a good starting point for someone who would like to study the implementation.
 
-When a task proves difficult to compete according to the plan, developers and agents will NEVER deviate significantly from the original goal. Instead, they will update the task status section to report what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. Developers and agents should provide a very detailed context in the status reports for observed problems as they may be shared with online AI agents who are not familiar with our project.
+When a task proves difficult to complete according to the plan, you should NEVER deviate significantly from the original goal. Instead, you must update the milestone status section with a link to a markdown report detailing what have been tried and what problems were observed. These reports will be forwarded to senior developers and management who may adjust the plan in response. The reports should describe the context of the problem in extreme detail as they may be shared with online AI agents who are not familiar with our project.
 
-The planning and status file typically exists as a separate markdown file with an extension `.status.md` . It may be named after a corresponding spec file. An existing example is [Local-Sandboxing-on-Linux.status.md](Public/Sanboxing/Local-Sandboxing-on-Linux.status.md).
+### Expected Structure for Status Files
+
+Each milestone in a status.md file should contain:
+
+- **Deliverables:** A bullet-point list of specific features, components, or capabilities that must be implemented
+- **Verification:** A bullet-point list of automated test scenarios that validate the deliverables, with emphasis on end-to-end integration tests that demonstrate the feature working in real-world conditions
+
+When milestones are completed, their sections should be expanded with additional documentation:
+
+- **Implementation Details:** Detailed description of architectural decisions, implementation approaches, and key technical insights
+- **Key Source Files:** References to specific source files that serve as good starting points for understanding the implementation
+- **Outstanding Tasks:** Any remaining work, bugs, or improvements that still need to be addressed
+- The **Verification** section should be updated with checkboxes showing which verification criteria have been met (`[x]`) and which are still pending (`[ ]`).
+
+This structure ensures that every milestone has clear, testable completion criteria and that completed work is thoroughly documented for future reference and maintenance.
 
 It's extremely important that the tasks are very granular and that they can be verified with automated tests. Prefer integration tests over unit tests, but apply reasonable judgment on a case-by-case basis.
 
