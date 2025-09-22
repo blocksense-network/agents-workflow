@@ -227,7 +227,7 @@ webui-format:
 
 # Run WebUI E2E tests
 webui-test:
-    cd webui/e2e-tests && npm test
+    cd webui/e2e-tests && npm run test:e2e
 
 # Run WebUI E2E tests in headed mode (visible browser)
 webui-test-headed:

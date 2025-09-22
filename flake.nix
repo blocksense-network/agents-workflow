@@ -2,7 +2,11 @@
   description = "agents-workflow";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Pinned to specific commit for Playwright compatibility
+    # Playwright 1.52.0 expects chromium-1169, which is available in this commit
+    # but not in current nixpkgs-unstable. Can be updated when Playwright version
+    # is upgraded or when nixpkgs-unstable has compatible chromium version.
+    nixpkgs.url = "github:NixOS/nixpkgs/979daf34c8cacebcd917d540070b52a3c2b9b16e";
     rust-overlay.url = "github:oxalica/rust-overlay";
     git-hooks.url = "github:cachix/git-hooks.nix";
     codex = {
@@ -241,14 +245,20 @@
           pkgs.taplo
 
           # WebUI testing
+          # Playwright driver and browsers (bundled system libs for headless testing)
+          pkgs.playwright-driver  # The driver itself
+          pkgs.playwright-driver.browsers  # Bundled browsers with required libs
+          # Server management utilities for test orchestration
+          pkgs.netcat  # For port checking (nc command)
+          pkgs.procps  # For process management (pgrep, kill, etc.)
           # Note: playwright and tsx are installed via npm in individual packages
 
           # AI Coding Assistants (latest versions from nixpkgs-unstable)
           pkgs.goose-cli # Goose AI coding assistant
           pkgs.claude-code # Claude Code - agentic coding tool
-          pkgs.gemini-cli # Gemini CLI
+          # pkgs.gemini-cli # Gemini CLI - not available in older nixpkgs
           codex.packages.${system}.codex-rs # OpenAI Codex CLI (local submodule)
-          pkgs.opencode # OpenCode AI coding assistant
+          # pkgs.opencode # OpenCode AI coding assistant - not available in older nixpkgs
           # Terminal recording and sharing
           pkgs.asciinema # Terminal session recorder
           pkgs.fzf
@@ -284,6 +294,13 @@
           # Install git pre-commit hook invoking our Nix-defined hooks
           ${self.checks.${system}.pre-commit-check.shellHook}
           echo "Agent workflow development environment loaded"
+
+          # Playwright setup (use Nix-provided browsers, skip runtime downloads)
+          export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+          export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+          export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+          export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs}/bin/node"
+          export PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH="${pkgs.playwright-driver.browsers}/chromium-1169/chrome-linux/chrome"
           # Provide a convenience function for Docson; no fallbacks in Nix shell
           docson () {
             if command -v docson >/dev/null 2>&1; then

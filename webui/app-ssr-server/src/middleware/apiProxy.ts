@@ -8,7 +8,7 @@ export const apiProxyMiddleware = createProxyMiddleware({
   target: NODE_ENV === "production" ? RUST_API_URL : MOCK_API_URL,
   changeOrigin: true,
   pathRewrite: {
-    "^/api": "/api/v1", // Rewrite /api to /api/v1 to match REST service spec
+    // No path rewriting needed - client requests /api/v1/* and server expects /api/v1/*
   },
   onProxyReq: (proxyReq, _req, _res) => {
     // Add any necessary headers for the target service

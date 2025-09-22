@@ -4,6 +4,7 @@
   "description": "End-to-end tests for Agents-Workflow WebUI using Playwright",
   "scripts": {
     "test": "playwright test",
+    "test:e2e": "./start-servers.sh",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
@@ -24,9 +25,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^24.5.2",
     "eslint": "^9.36.0",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=22"
