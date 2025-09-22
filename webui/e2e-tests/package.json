@@ -1,0 +1,34 @@
+{
+  "name": "aw-webui-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for Agents-Workflow WebUI using Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "install-browsers": "playwright install",
+    "lint": "eslint tests --ext .ts,.js",
+    "lint:fix": "eslint tests --ext .ts,.js --fix",
+    "format": "prettier --write tests/**/*.{ts,js,json}",
+    "format:check": "prettier --check tests/**/*.{ts,js,json}"
+  },
+  "keywords": [
+    "e2e",
+    "testing",
+    "playwright",
+    "webui",
+    "agents-workflow"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "eslint": "^9.36.0",
+    "prettier": "^3.6.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

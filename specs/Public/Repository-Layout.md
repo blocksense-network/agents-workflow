@@ -35,6 +35,12 @@ agents-workflow/
 ├─ adapters/
 │  └─ macos/
 │     └─ xcode/AgentFSKitExtension/   # FSKit App Extension (Swift) bridging Rust FFI
+├─ webui/                      # WebUI and related JavaScript/Node.js projects
+│  ├─ app/                     # Main SolidJS WebUI application
+│  ├─ app-ssr-server/          # Node.js SSR sidecar server
+│  ├─ mock-server/             # Mock REST API server for development/testing
+│  ├─ e2e-tests/               # Playwright E2E test suite
+│  └─ shared/                  # Shared utilities and types between WebUI components
 ├─ bins/                       # Packaging assets/manifests per final binary
 │  ├─ aw/                      # CLI packaging, completions, manpages
 │  ├─ agentfs-fuse/            # FUSE host packaging (Linux/macOS dev)
@@ -88,6 +94,14 @@ agents-workflow/
 - CLI/TUI: `aw-cli`, `aw-tui`, `aw-core`, `aw-config`, `aw-state`, `aw-repo`, `aw-workflows`, `aw-rest-client`, `aw-notify`, `aw-fleet`, `aw-agent-executor`, `aw-schemas`.
 - AgentFS: `agentfs-core`, `agentfs-proto`, `agentfs-fuse-host`, `agentfs-winfsp-host`, `agentfs-ffi`.
 - Sandbox (Local profile): `sandbox-core`, `sandbox-fs`, `sandbox-seccomp`, `sandbox-cgroups`, `sandbox-net`, `sandbox-proto`, `sbx-helper`.
+
+### WebUI structure
+
+- `webui/app/` — Main SolidJS + Tailwind CSS application with server-side rendering support
+- `webui/app-ssr-server/` — Node.js Express server providing SSR proxy and progressive enhancement for users without JavaScript
+- `webui/mock-server/` — Mock REST API server implementing the full REST-Service.md specification for development and testing
+- `webui/e2e-tests/` — Playwright E2E test suite with pre-scripted scenarios controlling both mock server and UI interactions
+- `webui/shared/` — Shared TypeScript utilities, API client code, and type definitions used across WebUI components
 
 ### Multiplexer crates structure
 

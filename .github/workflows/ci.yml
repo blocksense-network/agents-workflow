@@ -78,3 +78,60 @@ jobs:
     - name: Run legacy tests
       run: |
         just legacy-test
+
+  webui:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.npm
+          webui/*/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('webui/*/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      run: |
+        cd webui/shared && npm ci
+        cd ../app && npm ci
+        cd ../mock-server && npm ci
+        cd ../e2e-tests && npm ci
+
+    - name: Lint WebUI code
+      run: |
+        cd webui/app && npm run lint
+        cd ../mock-server && npm run lint
+        cd ../e2e-tests && npm run lint
+
+    - name: Type check WebUI code
+      run: |
+        cd webui/app && npm run type-check
+        cd ../mock-server && npm run type-check
+
+    - name: Build WebUI app
+      run: |
+        cd webui/app && npm run build
+
+    - name: Build mock server
+      run: |
+        cd webui/mock-server && npm run build
+
+    - name: Install Playwright browsers
+      run: |
+        cd webui/e2e-tests && npx playwright install --with-deps
+
+    - name: Run Playwright tests
+      run: |
+        cd webui/e2e-tests && npm test
+      env:
+        BASE_URL: http://localhost:3000
