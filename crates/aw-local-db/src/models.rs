@@ -24,7 +24,12 @@ impl TaskRecord {
             "Completed" => aw_core::TaskStatus::Completed,
             "Failed" => aw_core::TaskStatus::Failed,
             "Cancelled" => aw_core::TaskStatus::Cancelled,
-            _ => return Err(crate::Error::generic(format!("Unknown task status: {}", self.status))),
+            _ => {
+                return Err(crate::Error::generic(format!(
+                    "Unknown task status: {}",
+                    self.status
+                )))
+            }
         };
 
         let metadata = self

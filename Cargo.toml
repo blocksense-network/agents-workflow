@@ -8,6 +8,14 @@ members = [
   "crates/aw-sandbox",
   "crates/aw-sandbox-linux",
   "crates/aw-fs-snapshots-daemon",
+  # Sandbox crates
+  "crates/sandbox-core",
+  "crates/sandbox-fs",
+  "crates/sandbox-seccomp",
+  "crates/sandbox-cgroups",
+  "crates/sandbox-net",
+  "crates/sandbox-proto",
+  "crates/sbx-helper",
 ]
 resolver = "2"
 

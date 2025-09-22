@@ -1,0 +1,10 @@
+# Basic
+hard_tabs = false
+tab_spaces = 4
+max_width = 100
+
+# Consistency
+newline_style = "Auto"
+
+# Misc
+chain_width = 80

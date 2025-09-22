@@ -1,0 +1,10 @@
+# Clippy configuration for the workspace
+
+# Disallow certain methods
+disallowed-methods = []
+
+# Allow expect in tests (commonly needed)
+allow-expect-in-tests = true
+
+# Allow unwrap in tests (commonly needed)
+allow-unwrap-in-tests = true

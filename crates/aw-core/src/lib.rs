@@ -5,8 +5,8 @@
 //! transitions, and coordination with other AW components.
 
 pub mod error;
-pub mod task;
 pub mod session;
+pub mod task;
 
 /// Core result type used throughout the AW system.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -15,7 +15,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub use error::Error;
 
 /// Task lifecycle management and orchestration.
-pub use task::{Task, TaskId, TaskStatus, TaskManager};
+pub use task::{Task, TaskId, TaskManager, TaskStatus};
 
 /// Session lifecycle management and orchestration.
-pub use session::{Session, SessionId, SessionStatus, SessionManager};
+pub use session::{Session, SessionId, SessionManager, SessionStatus};

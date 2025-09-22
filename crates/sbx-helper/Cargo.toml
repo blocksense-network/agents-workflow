@@ -1,0 +1,26 @@
+[package]
+name = "sbx-helper"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sbx-helper"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+# Sandbox crates
+sandbox-core = { path = "../sandbox-core" }
+sandbox-fs = { path = "../sandbox-fs" }
+sandbox-seccomp = { path = "../sandbox-seccomp" }
+sandbox-cgroups = { path = "../sandbox-cgroups" }
+sandbox-net = { path = "../sandbox-net" }
+sandbox-proto = { path = "../sandbox-proto" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

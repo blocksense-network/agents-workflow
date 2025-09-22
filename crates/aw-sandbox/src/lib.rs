@@ -42,7 +42,9 @@ pub trait SandboxProvider: Send + Sync {
     async fn execute(&self, config: &SandboxConfig) -> Result<SandboxResult>;
 
     /// Check if this provider is available on the current system.
-    fn is_available() -> bool where Self: Sized;
+    fn is_available() -> bool
+    where
+        Self: Sized;
 }
 
 /// Get the best available sandbox provider for the current platform.
