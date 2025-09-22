@@ -7,6 +7,7 @@ Total estimated timeline: 12-16 months (broken into major phases with parallel d
 ### Milestone Completion & Outstanding Tasks
 
 Each milestone maintains an **outstanding tasks list** that tracks specific deliverables, bugs, and improvements. When milestones are completed, their sections are expanded with:
+
 - Implementation details and architectural decisions
 - References to key source files for diving into the implementation
 - Test coverage reports and known limitations
@@ -92,17 +93,19 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 
 - Deliverables:
   - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server
-  - JSON protocol implementation matching Ruby daemon API
+  - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../../Research/Using-SSZ.md) for implementation reference)
   - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
   - Async tokio runtime for concurrent request handling
+  - Tracing library for structured logging
   - Proper signal handling and cleanup
+  - **Daemon should not assume presence of any ZFS datasets or subvolumes** - all filesystem operations should be validated dynamically
 
 - Verification:
   - Daemon starts and listens on Unix socket at expected path
-  - `{"command": "ping"}` request returns `{"success": true}`
-  - Daemon handles invalid JSON gracefully with error responses
+  - Length-prefixed SSZ ping request returns success response
+  - Daemon handles invalid SSZ data gracefully with error responses
   - Daemon shuts down cleanly on SIGINT/SIGTERM
-  - Integration test: daemon processes basic ZFS snapshot request
+  - Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
 
 **0.4 FS Snapshots Core API** (3-4 days, parallel with 0.3, 0.5-0.6)
 
@@ -127,7 +130,6 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Snapshot creation, clone mounting, and cleanup
   - Daemon communication for privileged ZFS commands
   - Error handling for missing datasets, permissions, etc.
-  
 - Verification:
   - ZFS provider detects available ZFS datasets correctly
   - `create_workspace()` creates valid symlinks to ZFS clone mount points
