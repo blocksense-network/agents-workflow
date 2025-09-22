@@ -1,7 +1,6 @@
 use crate::operations::process_request;
-use crate::types::{Request, Response};
+use crate::types::Request;
 use anyhow::{anyhow, Result};
-use ssz::{Encode, Decode};
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
@@ -61,7 +60,6 @@ impl DaemonServer {
         while let Some(stream) = stream.next().await {
             match stream {
                 Ok(socket) => {
-                    let socket_path = self.socket_path.clone();
                     tokio::spawn(async move {
                         if let Err(e) = handle_client(socket).await {
                             error!("Error handling client: {}", e);

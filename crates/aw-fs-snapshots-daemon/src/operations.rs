@@ -195,7 +195,7 @@ async fn run_command(program: &str, args: &[&str]) -> Result<(), String> {
 
 async fn get_zfs_mountpoint(dataset: &str) -> Result<String, String> {
     let output = Command::new("sudo")
-        .args(&["zfs", "get", "-H", "-o", "value", "mountpoint", dataset])
+        .args(["zfs", "get", "-H", "-o", "value", "mountpoint", dataset])
         .output()
         .await
         .map_err(|e| format!("Failed to get mountpoint: {}", e))?;
@@ -213,18 +213,15 @@ fn get_sudo_user() -> Option<String> {
     std::env::var("SUDO_USER").ok().or_else(|| std::env::var("USER").ok())
 }
 
-async fn zfs_dataset_exists(dataset: &str) -> bool {
+pub async fn zfs_dataset_exists(dataset: &str) -> bool {
     run_command("zfs", &["list", dataset]).await.is_ok()
 }
 
-async fn zfs_snapshot_exists(snapshot: &str) -> bool {
+pub async fn zfs_snapshot_exists(snapshot: &str) -> bool {
     run_command("zfs", &["list", "-t", "snapshot", snapshot]).await.is_ok()
 }
 
-async fn btrfs_subvolume_exists(path: &str) -> bool {
+pub async fn btrfs_subvolume_exists(path: &str) -> bool {
     // Check if path exists and is a btrfs subvolume
-    match run_command("btrfs", &["subvolume", "show", path]).await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    run_command("btrfs", &["subvolume", "show", path]).await.is_ok()
 }

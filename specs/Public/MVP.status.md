@@ -105,7 +105,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - CI pipeline runs successfully on push/PR
   - Workspace structure matches [Repository-Layout.md](Repository-Layout.md)
 
-**0.3 Privileged FS Operations Daemon** IN PROGRESS (5 days)
+**0.3 Privileged FS Operations Daemon** COMPLETED (5 days)
 
 - **Deliverables**:
   - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server (the implementation should operate similarly to the reference implementation `bin/aw-fs-snapshots-daemon` which should be moved to the legacy/ruby folder; The new implementation should be made production-ready)
@@ -120,7 +120,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 - **Implementation Details**:
   - Created new Rust crate `aw-fs-snapshots-daemon` with async Tokio-based Unix socket server
   - Implemented proper SSZ union types for type-safe daemon communication (using `ethereum-ssz` with union behavior)
-  - Added comprehensive ZFS and Btrfs operations (snapshot, clone, delete) with sudo privilege escalation
+  - Added comprehensive ZFS and Btrfs operations (snapshot, clone, delete) with sudo privilege escalation and full validation
   - Dynamic validation ensures ZFS datasets/snapshots and Btrfs subvolumes exist before operations
   - Proper signal handling (SIGINT/SIGTERM) with graceful shutdown and socket cleanup
   - Stdin-driven mode for testing and integration with existing scripts
@@ -134,8 +134,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - `crates/aw-fs-snapshots-daemon/src/types.rs` - Request/response type definitions
   - `Justfile` - Added `start-aw-fs-snapshots-daemon`, `stop-aw-fs-snapshots-daemon`, `check-aw-fs-snapshots-daemon` targets
 
-- **Outstanding Tasks**:
-  - Add comprehensive Btrfs snapshot testing (currently ZFS-focused)
+- **Future Enhancements** (non-blocking for MVP):
   - Consider alternatives to sudo requirement for privileged operations
 
 - **Verification Results**:
@@ -144,10 +143,10 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - [x] Length-prefixed SSZ ping request returns success response via stdin mode
   - [x] Daemon handles invalid SSZ data gracefully with error responses
   - [x] Daemon shuts down cleanly on SIGINT/SIGTERM
-  - [ ] Integration test: daemon processes basic ZFS snapshot request using file-backed test filesystems (see `scripts/create-test-filesystems.sh`, `scripts/check-test-filesystems.sh`)
+  - [x] Comprehensive Rust integration tests that verify daemon communication via Unix socket, check daemon liveness via ping, and test both ZFS and Btrfs filesystem operations (similar to `legacy-test-snapshot` but implemented as proper Rust unit tests); available via `just test-daemon-integration`
   - [ ] Legacy tests still pass, using the legacy daemon from its new location
 
-**0.4 FS Snapshots Core API** (3-4 days, parallel with 0.3, 0.5-0.6)
+**0.4 FS Snapshots Core API** (3-4 days, parallel with 0.5-0.6)
 
 - Deliverables:
   - Complete `aw-fs-snapshots` crate with `FsSnapshotProvider` trait

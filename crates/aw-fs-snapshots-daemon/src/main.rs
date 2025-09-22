@@ -3,7 +3,7 @@ use clap::Parser;
 use ssz::{Encode, Decode};
 use std::path::PathBuf;
 use tokio::signal::unix::{signal, SignalKind};
-use tracing::{info, warn, error};
+use tracing::{info, error};
 
 mod server;
 mod types;
@@ -87,7 +87,7 @@ async fn run_socket_mode(socket_path: PathBuf) -> Result<()> {
 
 async fn run_stdin_mode() -> Result<()> {
     use tokio::io::{stdin, AsyncBufReadExt, BufReader};
-    use types::{Request, Response};
+    use types::Request;
 
     let stdin = BufReader::new(stdin());
     let mut lines = stdin.lines();

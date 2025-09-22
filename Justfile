@@ -128,6 +128,10 @@ stop-aw-fs-snapshots-daemon:
 check-aw-fs-snapshots-daemon:
     scripts/check-aw-fs-snapshots-daemon.sh
 
+# Run comprehensive daemon integration tests (requires test filesystems)
+test-daemon-integration:
+    cargo test --package aw-fs-snapshots-daemon -- --nocapture integration
+
 # Run all spec linting/validation in one go
 lint-specs:
     scripts/lint-specs.sh

@@ -2,13 +2,15 @@
 
 use async_trait::async_trait;
 use aw_fs_snapshots::{FsSnapshotProvider, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use tokio::process::Command;
 
 /// Btrfs snapshot provider implementation.
+#[derive(Default)]
 pub struct BtrfsProvider;
 
+#[allow(dead_code)]
 impl BtrfsProvider {
     /// Create a new Btrfs provider.
     pub fn new() -> Self {
@@ -16,7 +18,7 @@ impl BtrfsProvider {
     }
 
     /// Check if the given path is on a Btrfs filesystem.
-    pub fn supports_path(path: &Path) -> bool {
+    pub fn supports_path(_path: &Path) -> bool {
         // For now, assume all paths are supported as a placeholder
         // In a real implementation, this would check if the path is on a Btrfs mount
         true

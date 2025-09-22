@@ -25,6 +25,7 @@ pub enum Response {
 }
 
 // Constructors for SSZ union variants (convert String to Vec<u8>)
+#[allow(dead_code)]
 impl Request {
     pub fn ping() -> Self {
         Self::Ping(vec![])

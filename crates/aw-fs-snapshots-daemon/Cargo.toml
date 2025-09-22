@@ -24,3 +24,6 @@ clap = { workspace = true, features = ["derive"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 futures = "0.3"
 hex = "0.4"
+
+[dev-dependencies]
+tokio-test = "0.4"

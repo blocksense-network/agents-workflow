@@ -2,10 +2,10 @@
 
 use async_trait::async_trait;
 use aw_sandbox::{SandboxConfig, SandboxProvider, SandboxResult, Result};
-use std::os::unix::process::CommandExt;
 use tokio::process::Command;
 
 /// Linux sandbox provider using namespaces.
+#[derive(Default)]
 pub struct LinuxSandboxProvider;
 
 impl LinuxSandboxProvider {

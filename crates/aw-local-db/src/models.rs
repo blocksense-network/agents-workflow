@@ -2,7 +2,6 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Database model for tasks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
