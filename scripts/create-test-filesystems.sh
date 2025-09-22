@@ -10,9 +10,13 @@ echo "Creating reusable test filesystems in $CACHE_DIR"
 echo "These filesystems will be shared across git worktrees and persist between test runs."
 echo ""
 
-# Enable unprivileged user namespaces for Btrfs operations
-echo "Enabling unprivileged user namespaces for Btrfs operations..."
-sudo sysctl -w kernel.unprivileged_userns_clone=1 >/dev/null 2>&1 || echo "Warning: Could not enable unprivileged user namespaces"
+# Enable unprivileged user namespaces for Btrfs operations (Linux only)
+if [[ "$(uname -s)" == "Linux" ]]; then
+  echo "Enabling unprivileged user namespaces for Btrfs operations..."
+  sudo sysctl -w kernel.unprivileged_userns_clone=1 >/dev/null 2>&1 || echo "Warning: Could not enable unprivileged user namespaces"
+else
+  echo "Skipping Linux-specific kernel configuration on $(uname -s)"
+fi
 
 # Create cache directory
 mkdir -p "$CACHE_DIR"
@@ -30,14 +34,24 @@ if command -v zfs >/dev/null 2>&1; then
     echo "ZFS backing file already exists."
   fi
 
+
   # Create pool if it doesn't exist
   if ! zpool list "$ZFS_POOL" >/dev/null 2>&1; then
     echo "Creating ZFS pool (requires sudo)..."
     sudo zpool create "$ZFS_POOL" "$ZFS_FILE"
     sudo zfs create "$ZFS_POOL"/test_dataset
     sudo zfs allow "$USER" snapshot,create,destroy,mount,mountpoint "$ZFS_POOL"/test_dataset
-    # Set ownership on the mounted dataset
-    sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
+
+    # Set ownership on the mounted dataset (different paths on macOS vs Linux)
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      # On macOS, ZFS mounts under /Volumes/
+      MOUNTPOINT="/Volumes/$ZFS_POOL/test_dataset"
+      echo "Setting ownership on macOS mount point $MOUNTPOINT..."
+      sudo chown -R "$USER:$GID" "$MOUNTPOINT"
+    else
+      # On Linux, ZFS mounts under /pool_name/
+      sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
+    fi
     echo "ZFS pool created and permissions delegated to $USER."
   else
     echo "ZFS pool $ZFS_POOL already exists."
@@ -45,16 +59,25 @@ if command -v zfs >/dev/null 2>&1; then
     if ! zfs allow "$ZFS_POOL"/test_dataset | grep -q "user $USER mount"; then
       echo "Updating ZFS permissions..."
       sudo zfs allow "$USER" snapshot,create,destroy,mount,mountpoint "$ZFS_POOL"/test_dataset
-      # Set ownership on the mounted dataset
-      sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
+
+      # Set ownership on the mounted dataset (different paths on macOS vs Linux)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        MOUNTPOINT="/Volumes/$ZFS_POOL/test_dataset"
+        echo "Setting ownership on macOS mount point $MOUNTPOINT..."
+        sudo chown -R "$USER:$GID" "$MOUNTPOINT"
+      else
+        sudo chown -R "$USER:$GID" "/$ZFS_POOL/test_dataset"
+      fi
     fi
   fi
 else
   echo "ZFS not available, skipping ZFS setup."
 fi
 
-# Check if Btrfs is available
-if command -v mkfs.btrfs >/dev/null 2>&1; then
+# Check if Btrfs is available (skip on macOS)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  echo "Btrfs not supported on macOS, skipping Btrfs setup."
+elif command -v mkfs.btrfs >/dev/null 2>&1; then
   echo "Setting up Btrfs test filesystem..."
 
   # Create backing file if it doesn't exist
