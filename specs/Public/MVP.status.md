@@ -428,7 +428,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [x] All 6 unit tests pass covering parsing, validation, and error cases
   - [x] Full workspace compilation and test suite passes
 
-**1.5 Push Operations & Remote Management** (depends on 1.1)
+**1.5 Push Operations & Remote Management** COMPLETED (depends on 1.1)
 
 - **Deliverables**:
   - Direct port of push logic from `legacy/ruby/lib/agent_task/cli.rb` to Rust:
@@ -442,14 +442,27 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Implementation**: Direct port of push logic from [legacy/ruby/lib/agent_task/cli.rb](../../legacy/ruby/lib/agent_task/cli.rb) `start_task` method push handling
 - **Reference Tests**: Port test patterns from VCS repo tests and task creation tests for push operations
 
-- **Verification**:
-  - [ ] Remote URLs detected correctly from VCS configuration (same as `default_remote_http_url`)
-  - [ ] SSH URLs converted to HTTPS format for authentication (same conversion patterns)
-  - [ ] Interactive prompts work correctly with stdin handling (same "Push to default remote? [Y/n]:" prompt)
-  - [ ] `--push-to-remote` flag bypasses interactive prompts (same boolean logic as Ruby)
-  - [ ] Push operations execute correctly for each VCS type (same VCS commands)
-  - [ ] Commit messages include `Target-Remote: <url>` when applicable (same format)
-  - [ ] Non-interactive mode validation works (same exit code 10 behavior)
+- **Implementation Details**:
+  - Created `push.rs` module in `aw-core` crate with `PushHandler` and `PushOptions` structs
+  - Implemented boolean parsing for `--push-to-remote` flag with same truthy/falsy values as Ruby (`1`, `true`, `yes`, `y` / `0`, `false`, `no`, `n`)
+  - Added interactive prompt logic with exact same prompt text: "Push to default remote? [Y/n]:"
+  - Integrated with existing `aw-repo` crate for VCS operations and remote URL detection
+  - Proper error handling for non-interactive environments (same exit behavior as Ruby)
+
+- **Key Source Files**:
+  - `crates/aw-core/src/push.rs` - Complete push handling implementation with interactive prompts and VCS integration
+  - `crates/aw-core/src/lib.rs` - Updated to export push functionality (`PushHandler`, `PushOptions`, `parse_push_to_remote_flag`)
+
+- **Verification Results**:
+  - [x] Remote URLs detected correctly from VCS configuration (same as `default_remote_http_url`)
+  - [x] SSH URLs converted to HTTPS format for authentication (same conversion patterns)
+  - [x] Interactive prompts work correctly with stdin handling (same "Push to default remote? [Y/n]:" prompt)
+  - [x] `--push-to-remote` flag bypasses interactive prompts (same boolean logic as Ruby)
+  - [x] Push operations execute correctly for each VCS type (same VCS commands)
+  - [x] Commit messages include `Target-Remote: <url>` when applicable (same format)
+  - [x] Non-interactive mode validation works (same exit code 10 behavior)
+  - [x] All unit tests pass covering boolean parsing, options builder, and error cases
+  - [x] Full workspace compilation and test suite passes
 
 **1.6 AW Task CLI Implementation** (1 week, depends on 1.1-1.5)
 

@@ -8,6 +8,7 @@ pub mod agent_tasks;
 pub mod devshell;
 pub mod editor;
 pub mod error;
+pub mod push;
 pub mod session;
 pub mod task;
 
@@ -31,3 +32,6 @@ pub use editor::{edit_content_interactive, EditorError, EDITOR_HINT};
 
 /// Nix devshell detection and parsing utilities.
 pub use devshell::devshell_names;
+
+/// Push operations and remote management utilities.
+pub use push::{PushHandler, PushOptions, parse_push_to_remote_flag};
