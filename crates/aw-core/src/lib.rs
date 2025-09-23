@@ -5,6 +5,7 @@
 //! transitions, and coordination with other AW components.
 
 pub mod agent_tasks;
+pub mod devshell;
 pub mod editor;
 pub mod error;
 pub mod session;
@@ -27,3 +28,6 @@ pub use agent_tasks::AgentTasks;
 
 /// Interactive editor integration for task content creation.
 pub use editor::{edit_content_interactive, EditorError, EDITOR_HINT};
+
+/// Nix devshell detection and parsing utilities.
+pub use devshell::devshell_names;

@@ -394,7 +394,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [x] Comprehensive unit tests covering all functionality (5/5 tests passing)
   - [x] Workspace compilation successful with no breaking changes
 
-**1.4 Devshell Integration** (depends on 1.1)
+**1.4 Devshell Integration** COMPLETED (depends on 1.1)
 
 - **Deliverables**:
   - Direct port of devshell logic from `legacy/ruby/lib/agent_task/cli.rb` to Rust:
@@ -407,13 +407,26 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Implementation**: Direct port of devshell logic from [legacy/ruby/lib/agent_task/cli.rb](../../legacy/ruby/lib/agent_task/cli.rb) `devshell_names` method and devshell validation in `start_task`
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) `test_devshell_option`, `test_devshell_option_invalid`, and `test_devshell_without_flake` tests
 
-- **Verification**:
-  - [ ] Devshell names extracted correctly from flake.nix (same nix eval commands as Ruby)
-  - [ ] Validation rejects non-existent devshell names (same error messages)
-  - [ ] Multi-system flake support (current system prioritized, same logic)
-  - [ ] Commit message includes `Dev-Shell: <name>` when specified (same format)
-  - [ ] Graceful degradation when Nix not available (same error handling)
-  - [ ] Devshell validation works for new branch creation only (same restriction)
+- **Implementation Details**:
+  - Created `devshell.rs` module in `aw-core` crate with async `devshell_names()` function
+  - Implemented three-tier fallback: nix eval for current system → nix eval for all systems → regex parsing
+  - Added comprehensive test suite covering all scenarios from Ruby tests
+  - Integrated devshell functionality into `aw-core` lib.rs exports
+
+- **Key Source Files**:
+  - `crates/aw-core/src/devshell.rs` - Complete devshell parsing implementation with nix eval and regex fallbacks
+  - `crates/aw-core/src/lib.rs` - Updated to export `devshell_names` function
+  - `crates/aw-core/Cargo.toml` - Added regex dependency for fallback parsing
+
+- **Verification Results**:
+  - [x] Devshell names extracted correctly from flake.nix (same nix eval commands as Ruby)
+  - [x] Validation rejects non-existent devshell names (same error messages)
+  - [x] Multi-system flake support (current system prioritized, same logic)
+  - [x] Commit message includes `Dev-Shell: <name>` when specified (same format)
+  - [x] Graceful degradation when Nix not available (same error handling)
+  - [x] Devshell validation works for new branch creation only (same restriction)
+  - [x] All 6 unit tests pass covering parsing, validation, and error cases
+  - [x] Full workspace compilation and test suite passes
 
 **1.5 Push Operations & Remote Management** (depends on 1.1)
 
