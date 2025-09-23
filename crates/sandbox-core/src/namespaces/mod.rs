@@ -112,26 +112,23 @@ impl NamespaceManager {
         if let Some(uid_map) = &self.config.uid_map {
             self.write_mapping("/proc/self/uid_map", uid_map)?;
         } else {
-            // Default mapping: current UID maps to root in namespace
+            // Default mapping: current UID maps to root in namespace (equivalent to --map-root-user)
             let uid = getuid().as_raw();
-            let default_uid_map = format!("{} {} 1", uid, uid);
+            let default_uid_map = format!("{} 0 1", uid);
             self.write_mapping("/proc/self/uid_map", &default_uid_map)?;
         }
 
         if let Some(gid_map) = &self.config.gid_map {
             self.write_mapping("/proc/self/gid_map", gid_map)?;
         } else {
-            // Default mapping: current GID maps to root in namespace
+            // Default mapping: current GID maps to root in namespace (equivalent to --map-root-user)
             let gid = nix::unistd::getgid().as_raw();
-            let default_gid_map = format!("{} {} 1", gid, gid);
+            let default_gid_map = format!("{} 0 1", gid);
             self.write_mapping("/proc/self/gid_map", &default_gid_map)?;
         }
 
-        // Set groups to empty for user namespaces
-        setgroups(&[]).map_err(|e| {
-            warn!("Failed to set groups: {}", e);
-            Error::Namespace(format!("Failed to set groups: {}", e))
-        })?;
+        // Set setgroups to "deny" for user namespaces (required since Linux 3.19)
+        self.write_mapping("/proc/self/setgroups", "deny")?;
 
         // Switch to root in the namespace
         setresuid(Uid::from_raw(0), Uid::from_raw(0), Uid::from_raw(0)).map_err(|e| {

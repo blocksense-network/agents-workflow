@@ -177,9 +177,9 @@ build-network-test-binaries:
 # Build all test binaries needed for network enforcement tests
 build-network-tests: build-sbx-helper build-network-test-binaries
 
-# Build debugging enforcement test binaries (debugging_test_orchestrator, ptrace_tester, process_visibility_tester, mount_test)
+# Build debugging enforcement test binaries (debugging_test_orchestrator, ptrace_tester, process_visibility_tester, mount_test, bind_mount_test, simple_bind_mount, replicate_user_test, rust_user_namespace_test, final_bind_mount_test)
 build-debugging-test-binaries:
-    cargo build -p debugging-enforcement --bin debugging_test_orchestrator --bin ptrace_tester --bin process_visibility_tester --bin mount_test
+    cargo build -p debugging-enforcement --bin debugging_test_orchestrator --bin ptrace_tester --bin process_visibility_tester --bin mount_test --bin bind_mount_test --bin simple_bind_mount --bin replicate_user_test --bin rust_user_namespace_test --bin final_bind_mount_test
 
 # Build all test binaries needed for debugging enforcement tests
 build-debugging-tests: build-sbx-helper build-debugging-test-binaries
