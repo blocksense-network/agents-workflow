@@ -34,6 +34,7 @@ members = [
   "tests/cgroup-enforcement",
   "tests/overlay-enforcement",
   "tests/network-enforcement",
+  "tests/debugging-enforcement",
 ]
 resolver = "2"
 

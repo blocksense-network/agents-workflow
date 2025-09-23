@@ -1,0 +1,27 @@
+[package]
+name = "debugging-enforcement"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+nix = { version = "0.27", features = ["ptrace", "process", "mount", "sched"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[[bin]]
+name = "ptrace_tester"
+path = "src/ptrace_tester.rs"
+
+[[bin]]
+name = "process_visibility_tester"
+path = "src/process_visibility_tester.rs"
+
+[[bin]]
+name = "debugging_test_orchestrator"
+path = "src/test_orchestrator.rs"
+
+[[bin]]
+name = "mount_test"
+path = "src/mount_test.rs"

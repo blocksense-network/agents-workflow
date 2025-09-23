@@ -162,7 +162,7 @@ build-overlay-test-binaries:
 
 # Build sbx-helper binary
 build-sbx-helper:
-    cargo build --bin sbx-helper
+    cargo build -p sbx-helper --bin sbx-helper
 
 # Build all test binaries needed for cgroup enforcement tests
 build-cgroup-tests: build-sbx-helper build-cgroup-test-binaries
@@ -176,6 +176,13 @@ build-network-test-binaries:
 
 # Build all test binaries needed for network enforcement tests
 build-network-tests: build-sbx-helper build-network-test-binaries
+
+# Build debugging enforcement test binaries (debugging_test_orchestrator, ptrace_tester, process_visibility_tester, mount_test)
+build-debugging-test-binaries:
+    cargo build -p debugging-enforcement --bin debugging_test_orchestrator --bin ptrace_tester --bin process_visibility_tester --bin mount_test
+
+# Build all test binaries needed for debugging enforcement tests
+build-debugging-tests: build-sbx-helper build-debugging-test-binaries
 
 # Run cgroup tests with E2E enforcement verification
 test-cgroups:
@@ -312,3 +319,14 @@ clear-mock-agent-recordings:
 test-networks:
     just build-network-tests
     cargo test -p sandbox-integration-tests --verbose
+
+# Run debugging enforcement tests with E2E verification
+test-debugging:
+    just build-debugging-tests
+    cargo test -p sandbox-integration-tests --verbose
+    ./target/debug/debugging_test_orchestrator
+
+# Run simple mount test to verify CAP_SYS_ADMIN availability in user namespaces
+test-mount-capability:
+    just build-debugging-test-binaries
+    ./target/debug/mount_test

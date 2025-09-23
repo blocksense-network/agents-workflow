@@ -1,10 +1,11 @@
 //! Process execution and lifecycle management for sandboxing.
 
 use nix::mount::{mount, MsFlags};
-use nix::unistd::{execvp, fork, ForkResult, Pid};
+use nix::sys::wait;
+use nix::unistd::{fork, ForkResult, Pid};
 use std::ffi::CString;
 use tokio::process::Command as TokioCommand;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::error::Error;
 use crate::Result;
@@ -56,12 +57,9 @@ impl ProcessManager {
 
     /// Execute the configured command as PID 1 in the sandbox
     pub fn exec_as_pid1(&self) -> Result<()> {
-        info!("Executing as PID 1: {:?}", self.config.command);
+        info!("Forking to enter PID namespace and execute as PID 1: {:?}", self.config.command);
 
-        // Mount /proc for the new PID namespace
-        self.mount_proc()?;
-
-        // Prepare the command and arguments
+        // Prepare the command and arguments before forking
         if self.config.command.is_empty() {
             return Err(Error::Execution("No command specified".to_string()));
         }
@@ -70,26 +68,48 @@ impl ProcessManager {
         let args: Vec<CString> =
             self.config.command.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
 
-        // Set working directory if specified
-        if let Some(dir) = &self.config.working_dir {
-            std::env::set_current_dir(dir).map_err(|e| {
-                Error::Execution(format!("Failed to set working directory to {}: {}", dir, e))
-            })?;
+        // Fork to enter the new PID namespace
+        match unsafe { nix::unistd::fork() } {
+            Ok(nix::unistd::ForkResult::Parent { child }) => {
+                // Parent process: wait for child and handle cleanup
+                info!("Parent process waiting for child PID {}", child);
+                self.wait_for_child(child)?;
+                Ok(())
+            }
+            Ok(nix::unistd::ForkResult::Child) => {
+                // Child process: Now in new PID namespace as PID 1
+
+                // Mount /proc for the new PID namespace (may fail due to user namespace limitations)
+                if let Err(e) = self.mount_proc() {
+                    warn!("Failed to mount /proc in child process (expected in unprivileged user namespaces): {}", e);
+                    // Continue execution - some functionality may be limited but sandbox still provides other isolation
+                }
+
+                // Set working directory if specified
+                if let Some(dir) = &self.config.working_dir {
+                    std::env::set_current_dir(dir).map_err(|e| {
+                        Error::Execution(format!("Failed to set working directory to {}: {}", dir, e))
+                    })?;
+                }
+
+                // Set environment variables
+                for (key, value) in &self.config.env {
+                    std::env::set_var(key, value);
+                }
+
+                // Execute the command as PID 1
+                // This will replace the current child process
+                nix::unistd::execvp(&args[0], &args).map_err(|e| {
+                    Error::Execution(format!("Failed to execvp {}: {}", program, e))
+                })?;
+
+                // This should never be reached
+                unreachable!();
+            }
+            Err(e) => {
+                Err(Error::Execution(format!("Failed to fork: {}", e)))
+            }
         }
-
-        // Set environment variables
-        for (key, value) in &self.config.env {
-            std::env::set_var(key, value);
-        }
-
-        // Execute the command - this replaces the current process
-        execvp(&args[0], &args).map_err(|e| {
-            warn!("Failed to execute {}: {}", program, e);
-            Error::Execution(format!("Failed to execute {}: {}", program, e))
-        })?;
-
-        // This should never be reached
-        unreachable!("execvp should have replaced the process");
     }
 
     /// Mount /proc filesystem correctly for PID namespace
@@ -114,6 +134,34 @@ impl ProcessManager {
 
         debug!("Successfully mounted /proc");
         Ok(())
+    }
+
+    /// Wait for child process to complete and handle cleanup
+    fn wait_for_child(&self, child_pid: Pid) -> Result<()> {
+        info!("Waiting for child process {} to complete", child_pid);
+
+        match wait::waitpid(child_pid, None) {
+            Ok(wait::WaitStatus::Exited(pid, code)) => {
+                info!("Child process {} exited with code {}", pid, code);
+                if code == 0 {
+                    Ok(())
+                } else {
+                    Err(Error::Execution(format!("Child process exited with code {}", code)))
+                }
+            }
+            Ok(wait::WaitStatus::Signaled(pid, signal, _)) => {
+                warn!("Child process {} terminated by signal {:?}", pid, signal);
+                Err(Error::Execution(format!("Child process terminated by signal {:?}", signal)))
+            }
+            Ok(other) => {
+                warn!("Unexpected wait status for child {}: {:?}", child_pid, other);
+                Err(Error::Execution(format!("Unexpected child exit status: {:?}", other)))
+            }
+            Err(e) => {
+                error!("Failed to wait for child process {}: {}", child_pid, e);
+                Err(Error::Execution(format!("Failed to wait for child: {}", e)))
+            }
+        }
     }
 
     /// Fork and execute command in child process (for testing)

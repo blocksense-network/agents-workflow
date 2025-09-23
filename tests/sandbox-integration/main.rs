@@ -203,6 +203,73 @@ fn test_cgroups_enforcement_e2e() {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn test_debugging_enforcement_e2e() {
+    // This test runs the full E2E debugging enforcement test suite
+    // It requires the test binaries to be built and available
+    // Note: This test requires privileges to create namespaces and mount filesystems
+
+    use std::process::Command;
+
+    // Build paths relative to the project root (not the test directory)
+    let project_root = std::env::current_dir()
+        .unwrap_or_default()
+        .parent() // Go up from tests/sandbox-integration to tests/
+        .unwrap_or(&std::env::current_dir().unwrap_or_default())
+        .parent() // Go up from tests/ to project root
+        .unwrap_or(&std::env::current_dir().unwrap_or_default())
+        .to_path_buf();
+
+    let orchestrator_path = project_root.join("target/debug/debugging_test_orchestrator");
+    let helper_path = project_root.join("target/debug/sbx-helper");
+
+    println!("Looking for orchestrator at: {:?}", orchestrator_path);
+    println!(
+        "Current working directory: {:?}",
+        std::env::current_dir().unwrap_or_default()
+    );
+
+    // Verify the orchestrator binary exists
+    if !orchestrator_path.exists() {
+        panic!(
+            "Debugging test orchestrator not found at: {:?}. Run 'just build-debugging-tests' first.",
+            orchestrator_path
+        );
+    }
+
+    // Verify the helper binary exists
+    if !helper_path.exists() {
+        panic!(
+            "sbx-helper binary not found at: {:?}. Run 'just build-debugging-tests' first.",
+            helper_path
+        );
+    }
+
+    // Run the test orchestrator
+    println!("🧪 Running E2E debugging enforcement tests...");
+    let output = Command::new(orchestrator_path)
+        .output()
+        .expect("Failed to run debugging test orchestrator");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("Debugging test orchestrator stdout:\n{}", stdout);
+    if !stderr.is_empty() {
+        eprintln!("Debugging test orchestrator stderr:\n{}", stderr);
+    }
+
+    // Check if the orchestrator succeeded
+    if output.status.success() {
+        println!("✅ E2E debugging enforcement tests PASSED");
+    } else {
+        println!("❌ E2E debugging enforcement tests FAILED");
+        println!("Exit code: {:?}", output.status.code());
+        panic!("Debugging enforcement E2E tests failed");
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn test_overlay_enforcement_e2e() {
     // This test runs the full E2E overlay enforcement test suite
     // It requires the test binaries to be built and available

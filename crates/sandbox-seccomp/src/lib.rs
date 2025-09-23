@@ -72,6 +72,7 @@ impl SeccompManager {
             .block_filesystem_operations()?
             .allow_basic_operations()?
             .set_debug_mode(self.config.debug_mode)?;
+        info!("Seccomp filter configured with debug_mode={}", self.config.debug_mode);
 
         let filter = filter_builder.build()?;
         self.filter = Some(filter);
