@@ -32,9 +32,28 @@ agents-workflow/
 │  ├─ acceptance/
 │  └─ fixtures/
 ├─ examples/                   # Small runnable examples per subsystem
+├─ apps/                       # Platform-specific application bundles
+│  └─ macos/
+│     └─ AgentsWorkflow/              # Main macOS application (AgentsWorkflow.app)
+│        ├─ AgentsWorkflow.xcodeproj/ # Xcode project for main app
+│        ├─ AgentsWorkflow/           # Main app source (SwiftUI/AppKit)
+│        │  ├─ AppDelegate.swift
+│        │  ├─ MainMenu.xib
+│        │  └─ Info.plist
+│        └─ PlugIns/                  # Embedded system extensions (PlugIns/)
+│           └─ AgentFSKitExtension.appex/ # FSKit filesystem extension bundle
 ├─ adapters/
 │  └─ macos/
-│     └─ xcode/AgentFSKitExtension/   # FSKit App Extension (Swift) bridging Rust FFI
+│     └─ xcode/
+│        ├─ AgentFSKitExtension/      # FSKit filesystem extension source code
+│        │  ├─ AgentFSKitExtension/   # Extension source files
+│        │  │  ├─ AgentFsUnary.swift
+│        │  │  ├─ AgentFsVolume.swift
+│        │  │  ├─ AgentFsItem.swift
+│        │  │  └─ Constants.swift
+│        │  ├─ Package.swift          # Swift Package Manager configuration
+│        │  └─ build.sh               # Build script for Rust FFI integration
+│        └─ (legacy Swift package artifacts and build scripts)
 ├─ webui/                      # WebUI and related JavaScript/Node.js projects
 │  ├─ app/                     # Main SolidJS WebUI application
 │  ├─ app-ssr-server/          # Node.js SSR sidecar server
@@ -88,6 +107,28 @@ agents-workflow/
 ├─ bin/                        # Thin wrappers/launchers (may exec Rust bins)
 └─ (root scripts preserved; see below)
 ```
+
+### macOS Host Application Architecture
+
+The `apps/macos/AgentsWorkflow/` directory contains the main **AgentsWorkflow.app** - the primary macOS application for the entire Agents Workflow project. This app serves as a container for multiple system extensions and provides the main user interface for all AW functionality on macOS. This design follows Apple's system extension architecture where privileged components (like filesystem extensions) must be embedded within a host application for proper registration and lifecycle management.
+
+#### Host App Responsibilities
+- **Extension Hosting**: Contains and manages multiple system extensions (currently AgentFSKitExtension)
+- **User Interface**: Provides minimal UI for extension management and status monitoring
+- **Extension Registration**: Handles PlugInKit registration for embedded extensions
+- **Lifecycle Management**: Manages extension loading, unloading, and system approval workflows
+
+#### Extension Architecture
+- **AgentFSKitExtension**: FSKit-based filesystem extension for user-space AgentFS implementation
+- **Extension Sources**: Extension source code is developed in `adapters/macos/xcode/AgentFSKitExtension/`
+- **Built Extensions**: Compiled extensions are embedded in the host app's `PlugIns/` directory
+- **Future Extensions**: Additional system extensions (network filters, device drivers, etc.) will follow the same pattern
+
+#### Build and Distribution
+- Built as a standard macOS application bundle with embedded appex (extension) bundles
+- Requires code signing and notarization for system extension approval
+- Distributed as a single `.app` bundle containing all extensions
+- Uses universal binaries for Intel + Apple Silicon compatibility
 
 ### Crate mapping (selected)
 

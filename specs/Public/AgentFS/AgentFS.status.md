@@ -472,6 +472,112 @@ M17. FSKit Integration and Testing (4–6d)
 - [ ] macOS CI pipeline with FSKit testing (pending infrastructure)
 - [x] Setup and deployment process documented
 
+M18. Xcode Project Migration (3-4d)
+
+- Create proper Xcode macOS App project with embedded FSKit extension target
+- Migrate Swift package to Xcode project structure
+- Set up code signing, entitlements, and FSKit capabilities
+- Configure universal binary builds
+
+**Implementation Details:** Migrate from Swift Package Manager to proper Xcode project structure as recommended in [Compiling-FsKit-Extensions.md](../Research/Compiling-FsKit-Extensions.md) and following the repository layout specified in [Repository-Layout.md](../Repository-Layout.md). Create **AgentsWorkflow.app** host macOS application that embeds the AgentFSKitExtension filesystem extension (along with future extensions) for proper system registration and code signing. Implement universal binary support for both Intel and Apple Silicon Macs.
+
+**Key Source Files:**
+- `apps/macos/AgentsWorkflow/AgentsWorkflow.xcodeproj/` - Xcode project file for host app
+- `apps/macos/AgentsWorkflow/AgentsWorkflow/` - Host app source files
+- `apps/macos/AgentsWorkflow/PlugIns/AgentFSKitExtension.appex/` - Built extension bundle
+- `adapters/macos/xcode/AgentFSKitExtension/` - Extension source code and build scripts
+
+**Outstanding Tasks:**
+- Migrate existing Swift package code to Xcode project
+- Create host macOS application for extension embedding
+- Set up proper code signing certificates and entitlements
+- Implement universal binary build pipeline
+
+**Verification Results:**
+- [ ] Xcode project builds successfully with `xcodebuild`
+- [ ] Extension properly embedded in host app bundle
+- [ ] Code signing works with development certificates
+- [ ] Universal binaries created for both architectures
+
+M19. Host App & Extension Registration (2-3d)
+
+- Create minimal macOS host application for extension registration
+- Implement proper extension lifecycle management
+- Add system extension approval workflow documentation
+
+**Implementation Details:** Create **AgentsWorkflow.app** - the main macOS host application that embeds multiple system extensions including AgentFSKitExtension. Follow the host app pattern described in [Compiling-FsKit-Extensions.md](../Research/Compiling-FsKit-Extensions.md) for extension loading and system approval workflows. This app will serve as the container for all AW system extensions.
+
+**Key Source Files:**
+- `apps/macos/AgentsWorkflow/AgentsWorkflow/AppDelegate.swift` - Host app delegate
+- `apps/macos/AgentsWorkflow/AgentsWorkflow/main.swift` - Host app entry point
+- `apps/macos/AgentsWorkflow/AgentsWorkflow/Info.plist` - Host app metadata
+- `apps/macos/AgentsWorkflow/PlugIns/AgentFSKitExtension.appex/` - Embedded extension bundle
+
+**Outstanding Tasks:**
+- Implement host app UI (minimal interface)
+- Set up extension registration via PlugInKit
+- Document system extension approval process
+- Add extension status monitoring
+
+**Verification Results:**
+- [ ] Host app launches and registers extension with PlugInKit
+- [ ] Extension appears in System Settings > File System Extensions
+- [ ] Extension can be enabled/disabled properly
+- [ ] Clean registration/unregistration process
+
+M20. Universal Binary & Distribution (3-4d)
+
+- Implement universal binary creation for Rust libraries
+- Set up proper build pipeline with `lipo` for multi-architecture support
+- Create signed and notarized app bundle for distribution
+
+**Implementation Details:** Implement universal binary creation using `lipo` tool as detailed in [Compiling-FsKit-Extensions.md](../Research/Compiling-FsKit-Extensions.md). Set up automated build pipeline for cross-compilation and universal binary assembly. Enable code signing and notarization for distribution.
+
+**Key Source Files:**
+- `adapters/macos/xcode/build-universal.sh` - Universal binary creation script
+- `adapters/macos/xcode/package.sh` - Packaging and signing script
+- `adapters/macos/xcode/AgentFSKitExtension/AgentFSKitExtension.entitlements` - Code signing entitlements
+
+**Outstanding Tasks:**
+- Set up cross-compilation for both Mac architectures
+- Implement `lipo` universal binary creation
+- Configure code signing and notarization
+- Create distribution-ready app bundles
+
+**Verification Results:**
+- [ ] Libraries work on both Intel and Apple Silicon Macs
+- [ ] App bundle is properly signed and notarized
+- [ ] Clean installation/uninstallation process
+- [ ] Distribution package created successfully
+
+M21. Real Filesystem Integration Tests (4-5d)
+
+- Implement comprehensive mount/unmount testing with real block devices
+- Create automated test suite that actually exercises AgentFS operations
+- Add filesystem benchmarking and stress testing
+- Implement proper test cleanup and device management
+
+**Implementation Details:** Implement comprehensive integration tests that create real block devices and mount actual AgentFS filesystems, following the testing patterns in [Compiling-FsKit-Extensions.md](../Research/Compiling-FsKit-Extensions.md). Replace stubbed tests with real filesystem operations including file creation, snapshots, and branches.
+
+**Key Source Files:**
+- `adapters/macos/xcode/test-filesystem.sh` - Real filesystem integration test script
+- `adapters/macos/xcode/test-stress.sh` - Stress testing and benchmarking
+- `adapters/macos/xcode/test-device-setup.sh` - Block device creation and cleanup utilities
+
+**Outstanding Tasks:**
+- Implement real block device creation and management
+- Add comprehensive file operation testing
+- Implement control plane testing (snapshots/branches)
+- Add performance benchmarking
+- Set up automated test cleanup
+
+**Verification Results:**
+- [ ] Full mount cycle works: create device → mount → operations → unmount → cleanup
+- [ ] File operations (create, read, write, delete) work correctly
+- [ ] Control plane operations (snapshots, branches) functional
+- [ ] Performance benchmarks meet baseline requirements
+- [ ] Automated test cleanup works reliably
+
 ### Risks & mitigations
 
 - Platform API variance (FSKit maturity; WinFsp nuances): feature‑gate and document exceptions; track upstream issues.
