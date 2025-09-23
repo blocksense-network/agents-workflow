@@ -1,6 +1,7 @@
 //! Agents Workflow CLI library
 
 pub mod agent;
+pub mod task;
 pub mod transport;
 
 // Re-export CLI types for testing
@@ -17,6 +18,11 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Task management commands
+    Task {
+        #[command(subcommand)]
+        subcommand: task::TaskCommands,
+    },
     /// Agent-related commands
     Agent {
         #[command(subcommand)]

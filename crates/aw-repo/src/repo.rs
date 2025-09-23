@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use tokio::process::Command;
+use std::process::Command;
 use regex::Regex;
 
 use crate::error::{VcsError, VcsResult};
@@ -13,7 +13,7 @@ pub struct VcsRepo {
 
 impl VcsRepo {
     /// Create a new VCS repository instance by finding the repository root from the given path
-    pub async fn new<P: AsRef<Path>>(path_in_repo: P) -> VcsResult<Self> {
+    pub fn new<P: AsRef<Path>>(path_in_repo: P) -> VcsResult<Self> {
         let root = Self::find_repo_root(path_in_repo.as_ref())?;
         let vcs_type = Self::determine_vcs_type(&root)?;
 
@@ -31,9 +31,9 @@ impl VcsRepo {
     }
 
     /// Get the current branch name
-    pub async fn current_branch(&self) -> VcsResult<String> {
+    pub fn current_branch(&self) -> VcsResult<String> {
         let cmd = self.get_current_branch_command();
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         let branch = output.trim().to_string();
 
         if branch.is_empty() {
@@ -56,7 +56,7 @@ impl VcsRepo {
     }
 
     /// Start a new branch
-    pub async fn start_branch(&self, branch_name: &str) -> VcsResult<()> {
+    pub fn start_branch(&self, branch_name: &str) -> VcsResult<()> {
         if !Self::valid_branch_name(branch_name) {
             return Err(VcsError::InvalidBranchName(branch_name.to_string()));
         }
@@ -67,51 +67,51 @@ impl VcsRepo {
 
         let commands = self.get_start_branch_commands(branch_name);
         for cmd in commands {
-            self.run_command(&cmd).await?;
+            self.run_command(&cmd)?;
         }
 
         Ok(())
     }
 
     /// Commit a file with a message
-    pub async fn commit_file(&self, file_path: &str, message: &str) -> VcsResult<()> {
+    pub fn commit_file(&self, file_path: &str, message: &str) -> VcsResult<()> {
         let commands = self.get_commit_file_commands(file_path, message);
         for cmd in commands {
-            self.run_command(&cmd).await?;
+            self.run_command(&cmd)?;
         }
         Ok(())
     }
 
     /// Push current branch to remote
-    pub async fn push_current_branch(&self, branch_name: &str, remote: &str) -> VcsResult<()> {
+    pub fn push_current_branch(&self, branch_name: &str, remote: &str) -> VcsResult<()> {
         let cmd = self.get_push_branch_command(branch_name, remote);
-        self.run_command(&cmd).await?;
+        self.run_command(&cmd)?;
         Ok(())
     }
 
     /// Force push current branch to remote
-    pub async fn force_push_current_branch(&self, remote: &str, branch: &str) -> VcsResult<()> {
+    pub fn force_push_current_branch(&self, remote: &str, branch: &str) -> VcsResult<()> {
         let cmd = self.get_force_push_branch_command(remote, branch);
-        self.run_command(&cmd).await?;
+        self.run_command(&cmd)?;
         Ok(())
     }
 
     /// Checkout a branch
-    pub async fn checkout_branch(&self, branch_name: &str) -> VcsResult<()> {
+    pub fn checkout_branch(&self, branch_name: &str) -> VcsResult<()> {
         if branch_name.trim().is_empty() {
             return Ok(());
         }
 
         let cmd = self.get_checkout_branch_command(branch_name);
-        self.run_command(&cmd).await?;
+        self.run_command(&cmd)?;
         Ok(())
     }
 
     /// Create a local branch
-    pub async fn create_local_branch(&self, branch_name: &str) -> VcsResult<()> {
-        let commands = self.get_create_local_branch_commands(branch_name).await?;
+    pub fn create_local_branch(&self, branch_name: &str) -> VcsResult<()> {
+        let commands = self.get_create_local_branch_commands(branch_name)?;
         for cmd in commands {
-            self.run_command(&cmd).await?;
+            self.run_command(&cmd)?;
         }
         Ok(())
     }
@@ -122,43 +122,43 @@ impl VcsRepo {
     }
 
     /// Add a file to VCS
-    pub async fn add_file(&self, file_path: &str) -> VcsResult<()> {
+    pub fn add_file(&self, file_path: &str) -> VcsResult<()> {
         let cmd = self.get_add_file_command(file_path);
-        self.run_command(&cmd).await?;
+        self.run_command(&cmd)?;
         Ok(())
     }
 
     /// Get working copy status
-    pub async fn working_copy_status(&self) -> VcsResult<String> {
+    pub fn working_copy_status(&self) -> VcsResult<String> {
         let cmd = self.get_status_command();
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         Ok(output.trim().to_string())
     }
 
     /// Get commit hash for a branch tip
-    pub async fn tip_commit(&self, branch: &str) -> VcsResult<String> {
+    pub fn tip_commit(&self, branch: &str) -> VcsResult<String> {
         let cmd = self.get_tip_commit_command(branch);
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         Ok(output.trim().to_string())
     }
 
     /// Get commit count between two branches
-    pub async fn commit_count(&self, base_branch: &str, branch: &str) -> VcsResult<usize> {
+    pub fn commit_count(&self, base_branch: &str, branch: &str) -> VcsResult<usize> {
         let cmd = self.get_commit_count_command(base_branch, branch);
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         output.trim().parse().map_err(|_| VcsError::Other("Invalid commit count".to_string()))
     }
 
     /// Check if branch exists
-    pub async fn branch_exists(&self, branch_name: &str) -> VcsResult<bool> {
-        let branches = self.branches().await?;
+    pub fn branch_exists(&self, branch_name: &str) -> VcsResult<bool> {
+        let branches = self.branches()?;
         Ok(branches.contains(&branch_name.to_string()))
     }
 
     /// List all branches
-    pub async fn branches(&self) -> VcsResult<Vec<String>> {
+    pub fn branches(&self) -> VcsResult<Vec<String>> {
         let cmd = self.get_branches_command();
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         let branches = output.lines()
             .map(|line| line.trim_start_matches(|c: char| c == '*' || c == ' ').trim().to_string())
             .filter(|line| !line.is_empty())
@@ -167,13 +167,13 @@ impl VcsRepo {
     }
 
     /// Get commit message for a hash
-    pub async fn commit_message(&self, commit_hash: &str) -> VcsResult<Option<String>> {
+    pub fn commit_message(&self, commit_hash: &str) -> VcsResult<Option<String>> {
         if commit_hash.trim().is_empty() {
             return Ok(None);
         }
 
         let cmd = self.get_commit_message_command(commit_hash);
-        match self.run_command(&cmd).await {
+        match self.run_command(&cmd) {
             Ok(output) => Ok(Some(output.trim().to_string())),
             Err(VcsError::CommandFailed { exit_code, .. }) if exit_code != 0 => Ok(None),
             Err(e) => Err(e),
@@ -181,9 +181,9 @@ impl VcsRepo {
     }
 
     /// Get default remote HTTP URL
-    pub async fn default_remote_http_url(&self) -> VcsResult<Option<String>> {
+    pub fn default_remote_http_url(&self) -> VcsResult<Option<String>> {
         let cmd = self.get_default_remote_command();
-        match self.run_command(&cmd).await {
+        match self.run_command(&cmd) {
             Ok(output) => {
                 let url = output.trim();
                 if url.is_empty() {
@@ -197,12 +197,12 @@ impl VcsRepo {
     }
 
     /// Get the first commit in current branch
-    pub async fn first_commit_in_current_branch(&self) -> VcsResult<Option<String>> {
-        let current_branch = self.current_branch().await?;
+    pub fn first_commit_in_current_branch(&self) -> VcsResult<Option<String>> {
+        let current_branch = self.current_branch()?;
         let commands = self.get_first_commit_commands(&current_branch);
 
         for cmd in commands {
-            match self.run_command(&cmd).await {
+            match self.run_command(&cmd) {
                 Ok(output) => {
                     let commit = output.trim().to_string();
                     if !commit.is_empty() {
@@ -217,13 +217,13 @@ impl VcsRepo {
     }
 
     /// Get files in a commit
-    pub async fn files_in_commit(&self, commit_hash: &str) -> VcsResult<Vec<String>> {
+    pub fn files_in_commit(&self, commit_hash: &str) -> VcsResult<Vec<String>> {
         if commit_hash.trim().is_empty() {
             return Ok(vec![]);
         }
 
         let cmd = self.get_files_in_commit_command(commit_hash);
-        match self.run_command(&cmd).await {
+        match self.run_command(&cmd) {
             Ok(output) => {
                 let files = output.lines()
                     .map(|line| line.trim().to_string())
@@ -238,17 +238,17 @@ impl VcsRepo {
     }
 
     /// Find the most recent commit starting with 'Start-Agent-Branch:'
-    pub async fn latest_agent_branch_commit(&self) -> VcsResult<String> {
+    pub fn latest_agent_branch_commit(&self) -> VcsResult<String> {
         let cmd = self.get_latest_agent_branch_commit_command();
-        let output = self.run_command(&cmd).await?;
+        let output = self.run_command(&cmd)?;
         Ok(output.trim().to_string())
     }
 
     /// Setup autopush for a target remote and branch
-    pub async fn setup_autopush(&self, target_remote_url: &str, target_branch: &str) -> VcsResult<()> {
+    pub fn setup_autopush(&self, target_remote_url: &str, target_branch: &str) -> VcsResult<()> {
         let commands = self.get_setup_autopush_commands(target_remote_url, target_branch);
         for cmd in commands {
-            self.run_command(&cmd).await?;
+            self.run_command(&cmd)?;
         }
         Ok(())
     }
@@ -304,7 +304,7 @@ impl VcsRepo {
         }
     }
 
-    async fn run_command(&self, cmd: &[String]) -> VcsResult<String> {
+    fn run_command(&self, cmd: &[String]) -> VcsResult<String> {
         use std::process::Stdio;
 
         let output = Command::new(&cmd[0])
@@ -316,7 +316,6 @@ impl VcsRepo {
             .env("SSH_ASKPASS", "echo")
             .stdin(Stdio::null())
             .output()
-            .await
             .map_err(|e| VcsError::CommandFailed {
                 command: cmd.join(" "),
                 exit_code: -1,
@@ -419,7 +418,7 @@ impl VcsRepo {
         }
     }
 
-    async fn get_create_local_branch_commands(&self, branch_name: &str) -> VcsResult<Vec<Vec<String>>> {
+    fn get_create_local_branch_commands(&self, branch_name: &str) -> VcsResult<Vec<Vec<String>>> {
         match self.vcs_type {
             VcsType::Git => Ok(vec![vec!["git".to_string(), "checkout".to_string(), "-b".to_string(), branch_name.to_string()]]),
             VcsType::Hg => Ok(vec![
@@ -427,7 +426,7 @@ impl VcsRepo {
                 vec!["hg".to_string(), "update".to_string(), branch_name.to_string()],
             ]),
             VcsType::Fossil => {
-                let current_branch = self.current_branch().await?;
+                let current_branch = self.current_branch()?;
                 Ok(vec![
                     vec!["fossil".to_string(), "branch".to_string(), "new".to_string(), branch_name.to_string(), current_branch],
                     vec!["fossil".to_string(), "update".to_string(), branch_name.to_string()],

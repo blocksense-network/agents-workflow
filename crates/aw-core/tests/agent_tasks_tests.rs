@@ -51,7 +51,7 @@ async fn setup_test_repo() -> (TempDir, VcsRepo) {
         .output()
         .expect("Failed to create initial commit");
 
-    let repo = VcsRepo::new(repo_path).await.expect("Failed to create VcsRepo");
+    let repo = VcsRepo::new(repo_path).expect("Failed to create VcsRepo");
     (temp_dir, repo)
 }
 
@@ -124,9 +124,9 @@ async fn test_record_initial_task_commit_message() {
     ).await.expect("Failed to record initial task");
 
     // Check the latest commit message
-    let current_branch = repo.current_branch().await.expect("Failed to get current branch");
-    let latest_commit = repo.tip_commit(&current_branch).await.expect("Failed to get tip commit");
-    let commit_msg = repo.commit_message(&latest_commit).await.expect("Failed to get commit message").unwrap();
+    let current_branch = repo.current_branch().expect("Failed to get current branch");
+    let latest_commit = repo.tip_commit(&current_branch).expect("Failed to get tip commit");
+    let commit_msg = repo.commit_message(&latest_commit).expect("Failed to get commit message").unwrap();
 
     assert!(commit_msg.contains("Start-Agent-Branch: test-branch"), "Commit message should contain branch: {}", commit_msg);
     assert!(commit_msg.contains("Target-Remote: https://github.com/test/repo.git"), "Commit message should contain remote: {}", commit_msg);
@@ -270,9 +270,9 @@ async fn test_append_task_commit_message() {
         .await.expect("Failed to append task");
 
     // Check the latest commit message
-    let current_branch = repo.current_branch().await.expect("Failed to get current branch");
-    let latest_commit = repo.tip_commit(&current_branch).await.expect("Failed to get tip commit");
-    let commit_msg = repo.commit_message(&latest_commit).await.expect("Failed to get commit message").unwrap();
+    let current_branch = repo.current_branch().expect("Failed to get current branch");
+    let latest_commit = repo.tip_commit(&current_branch).expect("Failed to get tip commit");
+    let commit_msg = repo.commit_message(&latest_commit).expect("Failed to get commit message").unwrap();
 
     assert_eq!(commit_msg, "Follow-up task");
 }

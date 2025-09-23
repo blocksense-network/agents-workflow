@@ -15,7 +15,7 @@ fn check_git_available() -> bool {
         .unwrap_or(false)
 }
 
-async fn setup_git_repo() -> Result<(TempDir, TempDir), Box<dyn std::error::Error>> {
+fn setup_git_repo() -> Result<(TempDir, TempDir), Box<dyn std::error::Error>> {
     // Set environment variables globally for this test
     std::env::set_var("GIT_CONFIG_NOSYSTEM", "1");
     std::env::set_var("GIT_TERMINAL_PROMPT", "0");
@@ -30,77 +30,77 @@ async fn setup_git_repo() -> Result<(TempDir, TempDir), Box<dyn std::error::Erro
     let repo_dir = TempDir::new()?;
 
     // Initialize bare remote repository
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["init", "--bare"])
-        .current_dir(&remote_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["init", "--bare"])
+        .current_dir(&remote_dir)
+        .output()?;
 
     // Initialize local repository
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["init", "-b", "main"])
-        .current_dir(&repo_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["init", "-b", "main"])
+        .current_dir(&repo_dir)
+        .output()?;
 
     // Configure git
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["config", "user.email", "test@example.com"])
-        .current_dir(&repo_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["config", "user.email", "test@example.com"])
+        .current_dir(&repo_dir)
+        .output()?;
 
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["config", "user.name", "Test User"])
-        .current_dir(&repo_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["config", "user.name", "Test User"])
+        .current_dir(&repo_dir)
+        .output()?;
 
     // Create initial file and commit
     fs::write(repo_dir.path().join("README.md"), "Initial content")?;
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["add", "README.md"])
-        .current_dir(&repo_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["add", "README.md"])
+        .current_dir(&repo_dir)
+        .output()?;
 
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["commit", "-m", "Initial commit"])
-        .current_dir(&repo_dir);
-    cmd.output().await?;
+    std::process::Command::new("git")
+        .args(&["commit", "-m", "Initial commit"])
+        .current_dir(&repo_dir)
+        .output()?;
 
     // Don't add remote for now to avoid potential issues
 
     Ok((temp_home, repo_dir))
 }
 
-#[tokio::test]
-async fn test_repository_detection() {
+    #[test]
+fn test_repository_detection() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
     let repo_path = repo.path().join("some").join("nested").join("dir");
     fs::create_dir_all(&repo_path).unwrap();
 
-    let vcs_repo = VcsRepo::new(&repo_path).await.unwrap();
+    let vcs_repo = VcsRepo::new(&repo_path).unwrap();
     assert_eq!(vcs_repo.root(), repo.path());
     assert_eq!(vcs_repo.vcs_type(), VcsType::Git);
 }
 
-#[tokio::test]
-async fn test_current_branch() {
+    #[test]
+fn test_current_branch() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
 
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
-    let branch = vcs_repo.current_branch().await.unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
+    let branch = vcs_repo.current_branch().unwrap();
     assert_eq!(branch, "main");
 }
 
-#[tokio::test]
-async fn test_branch_validation() {
+    #[test]
+fn test_branch_validation() {
     // Valid branch names
     assert!(VcsRepo::valid_branch_name("feature-branch"));
     assert!(VcsRepo::valid_branch_name("bug_fix"));
@@ -113,15 +113,15 @@ async fn test_branch_validation() {
     assert!(!VcsRepo::valid_branch_name("feature@branch")); // @ symbol
 }
 
-#[tokio::test]
-async fn test_protected_branches() {
+    #[test]
+fn test_protected_branches() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
     assert!(vcs_repo.is_protected_branch("main"));
     assert!(vcs_repo.is_protected_branch("master"));
@@ -130,119 +130,121 @@ async fn test_protected_branches() {
     assert!(!vcs_repo.is_protected_branch("feature-branch"));
 }
 
-#[tokio::test]
-async fn test_start_branch() {
+    #[test]
+fn test_start_branch() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
     // Test starting a new branch
-    vcs_repo.start_branch("feature-test").await.unwrap();
+    vcs_repo.start_branch("feature-test").unwrap();
 
     // Verify we're on the new branch
-    let current_branch = vcs_repo.current_branch().await.unwrap();
+    let current_branch = vcs_repo.current_branch().unwrap();
     assert_eq!(current_branch, "feature-test");
 
     // Test that we can't start a protected branch
-    let result = vcs_repo.start_branch("main").await;
+    let result = vcs_repo.start_branch("main");
     assert!(matches!(result, Err(VcsError::ProtectedBranch(_))));
 }
 
-#[tokio::test]
-async fn test_commit_file() {
+    #[test]
+fn test_commit_file() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
     // Start a new branch
-    vcs_repo.start_branch("test-commit").await.unwrap();
+    vcs_repo.start_branch("test-commit").unwrap();
 
     // Create and commit a new file
     let test_file = repo.path().join("test.txt");
     fs::write(&test_file, "Test content").unwrap();
 
-    vcs_repo.commit_file("test.txt", "Add test file").await.unwrap();
+    vcs_repo.commit_file("test.txt", "Add test file").unwrap();
 
     // Verify file was committed
-    let status = vcs_repo.working_copy_status().await.unwrap();
+    let status = vcs_repo.working_copy_status().unwrap();
     assert!(!status.contains("test.txt"));
 }
 
-#[tokio::test]
-async fn test_branches() {
+    #[test]
+fn test_branches() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
     // Create a few branches
-    vcs_repo.start_branch("branch1").await.unwrap();
-    vcs_repo.checkout_branch("main").await.unwrap();
-    vcs_repo.start_branch("branch2").await.unwrap();
+    vcs_repo.start_branch("branch1").unwrap();
+    vcs_repo.checkout_branch("main").unwrap();
+    vcs_repo.start_branch("branch2").unwrap();
 
-    let branches = vcs_repo.branches().await.unwrap();
+    let branches = vcs_repo.branches().unwrap();
     assert!(branches.contains(&"main".to_string()));
     assert!(branches.contains(&"branch1".to_string()));
     assert!(branches.contains(&"branch2".to_string()));
 }
 
-#[tokio::test]
-async fn test_default_remote_http_url() {
+    #[test]
+fn test_default_remote_http_url() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_temp_home, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_temp_home, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
     // Test HTTPS URL - add remote first
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["remote", "add", "origin", "https://github.com/user/repo.git"])
-        .current_dir(repo.path());
-    cmd.output().await.unwrap();
+    std::process::Command::new("git")
+        .args(&["remote", "add", "origin", "https://github.com/user/repo.git"])
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
 
-    let url = vcs_repo.default_remote_http_url().await.unwrap();
+    let url = vcs_repo.default_remote_http_url().unwrap();
     assert_eq!(url, Some("https://github.com/user/repo.git".to_string()));
 
     // Test SSH URL conversion
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(&["remote", "set-url", "origin", "git@github.com:user/repo.git"])
-        .current_dir(repo.path());
-    cmd.output().await.unwrap();
+    std::process::Command::new("git")
+        .args(&["remote", "set-url", "origin", "git@github.com:user/repo.git"])
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
 
-    let url = vcs_repo.default_remote_http_url().await.unwrap();
+    let url = vcs_repo.default_remote_http_url().unwrap();
     assert_eq!(url, Some("https://github.com/user/repo.git".to_string()));
 }
 
-#[tokio::test]
-async fn test_repository_not_found() {
+    #[test]
+fn test_repository_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    let result = VcsRepo::new(temp_dir.path()).await;
+    let result = VcsRepo::new(temp_dir.path());
     assert!(matches!(result, Err(VcsError::RepositoryNotFound(_))));
 }
 
-#[tokio::test]
-async fn test_invalid_branch_name() {
+    #[test]
+fn test_invalid_branch_name() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
         return;
     }
 
-    let (_remote, repo) = setup_git_repo().await.unwrap();
-    let vcs_repo = VcsRepo::new(repo.path()).await.unwrap();
+    let (_remote, repo) = setup_git_repo().unwrap();
+    let vcs_repo = VcsRepo::new(repo.path()).unwrap();
 
-    let result = vcs_repo.start_branch("invalid branch").await;
+    let result = vcs_repo.start_branch("invalid branch");
     assert!(matches!(result, Err(VcsError::InvalidBranchName(_))));
 }

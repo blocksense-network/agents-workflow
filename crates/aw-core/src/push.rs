@@ -45,7 +45,6 @@ impl PushHandler {
     /// Create a new push handler for the given repository
     pub async fn new<P: AsRef<std::path::Path>>(repo_path: P) -> Result<Self> {
         let repo = VcsRepo::new(repo_path)
-            .await
             .context("Failed to create VCS repository instance")?;
         Ok(Self { repo })
     }
@@ -97,7 +96,6 @@ impl PushHandler {
     async fn execute_push(&self, branch_name: &str, remote: &str) -> Result<()> {
         self.repo
             .push_current_branch(branch_name, remote)
-            .await
             .context("Failed to push branch to remote")?;
         Ok(())
     }
@@ -106,7 +104,6 @@ impl PushHandler {
     pub async fn default_remote_http_url(&self) -> Result<Option<String>> {
         self.repo
             .default_remote_http_url()
-            .await
             .context("Failed to get default remote HTTP URL")
     }
 }

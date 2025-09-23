@@ -20,6 +20,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# AW core dependencies
+aw-core = { path = "../aw-core" }
+aw-repo = { path = "../aw-repo" }
+
 # AgentFS dependencies
 agentfs-proto = { path = "../agentfs-proto" }
 # SSZ serialization (matching agentfs-proto)

@@ -30,7 +30,7 @@ impl AgentTasks {
     /// # Errors
     /// Returns an error if the path is not within a VCS repository.
     pub async fn new<P: AsRef<Path>>(path_in_repo: P) -> VcsResult<Self> {
-        let repo = VcsRepo::new(path_in_repo).await?;
+        let repo = VcsRepo::new(path_in_repo)?;
         Ok(Self { repo })
     }
 
@@ -47,12 +47,12 @@ impl AgentTasks {
     /// Returns an error if not currently on an agent task branch, or if the task start
     /// commit doesn't contain exactly one file.
     pub async fn agent_task_file_in_current_branch(&self) -> VcsResult<PathBuf> {
-        let start_commit_hash = self.repo.latest_agent_branch_commit().await?;
+        let start_commit_hash = self.repo.latest_agent_branch_commit()?;
         if start_commit_hash.is_empty() {
             return Err(aw_repo::VcsError::Other("You are not currently on an agent task branch".into()));
         }
 
-        let files_in_commit = self.repo.files_in_commit(&start_commit_hash).await?;
+        let files_in_commit = self.repo.files_in_commit(&start_commit_hash)?;
         if files_in_commit.is_empty() {
             return Err(aw_repo::VcsError::Other(format!(
                 "Error: No files found in the task start commit ('{}').",
@@ -68,7 +68,7 @@ impl AgentTasks {
     /// # Returns
     /// `true` if the current branch is an agent task branch, `false` otherwise.
     pub async fn on_task_branch(&self) -> VcsResult<bool> {
-        match self.repo.latest_agent_branch_commit().await {
+        match self.repo.latest_agent_branch_commit() {
             Ok(commit) => Ok(!commit.is_empty()),
             Err(_) => Ok(false),
         }
@@ -107,7 +107,7 @@ impl AgentTasks {
 
         let mut commit_msg = format!("Start-Agent-Branch: {}", branch_name);
 
-        if let Some(remote_url) = self.repo.default_remote_http_url().await? {
+        if let Some(remote_url) = self.repo.default_remote_http_url()? {
             commit_msg.push_str(&format!("\nTarget-Remote: {}", remote_url));
         }
 
@@ -116,7 +116,7 @@ impl AgentTasks {
         }
 
         fs::write(&task_file, task_content)?;
-        self.repo.commit_file(task_file.to_str().unwrap(), &commit_msg).await?;
+        self.repo.commit_file(task_file.to_str().unwrap(), &commit_msg)?;
 
         Ok(())
     }
@@ -132,12 +132,12 @@ impl AgentTasks {
     /// # Errors
     /// Returns an error if not on a task branch, or if file operations fail.
     pub async fn append_task(&self, task_content: &str) -> VcsResult<()> {
-        let start_commit = self.repo.latest_agent_branch_commit().await?;
+        let start_commit = self.repo.latest_agent_branch_commit()?;
         if start_commit.is_empty() {
             return Err(aw_repo::VcsError::Other("Error: Could not locate task start commit".into()));
         }
 
-        let files = self.repo.files_in_commit(&start_commit).await?;
+        let files = self.repo.files_in_commit(&start_commit)?;
         if files.len() != 1 {
             return Err(aw_repo::VcsError::Other("Error: Task start commit should introduce exactly one file".into()));
         }
@@ -150,7 +150,7 @@ impl AgentTasks {
 
         write!(file, "\n--- FOLLOW UP TASK ---\n{}", task_content)?;
 
-        self.repo.commit_file(task_file.to_str().unwrap(), "Follow-up task").await?;
+        self.repo.commit_file(task_file.to_str().unwrap(), "Follow-up task")?;
 
         Ok(())
     }
@@ -183,12 +183,12 @@ impl AgentTasks {
     /// # Errors
     /// Returns an error if not on a task branch, or if commit message parsing fails.
     pub async fn setup_autopush(&self) -> VcsResult<()> {
-        let first_commit_hash = self.repo.latest_agent_branch_commit().await?;
+        let first_commit_hash = self.repo.latest_agent_branch_commit()?;
         if first_commit_hash.is_empty() {
             return Err(aw_repo::VcsError::Other("Error: Could not find first commit in current branch".into()));
         }
 
-        let commit_msg = self.repo.commit_message(&first_commit_hash).await?;
+        let commit_msg = self.repo.commit_message(&first_commit_hash)?;
         let commit_msg = match commit_msg {
             Some(msg) => msg,
             None => return Err(aw_repo::VcsError::Other("Error: Could not retrieve commit message from first commit".into())),
@@ -212,7 +212,7 @@ impl AgentTasks {
             _ => return Err(aw_repo::VcsError::Other("Error: Start-Agent-Branch not found in commit message".into())),
         };
 
-        self.repo.setup_autopush(target_remote, target_branch).await?;
+        self.repo.setup_autopush(target_remote, target_branch)?;
 
         Ok(())
     }
