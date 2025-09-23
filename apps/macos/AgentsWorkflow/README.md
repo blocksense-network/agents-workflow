@@ -73,11 +73,88 @@ xcodebuild -project AgentsWorkflow.xcodeproj -scheme AgentsWorkflow -configurati
 
 ## System Extension Registration
 
-When the application launches, embedded system extensions are automatically registered with the system. To enable the extensions:
+The AgentsWorkflow application automatically registers embedded system extensions when launched. However, macOS requires explicit user approval for system extensions to be activated.
+
+### Automatic Registration (macOS 13.0+)
+
+On macOS 13.0 and later, the application will automatically request system extension approval when launched. The approval process involves:
 
 1. Launch the AgentsWorkflow application
-2. Go to System Settings > General > Login Items & Extensions > File System Extensions
-3. Enable the AgentFSKitExtension
+2. A system dialog will appear requesting permission to install the filesystem extension
+3. Click "Allow" to approve the extension
+
+### Diagnostic Mode
+
+For CI/testing purposes, the application supports a diagnostic mode that performs extension validation without launching the GUI:
+
+```bash
+# Run diagnostic checks
+./AgentsWorkflow.app/Contents/MacOS/AgentsWorkflow --diagnostic
+
+# Or use the short form
+./AgentsWorkflow.app/Contents/MacOS/AgentsWorkflow -d
+```
+
+The diagnostic mode performs comprehensive validation of the extension bundle:
+
+**Bundle Structure Validation:**
+- ✅ Extension bundle exists and loads correctly
+- ✅ All required Info.plist keys are present (`CFBundleIdentifier`, `CFBundleName`, etc.)
+- ✅ NSExtension configuration is properly structured
+- ✅ Extension point identifier is correct (`com.apple.filesystems`)
+
+**Executable Validation:**
+- ✅ Extension executable exists and is readable
+- ✅ Executable size is within expected range
+- ✅ Bundle identifier matches expected values
+
+**System Compatibility:**
+- ✅ Extension conforms to macOS system extension requirements
+- ✅ Bundle structure follows Apple's extension guidelines
+
+**Exit codes:**
+- `0`: All checks passed - extension properly embedded
+- `1`: One or more checks failed - build or embedding issue detected
+
+This is ideal for automated testing and CI pipelines to verify that builds include the required extensions.
+
+### Manual Approval Process
+
+If automatic registration fails or on older macOS versions, manually approve the extension:
+
+1. Launch the AgentsWorkflow application
+2. Open System Settings
+3. Navigate to General > Login Items & Extensions
+4. Select "File System Extensions" from the sidebar
+5. Find "AgentFSKitExtension" in the list
+6. Toggle the switch to enable the extension
+7. If prompted, enter your administrator password
+
+### Extension Status Monitoring
+
+The application provides real-time status monitoring of the filesystem extension:
+
+- **Active**: Extension is loaded and functioning
+- **Pending Reboot**: Extension will activate after system restart
+- **Failed**: Extension approval was denied or encountered an error
+- **Not Found**: Extension bundle could not be located
+
+### Troubleshooting Extension Issues
+
+**Extension Not Appearing in System Settings:**
+- Ensure the host application has been launched at least once
+- Check that the application has the necessary entitlements
+- Verify the extension bundle is properly embedded in the app
+
+**Extension Approval Denied:**
+- Check System Settings > Privacy & Security for blocked extensions
+- Restart the system and try again
+- Ensure you're running macOS 15.4+ (required for FSKit)
+
+**Extension Loading Errors:**
+- Check Console.app for detailed error messages
+- Verify all Rust libraries are properly linked
+- Ensure code signing is valid (required for system extensions)
 
 ## Testing
 

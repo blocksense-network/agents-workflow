@@ -49,8 +49,22 @@ echo "Creating extension bundle..."
 mkdir -p "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/MacOS"
 mkdir -p "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/Resources"
 
-# Copy the built binary
-cp "$SCRIPT_DIR/.build/apple/Products/Release/AgentFSKitExtension" "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/MacOS/"
+# Copy the built binary (find the correct path based on architecture)
+BINARY_PATH=""
+if [ -f "$SCRIPT_DIR/.build/arm64-apple-macosx/release/AgentFSKitExtension" ]; then
+    BINARY_PATH="$SCRIPT_DIR/.build/arm64-apple-macosx/release/AgentFSKitExtension"
+elif [ -f "$SCRIPT_DIR/.build/x86_64-apple-macosx/release/AgentFSKitExtension" ]; then
+    BINARY_PATH="$SCRIPT_DIR/.build/x86_64-apple-macosx/release/AgentFSKitExtension"
+elif [ -f "$SCRIPT_DIR/.build/apple/Products/Release/AgentFSKitExtension" ]; then
+    BINARY_PATH="$SCRIPT_DIR/.build/apple/Products/Release/AgentFSKitExtension"
+else
+    echo "Error: Could not find AgentFSKitExtension binary"
+    find "$SCRIPT_DIR/.build" -name "AgentFSKitExtension" -type f -executable 2>/dev/null || echo "No executable found"
+    exit 1
+fi
+
+echo "Found binary at: $BINARY_PATH"
+cp "$BINARY_PATH" "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/MacOS/"
 
 # Create Info.plist for the extension
 cat > "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/Info.plist" << EOF

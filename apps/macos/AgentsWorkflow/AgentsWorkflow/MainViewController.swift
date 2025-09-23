@@ -5,6 +5,11 @@
 
 import Cocoa
 
+// Import SystemExtensions only if available (macOS 10.15+)
+#if canImport(SystemExtensions)
+import SystemExtensions
+#endif
+
 class MainViewController: NSViewController {
 
     private let statusLabel = NSTextField(labelWithString: "Agents Workflow")
@@ -60,8 +65,42 @@ class MainViewController: NSViewController {
     }
 
     private func checkExtensionStatus() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.extensionStatusLabel.stringValue = "Extension Status: Ready"
+        updateExtensionStatus()
+
+        // Set up periodic status checking
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.updateExtensionStatus()
         }
+    }
+
+    private func updateExtensionStatus() {
+        // Check if the extension bundle exists in the app
+        if let extensionURL = Bundle.main.builtInPlugInsURL?.appendingPathComponent("AgentFSKitExtension.appex"),
+           FileManager.default.fileExists(atPath: extensionURL.path) {
+
+            // Extension bundle exists - it will be automatically registered by the system
+            DispatchQueue.main.async {
+                self.extensionStatusLabel.stringValue = "Extension Status: Available"
+                self.updateInfoText(withError: "Extension bundle found. System will request approval automatically when needed.")
+            }
+        } else {
+            DispatchQueue.main.async {
+                self.extensionStatusLabel.stringValue = "Extension Status: Not Found"
+                self.updateInfoText(withError: "Extension bundle not found in app")
+            }
+        }
+    }
+
+
+    private func updateInfoText(withError error: String) {
+        infoTextView.string = """
+        Agents Workflow macOS Application
+
+        This application hosts system extensions for the Agents Workflow platform,
+        including filesystem extensions for AgentFS.
+
+        Extension Status: Error
+        - \(error)
+        """
     }
 }
