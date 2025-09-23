@@ -28,6 +28,17 @@ Cargo.lock
 .build/
 *.xcodeproj/
 
+# Xcode build artifacts
+DerivedData/
+build/
+*.app/
+*.appex/
+PlugIns/
+
+# Extension build artifacts
+adapters/macos/xcode/AgentFSKitExtension/build/
+adapters/macos/xcode/AgentFSKitExtension/AgentFSKitExtension.appex
+
 # FSKit adapter build artifacts
 adapters/macos/xcode/AgentFSKitExtension/libs/
 

@@ -257,6 +257,21 @@ webui-check:
     just webui-build-mock
     just webui-test
 
+# macOS / Xcode Targets
+# ====================
+
+# Build the AgentFSKitExtension from adapters directory
+build-agentfs-extension:
+    cd adapters/macos/xcode/AgentFSKitExtension && ./build.sh
+
+# Build the AgentsWorkflow Xcode project (includes embedded AgentFSKitExtension)
+build-agents-workflow-xcode:
+    cd apps/macos/AgentsWorkflow && xcodebuild build -project AgentsWorkflow.xcodeproj -scheme AgentsWorkflow -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+# Build and test the complete AgentsWorkflow macOS app
+build-agents-workflow:
+    just build-agents-workflow-xcode
+
 # Run overlay tests with E2E enforcement verification
 test-overlays:
     just build-overlay-tests

@@ -17,6 +17,10 @@ extern "C" {
     fn af_snapshot_create(fs: u64, name: *const libc::c_char, out_id: *mut u8) -> i32;
     fn af_branch_create_from_snapshot(fs: u64, snap: *const u8, name: *const libc::c_char, out_id: *mut u8) -> i32;
     fn af_bind_process_to_branch(fs: u64, branch: *const u8) -> i32;
+    fn af_open(fs: u64, path: *const libc::c_char, options_json: *const libc::c_char, out_h: *mut u64) -> i32;
+    fn af_read(fs: u64, h: u64, off: u64, buf: *mut u8, len: u32, out_read: *mut u32) -> i32;
+    fn af_write(fs: u64, h: u64, off: u64, buf: *const u8, len: u32, out_written: *mut u32) -> i32;
+    fn af_close(fs: u64, h: u64) -> i32;
 }
 
 // ============================================================================
@@ -401,6 +405,165 @@ pub extern "C" fn agentfs_bridge_bind_process(core: *mut FsCore, branch_id: *con
         Ok(()) => 0,
         Err(_) => -1,
     }
+}
+
+/// Open file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_open(core: *mut FsCore, path: *const c_char, options_json: *const c_char, out_handle: *mut u64) -> i32 {
+    if core.is_null() || path.is_null() || options_json.is_null() || out_handle.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+
+    let result = unsafe {
+        af_open(core_handle, path, options_json, out_handle)
+    };
+
+    result
+}
+
+/// Read from file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_read(core: *mut FsCore, handle: u64, offset: u64, buffer: *mut u8, length: u32, out_read: *mut u32) -> i32 {
+    if core.is_null() || buffer.is_null() || out_read.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+
+    let result = unsafe {
+        af_read(core_handle, handle, offset, buffer, length, out_read)
+    };
+
+    result
+}
+
+/// Write to file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_write(core: *mut FsCore, handle: u64, offset: u64, buffer: *const u8, length: u32, out_written: *mut u32) -> i32 {
+    if core.is_null() || buffer.is_null() || out_written.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+
+    let result = unsafe {
+        af_write(core_handle, handle, offset, buffer, length, out_written)
+    };
+
+    result
+}
+
+/// Close file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_close(core: *mut FsCore, handle: u64) -> i32 {
+    if core.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+
+    let result = unsafe {
+        af_close(core_handle, handle)
+    };
+
+    result
+}
+
+/// Get file statistics (Swift-callable)
+/// Returns JSON string with file attributes
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_stat(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+    if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
+        return -1;
+    }
+
+    // For now, return a basic stat structure
+    // In a full implementation, this would call af_stat or similar
+    let stat_json = r#"{
+        "file_id": 1,
+        "parent_id": 0,
+        "size": 0,
+        "alloc_size": 4096,
+        "mode": 33188,
+        "uid": 501,
+        "gid": 20,
+        "link_count": 1,
+        "flags": 0,
+        "file_type": 0,
+        "access_time_sec": 1640995200,
+        "access_time_nsec": 0,
+        "modify_time_sec": 1640995200,
+        "modify_time_nsec": 0,
+        "change_time_sec": 1640995200,
+        "change_time_nsec": 0,
+        "birth_time_sec": 1640995200,
+        "birth_time_nsec": 0
+    }"#;
+
+    let len = stat_json.len().min(buffer_size - 1);
+
+    unsafe {
+        ptr::copy_nonoverlapping(stat_json.as_ptr(), buffer as *mut u8, len);
+        *buffer.add(len) = 0; // null terminator
+    }
+
+    0
+}
+
+/// Get filesystem statistics (Swift-callable)
+/// Returns JSON string with filesystem stats
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_statfs(core: *mut FsCore, buffer: *mut c_char, buffer_size: usize) -> i32 {
+    if core.is_null() || buffer.is_null() || buffer_size == 0 {
+        return -1;
+    }
+
+    let statfs_json = r#"{
+        "block_size": 4096,
+        "io_size": 4096,
+        "total_blocks": 1048576,
+        "available_blocks": 1048576,
+        "free_blocks": 1048576,
+        "total_files": 1048576,
+        "free_files": 1048576
+    }"#;
+
+    let len = statfs_json.len().min(buffer_size - 1);
+
+    unsafe {
+        ptr::copy_nonoverlapping(statfs_json.as_ptr(), buffer as *mut u8, len);
+        *buffer.add(len) = 0; // null terminator
+    }
+
+    0
+}
+
+/// Read directory contents (Swift-callable)
+/// Returns JSON array of directory entries
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_readdir(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+    if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
+        return -1;
+    }
+
+    // For now, return a basic directory listing
+    // In a full implementation, this would enumerate the actual directory contents
+    let readdir_json = r#"[
+        {"name": ".", "type": "directory"},
+        {"name": "..", "type": "directory"},
+        {"name": ".agentfs", "type": "directory"}
+    ]"#;
+
+    let len = readdir_json.len().min(buffer_size - 1);
+
+    unsafe {
+        ptr::copy_nonoverlapping(readdir_json.as_ptr(), buffer as *mut u8, len);
+        *buffer.add(len) = 0; // null terminator
+    }
+
+    0
 }
 
 /// Get error message from last operation (Swift-callable)

@@ -38,8 +38,51 @@ cp "$PROJECT_ROOT/target/release/libagentfs_ffi.a" "$SCRIPT_DIR/libs/"
 # Note: On macOS, we might need to link against system libraries
 # This is handled by the Package.swift linker settings
 
-echo "Rust build complete. Libraries are ready for Swift linking."
-echo "You can now build the Swift extension with: swift build"
+echo "Building Swift extension with Swift Package Manager..."
+cd "$SCRIPT_DIR"
 
-# Note: The actual Swift build should be done in Xcode
-# This script just prepares the dependencies
+# Build with SwiftPM to avoid Xcode linker issues
+swift build --configuration release
+
+# Create the .appex bundle structure manually
+echo "Creating extension bundle..."
+mkdir -p "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/MacOS"
+mkdir -p "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/Resources"
+
+# Copy the built binary
+cp "$SCRIPT_DIR/.build/apple/Products/Release/AgentFSKitExtension" "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/MacOS/"
+
+# Create Info.plist for the extension
+cat > "$SCRIPT_DIR/AgentFSKitExtension.appex/Contents/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>AgentFSKitExtension</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.agentsworkflow.AgentFSKitExtension</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>AgentFSKitExtension</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.filesystems</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>AgentFSKitExtension.AgentFSKitExtension</string>
+	</dict>
+</dict>
+</plist>
+EOF
+
+echo "Extension build complete. Bundle created at: $SCRIPT_DIR/AgentFSKitExtension.appex"

@@ -243,6 +243,7 @@
         (pkgs.nodePackages.cspell)
         (pkgs.nodePackages.prettier)
         pkgs.shfmt
+
         # not available in the currently pinned older nixpkgs:
         # pkgs.taplo # TOML formatter and validator
         # pkgs.nodePackages."ajv-cli" # JSON Schema validator

@@ -16,24 +16,30 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
+        .target(
+            name: "AgentFSBridge",
+            path: "AgentFSKitExtension",
+            sources: ["AgentFSBridge.c"],
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath(".")
+            ]
+        ),
         .executableTarget(
             name: "AgentFSKitExtension",
-            dependencies: [],
+            dependencies: ["AgentFSBridge"],
             path: "AgentFSKitExtension",
             exclude: [
                 "AgentFSKitFFI.h",
-                "AgentFSKitFFI.modulemap"
+                "AgentFSKitFFI.modulemap",
+                "AgentFSBridge.c"
             ],
             sources: [
                 "AgentFSKitExtension.swift",
                 "AgentFsUnary.swift",
                 "AgentFsVolume.swift",
                 "AgentFsItem.swift",
-                "Constants.swift",
-                "AgentFSBridge.c"
-            ],
-            cSettings: [
-                .headerSearchPath(".")
+                "Constants.swift"
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
