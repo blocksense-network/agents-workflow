@@ -158,13 +158,13 @@
         };
         aw-script = pkgs.writeShellScriptBin "aw" ''
           PATH=${pkgs.lib.makeBinPath [
-            pkgs.ruby
             pkgs.goose-cli
             pkgs.claude-code
-            pkgs.gemini-cli
             codex.packages.${system}.codex-rs
-            pkgs.opencode
             pkgs.asciinema
+            # not available in the currently pinned older nixpkgs:
+            # pkgs.gemini-cli # Gemini CLI
+            # pkgs.opencode # OpenCode AI coding assistant
           ]}:$PATH
           exec ruby ${./bin/agent-task} "$@"
         '';
@@ -201,107 +201,145 @@
       };
       isLinux = pkgs.stdenv.isLinux;
       isDarwin = pkgs.stdenv.isDarwin;
+
+      # Common packages for all systems
+      commonPackages = [
+        # Rust toolchain
+        (pkgs.rust-bin.stable.latest.default.override {
+          extensions = ["rustfmt" "clippy"];
+          targets = [
+            # Linux
+            "x86_64-unknown-linux-gnu"
+            "aarch64-unknown-linux-gnu"
+            # macOS
+            "x86_64-apple-darwin"
+            "aarch64-apple-darwin"
+            # Windows (GNU)
+            "x86_64-pc-windows-gnu"
+            "aarch64-pc-windows-gnullvm"
+          ];
+        })
+
+        pkgs.just
+        pkgs.ruby
+        pkgs.python3
+        pkgs.python3Packages.pexpect
+        pkgs.python3Packages.pytest
+        pkgs.ruby
+        pkgs.bundler
+        pkgs.rubocop
+        pkgs.git
+        pkgs.fossil
+        pkgs.mercurial
+        pkgs.nodejs # for npx-based docson helper
+        # Mermaid validation (diagram syntax)
+        (pkgs.nodePackages."@mermaid-js/mermaid-cli")
+        pkgs.noto-fonts
+
+        # Markdown linting & link/prose checking
+        (pkgs.nodePackages.markdownlint-cli2)
+        pkgs.lychee
+        pkgs.vale
+        (pkgs.nodePackages.cspell)
+        (pkgs.nodePackages.prettier)
+        pkgs.shfmt
+        # not available in the currently pinned older nixpkgs:
+        # pkgs.taplo # TOML formatter and validator
+        # pkgs.nodePackages."ajv-cli" # JSON Schema validator
+
+        # WebUI testing
+        # Playwright driver and browsers (bundled system libs for headless testing)
+        pkgs.playwright-driver  # The driver itself
+        pkgs.playwright-driver.browsers  # Bundled browsers with required libs
+        # Server management utilities for test orchestration
+        pkgs.netcat  # For port checking (nc command)
+        pkgs.procps  # For process management (pgrep, kill, etc.)
+        # Note: playwright and tsx are installed via npm in individual packages
+
+        # AI Coding Assistants (available in current nixpkgs)
+        pkgs.goose-cli # Goose AI coding assistant
+        pkgs.claude-code # Claude Code - agentic coding tool
+        # pkgs.gemini-cli # Gemini CLI - not available in older nixpkgs
+        codex.packages.${system}.codex-rs # OpenAI Codex CLI (local submodule)
+        # pkgs.opencode # OpenCode AI coding assistant - not available in older nixpkgs
+        # Terminal recording and sharing
+        pkgs.asciinema # Terminal session recorder
+        pkgs.fzf
+      ];
+
+      # Linux-specific packages
+      linuxPackages = pkgs.lib.optionals isLinux [
+        # Use Chromium on Linux for mermaid-cli's Puppeteer
+        pkgs.chromium
+        # Linux-only filesystem utilities for snapshot functionality
+        pkgs.btrfs-progs # Btrfs utilities for subvolume snapshots
+        # Docker for containerized testing
+        pkgs.docker
+        # System monitoring tools for performance tests
+        pkgs.procps # ps, top, etc. for memory monitoring
+        # Seccomp library for sandboxing functionality
+        pkgs.libseccomp # Required for seccomp-based sandboxing
+        pkgs.pkg-config # Required for libseccomp-sys to find libseccomp
+      ];
+
+      # macOS-specific packages
+      darwinPackages = pkgs.lib.optionals isDarwin [
+        # Xcode environment wrapper
+        (pkgs.xcodeenv.composeXcodeWrapper {
+          versions = [ "16.0" ];  # Match your installed Xcode version
+        })
+        # Apple SDK frameworks
+        pkgs.darwin.apple_sdk.frameworks.CoreFoundation
+        pkgs.darwin.apple_sdk.frameworks.Security
+        # macOS-specific tools
+        pkgs.lima # Linux virtual machines on macOS
+        # Provide a reproducible Chrome for Puppeteer on macOS (unfree)
+        pkgs.google-chrome
+      ];
+
+      # All packages combined
+      allPackages = commonPackages ++ linuxPackages ++ darwinPackages ++
+                    self.checks.${system}.pre-commit-check.enabledPackages;
+
+      # Platform-specific shell hook additions
+      linuxShellHook = if isLinux then ''
+        export PUPPETEER_EXECUTABLE_PATH="${pkgs.chromium}/bin/chromium"
+      '' else "";
+
+      darwinShellHook = if isDarwin then ''
+        # Clean up environment variables that might point to wrong tools
+        unset DEVELOPER_DIR
+        unset SDKROOT
+        export PUPPETEER_EXECUTABLE_PATH="${pkgs.google-chrome}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      '' else "";
+
     in {
       default = pkgs.mkShell {
-        buildInputs = [
-          # Rust toolchain
-          (pkgs.rust-bin.stable.latest.default.override {
-            extensions = ["rustfmt" "clippy"];
-            targets = [
-              # Linux
-              "x86_64-unknown-linux-gnu"
-              "aarch64-unknown-linux-gnu"
-              # macOS
-              "x86_64-apple-darwin"
-              "aarch64-apple-darwin"
-              # Windows (GNU)
-              "x86_64-pc-windows-gnu"
-              "aarch64-pc-windows-gnullvm"
-            ];
-          })
-
-          pkgs.just
-          pkgs.python3
-          pkgs.python3Packages.pexpect
-          pkgs.python3Packages.pytest
-          pkgs.ruby
-          pkgs.bundler
-          pkgs.rubocop
-          pkgs.git
-          pkgs.fossil
-          pkgs.mercurial
-          pkgs.nodejs # for npx-based docson helper
-          # Mermaid validation (diagram syntax)
-          (pkgs.nodePackages."@mermaid-js/mermaid-cli")
-          pkgs.noto-fonts
-
-          # Markdown linting & link/prose checking
-          (pkgs.nodePackages.markdownlint-cli2)
-          pkgs.lychee
-          pkgs.vale
-          (pkgs.nodePackages.cspell)
-          (pkgs.nodePackages.prettier)
-          pkgs.shfmt
-          pkgs.taplo
-
-          # WebUI testing
-          # Playwright driver and browsers (bundled system libs for headless testing)
-          pkgs.playwright-driver  # The driver itself
-          pkgs.playwright-driver.browsers  # Bundled browsers with required libs
-          # Server management utilities for test orchestration
-          pkgs.netcat  # For port checking (nc command)
-          pkgs.procps  # For process management (pgrep, kill, etc.)
-          # Note: playwright and tsx are installed via npm in individual packages
-
-          # AI Coding Assistants (latest versions from nixpkgs-unstable)
-          pkgs.goose-cli # Goose AI coding assistant
-          pkgs.claude-code # Claude Code - agentic coding tool
-          # pkgs.gemini-cli # Gemini CLI - not available in older nixpkgs
-          codex.packages.${system}.codex-rs # OpenAI Codex CLI (local submodule)
-          # pkgs.opencode # OpenCode AI coding assistant - not available in older nixpkgs
-          # Terminal recording and sharing
-          pkgs.asciinema # Terminal session recorder
-          pkgs.fzf
-        ]
-        ++ self.checks.${system}.pre-commit-check.enabledPackages
-        # Optional schema/validation tooling (only if available in this nixpkgs)
-        ++ (builtins.filter (x: x != null) [
-          (if pkgs ? taplo then pkgs.taplo else null)
-          (if (builtins.hasAttr "nodePackages" pkgs) && (builtins.hasAttr "ajv-cli" pkgs.nodePackages)
-           then pkgs.nodePackages."ajv-cli" else null)
-        ])
-        ++ pkgs.lib.optionals isLinux [
-          # Use Chromium on Linux for mermaid-cli's Puppeteer
-          pkgs.chromium
-          # Linux-only filesystem utilities for snapshot functionality
-          pkgs.zfs # ZFS utilities for copy-on-write snapshots
-          pkgs.btrfs-progs # Btrfs utilities for subvolume snapshots
-          # Docker for containerized testing
-          pkgs.docker
-          # System monitoring tools for performance tests
-          pkgs.procps # ps, top, etc. for memory monitoring
-          # Seccomp library for sandboxing functionality
-          pkgs.libseccomp # Required for seccomp-based sandboxing
-          pkgs.pkg-config # Required for libseccomp-sys to find libseccomp
-        ] ++ pkgs.lib.optionals isDarwin [
-          # macOS-only VM manager
-          pkgs.lima # Linux virtual machines on macOS
-          # Provide a reproducible Chrome for Puppeteer on macOS (unfree)
-          pkgs.google-chrome
-        ];
+        buildInputs = allPackages;
 
         shellHook = ''
           # Install git pre-commit hook invoking our Nix-defined hooks
           ${self.checks.${system}.pre-commit-check.shellHook}
-          echo "Agent workflow development environment loaded"
+          echo "Agent workflow development environment loaded${if isDarwin then " (macOS)" else if isLinux then " (Linux)" else ""}"
 
           # Playwright setup (use Nix-provided browsers, skip runtime downloads)
           export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
           export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
           export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
           export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs}/bin/node"
-          export PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH="${pkgs.playwright-driver.browsers}/chromium-1169/chrome-linux/chrome"
-          # Provide a convenience function for Docson; no fallbacks in Nix shell
+          ${if isLinux then ''
+            export PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH="${pkgs.playwright-driver.browsers}/chromium-1169/chrome-linux/chrome"
+          '' else if isDarwin then ''
+            export PLAYWRIGHT_LAUNCH_OPTIONS_EXECUTABLE_PATH="${pkgs.playwright-driver.browsers}/chromium-1169/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+          '' else ""}
+
+          ${linuxShellHook}
+          ${darwinShellHook}
+
+          export PUPPETEER_PRODUCT=chrome
+          # Use the Nix-provided browser path (fully reproducible)
+
+          # Convenience function for Docson
           docson () {
             if command -v docson >/dev/null 2>&1; then
               command docson "$@"
@@ -319,16 +357,6 @@
             fi
           }
           echo "Tip: run: docson -d ./specs/schemas  # then open http://localhost:3000"
-          # Use the Nix-provided browser path (fully reproducible)
-          ''
-          + (if isLinux then ''
-            export PUPPETEER_EXECUTABLE_PATH="${pkgs.chromium}/bin/chromium"
-          '' else "")
-          + (if isDarwin then ''
-            export PUPPETEER_EXECUTABLE_PATH="${pkgs.google-chrome}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-          '' else "")
-          + ''
-          export PUPPETEER_PRODUCT=chrome
         '';
       };
     });
