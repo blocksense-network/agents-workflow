@@ -2,6 +2,7 @@
 members = [
   "crates/aw-core",
   "crates/aw-local-db",
+  "crates/aw-repo",
   "crates/aw-fs-snapshots",
   "crates/aw-fs-snapshots-traits",
   "crates/aw-fs-snapshots-zfs",
