@@ -5,12 +5,18 @@ import { TaskDetailsPane } from "../tasks/TaskDetailsPane.js";
 
 interface ThreePaneLayoutProps {
   selectedSessionId?: string;
+  onSessionSelect?: (sessionId: string) => void;
 }
 
 export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
   // State for pane collapse/expand
   const [repositoriesCollapsed, setRepositoriesCollapsed] = createSignal(false);
   const [sessionsCollapsed, setSessionsCollapsed] = createSignal(false);
+
+  // Handle session selection
+  const handleSessionSelect = (sessionId: string) => {
+    props.onSessionSelect?.(sessionId);
+  };
 
   // Load and save preferences from/to localStorage (client-side only)
   onMount(() => {
@@ -74,6 +80,7 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
           selectedSessionId={props.selectedSessionId}
           collapsed={sessionsCollapsed()}
           onToggleCollapse={toggleSessions}
+          onSessionSelect={handleSessionSelect}
         />
       </div>
 

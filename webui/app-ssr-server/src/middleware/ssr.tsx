@@ -8,13 +8,13 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
     }
 
     // Only serve HTML for known application routes, otherwise let Express handle 404
-    const knownRoutes = ['/', '/sessions', '/create', '/settings'];
+    const knownRoutes = ["/", "/sessions", "/create", "/settings"];
     if (!knownRoutes.includes(req.url)) {
       // For API requests, return JSON error; for others, let Express handle
-      if (req.url?.startsWith('/api')) {
+      if (req.url?.startsWith("/api")) {
         res.status(404).json({
-          type: 'https://docs.example.com/errors/not-found',
-          title: 'Not Found',
+          type: "https://docs.example.com/errors/not-found",
+          title: "Not Found",
           status: 404,
           detail: `The requested resource '${req.url}' was not found`,
         });
