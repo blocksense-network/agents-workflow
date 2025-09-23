@@ -321,7 +321,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [x] Agent branch commit detection works (same `latest_agent_branch_commit` logic)
   - [x] Autopush setup installs hooks correctly (same hook installation as Ruby)
 
-**1.2 Task File Management System** (1 week, parallel with 1.1)
+**1.2 Task File Management System** COMPLETED
 
 - **Deliverables**:
   - Direct port of task file logic from `legacy/ruby/lib/agent_tasks.rb` to `aw-core` crate (per Repository-Layout.md task/session lifecycle orchestration):
@@ -336,13 +336,28 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Implementation**: Direct port of task file logic from [legacy/ruby/lib/agent_tasks.rb](../../legacy/ruby/lib/agent_tasks.rb) methods `record_initial_task` and `append_task`
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) `assert_task_branch_created` helper and task file assertions
 
-- **Verification**:
-  - [ ] Task files created with correct timestamped naming format (same as `record_initial_task`)
-  - [ ] Follow-up tasks appended with proper delimiter `--- FOLLOW UP TASK ---`
-  - [ ] Directory structure created automatically (`.agents/tasks/YYYY/MM/`)
-  - [ ] File content matches legacy Ruby implementation format
-  - [ ] Commit messages use correct format (`Start-Agent-Branch: <branch>` or `Follow-up task`)
-  - [ ] Integration tests with mock VCS operations (port `assert_task_branch_created` logic)
+- **Implementation Details**:
+  - Created `AgentTasks` struct with async API matching `aw-repo` requirements
+  - Implemented `record_initial_task()` method with timestamped file naming and directory creation
+  - Implemented `append_task()` method with proper delimiter handling
+  - Added `agent_task_file_in_current_branch()` and `on_task_branch()` for task branch detection
+  - Integrated `setup_autopush()` and `online()` connectivity check methods
+  - Used ureq instead of reqwest for better Nix compatibility
+  - All methods are async to match the underlying VCS repository API
+
+- **Key Source Files**:
+  - `crates/aw-core/src/agent_tasks.rs` - AgentTasks struct and implementation
+  - `crates/aw-core/tests/agent_tasks_tests.rs` - Comprehensive test suite (11 tests)
+  - `crates/aw-core/Cargo.toml` - Updated with aw-repo and ureq dependencies
+
+- **Verification Results**:
+  - [x] Task files created with correct timestamped naming format (same as `record_initial_task`)
+  - [x] Follow-up tasks appended with proper delimiter `--- FOLLOW UP TASK ---`
+  - [x] Directory structure created automatically (`.agents/tasks/YYYY/MM/`)
+  - [x] File content matches legacy Ruby implementation format
+  - [x] Commit messages use correct format (`Start-Agent-Branch: <branch>` or `Follow-up task`)
+  - [x] Integration tests with mock VCS operations (port `assert_task_branch_created` logic)
+  - [x] All 11 unit tests pass covering file creation, appending, branch detection, and error cases
 
 **1.3 Editor Integration** (depends on 1.1)
 

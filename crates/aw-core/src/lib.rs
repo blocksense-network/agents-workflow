@@ -4,6 +4,7 @@
 //! managing agent tasks and sessions, including lifecycle management, state
 //! transitions, and coordination with other AW components.
 
+pub mod agent_tasks;
 pub mod error;
 pub mod session;
 pub mod task;
@@ -19,3 +20,6 @@ pub use task::{Task, TaskId, TaskManager, TaskStatus};
 
 /// Session lifecycle management and orchestration.
 pub use session::{Session, SessionId, SessionManager, SessionStatus};
+
+/// Agent task file management and operations.
+pub use agent_tasks::AgentTasks;

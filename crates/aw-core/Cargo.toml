@@ -13,3 +13,8 @@ tracing.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
+aw-repo = { path = "../aw-repo" }
+ureq = { version = "2.0", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3.0"

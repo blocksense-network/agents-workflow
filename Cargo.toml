@@ -68,6 +68,12 @@ async-trait = "0.1"
 # Testing
 tempfile = "3.0"
 
+# HTTP client for connectivity checks
+ureq = { version = "2.0", features = ["json"] }
+
+# VCS repository abstraction
+chrono = { version = "0.4", features = ["serde"] }
+
 # SSZ serialization for daemon
 ethereum_ssz = "0.8"
 ethereum_ssz_derive = "0.8"
