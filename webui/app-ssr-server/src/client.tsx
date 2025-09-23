@@ -17,4 +17,5 @@ function FullApp() {
 }
 
 // Hydrate the server-rendered content with the full application
+// The server rendered a simple HTML structure, and the client will replace it with the full SolidJS app
 hydrate(() => FullApp(), document.getElementById("app")!);

@@ -10,7 +10,7 @@ export const apiProxyMiddleware = createProxyMiddleware({
   pathRewrite: {
     // No path rewriting needed - client requests /api/v1/* and server expects /api/v1/*
   },
-  onProxyReq: (proxyReq, _req, _res) => {
+  onProxyReq: (proxyReq, req, _res) => {
     // Add any necessary headers for the target service
     if (NODE_ENV === "production") {
       // Add authentication headers for production Rust service

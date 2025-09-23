@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { apiProxyMiddleware } from "./middleware/apiProxy.js";
-import { ssrMiddleware } from "./middleware/ssr.js";
+import { ssrMiddleware } from "./middleware/ssr.tsx";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,7 +35,12 @@ app.use(
 );
 
 app.use(morgan("combined"));
-app.use(express.json());
+
+// API proxy middleware - forwards requests to Rust REST service or mock server
+// Must come before body parser to avoid interfering with POST request bodies
+app.use("/api", apiProxyMiddleware);
+
+app.use(express.json()); // Body parser after API proxy
 
 // Health check
 app.get("/health", (req, res) => {
@@ -45,9 +50,6 @@ app.get("/health", (req, res) => {
     environment: NODE_ENV,
   });
 });
-
-// API proxy middleware - forwards requests to Rust REST service or mock server
-app.use("/api", apiProxyMiddleware);
 
 // Static assets from the built client bundle
 app.use(express.static("./dist/public"));

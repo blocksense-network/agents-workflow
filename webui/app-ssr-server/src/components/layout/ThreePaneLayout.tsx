@@ -14,15 +14,17 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
 
   // Load and save preferences from/to localStorage (client-side only)
   onMount(() => {
-    // Load preferences from localStorage
-    const saved = localStorage.getItem("webui-layout-prefs");
-    if (saved) {
-      try {
-        const prefs = JSON.parse(saved);
-        setRepositoriesCollapsed(prefs.repositoriesCollapsed || false);
-        setSessionsCollapsed(prefs.sessionsCollapsed || false);
-      } catch (e) {
-        console.warn("Failed to parse layout preferences:", e);
+    // Load preferences from localStorage (only available on client)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("webui-layout-prefs");
+      if (saved) {
+        try {
+          const prefs = JSON.parse(saved);
+          setRepositoriesCollapsed(prefs.repositoriesCollapsed || false);
+          setSessionsCollapsed(prefs.sessionsCollapsed || false);
+        } catch (e) {
+          console.warn("Failed to parse layout preferences:", e);
+        }
       }
     }
   });

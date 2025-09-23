@@ -1,3 +1,5 @@
+// Simple SSR using plain HTML strings to avoid SolidJS client-only API issues
+
 export const ssrMiddleware = async (req: any, res: any, next: any) => {
   try {
     // Skip SSR for API routes and static assets
@@ -21,7 +23,38 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
       return next(); // Let Express handle non-API 404s
     }
 
-    // HTML template with basic structure for progressive enhancement
+    // Simple SSR HTML that matches the client structure for hydration
+    const appHtml = `<div class="h-screen flex flex-col bg-gray-50">
+      <header class="bg-white border-b border-gray-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-semibold text-gray-900">Agents-Workflow</h1>
+          </div>
+          <nav class="flex items-center space-x-6">
+            <a href="/" class="text-sm font-medium text-blue-600">Dashboard</a>
+            <a href="/sessions" class="text-sm font-medium text-gray-600 hover:text-gray-900">Sessions</a>
+            <a href="/create" class="text-sm font-medium text-gray-600 hover:text-gray-900">Create Task</a>
+            <a href="/settings" class="text-sm font-medium text-gray-600 hover:text-gray-900">Settings</a>
+          </nav>
+        </div>
+      </header>
+      <div class="flex-1 flex overflow-hidden">
+        <div class="w-80 bg-white border-r border-gray-200 p-4">
+          <h2 class="text-lg font-semibold text-gray-900">Loading...</h2>
+          <p class="text-sm text-gray-600 mt-1">Client-side content loading</p>
+        </div>
+        <div class="flex-1 bg-white border-r border-gray-200 p-4">
+          <h2 class="text-lg font-semibold text-gray-900">Dashboard</h2>
+          <p class="text-sm text-gray-600 mt-1">Loading application...</p>
+        </div>
+        <div class="w-96 bg-white p-4">
+          <h2 class="text-lg font-semibold text-gray-900">Task Details</h2>
+          <p class="text-sm text-gray-600 mt-1">Select a session to view details</p>
+        </div>
+      </div>
+    </div>`;
+
+    // HTML template with server-rendered content for hydration
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,27 +71,22 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
       background-color: #f8fafc;
       color: #1e293b;
     }
-    .ssr-placeholder {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    .h-screen {
       height: 100vh;
-      font-size: 1.2rem;
-      color: #64748b;
     }
-    .ssr-loading {
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    .flex {
+      display: flex;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: .5; }
+    .flex-col {
+      flex-direction: column;
+    }
+    .bg-gray-50 {
+      background-color: #f9fafb;
     }
   </style>
 </head>
 <body>
-  <div id="app" class="ssr-placeholder ssr-loading">
-    Loading Agents-Workflow WebUI...
-  </div>
+  <div id="app">${appHtml}</div>
 
   <!-- Fallback for when JavaScript is disabled -->
   <noscript>

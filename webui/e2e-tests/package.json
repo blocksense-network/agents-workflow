@@ -12,8 +12,8 @@
     "install-browsers": "playwright install",
     "lint": "eslint tests --ext .ts,.js",
     "lint:fix": "eslint tests --ext .ts,.js --fix",
-    "format": "prettier --write tests/**/*.{ts,js,json}",
-    "format:check": "prettier --check tests/**/*.{ts,js,json}"
+    "format": "prettier --write tests/**/*.{ts}",
+    "format:check": "prettier --check tests/**/*.{ts}"
   },
   "keywords": [
     "e2e",

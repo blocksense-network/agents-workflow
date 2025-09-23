@@ -101,6 +101,9 @@ test.describe('API Contract Tests', () => {
       };
 
       const response = await request.post('/api/v1/tasks', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
         data: taskData,
       });
 
@@ -286,6 +289,9 @@ test.describe('API Contract Tests', () => {
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
         data: taskData,
       });
       const createData = await createResponse.json();
@@ -293,6 +299,8 @@ test.describe('API Contract Tests', () => {
 
       // Test SSE endpoint (basic connectivity test)
       const response = await request.get(`/api/v1/sessions/${sessionId}/events`);
+
+      expect(response.status()).toBe(200);
       expect(response.headers()['content-type']).toContain('text/event-stream');
       expect(response.headers()['cache-control']).toBe('no-cache');
     });

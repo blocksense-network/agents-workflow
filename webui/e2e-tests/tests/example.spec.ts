@@ -17,9 +17,9 @@ test.describe('Infrastructure Tests', () => {
 
     const pageContent = await pageResponse.text();
     expect(pageContent).toContain('Agents-Workflow WebUI');
-    expect(pageContent).toContain('Loading Agents-Workflow WebUI');
+    expect(pageContent).toContain('Agents-Workflow</h1>');
     expect(pageContent).toContain('<script type="module" src="/client.js">');
-    expect(pageContent).toContain('<div id="app" class="ssr-placeholder ssr-loading">');
+    expect(pageContent).toContain('<div id="app">');
   });
 
   test('API proxy forwards requests correctly', async ({ request }) => {
