@@ -1,45 +1,29 @@
 import express from 'express';
+import { mockSessions } from './tasks.js';
 
 const router = express.Router();
 
-// Mock data
-let mockSessions: any[] = [
-  {
+// Add a default session for testing
+if (mockSessions.length === 0) {
+  mockSessions.push({
     id: '01HVZ6K9T1N8S6M3V3Q3F0X5B7',
     tenantId: 'acme',
     projectId: 'storefront',
     status: 'running',
     createdAt: '2025-01-01T12:00:00Z',
+    prompt: 'Default test session',
+    repo: { mode: 'git', url: 'https://github.com/test/repo.git', branch: 'main' },
+    agent: { type: 'claude-code', version: 'latest' },
+    runtime: { type: 'devcontainer' },
     links: {
       self: '/api/v1/sessions/01HVZ6K9T1N8S6M3V3Q3F0X5B7',
       events: '/api/v1/sessions/01HVZ6K9T1N8S6M3V3Q3F0X5B7/events',
       logs: '/api/v1/sessions/01HVZ6K9T1N8S6M3V3Q3F0X5B7/logs'
     }
-  }
-];
-
-// POST /api/v1/tasks - Create Task/Session
-router.post('/', (req, res) => {
-  const session = {
-    id: `mock-session-${Date.now()}`,
-    status: 'queued',
-    createdAt: new Date().toISOString(),
-    ...req.body,
-    links: {
-      self: `/api/v1/sessions/mock-session-${Date.now()}`,
-      events: `/api/v1/sessions/mock-session-${Date.now()}/events`,
-      logs: `/api/v1/sessions/mock-session-${Date.now()}/logs`
-    }
-  };
-
-  mockSessions.push(session);
-
-  res.status(201).json({
-    id: session.id,
-    status: session.status,
-    links: session.links
   });
-});
+}
+
+// Sessions creation is now handled by POST /api/v1/tasks
 
 // GET /api/v1/sessions - List Sessions
 router.get('/', (req, res) => {

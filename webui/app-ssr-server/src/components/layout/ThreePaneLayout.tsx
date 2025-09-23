@@ -1,4 +1,4 @@
-import { Component, createSignal, createEffect } from "solid-js";
+import { Component, createSignal, createEffect, onMount } from "solid-js";
 import { RepositoriesPane } from "../repositories/RepositoriesPane.js";
 import { SessionsPane } from "../sessions/SessionsPane.js";
 import { TaskDetailsPane } from "../tasks/TaskDetailsPane.js";
@@ -12,8 +12,9 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
   const [repositoriesCollapsed, setRepositoriesCollapsed] = createSignal(false);
   const [sessionsCollapsed, setSessionsCollapsed] = createSignal(false);
 
-  // Load preferences from localStorage
-  createEffect(() => {
+  // Load and save preferences from/to localStorage (client-side only)
+  onMount(() => {
+    // Load preferences from localStorage
     const saved = localStorage.getItem("webui-layout-prefs");
     if (saved) {
       try {
@@ -28,11 +29,13 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
 
   // Save preferences to localStorage
   const savePreferences = () => {
-    const prefs = {
-      repositoriesCollapsed: repositoriesCollapsed(),
-      sessionsCollapsed: sessionsCollapsed(),
-    };
-    localStorage.setItem("webui-layout-prefs", JSON.stringify(prefs));
+    if (typeof window !== 'undefined') {
+      const prefs = {
+        repositoriesCollapsed: repositoriesCollapsed(),
+        sessionsCollapsed: sessionsCollapsed(),
+      };
+      localStorage.setItem("webui-layout-prefs", JSON.stringify(prefs));
+    }
   };
 
   const toggleRepositories = () => {

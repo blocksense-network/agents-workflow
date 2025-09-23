@@ -26,7 +26,8 @@ test.describe('Infrastructure Tests', () => {
     // Test API proxy (if mock server is running)
     try {
       const apiResponse = await request.get('/api/v1/agents');
-      if (apiResponse.status() !== 502) { // 502 means mock server not running
+      if (apiResponse.status() !== 502) {
+        // 502 means mock server not running
         expect(apiResponse.ok()).toBeTruthy();
         const apiData = await apiResponse.json();
         expect(apiData).toHaveProperty('items');
@@ -39,7 +40,7 @@ test.describe('Infrastructure Tests', () => {
         expect(agent).toHaveProperty('versions');
         expect(agent).toHaveProperty('settingsSchemaRef');
       }
-    } catch (error) {
+    } catch {
       // API proxy test is optional if mock server isn't running
       console.log('API proxy test skipped - mock server not available');
     }

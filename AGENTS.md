@@ -34,6 +34,14 @@ tests firsts:
   other software, always make sure to include relevant links (URLs) that provide the
   necessary technical details.
 
+### Test writing guidelines
+
+- Each test MUST create a unique log file capturing its full output.
+- On success: tests print minimal output to keep logs out of AI context windows.
+- On failure: the test runner prints the path and file size of the relevant log(s) so developers (or agents) can open them directly without flooding the console or context.
+- Rationale: preserves context-budget for AI tools by avoiding large inline logs, while retaining full fidelity in files.
+- NEVER cheat with the tested assertions in order to satisfy a specified Verification requirement (e.g. one from a .status.md file)
+
 ## Writing git commit messages
 
 - You MUST use multiline git commit messages using heredoc syntax.

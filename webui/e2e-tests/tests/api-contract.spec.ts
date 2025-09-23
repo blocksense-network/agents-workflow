@@ -89,19 +89,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const response = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
 
       expect(response.status()).toBe(201);
@@ -122,19 +122,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
       const createData = await createResponse.json();
       const sessionId = createData.id;
@@ -168,19 +168,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
       const createData = await createResponse.json();
       const sessionId = createData.id;
@@ -200,19 +200,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
       const createData = await createResponse.json();
       const sessionId = createData.id;
@@ -233,19 +233,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
       const createData = await createResponse.json();
       const sessionId = createData.id;
@@ -274,19 +274,19 @@ test.describe('API Contract Tests', () => {
         repo: {
           mode: 'git',
           url: 'https://github.com/test/repo.git',
-          branch: 'main'
+          branch: 'main',
         },
         agent: {
           type: 'claude-code',
-          version: 'latest'
+          version: 'latest',
         },
         runtime: {
-          type: 'devcontainer'
-        }
+          type: 'devcontainer',
+        },
       };
 
       const createResponse = await request.post('/api/v1/tasks', {
-        data: taskData
+        data: taskData,
       });
       const createData = await createResponse.json();
       const sessionId = createData.id;
@@ -303,8 +303,8 @@ test.describe('API Contract Tests', () => {
       const response = await request.post('/api/v1/tasks', {
         data: 'invalid json',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       // Note: Express may handle this differently, but we test the pattern
@@ -313,12 +313,10 @@ test.describe('API Contract Tests', () => {
 
     test('Missing required fields returns validation error', async ({ request }) => {
       const response = await request.post('/api/v1/tasks', {
-        data: {}
+        data: {},
       });
 
       expect(response.status()).toBeGreaterThanOrEqual(400);
     });
   });
 });
-
-

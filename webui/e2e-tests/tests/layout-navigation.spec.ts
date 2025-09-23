@@ -20,6 +20,12 @@ test.describe('Layout and Navigation Tests', () => {
   test('Navigation links work and highlight active routes', async ({ page }) => {
     await page.goto('/');
 
+    // Wait for client-side hydration to complete (loading placeholder should be replaced)
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
     // Check navigation links are present
     const dashboardLink = page.locator('a[href="/"]');
     const sessionsLink = page.locator('a[href="/sessions"]');
@@ -51,6 +57,12 @@ test.describe('Layout and Navigation Tests', () => {
   test('Collapsible panes work correctly', async ({ page }) => {
     await page.goto('/');
 
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
     // Find collapse/expand buttons
     const repositoriesCollapseBtn = page.locator('[data-testid="repositories-collapse"]');
     const sessionsCollapseBtn = page.locator('[data-testid="sessions-collapse"]');
@@ -80,6 +92,12 @@ test.describe('Layout and Navigation Tests', () => {
 
     await page.goto('/');
 
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
     // Test desktop layout (default)
     await page.setViewportSize({ width: 1200, height: 800 });
     await expect(page.locator('[data-testid="three-pane-layout"]')).toBeVisible();
@@ -97,6 +115,12 @@ test.describe('Layout and Navigation Tests', () => {
 
   test('Global search interface renders correctly', async ({ page }) => {
     await page.goto('/');
+
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
 
     // Check for global search input
     const searchInput = page.locator('input[placeholder*="search" i]');
@@ -120,6 +144,13 @@ test.describe('Layout and Navigation Tests', () => {
 
   test('Browser back/forward navigation works', async ({ page }) => {
     await page.goto('/');
+
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
     await page.locator('a[href="/sessions"]').click();
     await expect(page).toHaveURL('/sessions');
 
@@ -130,5 +161,3 @@ test.describe('Layout and Navigation Tests', () => {
     await expect(page).toHaveURL('/sessions');
   });
 });
-
-

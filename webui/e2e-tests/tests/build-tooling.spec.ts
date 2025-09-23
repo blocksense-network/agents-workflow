@@ -1,73 +1,87 @@
 import { test, expect } from '@playwright/test';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 test.describe('Build and Tooling Tests', () => {
-  test('App SSR server builds successfully with TypeScript strict mode', async () => {
-    // This test runs the build process for the app-ssr-server
-    try {
-      execSync('cd ../app-ssr-server && npm run build', { stdio: 'pipe' });
-      expect(true).toBe(true); // Build succeeded
-    } catch (error) {
-      console.error('Build failed:', error);
-      expect(false).toBe(true); // Build failed
+  // Helper function to run commands and capture output to unique log files
+  async function runCommandWithLogging(command: string, args: string[], description: string) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    // Use description to create unique log file name
+    const sanitizedDescription = description.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const logFile = path.join('test-results', `build-tooling-${sanitizedDescription}-${timestamp}.log`);
+
+    // Ensure test-results directory exists
+    if (!fs.existsSync('test-results')) {
+      fs.mkdirSync('test-results', { recursive: true });
     }
+
+    try {
+      // Run command and capture all output to log file
+      const child = spawn(command, args, {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        shell: true
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        child.on('close', (code) => {
+          const fullOutput = `Command: ${command} ${args.join(' ')}\nExit Code: ${code}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`;
+          fs.writeFileSync(logFile, fullOutput);
+
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`${description} failed with exit code ${code}`));
+          }
+        });
+
+        child.on('error', (error) => {
+          const errorOutput = `Command: ${command} ${args.join(' ')}\nError: ${error.message}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`;
+          fs.writeFileSync(logFile, errorOutput);
+          reject(error);
+        });
+      });
+    } catch (error) {
+      // On failure, print log file info instead of flooding console
+      const stats = fs.statSync(logFile);
+      console.error(`${description} failed. Log file: ${logFile} (${stats.size} bytes)`);
+      throw error;
+    }
+  }
+
+  test('App SSR server builds successfully with TypeScript strict mode', async () => {
+    await runCommandWithLogging('cd ../app-ssr-server && npm run build', [], 'App SSR server build');
   });
 
   test('App builds successfully with TypeScript strict mode', async () => {
-    // This test runs the build process for the app
-    try {
-      execSync('cd ../app && npm run build', { stdio: 'pipe' });
-      expect(true).toBe(true); // Build succeeded
-    } catch (error) {
-      console.error('Build failed:', error);
-      expect(false).toBe(true); // Build failed
-    }
+    await runCommandWithLogging('cd ../app && npm run build', [], 'App build');
   });
 
   test('Mock server builds successfully with TypeScript strict mode', async () => {
-    // This test runs the build process for the mock-server
-    try {
-      execSync('cd ../mock-server && npm run build', { stdio: 'pipe' });
-      expect(true).toBe(true); // Build succeeded
-    } catch (error) {
-      console.error('Build failed:', error);
-      expect(false).toBe(true); // Build failed
-    }
+    await runCommandWithLogging('cd ../mock-server && npm run build', [], 'Mock server build');
   });
 
   test('E2E tests build successfully with TypeScript strict mode', async () => {
-    // This test runs the TypeScript compilation for e2e tests
-    try {
-      execSync('npx tsc --noEmit', { stdio: 'pipe' });
-      expect(true).toBe(true); // TypeScript compilation succeeded
-    } catch (error) {
-      console.error('TypeScript compilation failed:', error);
-      expect(false).toBe(true); // TypeScript compilation failed
-    }
+    await runCommandWithLogging('npx tsc --noEmit', [], 'E2E TypeScript compilation');
   });
 
   test('ESLint configuration works across all projects', async () => {
-    // Test ESLint on e2e tests
-    try {
-      execSync('npm run lint', { stdio: 'pipe' });
-      expect(true).toBe(true); // ESLint succeeded
-    } catch (error) {
-      console.error('ESLint failed:', error);
-      expect(false).toBe(true); // ESLint failed
-    }
+    await runCommandWithLogging('npm run lint', [], 'ESLint check');
   });
 
   test('Prettier configuration works across all projects', async () => {
-    // Test Prettier formatting check
-    try {
-      execSync('npm run format:check', { stdio: 'pipe' });
-      expect(true).toBe(true); // Prettier check succeeded
-    } catch (error) {
-      console.error('Prettier check failed:', error);
-      expect(false).toBe(true); // Prettier check failed
-    }
+    await runCommandWithLogging('npm run format:check', [], 'Prettier format check');
   });
 
   test('TypeScript configuration files are valid JSON', async () => {
@@ -82,13 +96,6 @@ test.describe('Build and Tooling Tests', () => {
     const playwrightConfigPath = 'playwright.config.ts';
     expect(fs.existsSync(playwrightConfigPath)).toBe(true);
 
-    // Test that Playwright can parse the config without errors
-    try {
-      execSync('npx playwright test --list | head -1', { stdio: 'pipe' });
-      expect(true).toBe(true); // Playwright config is valid
-    } catch (error) {
-      console.error('Playwright config validation failed:', error);
-      expect(false).toBe(true); // Playwright config is invalid
-    }
+    await runCommandWithLogging('npx playwright test --list | head -1', [], 'Playwright config validation');
   });
 });

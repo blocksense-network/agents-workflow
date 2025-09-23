@@ -5,7 +5,13 @@ test.describe('Accessibility Tests', () => {
   test('Dashboard page passes basic accessibility checks', async ({ page }) => {
     await page.goto('/');
 
-    const accessibilityScanResults = await new AxeBuilder({ page })
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
+    const accessibilityScanResults = await new AxeBuilder({ page: page as any })
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
@@ -23,7 +29,7 @@ test.describe('Accessibility Tests', () => {
     // For now, we'll allow some violations but ensure no critical issues
     // In production, this should be: expect(accessibilityScanResults.violations).toHaveLength(0);
     const criticalViolations = accessibilityScanResults.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious'
+      (v) => v.impact === 'critical' || v.impact === 'serious'
     );
 
     expect(criticalViolations).toHaveLength(0);
@@ -32,12 +38,18 @@ test.describe('Accessibility Tests', () => {
   test('Sessions page passes basic accessibility checks', async ({ page }) => {
     await page.goto('/sessions');
 
-    const accessibilityScanResults = await new AxeBuilder({ page })
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
+    const accessibilityScanResults = await new AxeBuilder({ page: page as any })
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
     const criticalViolations = accessibilityScanResults.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious'
+      (v) => v.impact === 'critical' || v.impact === 'serious'
     );
 
     expect(criticalViolations).toHaveLength(0);
@@ -46,12 +58,18 @@ test.describe('Accessibility Tests', () => {
   test('Create Task page passes basic accessibility checks', async ({ page }) => {
     await page.goto('/create');
 
-    const accessibilityScanResults = await new AxeBuilder({ page })
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
+    const accessibilityScanResults = await new AxeBuilder({ page: page as any })
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
     const criticalViolations = accessibilityScanResults.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious'
+      (v) => v.impact === 'critical' || v.impact === 'serious'
     );
 
     expect(criticalViolations).toHaveLength(0);
@@ -60,12 +78,18 @@ test.describe('Accessibility Tests', () => {
   test('Settings page passes basic accessibility checks', async ({ page }) => {
     await page.goto('/settings');
 
-    const accessibilityScanResults = await new AxeBuilder({ page })
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
+
+    const accessibilityScanResults = await new AxeBuilder({ page: page as any })
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
     const criticalViolations = accessibilityScanResults.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious'
+      (v) => v.impact === 'critical' || v.impact === 'serious'
     );
 
     expect(criticalViolations).toHaveLength(0);
@@ -88,12 +112,18 @@ test.describe('Accessibility Tests', () => {
     // Should be able to focus on navigation links
     const navLink = page.locator('nav a').first();
     await navLink.focus();
-    const isFocused = await navLink.evaluate(el => el === document.activeElement);
+    const isFocused = await navLink.evaluate((el) => el === document.activeElement);
     expect(isFocused).toBe(true);
   });
 
   test('ARIA landmarks are present', async ({ page }) => {
     await page.goto('/');
+
+    // Wait for client-side hydration to complete
+    await page.waitForFunction(() => {
+      const app = document.getElementById('app');
+      return app && !app.classList.contains('ssr-placeholder');
+    }, { timeout: 10000 });
 
     // Check for main landmark
     const mainElement = page.locator('main, [role="main"]');
@@ -113,7 +143,7 @@ test.describe('Accessibility Tests', () => {
 
     for (let i = 0; i < inputCount; i++) {
       const input = inputs.nth(i);
-      const hasLabel = await input.evaluate(el => {
+      const hasLabel = await input.evaluate((el) => {
         const id = el.id;
         const ariaLabel = el.getAttribute('aria-label');
         const ariaLabelledBy = el.getAttribute('aria-labelledby');
@@ -146,16 +176,16 @@ test.describe('Accessibility Tests', () => {
 
     // Check that the element has some form of focus styling
     // This is a basic check - more sophisticated focus testing would require CSS analysis
-    const hasFocusStyling = await focusableElement.evaluate(el => {
+    const hasFocusStyling = await focusableElement.evaluate((el) => {
       const computedStyle = window.getComputedStyle(el);
-      return computedStyle.outline !== 'none' ||
-             computedStyle.boxShadow !== 'none' ||
-             computedStyle.border !== computedStyle.border.replace(/rgb\(.*?\)/, 'rgb(0,0,0)');
+      return (
+        computedStyle.outline !== 'none' ||
+        computedStyle.boxShadow !== 'none' ||
+        computedStyle.border !== computedStyle.border.replace(/rgb\(.*?\)/, 'rgb(0,0,0)')
+      );
     });
 
     // Note: This is a basic check. In production, you'd want more sophisticated focus testing
     expect(hasFocusStyling || true).toBe(true); // Allow pass for now
   });
 });
-
-

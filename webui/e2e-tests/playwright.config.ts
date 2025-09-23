@@ -15,7 +15,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html'],
+    ['dot'], // Minimal console output with dots for each test
     ['junit', { outputFile: 'results.xml' }],
     ['github']
   ],
@@ -26,6 +26,9 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+
+    /* Run tests in headless mode to prevent browser windows from opening */
+    headless: true,
   },
 
   /* Configure projects for different test types */

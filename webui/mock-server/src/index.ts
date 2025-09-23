@@ -6,6 +6,7 @@ import { sessionsRouter } from './routes/sessions.js';
 import { agentsRouter } from './routes/agents.js';
 import { runtimesRouter } from './routes/runtimes.js';
 import { executorsRouter } from './routes/executors.js';
+import { tasksRouter } from './routes/tasks.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,7 @@ app.use('/api/v1/sessions', sessionsRouter);
 app.use('/api/v1/agents', agentsRouter);
 app.use('/api/v1/runtimes', runtimesRouter);
 app.use('/api/v1/executors', executorsRouter);
+app.use('/api/v1/tasks', tasksRouter);
 
 // Mock capability discovery endpoints
 app.get('/api/v1/agents', (req, res) => {

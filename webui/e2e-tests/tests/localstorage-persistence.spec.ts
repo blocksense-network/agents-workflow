@@ -4,13 +4,12 @@ test.describe('localStorage Persistence Tests', () => {
   test('UI preferences persist across browser sessions', async ({ page, context }) => {
     await page.goto('/');
 
-    // Check initial localStorage state
-    const initialCollapsedState = await page.evaluate(() => {
-      return localStorage.getItem('repositoriesCollapsed');
-    });
+    // Check initial localStorage state (removed unused variable)
 
     // Find and click a collapse button if it exists
-    const collapseBtn = page.locator('[data-testid="repositories-collapse"], [data-testid="sessions-collapse"]').first();
+    const collapseBtn = page
+      .locator('[data-testid="repositories-collapse"], [data-testid="sessions-collapse"]')
+      .first();
     if (await collapseBtn.isVisible()) {
       await collapseBtn.click();
 
@@ -19,7 +18,9 @@ test.describe('localStorage Persistence Tests', () => {
 
       // Check that preference was saved to localStorage
       const collapsedState = await page.evaluate(() => {
-        return localStorage.getItem('repositoriesCollapsed') || localStorage.getItem('sessionsCollapsed');
+        return (
+          localStorage.getItem('repositoriesCollapsed') || localStorage.getItem('sessionsCollapsed')
+        );
       });
 
       expect(collapsedState).toBeDefined();
@@ -30,7 +31,9 @@ test.describe('localStorage Persistence Tests', () => {
 
       // Check that the collapsed state persists
       const persistedState = await newPage.evaluate(() => {
-        return localStorage.getItem('repositoriesCollapsed') || localStorage.getItem('sessionsCollapsed');
+        return (
+          localStorage.getItem('repositoriesCollapsed') || localStorage.getItem('sessionsCollapsed')
+        );
       });
 
       expect(persistedState).toBe(collapsedState);
@@ -41,7 +44,9 @@ test.describe('localStorage Persistence Tests', () => {
     await page.goto('/');
 
     // Find search input
-    const searchInput = page.locator('input[placeholder*="search" i], [data-testid="global-search"] input').first();
+    const searchInput = page
+      .locator('input[placeholder*="search" i], [data-testid="global-search"] input')
+      .first();
 
     if (await searchInput.isVisible()) {
       // Type something in search
@@ -66,7 +71,9 @@ test.describe('localStorage Persistence Tests', () => {
     await page.goto('/');
 
     // Look for theme toggle or dark mode switch
-    const themeToggle = page.locator('[data-testid="theme-toggle"], [aria-label*="theme" i], [aria-label*="dark" i]').first();
+    const themeToggle = page
+      .locator('[data-testid="theme-toggle"], [aria-label*="theme" i], [aria-label*="dark" i]')
+      .first();
 
     if (await themeToggle.isVisible()) {
       const initialTheme = await page.evaluate(() => {
@@ -112,9 +119,11 @@ test.describe('localStorage Persistence Tests', () => {
 
       // Check if draft was saved
       const savedDraft = await page.evaluate(() => {
-        return localStorage.getItem('taskDraft') ||
-               localStorage.getItem('formDraft') ||
-               localStorage.getItem('createTaskDraft');
+        return (
+          localStorage.getItem('taskDraft') ||
+          localStorage.getItem('formDraft') ||
+          localStorage.getItem('createTaskDraft')
+        );
       });
 
       // Note: This test assumes the app auto-saves drafts. If not implemented, this will be informational.
@@ -131,15 +140,7 @@ test.describe('localStorage Persistence Tests', () => {
     const splitter = page.locator('[data-testid="pane-splitter"], [data-testid="resizer"]').first();
 
     if (await splitter.isVisible()) {
-      // Get initial pane sizes
-      const initialSizes = await page.evaluate(() => {
-        const panes = document.querySelectorAll('[data-testid*="pane"]');
-        return Array.from(panes).map(pane => ({
-          id: pane.getAttribute('data-testid'),
-          width: pane.offsetWidth,
-          height: pane.offsetHeight
-        }));
-      });
+      // Get initial pane sizes (removed unused variable)
 
       // Simulate resize if possible (this would require more complex interaction)
       // For now, just check if pane sizes are stored
@@ -173,23 +174,25 @@ test.describe('localStorage Persistence Tests', () => {
     // Check that localStorage doesn't contain sensitive information
     const allKeys = await page.evaluate(() => {
       const keys = Object.keys(localStorage);
-      return keys.filter(key =>
-        !key.includes('Collapsed') &&
-        !key.includes('theme') &&
-        !key.includes('search') &&
-        !key.includes('draft') &&
-        !key.includes('pane') &&
-        !key.includes('layout')
+      return keys.filter(
+        (key) =>
+          !key.includes('Collapsed') &&
+          !key.includes('theme') &&
+          !key.includes('search') &&
+          !key.includes('draft') &&
+          !key.includes('pane') &&
+          !key.includes('layout')
       );
     });
 
     // Should not contain API keys, tokens, passwords, etc.
-    const sensitiveKeys = allKeys.filter(key =>
-      key.toLowerCase().includes('token') ||
-      key.toLowerCase().includes('key') ||
-      key.toLowerCase().includes('secret') ||
-      key.toLowerCase().includes('password') ||
-      key.toLowerCase().includes('auth')
+    const sensitiveKeys = allKeys.filter(
+      (key) =>
+        key.toLowerCase().includes('token') ||
+        key.toLowerCase().includes('key') ||
+        key.toLowerCase().includes('secret') ||
+        key.toLowerCase().includes('password') ||
+        key.toLowerCase().includes('auth')
     );
 
     expect(sensitiveKeys).toHaveLength(0);
@@ -202,7 +205,7 @@ test.describe('localStorage Persistence Tests', () => {
     const storageSize = await page.evaluate(() => {
       let total = 0;
       for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
           total += localStorage[key].length + key.length;
         }
       }
@@ -213,5 +216,3 @@ test.describe('localStorage Persistence Tests', () => {
     expect(storageSize).toBeLessThan(1024 * 1024); // Less than 1MB
   });
 });
-
-
