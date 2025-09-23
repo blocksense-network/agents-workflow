@@ -1,6 +1,9 @@
 # Nix environment
 .direnv/
 
+# Nix builds
+result
+
 # Ruby/Rails
 .install-markers/
 test/logs/
