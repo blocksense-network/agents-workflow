@@ -1,0 +1,16 @@
+[package]
+name = "agentfs-fskit-sys"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI bindings for AgentFS FSKit adapter"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "agentfs_fskit_sys"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"

@@ -21,6 +21,13 @@ legacy/ruby/test/logs/
 target/
 Cargo.lock
 
+# Swift Package Manager build artifacts
+.build/
+*.xcodeproj/
+
+# FSKit adapter build artifacts
+adapters/macos/xcode/AgentFSKitExtension/libs/
+
 # Rust backup files
 *.rs.bk
 

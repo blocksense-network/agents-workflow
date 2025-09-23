@@ -6,6 +6,8 @@ members = [
   "crates/aw-fs-snapshots-traits",
   "crates/aw-fs-snapshots-zfs",
   "crates/aw-fs-snapshots-btrfs",
+  "crates/agentfs-fskit-sys",
+  "crates/agentfs-fskit-bridge",
   "crates/aw-sandbox",
   "crates/aw-sandbox-linux",
   "crates/aw-fs-snapshots-daemon",

@@ -1,0 +1,4 @@
+module AgentFSKitFFI {
+    header "AgentFSKitFFI.h"
+    export *
+}
