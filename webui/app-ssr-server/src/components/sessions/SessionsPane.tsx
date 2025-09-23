@@ -1,4 +1,11 @@
-import { Component, createResource, createSignal, For, Show, onMount } from "solid-js";
+import {
+  Component,
+  createResource,
+  createSignal,
+  For,
+  Show,
+  onMount,
+} from "solid-js";
 import { apiClient, type Session } from "../../lib/api.js";
 import { SessionCard } from "./SessionCard.js";
 
@@ -22,16 +29,19 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
         params.perPage = 50; // Load more sessions
         return await apiClient.listSessions(params);
       } catch (error) {
-        console.error('Failed to load sessions:', error);
-        return { items: [], pagination: { page: 1, perPage: 20, total: 0, totalPages: 1 } };
+        console.error("Failed to load sessions:", error);
+        return {
+          items: [],
+          pagination: { page: 1, perPage: 20, total: 0, totalPages: 1 },
+        };
       }
-    }
+    },
   );
 
   // Auto-refresh sessions every 30 seconds
   onMount(() => {
     const interval = setInterval(() => {
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
     }, 30000);
 
     return () => clearInterval(interval);
@@ -40,23 +50,23 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
   const handleStopSession = async (sessionId: string) => {
     try {
       await apiClient.stopSession(sessionId);
-      setRefreshTrigger(prev => prev + 1); // Refresh the list
+      setRefreshTrigger((prev) => prev + 1); // Refresh the list
     } catch (error) {
-      console.error('Failed to stop session:', error);
+      console.error("Failed to stop session:", error);
       // TODO: Show error notification
     }
   };
 
   const handleCancelSession = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to cancel this session?')) {
+    if (!confirm("Are you sure you want to cancel this session?")) {
       return;
     }
 
     try {
       await apiClient.cancelSession(sessionId);
-      setRefreshTrigger(prev => prev + 1); // Refresh the list
+      setRefreshTrigger((prev) => prev + 1); // Refresh the list
     } catch (error) {
-      console.error('Failed to cancel session:', error);
+      console.error("Failed to cancel session:", error);
       // TODO: Show error notification
     }
   };
@@ -129,7 +139,10 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
 
         {/* Status filter */}
         <div>
-          <label for="status-filter" class="block text-xs font-medium text-gray-700 mb-1">
+          <label
+            for="status-filter"
+            class="block text-xs font-medium text-gray-700 mb-1"
+          >
             Filter by Status
           </label>
           <select
@@ -172,12 +185,26 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
               when={sessionsData()?.items.length > 0}
               fallback={
                 <div class="text-center py-8">
-                  <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    class="mx-auto h-12 w-12 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
-                  <h3 class="mt-2 text-sm font-medium text-gray-900">No sessions</h3>
+                  <h3 class="mt-2 text-sm font-medium text-gray-900">
+                    No sessions
+                  </h3>
                   <p class="mt-1 text-sm text-gray-500">
-                    {statusFilter() ? `No sessions with status "${statusFilter()}"` : "Get started by creating a new task."}
+                    {statusFilter()
+                      ? `No sessions with status "${statusFilter()}"`
+                      : "Get started by creating a new task."}
                   </p>
                   <Show when={statusFilter()}>
                     <button
@@ -206,7 +233,8 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
 
               <Show when={sessionsData()?.pagination.totalPages > 1}>
                 <div class="mt-4 text-center text-sm text-gray-500">
-                  Showing {sessionsData()?.items.length} of {sessionsData()?.pagination.total} sessions
+                  Showing {sessionsData()?.items.length} of{" "}
+                  {sessionsData()?.pagination.total} sessions
                 </div>
               </Show>
             </Show>

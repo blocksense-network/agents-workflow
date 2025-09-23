@@ -19,7 +19,7 @@ export const TaskDetailsPane: Component<TaskDetailsPaneProps> = (props) => {
       { timestamp: '2025-01-01T12:00:05Z', level: 'info', message: 'Agent initialized' },
       { timestamp: '2025-01-01T12:00:10Z', level: 'info', message: 'Running tests...' },
       { timestamp: '2025-01-01T12:00:15Z', level: 'info', message: 'Found 3 failing tests' },
-    ]
+    ],
   };
 
   return (
@@ -72,11 +72,18 @@ export const TaskDetailsPane: Component<TaskDetailsPaneProps> = (props) => {
               <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
                 {sessionDetails.logs.map((log) => (
                   <div key={log.timestamp} class="mb-1">
-                    <span class="text-gray-400">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                    <span class={`ml-2 ${
-                      log.level === 'error' ? 'text-red-400' :
-                      log.level === 'warn' ? 'text-yellow-400' : 'text-green-400'
-                    }`}>
+                    <span class="text-gray-400">
+                      [{new Date(log.timestamp).toLocaleTimeString()}]
+                    </span>
+                    <span
+                      class={`ml-2 ${
+                        log.level === 'error'
+                          ? 'text-red-400'
+                          : log.level === 'warn'
+                            ? 'text-yellow-400'
+                            : 'text-green-400'
+                      }`}
+                    >
                       {log.message}
                     </span>
                   </div>

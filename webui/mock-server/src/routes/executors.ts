@@ -11,16 +11,16 @@ router.get('/', (req, res) => {
         os: 'linux',
         arch: 'x86_64',
         snapshotCapabilities: ['zfs', 'btrfs', 'overlay', 'copy'],
-        status: 'online'
+        status: 'online',
       },
       {
         id: 'executor-macos-01',
         os: 'macos',
         arch: 'arm64',
         snapshotCapabilities: ['overlay', 'copy'],
-        status: 'online'
-      }
-    ]
+        status: 'online',
+      },
+    ],
   });
 });
 

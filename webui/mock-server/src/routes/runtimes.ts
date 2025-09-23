@@ -9,13 +9,13 @@ router.get('/', (req, res) => {
       {
         type: 'devcontainer',
         images: ['ghcr.io/acme/base:latest'],
-        paths: ['.devcontainer/devcontainer.json']
+        paths: ['.devcontainer/devcontainer.json'],
       },
       {
         type: 'local',
-        sandboxProfiles: ['default', 'disabled']
-      }
-    ]
+        sandboxProfiles: ['default', 'disabled'],
+      },
+    ],
   });
 });
 

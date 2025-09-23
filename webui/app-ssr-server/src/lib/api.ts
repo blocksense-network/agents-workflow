@@ -115,6 +115,19 @@ export interface LogsResponse {
   logs: LogEntry[];
 }
 
+export interface SessionEvent {
+  type: "status" | "log" | "progress";
+  sessionId: string;
+  status?: string;
+  level?: string;
+  message?: string;
+  progress?: number;
+  stage?: string;
+  ts: string;
+}
+
+export type SessionEventHandler = (event: SessionEvent) => void;
+
 export interface ApiError {
   type: string;
   title: string;
@@ -210,6 +223,29 @@ class ApiClient {
   async getSessionLogs(id: string, tail?: number): Promise<LogsResponse> {
     const params = tail ? `?tail=${tail}` : "";
     return this.request(`/sessions/${id}/logs${params}`);
+  }
+
+  // SSE event streaming
+  subscribeToSessionEvents(
+    id: string,
+    onEvent: SessionEventHandler,
+  ): EventSource {
+    const eventSource = new EventSource(`${API_BASE}/sessions/${id}/events`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onEvent(data);
+      } catch (error) {
+        console.error("Failed to parse SSE event:", error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE connection error:", error);
+    };
+
+    return eventSource;
   }
 
   // Metadata operations

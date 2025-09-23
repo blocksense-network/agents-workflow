@@ -211,23 +211,27 @@ webui-mock-server:
 # Lint all WebUI projects
 webui-lint:
     cd webui/app && npm run lint
-    cd ../mock-server && npm run lint
-    cd ../e2e-tests && npm run lint
+    cd webui/mock-server && npm run lint
+    cd webui/e2e-tests && npm run lint
 
 # Type check all WebUI projects
 webui-type-check:
     cd webui/app && npm run type-check
-    cd ../mock-server && npm run type-check
+    cd webui/mock-server && npm run type-check
 
 # Format all WebUI projects
 webui-format:
     cd webui/app && npm run format
-    cd ../mock-server && npm run format
-    cd ../e2e-tests && npm run format
+    cd webui/mock-server && npm run format
+    cd webui/e2e-tests && npm run format
 
 # Run WebUI E2E tests
 webui-test:
     cd webui/e2e-tests && npm run test:e2e
+
+# Start WebUI with mock server for manual testing (cycles through 5 scenarios)
+webui-manual:
+    ./scripts/webui-manual.sh
 
 # Run WebUI E2E tests in headed mode (visible browser)
 webui-test-headed:

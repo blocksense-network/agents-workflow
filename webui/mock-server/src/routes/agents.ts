@@ -9,14 +9,14 @@ router.get('/', (req, res) => {
       {
         type: 'claude-code',
         versions: ['latest'],
-        settingsSchemaRef: '/api/v1/schemas/agents/claude-code.json'
+        settingsSchemaRef: '/api/v1/schemas/agents/claude-code.json',
       },
       {
         type: 'openhands',
         versions: ['latest'],
-        settingsSchemaRef: '/api/v1/schemas/agents/openhands.json'
-      }
-    ]
+        settingsSchemaRef: '/api/v1/schemas/agents/openhands.json',
+      },
+    ],
   });
 });
 

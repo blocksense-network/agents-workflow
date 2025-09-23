@@ -16,7 +16,9 @@ test.describe('Session Interactions and Controls', () => {
       await page.waitForTimeout(2000);
 
       // Find a session card
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -48,7 +50,9 @@ test.describe('Session Interactions and Controls', () => {
       await page.goto('/sessions');
       await page.waitForTimeout(2000);
 
-      const sessionCards = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]');
+      const sessionCards = page.locator(
+        '[class*="bg-white"][class*="border"][class*="rounded-lg"]'
+      );
       const cardCount = await sessionCards.count();
 
       if (cardCount >= 2) {
@@ -80,7 +84,9 @@ test.describe('Session Interactions and Controls', () => {
       await expect(page.locator('text=No session selected')).toBeVisible();
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -161,7 +167,9 @@ test.describe('Session Interactions and Controls', () => {
       await page.waitForTimeout(2000);
 
       // Select session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -200,7 +208,9 @@ test.describe('Session Interactions and Controls', () => {
       if (badgeVisible) {
         // Should contain status text
         const badgeText = await statusBadge.textContent();
-        expect(['running', 'queued', 'provisioning', 'completed', 'failed']).toContain(badgeText?.toLowerCase());
+        expect(['running', 'queued', 'provisioning', 'completed', 'failed']).toContain(
+          badgeText?.toLowerCase()
+        );
       }
     });
 
@@ -221,13 +231,14 @@ test.describe('Session Interactions and Controls', () => {
 
       if (badgeVisible) {
         // Badge should have background color classes
-        const hasBackgroundColor = await statusBadge.evaluate(el =>
-          el.classList.contains('bg-green-100') ||
-          el.classList.contains('bg-yellow-100') ||
-          el.classList.contains('bg-blue-100') ||
-          el.classList.contains('bg-gray-100') ||
-          el.classList.contains('bg-red-100') ||
-          el.classList.contains('bg-orange-100')
+        const hasBackgroundColor = await statusBadge.evaluate(
+          (el) =>
+            el.classList.contains('bg-green-100') ||
+            el.classList.contains('bg-yellow-100') ||
+            el.classList.contains('bg-blue-100') ||
+            el.classList.contains('bg-gray-100') ||
+            el.classList.contains('bg-red-100') ||
+            el.classList.contains('bg-orange-100')
         );
         expect(hasBackgroundColor).toBe(true);
       }
@@ -247,14 +258,18 @@ test.describe('Session Interactions and Controls', () => {
       await page.locator('text=View Sessions').click();
       await page.waitForTimeout(2000);
 
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
         await sessionCard.click();
 
         // Overview tab should be active by default
-        await expect(page.locator('button').filter({ hasText: 'Overview' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Overview' })).toHaveClass(
+          /border-blue-500/
+        );
 
         // Check overview content
         await expect(page.locator('text=Created:')).toBeVisible();
@@ -275,7 +290,9 @@ test.describe('Session Interactions and Controls', () => {
       await page.locator('text=View Sessions').click();
       await page.waitForTimeout(2000);
 
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -283,11 +300,20 @@ test.describe('Session Interactions and Controls', () => {
 
         // Click logs tab
         await page.locator('button').filter({ hasText: 'Logs' }).click();
-        await expect(page.locator('button').filter({ hasText: 'Logs' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Logs' })).toHaveClass(
+          /border-blue-500/
+        );
 
         // Should show logs or "no logs" message
-        const hasLogs = await page.locator('text=No logs available').isVisible().catch(() => false);
-        const hasLogContent = await page.locator('[class*="font-mono"]').first().isVisible().catch(() => false);
+        const hasLogs = await page
+          .locator('text=No logs available')
+          .isVisible()
+          .catch(() => false);
+        const hasLogContent = await page
+          .locator('[class*="font-mono"]')
+          .first()
+          .isVisible()
+          .catch(() => false);
 
         expect(hasLogs || hasLogContent).toBe(true);
       }
@@ -305,7 +331,9 @@ test.describe('Session Interactions and Controls', () => {
       await page.locator('text=View Sessions').click();
       await page.waitForTimeout(2000);
 
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -313,7 +341,9 @@ test.describe('Session Interactions and Controls', () => {
 
         // Click events tab
         await page.locator('button').filter({ hasText: 'Events' }).click();
-        await expect(page.locator('button').filter({ hasText: 'Events' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Events' })).toHaveClass(
+          /border-blue-500/
+        );
 
         // Should show placeholder message
         await expect(page.locator('text=Events will be displayed here')).toBeVisible();
@@ -333,25 +363,37 @@ test.describe('Session Interactions and Controls', () => {
       await page.locator('text=View Sessions').click();
       await page.waitForTimeout(2000);
 
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
         await sessionCard.click();
 
         // Start with overview tab
-        await expect(page.locator('button').filter({ hasText: 'Overview' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Overview' })).toHaveClass(
+          /border-blue-500/
+        );
         await expect(page.locator('text=Created:')).toBeVisible();
 
         // Switch to logs tab
         await page.locator('button').filter({ hasText: 'Logs' }).click();
-        await expect(page.locator('button').filter({ hasText: 'Overview' })).not.toHaveClass(/border-blue-500/);
-        await expect(page.locator('button').filter({ hasText: 'Logs' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Overview' })).not.toHaveClass(
+          /border-blue-500/
+        );
+        await expect(page.locator('button').filter({ hasText: 'Logs' })).toHaveClass(
+          /border-blue-500/
+        );
 
         // Switch to events tab
         await page.locator('button').filter({ hasText: 'Events' }).click();
-        await expect(page.locator('button').filter({ hasText: 'Logs' })).not.toHaveClass(/border-blue-500/);
-        await expect(page.locator('button').filter({ hasText: 'Events' })).toHaveClass(/border-blue-500/);
+        await expect(page.locator('button').filter({ hasText: 'Logs' })).not.toHaveClass(
+          /border-blue-500/
+        );
+        await expect(page.locator('button').filter({ hasText: 'Events' })).toHaveClass(
+          /border-blue-500/
+        );
       }
     });
   });
@@ -369,8 +411,14 @@ test.describe('Session Interactions and Controls', () => {
       await page.waitForTimeout(1000);
 
       // May show empty state or filtered results
-      const hasEmptyState = await page.locator('text=No sessions').isVisible().catch(() => false);
-      const hasFilterMessage = await page.locator('text=No sessions with status').isVisible().catch(() => false);
+      const hasEmptyState = await page
+        .locator('text=No sessions')
+        .isVisible()
+        .catch(() => false);
+      const hasFilterMessage = await page
+        .locator('text=No sessions with status')
+        .isVisible()
+        .catch(() => false);
 
       // Either we have content or an appropriate empty/filtered state
       expect(hasEmptyState || hasFilterMessage || true).toBe(true); // Allow for sessions existing
@@ -385,7 +433,7 @@ test.describe('Session Interactions and Controls', () => {
       // Change filter
       await statusFilter.selectOption('completed');
 
-      if (await statusFilter.inputValue() !== originalValue) {
+      if ((await statusFilter.inputValue()) !== originalValue) {
         // Should show clear filter option if results are filtered
         const clearButton = page.locator('text=Clear filter').first();
         const clearVisible = await clearButton.isVisible().catch(() => false);

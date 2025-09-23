@@ -1,14 +1,13 @@
-import { Router } from "@solidjs/router";
-import { FileRoutes } from "@solidjs/start/router";
-import { Suspense } from "solid-js";
-import { MainLayout } from "./components/layout/MainLayout";
-import { ThreePaneLayout } from "./components/layout/ThreePaneLayout";
-import "./app.css";
+import { Router } from '@solidjs/router';
+import { FileRoutes } from '@solidjs/start/router';
+import { MainLayout } from './components/layout/MainLayout';
+import { ThreePaneLayout } from './components/layout/ThreePaneLayout';
+import './app.css';
 
 export default function App() {
   return (
     <Router
-      root={props => (
+      root={() => (
         <MainLayout>
           <ThreePaneLayout />
         </MainLayout>

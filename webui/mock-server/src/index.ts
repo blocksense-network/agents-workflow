@@ -13,10 +13,12 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? false : true,
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.NODE_ENV === 'production' ? false : true,
+    credentials: true,
+  })
+);
 app.use(morgan('combined'));
 app.use(express.json());
 
@@ -39,14 +41,14 @@ app.get('/api/v1/agents', (req, res) => {
       {
         type: 'claude-code',
         versions: ['latest'],
-        settingsSchemaRef: '/api/v1/schemas/agents/claude-code.json'
+        settingsSchemaRef: '/api/v1/schemas/agents/claude-code.json',
       },
       {
         type: 'openhands',
         versions: ['latest'],
-        settingsSchemaRef: '/api/v1/schemas/agents/openhands.json'
-      }
-    ]
+        settingsSchemaRef: '/api/v1/schemas/agents/openhands.json',
+      },
+    ],
   });
 });
 
@@ -56,13 +58,13 @@ app.get('/api/v1/runtimes', (req, res) => {
       {
         type: 'devcontainer',
         images: ['ghcr.io/acme/base:latest'],
-        paths: ['.devcontainer/devcontainer.json']
+        paths: ['.devcontainer/devcontainer.json'],
       },
       {
         type: 'local',
-        sandboxProfiles: ['default', 'disabled']
-      }
-    ]
+        sandboxProfiles: ['default', 'disabled'],
+      },
+    ],
   });
 });
 
@@ -74,9 +76,9 @@ app.get('/api/v1/executors', (req, res) => {
         os: 'linux',
         arch: 'x86_64',
         snapshotCapabilities: ['zfs', 'btrfs', 'overlay', 'copy'],
-        status: 'online'
-      }
-    ]
+        status: 'online',
+      },
+    ],
   });
 });
 
@@ -86,18 +88,18 @@ app.use((req, res) => {
     type: 'https://docs.example.com/errors/not-found',
     title: 'Not Found',
     status: 404,
-    detail: `Route ${req.originalUrl} not found`
+    detail: `Route ${req.originalUrl} not found`,
   });
 });
 
 // Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack);
   res.status(500).json({
     type: 'https://docs.example.com/errors/internal-server-error',
     title: 'Internal Server Error',
     status: 500,
-    detail: 'An unexpected error occurred'
+    detail: 'An unexpected error occurred',
   });
 });
 

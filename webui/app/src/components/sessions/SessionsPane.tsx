@@ -12,7 +12,7 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
       task: 'Fix flaky tests in checkout service',
       agent: 'claude-code',
       repository: 'storefront',
-      createdAt: '2025-01-01T12:00:00Z'
+      createdAt: '2025-01-01T12:00:00Z',
     },
     {
       id: '02HVZ6K9T1N8S6M3V3Q3F0X5B8',
@@ -20,7 +20,7 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
       task: 'Add error handling to user auth',
       agent: 'openhands',
       repository: 'api-gateway',
-      createdAt: '2025-01-01T11:30:00Z'
+      createdAt: '2025-01-01T11:30:00Z',
     },
     {
       id: '03HVZ6K9T1N8S6M3V3Q3F0X5B9',
@@ -28,16 +28,20 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
       task: 'Optimize database queries',
       agent: 'claude-code',
       repository: 'user-service',
-      createdAt: '2025-01-01T11:00:00Z'
+      createdAt: '2025-01-01T11:00:00Z',
     },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'running':
+        return 'bg-green-100 text-green-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -64,15 +68,23 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
             >
               <div class="flex items-start justify-between mb-2">
                 <h3 class="font-medium text-gray-900 text-sm">{session.task}</h3>
-                <span class={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
+                <span
+                  class={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}
+                >
                   {session.status}
                 </span>
               </div>
 
               <div class="text-sm text-gray-600 space-y-1">
-                <p><strong>Agent:</strong> {session.agent}</p>
-                <p><strong>Repository:</strong> {session.repository}</p>
-                <p><strong>Created:</strong> {new Date(session.createdAt).toLocaleString()}</p>
+                <p>
+                  <strong>Agent:</strong> {session.agent}
+                </p>
+                <p>
+                  <strong>Repository:</strong> {session.repository}
+                </p>
+                <p>
+                  <strong>Created:</strong> {new Date(session.createdAt).toLocaleString()}
+                </p>
               </div>
             </div>
           ))}

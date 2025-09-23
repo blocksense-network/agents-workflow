@@ -127,8 +127,14 @@ test.describe('Form Validation Tests', () => {
       await page.locator('button[type="submit"]').click();
 
       // Either success or API error should be shown
-      const hasSuccess = await page.locator('text=Task Created Successfully!').isVisible().catch(() => false);
-      const hasError = await page.locator('[class*="bg-red-50"]').isVisible().catch(() => false);
+      const hasSuccess = await page
+        .locator('text=Task Created Successfully!')
+        .isVisible()
+        .catch(() => false);
+      const hasError = await page
+        .locator('[class*="bg-red-50"]')
+        .isVisible()
+        .catch(() => false);
 
       expect(hasSuccess || hasError).toBe(true);
     });
@@ -186,7 +192,7 @@ test.describe('Form Validation Tests', () => {
         'https://github.com/user/repo.git',
         'http://gitlab.com/user/repo.git',
         'git@github.com:user/repo.git',
-        'https://bitbucket.org/user/repo.git'
+        'https://bitbucket.org/user/repo.git',
       ];
 
       for (const url of testUrls) {
@@ -211,7 +217,7 @@ test.describe('Form Validation Tests', () => {
         'develop',
         'feature/new-feature',
         'bugfix/issue-123',
-        'v1.0.0'
+        'v1.0.0',
       ];
 
       for (const branch of testBranches) {

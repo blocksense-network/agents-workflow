@@ -18,10 +18,15 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Check if session cards are present (may be empty or have sessions)
-      const sessionCards = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCards = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       // Either we have session cards or an empty state message
       const hasSessions = await sessionCards.isVisible().catch(() => false);
-      const hasEmptyState = await page.locator('text=No sessions').isVisible().catch(() => false);
+      const hasEmptyState = await page
+        .locator('text=No sessions')
+        .isVisible()
+        .catch(() => false);
 
       expect(hasSessions || hasEmptyState).toBe(true);
     });
@@ -37,7 +42,9 @@ test.describe('Session Management Functionality', () => {
       await expect(statusFilter).toBeVisible();
 
       // Check filter options
-      await expect(statusFilter.locator('option').filter({ hasText: 'All Sessions' })).toBeVisible();
+      await expect(
+        statusFilter.locator('option').filter({ hasText: 'All Sessions' })
+      ).toBeVisible();
       await expect(statusFilter.locator('option').filter({ hasText: 'Running' })).toBeVisible();
       await expect(statusFilter.locator('option').filter({ hasText: 'Queued' })).toBeVisible();
       await expect(statusFilter.locator('option').filter({ hasText: 'Completed' })).toBeVisible();
@@ -91,7 +98,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Find a session card
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -117,7 +126,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Find and click a session card
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -145,7 +156,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -171,7 +184,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -246,7 +261,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -277,7 +294,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
@@ -287,8 +306,15 @@ test.describe('Session Management Functionality', () => {
         await page.locator('button').filter({ hasText: 'Logs' }).click();
 
         // Check logs content (may be empty or have mock logs)
-        const hasLogs = await page.locator('text=No logs available').isVisible().catch(() => false);
-        const hasLogEntries = await page.locator('[class*="font-mono"]').first().isVisible().catch(() => false);
+        const hasLogs = await page
+          .locator('text=No logs available')
+          .isVisible()
+          .catch(() => false);
+        const hasLogEntries = await page
+          .locator('[class*="font-mono"]')
+          .first()
+          .isVisible()
+          .catch(() => false);
 
         expect(hasLogs || hasLogEntries).toBe(true);
       }
@@ -309,7 +335,9 @@ test.describe('Session Management Functionality', () => {
       await page.waitForTimeout(2000);
 
       // Select a session
-      const sessionCard = page.locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]').first();
+      const sessionCard = page
+        .locator('[class*="bg-white"][class*="border"][class*="rounded-lg"]')
+        .first();
       const cardVisible = await sessionCard.isVisible().catch(() => false);
 
       if (cardVisible) {
