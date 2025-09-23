@@ -10,5 +10,7 @@
 	<false/>
 	<key>com.apple.security.network.server</key>
 	<false/>
+	<key>com.apple.developer.fskit.fsmodule</key>
+	<true/>
 </dict>
 </plist>

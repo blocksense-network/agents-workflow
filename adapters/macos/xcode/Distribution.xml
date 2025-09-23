@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-script minSpecVersion="2.0">
+    <title>AgentsWorkflow</title>
+    <organization>com.blocksense.agents-workflow</organization>
+    <domains enable_anywhere="true"/>
+    <options customize="never" require-scripts="false"/>
+    <welcome file="Welcome.txt"/>
+    <license file="License.txt"/>
+    <conclusion file="Conclusion.txt"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="agents-workflow"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="agents-workflow" visible="false">
+        <pkg-ref id="com.blocksense.agents-workflow"/>
+    </choice>
+    <pkg-ref id="com.blocksense.agents-workflow" version="1.0.0" onConclusion="none">#AgentsWorkflow.pkg</pkg-ref>
+</installer-script>

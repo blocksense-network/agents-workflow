@@ -41,6 +41,18 @@ adapters/macos/xcode/AgentFSKitExtension/AgentFSKitExtension.appex
 
 # FSKit adapter build artifacts
 adapters/macos/xcode/AgentFSKitExtension/libs/
+adapters/macos/xcode/libs/
+
+# AgentsWorkflow app build artifacts
+apps/macos/AgentsWorkflow/libs/
+apps/macos/AgentsWorkflow/build/
+
+# Distribution packages
+*.pkg
+
+# Xcode build artifacts (additional)
+*.app/
+*.appex/
 
 # Rust backup files
 *.rs.bk
