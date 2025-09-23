@@ -5,6 +5,7 @@
 //! transitions, and coordination with other AW components.
 
 pub mod agent_tasks;
+pub mod editor;
 pub mod error;
 pub mod session;
 pub mod task;
@@ -23,3 +24,6 @@ pub use session::{Session, SessionId, SessionManager, SessionStatus};
 
 /// Agent task file management and operations.
 pub use agent_tasks::AgentTasks;
+
+/// Interactive editor integration for task content creation.
+pub use editor::{edit_content_interactive, EditorError, EDITOR_HINT};
