@@ -239,17 +239,18 @@
 
 2. **Mount ns**: `unshare(CLONE_NEWNS)` → mark `/` **private** (no propagation).
 
-3. **PID ns**: `unshare(CLONE_NEWPID)` → fork child that becomes **PID 1** inside; parent remains as orchestrator until hand‑off.
+3. **PID ns**: `unshare(CLONE_NEWPID)` → Execute fork(). The child process becomes **PID 1** inside the user namespace; Parent remains as orchestrator until hand‑off.
 
 4. **UTS/IPC/Time**: `unshare(CLONE_NEWUTS|CLONE_NEWIPC|CLONE_NEWTIME)`; set hostname; optionally skew time.
 
 5. **Net ns**: `unshare(CLONE_NEWNET)`; bring up `lo`. If `--allow-network`, start **slirp4netns** attached to the target PID; optional port‑forwards.
 
-6. **/proc**: mount a **new procfs** inside the PID ns (needed for correct `ps/kill`). Use `hidepid=2,subset=pid` if supported.
 
-7. **devpts & /dev**: mount **devpts** (`newinstance,gid=tty,mode=0620,ptmxmode=0666`); mount a minimal **/dev** (tmpfs) and populate required nodes (`null,zero,urandom,tty,ptmx,pts/*`).
+6. **/proc**: mount a **new procfs** inside the child (which still holds CAP_SYS_ADMIN as PID 1 in the user namespace). This is needed for correct `ps/kill`. Use `hidepid=2,subset=pid` if supported.
 
-8. **tmpfs**: mount tmpfs for `/tmp` and `/run` (per‑session private state).
+7. **devpts & /dev**: Similarly, mount **devpts** in the child (`newinstance,gid=tty,mode=0620,ptmxmode=0666`); mount a minimal **/dev** (tmpfs) and populate required nodes (`null,zero,urandom,tty,ptmx,pts/*`).
+
+8. **tmpfs** (in child): mount tmpfs for `/tmp` and `/run` (per‑session private state).
 
 9. **Filesystem sealing** (executed within user namespace context):
    - Make the existing mount tree **read‑only** recursively using `mount_setattr(AT_RECURSIVE, MS_RDONLY)` if available; otherwise bind‑remount each subtree RO.

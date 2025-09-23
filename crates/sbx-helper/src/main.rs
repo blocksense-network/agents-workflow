@@ -177,10 +177,13 @@ async fn main() -> anyhow::Result<()> {
         info!("Set network target PID to {}", current_pid);
     }
 
-    // Execute the process as PID 1
-    // This will replace the current process
+    // Execute the process as PID 1 in child process, wait for completion
+    // Parent process will return after child completes
     match sandbox.exec_process() {
-        Ok(_) => unreachable!("exec_process should not return"),
+        Ok(_) => {
+            info!("Sandbox execution completed successfully");
+            std::process::exit(0);
+        }
         Err(e) => {
             error!("Failed to execute process: {}", e);
             std::process::exit(1);

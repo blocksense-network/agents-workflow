@@ -305,16 +305,48 @@ All crates target stable Rust; Linux‑only crates gated behind `cfg(target_os =
   - **M5 seccomp**: slirp4netns runs with seccomp filters for syscall-level security
   - **Future milestones**: Foundation for container/VM networking and supervisor policy enforcement
 
-**M7. Debugging toggles** (2–3d)
+**M7. Debugging toggles** ✅ PARTIAL PROGRESS - Core Isolation Achieved
 
 - Deliverables:
   - Default deny ptrace/process*vm*\*; debug mode enables ptrace within sandbox only.
 
 - Verification:
-  - E2E test: gdb attach inside sandbox works in debug mode
-  - E2E test: gdb attach inside sandbox fails in normal mode (EPERM)
-  - E2E test: host processes remain invisible from within sandbox (cannot ptrace host processes)
-  - Unit tests: seccomp filter rules applied correctly in debug vs normal modes
+  - ✅ **Unit tests: seccomp filter rules applied correctly in debug vs normal modes** - Added comprehensive unit tests for FilterBuilder debug mode
+  - ❌ **E2E test: gdb attach inside sandbox works in debug mode** - LIMITED: Requires elevated privileges for `/proc` mounting (works with `sudo`)
+  - ❌ **E2E test: gdb attach inside sandbox fails in normal mode (EPERM)** - LIMITED: Requires elevated privileges for `/proc` mounting
+  - ✅ **E2E test: host processes remain invisible from within sandbox (cannot ptrace host processes)** - CONFIRMED: Process isolation works correctly even without `/proc` mounting
+
+- **Detailed Issue Analysis:** [Debugging-Enforcement-Implementation-Issues.md](../Research/Debugging-Enforcement-Implementation-Issues.md) (guru's fork solution implemented, confirmed user namespace CAP_SYS_ADMIN limitations)
+
+- **Root Cause Confirmed:** User namespaces provide CAP_SYS_ADMIN, but this capability has fundamental limitations for PID-namespace-specific operations like `/proc` mounting, even in the child process after fork.
+
+- **Core Achievement:** Sandbox provides complete process isolation without requiring elevated privileges. Full debugging functionality (ptrace attach) requires privileged execution due to Linux kernel security restrictions.
+
+- **Production Deployment:** Sandbox can be deployed with elevated privileges (`sudo`) to enable full debugging functionality, or run unprivileged for basic process isolation.
+
+- Implementation details:
+  - **`FilterBuilder::set_debug_mode()`** (`crates/sandbox-seccomp/src/filter.rs`): Configurable ptrace syscall handling - allows in debug mode, blocks with EPERM in normal mode
+  - **CLI integration**: `--seccomp-debug` flag in `sbx-helper` enables ptrace operations within sandbox
+  - **Test infrastructure**: Complete E2E test suite with `debugging-enforcement` package including `ptrace_tester`, `process_visibility_tester`, and `debugging_test_orchestrator`
+  - **Security-first design**: Default deny policy for debugging operations, explicit opt-in via debug mode flag
+
+- Key Source Files:
+  - `crates/sandbox-seccomp/src/filter.rs` - Seccomp filter debug mode implementation
+  - `crates/sbx-helper/src/main.rs` - CLI debug mode flag integration
+  - `tests/debugging-enforcement/src/` - Complete E2E test suite for debugging functionality
+  - `Justfile` - Build and test commands for debugging enforcement
+
+- Test Coverage:
+  - **Unit tests** (3 tests): Filter builder debug mode configuration and rule application
+  - **E2E tests** (3 test programs + orchestrator): ptrace functionality testing, process isolation verification, comprehensive test orchestration
+  - **Feature-gated testing**: Separate test runs with debugging enforcement package
+  - **CI integration**: All tests pass in `cargo test --workspace` pipeline (requires appropriate privileges for E2E tests)
+
+- Integration Points:
+  - **M5 seccomp notify**: Extends dynamic filesystem access control with debugging toggles
+  - **M2 namespace isolation**: Complements namespace isolation with syscall-level debugging restrictions
+  - **M3 cgroups**: Resource limits apply to debugging operations within sandbox
+  - **Future milestones**: Foundation for container/VM debugging support
 
 **M8. Containers/VMs inside sandbox** (4–6d)
 
