@@ -1,0 +1,31 @@
+[package]
+name = "vm-enforcement"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+# Sandbox crates
+sandbox-core = { path = "../../crates/sandbox-core", features = ["cgroups", "net", "devices"] }
+sandbox-fs = { path = "../../crates/sandbox-fs" }
+sandbox-devices = { path = "../../crates/sandbox-devices" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[[bin]]
+name = "qemu_vm_tester"
+path = "src/qemu_vm_tester.rs"
+
+[[bin]]
+name = "kvm_device_tester"
+path = "src/kvm_device_tester.rs"
+
+[[bin]]
+name = "vm_test_orchestrator"
+path = "src/main.rs"

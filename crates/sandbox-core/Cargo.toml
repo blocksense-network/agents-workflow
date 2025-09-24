@@ -20,6 +20,7 @@ nix = { version = "0.27", features = [
 sandbox-cgroups = { path = "../sandbox-cgroups", optional = true }
 sandbox-seccomp = { path = "../sandbox-seccomp", optional = true }
 sandbox-net = { path = "../sandbox-net", optional = true }
+sandbox-devices = { path = "../sandbox-devices", optional = true }
 sandbox-proto = { path = "../sandbox-proto" }
 
 [features]
@@ -27,6 +28,7 @@ default = ["cgroups", "seccomp"]
 cgroups = ["sandbox-cgroups"]
 seccomp = ["sandbox-seccomp"]
 net = ["sandbox-net"]
+devices = ["sandbox-devices"]
 
 [dev-dependencies]
 tempfile = { workspace = true }

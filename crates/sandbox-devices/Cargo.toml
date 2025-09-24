@@ -1,0 +1,16 @@
+[package]
+name = "sandbox-devices"
+version = "0.1.0"
+edition = "2021"
+description = "Device management and access control for sandboxing"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+nix = { version = "0.27", features = ["mount", "fs"] }
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["fs"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.0"

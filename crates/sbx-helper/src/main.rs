@@ -70,6 +70,14 @@ struct Args {
     /// Allow network access via slirp4netns
     #[arg(long)]
     allow_network: bool,
+
+    /// Allow container workloads (enables /dev/fuse, cgroup delegation)
+    #[arg(long)]
+    allow_containers: bool,
+
+    /// Allow KVM access for virtual machines
+    #[arg(long)]
+    allow_kvm: bool,
 }
 
 #[tokio::main]
@@ -156,6 +164,20 @@ async fn main() -> anyhow::Result<()> {
 
         sandbox = sandbox.with_seccomp(seccomp_config);
         info!("Seccomp dynamic filesystem access control enabled");
+    }
+
+    // Enable device management if requested
+    if args.allow_containers || args.allow_kvm {
+        if args.allow_containers && args.allow_kvm {
+            sandbox = sandbox.with_container_and_vm_devices();
+            info!("Device access enabled for both containers and VMs");
+        } else if args.allow_containers {
+            sandbox = sandbox.with_container_devices();
+            info!("Device access enabled for containers (/dev/fuse, storage dirs)");
+        } else if args.allow_kvm {
+            sandbox = sandbox.with_vm_devices();
+            info!("Device access enabled for VMs (/dev/kvm)");
+        }
     }
 
     let fs_manager = FilesystemManager::with_config(fs_config);

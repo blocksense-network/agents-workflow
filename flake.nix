@@ -274,8 +274,9 @@
         pkgs.chromium
         # Linux-only filesystem utilities for snapshot functionality
         pkgs.btrfs-progs # Btrfs utilities for subvolume snapshots
-        # Docker for containerized testing
+        # Container runtimes for testing container workloads in sandbox
         pkgs.docker
+        pkgs.podman
         # System monitoring tools for performance tests
         pkgs.procps # ps, top, etc. for memory monitoring
         # Seccomp library for sandboxing functionality

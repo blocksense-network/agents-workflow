@@ -177,9 +177,9 @@ build-network-test-binaries:
 # Build all test binaries needed for network enforcement tests
 build-network-tests: build-sbx-helper build-network-test-binaries
 
-# Build debugging enforcement test binaries (debugging_test_orchestrator, ptrace_tester, process_visibility_tester, mount_test, bind_mount_test, simple_bind_mount, replicate_user_test, rust_user_namespace_test, final_bind_mount_test)
+# Build debugging enforcement test binaries (debugging_test_orchestrator, ptrace_tester, process_visibility_tester, mount_test)
 build-debugging-test-binaries:
-    cargo build -p debugging-enforcement --bin debugging_test_orchestrator --bin ptrace_tester --bin process_visibility_tester --bin mount_test --bin bind_mount_test --bin simple_bind_mount --bin replicate_user_test --bin rust_user_namespace_test --bin final_bind_mount_test
+    cargo build -p debugging-enforcement --bin debugging_test_orchestrator --bin ptrace_tester --bin process_visibility_tester --bin mount_test
 
 # Build all test binaries needed for debugging enforcement tests
 build-debugging-tests: build-sbx-helper build-debugging-test-binaries
@@ -334,6 +334,30 @@ test-debugging:
     just build-debugging-tests
     cargo test -p sandbox-integration-tests --verbose
     ./target/debug/debugging_test_orchestrator
+
+# Build VM enforcement test binaries (qemu_vm_tester, kvm_device_tester, vm_test_orchestrator)
+build-vm-test-binaries:
+    cargo build -p vm-enforcement --bin qemu_vm_tester --bin kvm_device_tester --bin vm_test_orchestrator
+
+# Build all test binaries needed for VM enforcement tests
+build-vm-tests: build-sbx-helper build-vm-test-binaries
+
+# Run VM tests with E2E enforcement verification
+test-vms:
+    just build-vm-tests
+    ./target/debug/vm_test_orchestrator
+
+# Build container enforcement test binaries (podman_container_tester, container_resource_tester, docker_socket_tester, container_test_orchestrator)
+build-container-test-binaries:
+    cargo build -p container-enforcement --bin podman_container_tester --bin container_resource_tester --bin docker_socket_tester --bin container_test_orchestrator
+
+# Build all test binaries needed for container enforcement tests
+build-container-tests: build-sbx-helper build-container-test-binaries
+
+# Run container tests with E2E enforcement verification
+test-containers:
+    just build-container-tests
+    ./target/debug/container_test_orchestrator
 
 # Run simple mount test to verify CAP_SYS_ADMIN availability in user namespaces
 test-mount-capability:

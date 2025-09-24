@@ -1,0 +1,35 @@
+[package]
+name = "container-enforcement"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+# Sandbox crates
+sandbox-core = { path = "../../crates/sandbox-core", features = ["cgroups", "net", "devices"] }
+sandbox-fs = { path = "../../crates/sandbox-fs" }
+sandbox-devices = { path = "../../crates/sandbox-devices" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[[bin]]
+name = "podman_container_tester"
+path = "src/podman_container_tester.rs"
+
+[[bin]]
+name = "container_resource_tester"
+path = "src/container_resource_tester.rs"
+
+[[bin]]
+name = "docker_socket_tester"
+path = "src/docker_socket_tester.rs"
+
+[[bin]]
+name = "container_test_orchestrator"
+path = "src/main.rs"

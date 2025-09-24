@@ -24,6 +24,11 @@ pub use sandbox_net::{
     NetworkConfig, NetworkManager,
 };
 
+#[cfg(feature = "devices")]
+pub use sandbox_devices::{
+    DeviceConfig, DeviceManager,
+};
+
 use tracing::{debug, info};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
@@ -46,6 +51,10 @@ pub struct Sandbox {
     network_config: Option<sandbox_net::NetworkConfig>,
     #[cfg(feature = "net")]
     network_manager: Option<sandbox_net::NetworkManager>,
+    #[cfg(feature = "devices")]
+    device_config: Option<sandbox_devices::DeviceConfig>,
+    #[cfg(feature = "devices")]
+    device_manager: Option<sandbox_devices::DeviceManager>,
 }
 
 impl Default for Sandbox {
@@ -93,6 +102,10 @@ impl Sandbox {
             network_config: None,
             #[cfg(feature = "net")]
             network_manager: None,
+            #[cfg(feature = "devices")]
+            device_config: None,
+            #[cfg(feature = "devices")]
+            device_manager: None,
         }
     }
 
@@ -118,6 +131,10 @@ impl Sandbox {
             network_config: None,
             #[cfg(feature = "net")]
             network_manager: None,
+            #[cfg(feature = "devices")]
+            device_config: None,
+            #[cfg(feature = "devices")]
+            device_manager: None,
         }
     }
 
@@ -176,6 +193,41 @@ impl Sandbox {
         let config = sandbox_net::NetworkConfig::default();
         self.network_config = Some(config.clone());
         self.network_manager = Some(sandbox_net::NetworkManager::new(config));
+        self
+    }
+
+    /// Enable device management for this sandbox
+    #[cfg(feature = "devices")]
+    pub fn with_devices(mut self, config: sandbox_devices::DeviceConfig) -> Self {
+        self.device_config = Some(config.clone());
+        self.device_manager = Some(sandbox_devices::DeviceManager::new(config));
+        self
+    }
+
+    /// Enable device management with container support
+    #[cfg(feature = "devices")]
+    pub fn with_container_devices(mut self) -> Self {
+        let config = sandbox_devices::DeviceConfig::for_containers();
+        self.device_config = Some(config.clone());
+        self.device_manager = Some(sandbox_devices::DeviceManager::new(config));
+        self
+    }
+
+    /// Enable device management with VM support
+    #[cfg(feature = "devices")]
+    pub fn with_vm_devices(mut self) -> Self {
+        let config = sandbox_devices::DeviceConfig::for_vms();
+        self.device_config = Some(config.clone());
+        self.device_manager = Some(sandbox_devices::DeviceManager::new(config));
+        self
+    }
+
+    /// Enable device management for both containers and VMs
+    #[cfg(feature = "devices")]
+    pub fn with_container_and_vm_devices(mut self) -> Self {
+        let config = sandbox_devices::DeviceConfig::for_containers_and_vms();
+        self.device_config = Some(config.clone());
+        self.device_manager = Some(sandbox_devices::DeviceManager::new(config));
         self
     }
 
@@ -255,6 +307,20 @@ impl Sandbox {
             }
         }
 
+        // Set up device access if enabled
+        #[cfg(feature = "devices")]
+        if let Some(ref device_manager) = self.device_manager {
+            match device_manager.setup_devices().await {
+                Ok(()) => {
+                    debug!("Sandbox device setup successfully");
+                }
+                Err(e) => {
+                    // In test environments or systems without device access, this may fail
+                    debug!("Device setup failed (expected in some environments): {}", e);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -279,6 +345,14 @@ impl Sandbox {
         if let Some(ref mut network_manager) = self.network_manager {
             if let Err(e) = network_manager.cleanup() {
                 debug!("Network cleanup failed: {}", e);
+            }
+        }
+
+        // Clean up device resources
+        #[cfg(feature = "devices")]
+        if let Some(ref device_manager) = self.device_manager {
+            if let Err(e) = device_manager.cleanup_devices() {
+                debug!("Device cleanup failed: {}", e);
             }
         }
 
@@ -307,6 +381,17 @@ impl Sandbox {
     /// Get the current namespace configuration
     pub fn namespace_config(&self) -> &namespaces::NamespaceConfig {
         &self.namespace_config
+    }
+
+    /// Check if device access is allowed (if devices are enabled)
+    #[cfg(feature = "devices")]
+    pub fn is_device_access_allowed(&self, device_path: &str) -> bool {
+        if let Some(ref device_manager) = self.device_manager {
+            device_manager.is_access_allowed(device_path)
+        } else {
+            // If devices are not configured, deny access by default for security
+            false
+        }
     }
 }
 
