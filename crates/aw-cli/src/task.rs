@@ -179,6 +179,17 @@ impl TaskCreateArgs {
         task_committed = true;
         cleanup_branch = false;
 
+        // Create initial filesystem snapshot for time travel (if supported)
+        // TODO: Once AgentFS integration is implemented, this will:
+        // 1. Detect if the current filesystem supports snapshots (ZFS/Btrfs)
+        // 2. Create an initial snapshot of the current workspace state
+        // 3. Associate the snapshot with the session for later time travel
+        // 4. Store snapshot metadata in the database
+        if !self.non_interactive {
+            println!("Note: Automatic snapshot creation for time travel not yet implemented in this milestone");
+            println!("When implemented, an initial snapshot will be created here for session '{}'", actual_branch_name);
+        }
+
         // Validate and prepare sandbox if requested
         let sandbox_workspace = if self.sandbox != "none" {
             Some(validate_and_prepare_sandbox(&self).await?)

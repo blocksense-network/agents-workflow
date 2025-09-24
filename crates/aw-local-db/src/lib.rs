@@ -47,5 +47,8 @@ impl Error {
 /// Database connection and management.
 pub use connection::Database;
 
+/// Database models and operations.
+pub use models::{TaskStore, FsSnapshotStore, FsSnapshotRecord};
+
 /// Schema definitions and constants.
 pub use schema::*;
