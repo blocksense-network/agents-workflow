@@ -50,42 +50,46 @@ export const RepositoriesPane: Component<RepositoriesPaneProps> = (props) => {
     props.onRepositorySelect?.(repo);
   };
 
-  if (props.collapsed) {
-    return (
-      <div class="flex flex-col h-full">
-        <div class="p-2 border-b border-gray-200 flex justify-center">
-          <button
-            onClick={props.onToggleCollapse}
-            class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-            title="Expand Repositories"
-            aria-label="Expand Repositories pane"
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5l7 7-7 7"
-              ></path>
-            </svg>
-          </button>
-        </div>
-        <div class="flex-1 flex items-center justify-center">
-          <div class="transform -rotate-90 whitespace-nowrap text-xs text-gray-500 font-medium">
-            Repositories
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full bg-white border-r border-gray-200">
+      <Show
+        when={!props.collapsed}
+        fallback={
+          <div class="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+            {/* Top expand button - prominent and easy to use */}
+            <div class="p-3 border-b border-gray-200 bg-white">
+              <button
+                onClick={props.onToggleCollapse}
+                class="w-full flex items-center justify-center p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors duration-200 border-2 border-dashed border-gray-300 hover:border-gray-400"
+                title="Expand Repositories"
+                aria-label="Expand Repositories pane"
+              >
+                <svg
+                  class="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 5l7 7-7 7"
+                  ></path>
+                </svg>
+                <span class="text-sm font-medium">Expand</span>
+              </button>
+            </div>
+
+            {/* Rotated label in center */}
+            <div class="flex-1 flex items-center justify-center">
+              <div class="transform -rotate-90 whitespace-nowrap text-xs text-gray-500 font-medium">
+                Repositories
+              </div>
+            </div>
+          </div>
+        }
+      >
       <div class="p-4 border-b border-gray-200">
         <div class="flex items-center justify-between mb-3">
           <div>
@@ -189,6 +193,7 @@ export const RepositoriesPane: Component<RepositoriesPaneProps> = (props) => {
           </For>
         </div>
       </div>
+      </Show>
     </div>
   );
 };

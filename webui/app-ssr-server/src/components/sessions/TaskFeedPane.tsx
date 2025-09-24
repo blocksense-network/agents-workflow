@@ -5,20 +5,41 @@ import {
   For,
   Show,
   onMount,
+  createEffect,
 } from "solid-js";
 import { apiClient, type Session } from "../../lib/api.js";
 import { SessionCard } from "./SessionCard.js";
+import { InlineTaskCreationCard } from "../tasks/InlineTaskCreationCard.js";
+
+interface Repository {
+  id: string;
+  name: string;
+  branch: string;
+  lastCommit: string;
+}
 
 interface TaskFeedPaneProps {
   selectedSessionId?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onSessionSelect?: (sessionId: string) => void;
+  inlineTaskCreationRepo?: Repository | null;
+  onInlineTaskCreated?: (taskId: string) => void;
+  onCancelInlineTaskCreation?: () => void;
 }
 
 export const TaskFeedPane: Component<TaskFeedPaneProps> = (props) => {
+  console.log("TaskFeedPane component function called, inlineTaskCreationRepo:", props.inlineTaskCreationRepo);
   const [statusFilter, setStatusFilter] = createSignal<string>("");
   const [refreshTrigger, setRefreshTrigger] = createSignal(0);
+  const [renderTrigger, setRenderTrigger] = createSignal(0);
+
+  // Monitor prop changes
+  createEffect(() => {
+    console.log("TaskFeedPane: inlineTaskCreationRepo changed to:", props.inlineTaskCreationRepo);
+    // Force re-render when prop changes
+    setRenderTrigger(prev => prev + 1);
+  });
 
   const [sessionsData] = createResource(
     () => ({ filter: statusFilter(), refresh: refreshTrigger() }),
@@ -73,16 +94,17 @@ export const TaskFeedPane: Component<TaskFeedPaneProps> = (props) => {
 
   if (props.collapsed) {
     return (
-      <div class="flex flex-col h-full">
-        <div class="p-2 border-b border-gray-200 flex justify-center">
+      <div class="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+        {/* Top expand button - prominent and easy to use */}
+        <div class="p-3 border-b border-gray-200 bg-white">
           <button
             onClick={props.onToggleCollapse}
-            class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-            title="Expand Sessions"
-            aria-label="Expand Sessions pane"
+            class="w-full flex items-center justify-center p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors duration-200 border-2 border-dashed border-gray-300 hover:border-gray-400"
+            title="Expand Task Feed"
+            aria-label="Expand Task Feed pane"
           >
             <svg
-              class="w-4 h-4"
+              class="w-5 h-5 mr-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -94,8 +116,11 @@ export const TaskFeedPane: Component<TaskFeedPaneProps> = (props) => {
                 d="M9 5l7 7-7 7"
               ></path>
             </svg>
+            <span class="text-sm font-medium">Expand</span>
           </button>
         </div>
+
+        {/* Rotated label in center */}
         <div class="flex-1 flex items-center justify-center">
           <div class="transform -rotate-90 whitespace-nowrap text-xs text-gray-500 font-medium">
             Task Feed ({sessionsData()?.pagination.total || 0})
@@ -181,6 +206,18 @@ export const TaskFeedPane: Component<TaskFeedPaneProps> = (props) => {
           }
         >
           <div class="p-4">
+            {/* Inline Task Creation Form */}
+            {props.inlineTaskCreationRepo && (
+              <div>
+                {console.log("Rendering InlineTaskCreationCard for repo:", props.inlineTaskCreationRepo)}
+                <InlineTaskCreationCard
+                  repository={props.inlineTaskCreationRepo}
+                  onTaskCreated={props.onInlineTaskCreated}
+                  onCancel={props.onCancelInlineTaskCreation}
+                />
+              </div>
+            )}
+
             <Show
               when={sessionsData()?.items.length > 0}
               fallback={

@@ -90,3 +90,4 @@ tests/tools/mock-agent/recordings/
 
 repomix.md
 reference_projects/
+webui/test-results/.last-run.json

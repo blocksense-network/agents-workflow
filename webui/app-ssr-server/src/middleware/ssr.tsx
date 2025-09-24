@@ -1,4 +1,21 @@
 // Simple SSR using plain HTML strings to avoid SolidJS client-only API issues
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Function to find the correct CSS filename
+const getCssFilename = (): string => {
+  try {
+    // In development, we build the client first, so files should be in dist/public
+    // In production, files are built alongside the server
+    const publicDir = path.join(process.cwd(), 'dist', 'public');
+    const files = fs.readdirSync(publicDir);
+    const cssFile = files.find(file => file.endsWith('.css'));
+    return cssFile || 'client.css'; // fallback to default name
+  } catch (error) {
+    console.warn('Could not find CSS file, using default:', error);
+    return 'client.css';
+  }
+};
 
 export const ssrMiddleware = async (req: any, res: any, next: any) => {
   try {
@@ -23,6 +40,9 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
       return next(); // Let Express handle non-API 404s
     }
 
+    // Find the correct CSS filename
+    const cssFilename = getCssFilename();
+
     // No SSR - let client handle everything to avoid hydration issues
     const appHtml = `<div></div>`;
 
@@ -35,7 +55,7 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
   <title>Agents-Workflow WebUI</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <meta name="description" content="Web-based dashboard for creating, monitoring, and managing agent coding sessions">
-  <link rel="stylesheet" href="/client-C2J1EW0P.css">
+  <link rel="stylesheet" href="/${cssFilename}">
   <style>
     /* Critical CSS for initial render */
     body {

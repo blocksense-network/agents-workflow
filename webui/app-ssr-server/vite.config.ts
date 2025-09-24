@@ -17,7 +17,7 @@ export default defineConfig(({ command, mode }) => {
         } : {
           entryFileNames: 'client.js',
           chunkFileNames: 'client-[hash].js',
-          assetFileNames: 'client-[hash].[ext]'
+          assetFileNames: command === 'build' ? 'client-[hash].[ext]' : 'client.[ext]'
         }
       },
       ssr: isServer,

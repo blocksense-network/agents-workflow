@@ -8,12 +8,16 @@ interface ThreePaneLayoutProps {
   onSessionSelect?: (sessionId: string) => void;
   onRepositorySelect?: (repo: { id: string; name: string; branch: string; lastCommit: string }) => void;
   onCreateTaskForRepo?: (repo: { id: string; name: string; branch: string; lastCommit: string }) => void;
+  inlineTaskCreationRepo?: { id: string; name: string; branch: string; lastCommit: string } | null;
+  onInlineTaskCreated?: (taskId: string) => void;
+  onCancelInlineTaskCreation?: () => void;
 }
 
 export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
-  // State for pane collapse/expand
-  const [repositoriesCollapsed, setRepositoriesCollapsed] = createSignal(false);
-  const [sessionsCollapsed, setSessionsCollapsed] = createSignal(false);
+  console.log("ThreePaneLayout component function called, inlineTaskCreationRepo:", props.inlineTaskCreationRepo);
+  // State for pane collapse/expand - start collapsed to show the new expand buttons
+  const [repositoriesCollapsed, setRepositoriesCollapsed] = createSignal(true);
+  const [sessionsCollapsed, setSessionsCollapsed] = createSignal(true);
 
   // Handle session selection
   const handleSessionSelect = (sessionId: string) => {
@@ -59,11 +63,11 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
   };
 
   return (
-    <div class="flex h-full overflow-hidden">
+    <div class="flex h-full overflow-hidden w-full">
       {/* Left Pane - Repositories */}
       <div
         class={`bg-white border-r border-gray-200 flex flex-col transition-all duration-200 ${
-          repositoriesCollapsed() ? "w-12" : "w-80"
+          repositoriesCollapsed() ? "w-12 flex-shrink-0" : "w-1/5 flex-shrink-0"
         }`}
       >
         <RepositoriesPane
@@ -77,7 +81,7 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
       {/* Center Pane - Task Feed */}
       <div
         class={`bg-white border-r border-gray-200 flex flex-col transition-all duration-200 ${
-          sessionsCollapsed() ? "w-12" : "flex-1 min-w-0"
+          sessionsCollapsed() ? "w-12 flex-shrink-0" : "w-2/5 flex-shrink-0"
         }`}
       >
         <TaskFeedPane
@@ -85,11 +89,14 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
           collapsed={sessionsCollapsed()}
           onToggleCollapse={toggleSessions}
           onSessionSelect={handleSessionSelect}
+          inlineTaskCreationRepo={props.inlineTaskCreationRepo}
+          onInlineTaskCreated={props.onInlineTaskCreated}
+          onCancelInlineTaskCreation={props.onCancelInlineTaskCreation}
         />
       </div>
 
       {/* Right Pane - Task Details */}
-      <div class="w-96 bg-white flex flex-col min-w-0">
+      <div class="w-2/5 flex-shrink-0 bg-white flex flex-col min-w-0">
         <TaskDetailsPane sessionId={props.selectedSessionId} />
       </div>
     </div>

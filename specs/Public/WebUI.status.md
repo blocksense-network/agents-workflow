@@ -424,23 +424,22 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 
 - **Outstanding Tasks**:
 
-  - Implement actual inline task creation form insertion in TaskFeedPane (currently logs to console)
   - Add repository filtering based on selected repositories in task feed
-  - Integrate branch selection dropdown with live autocomplete in inline task creation
   - Implement real Agents, Runtimes, and Hosts management functionality (currently placeholder pages)
   - Add proper repository data loading from API vs mock data
 
 - **Verification Results** (Current Progress):
   - [x] Navigation structure matches PRD exactly (Dashboard, Sessions, Create Task, Agents, Runtimes, Hosts, Settings)
-  - [x] Repository pane shows individual cards with + buttons for each repository (UI complete, functionality pending)
+  - [x] Repository pane shows individual cards with + buttons for each repository (UI complete, functionality complete)
   - [x] Task Feed pane properly renamed and described as chronological feed
   - [x] Three-pane layout terminology aligns with PRD (repositories, task feed, task details)
   - [x] All navigation routes implemented with appropriate placeholder content
   - [x] UI components follow PRD design patterns (+ buttons positioned correctly)
   - [x] Test suite updated and passing with new component structure
-  - [ ] Inline task creation form insertion (currently logs to console only)
+  - [ ] Inline task creation form insertion with compact UI and full functionality
+  - [ ] Branch selection dropdown with autocomplete and search
+  - [ ] Draft persistence for inline task creation forms (localStorage)
   - [ ] Repository filtering in task feed based on selected repositories
-  - [ ] Branch selection dropdown with live autocomplete
   - [ ] Real Agents, Runtimes, and Hosts functionality (placeholder pages only)
 
 **Phase 3: Advanced Features and Polish** (3-4 weeks total)
