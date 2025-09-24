@@ -190,3 +190,169 @@ impl<'a> TaskStore<'a> {
         Ok(())
     }
 }
+
+/// Database model for filesystem snapshots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FsSnapshotRecord {
+    pub id: i64,
+    pub session_id: String,
+    pub ts: String,
+    pub provider: String,
+    pub ref_: String, // `ref` is a keyword in Rust, so use `ref_`
+    pub path: Option<String>,
+    pub parent_id: Option<i64>,
+    pub metadata: Option<String>,
+}
+
+/// Database operations for filesystem snapshots.
+pub struct FsSnapshotStore<'a> {
+    conn: &'a rusqlite::Connection,
+}
+
+impl<'a> FsSnapshotStore<'a> {
+    /// Create a new fs snapshot store.
+    pub fn new(conn: &'a rusqlite::Connection) -> Self {
+        Self { conn }
+    }
+
+    /// Insert a new filesystem snapshot.
+    pub fn insert(&self, record: &FsSnapshotRecord) -> crate::Result<i64> {
+        self.conn.execute(
+            r#"
+            INSERT INTO fs_snapshots (session_id, ts, provider, ref, path, parent_id, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
+            params![
+                record.session_id,
+                record.ts,
+                record.provider,
+                record.ref_,
+                record.path,
+                record.parent_id,
+                record.metadata
+            ],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Get a snapshot by ID.
+    pub fn get(&self, id: i64) -> crate::Result<Option<FsSnapshotRecord>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT id, session_id, ts, provider, ref, path, parent_id, metadata
+            FROM fs_snapshots WHERE id = ?
+            "#,
+        )?;
+
+        let mut rows = stmt.query_map(params![id], |row| {
+            Ok(FsSnapshotRecord {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                ts: row.get(2)?,
+                provider: row.get(3)?,
+                ref_: row.get(4)?,
+                path: row.get(5)?,
+                parent_id: row.get(6)?,
+                metadata: row.get(7)?,
+            })
+        })?;
+
+        match rows.next() {
+            Some(Ok(record)) => Ok(Some(record)),
+            Some(Err(e)) => Err(e.into()),
+            None => Ok(None),
+        }
+    }
+
+    /// List snapshots for a session.
+    pub fn list_by_session(&self, session_id: &str) -> crate::Result<Vec<FsSnapshotRecord>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT id, session_id, ts, provider, ref, path, parent_id, metadata
+            FROM fs_snapshots
+            WHERE session_id = ?
+            ORDER BY ts ASC
+            "#,
+        )?;
+
+        let records = stmt.query_map(params![session_id], |row| {
+            Ok(FsSnapshotRecord {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                ts: row.get(2)?,
+                provider: row.get(3)?,
+                ref_: row.get(4)?,
+                path: row.get(5)?,
+                parent_id: row.get(6)?,
+                metadata: row.get(7)?,
+            })
+        })?;
+
+        let mut snapshots = Vec::new();
+        for record in records {
+            snapshots.push(record?);
+        }
+        Ok(snapshots)
+    }
+
+    /// List all snapshots.
+    pub fn list_all(&self) -> crate::Result<Vec<FsSnapshotRecord>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT id, session_id, ts, provider, ref, path, parent_id, metadata
+            FROM fs_snapshots
+            ORDER BY ts DESC
+            "#,
+        )?;
+
+        let records = stmt.query_map(params![], |row| {
+            Ok(FsSnapshotRecord {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                ts: row.get(2)?,
+                provider: row.get(3)?,
+                ref_: row.get(4)?,
+                path: row.get(5)?,
+                parent_id: row.get(6)?,
+                metadata: row.get(7)?,
+            })
+        })?;
+
+        let mut snapshots = Vec::new();
+        for record in records {
+            snapshots.push(record?);
+        }
+        Ok(snapshots)
+    }
+
+    /// Update a snapshot.
+    pub fn update(&self, record: &FsSnapshotRecord) -> crate::Result<()> {
+        self.conn.execute(
+            r#"
+            UPDATE fs_snapshots
+            SET session_id = ?, ts = ?, provider = ?, ref = ?, path = ?, parent_id = ?, metadata = ?
+            WHERE id = ?
+            "#,
+            params![
+                record.session_id,
+                record.ts,
+                record.provider,
+                record.ref_,
+                record.path,
+                record.parent_id,
+                record.metadata,
+                record.id
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Delete a snapshot.
+    pub fn delete(&self, id: i64) -> crate::Result<()> {
+        self.conn.execute(
+            "DELETE FROM fs_snapshots WHERE id = ?",
+            params![id],
+        )?;
+        Ok(())
+    }
+}
