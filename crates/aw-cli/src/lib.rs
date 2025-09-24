@@ -1,6 +1,7 @@
 //! Agents Workflow CLI library
 
 pub mod agent;
+pub mod sandbox;
 pub mod task;
 pub mod transport;
 
@@ -27,6 +28,11 @@ pub enum Commands {
     Agent {
         #[command(subcommand)]
         subcommand: AgentCommands,
+    },
+    /// Sandbox commands
+    Sandbox {
+        #[command(subcommand)]
+        subcommand: sandbox::SandboxCommands,
     },
 }
 

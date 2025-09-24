@@ -7,6 +7,8 @@ use aw_core::{
     devshell_names, parse_push_to_remote_flag,
     edit_content_interactive, EditorError
 };
+use aw_fs_snapshots::PreparedWorkspace;
+use crate::sandbox::{parse_bool_flag, prepare_workspace_with_fallback};
 
 /// Task-related commands
 #[derive(Subcommand)]
@@ -41,6 +43,38 @@ pub struct TaskCreateArgs {
     /// Non-interactive mode (skip prompts)
     #[arg(long = "non-interactive")]
     pub non_interactive: bool,
+
+    /// Run task in a local sandbox
+    #[arg(long = "sandbox", value_name = "TYPE", default_value = "none")]
+    pub sandbox: String,
+
+    /// Allow internet access in sandbox
+    #[arg(long = "allow-network", value_name = "BOOL", default_value = "no")]
+    pub allow_network: String,
+
+    /// Enable container device access (/dev/fuse, storage dirs)
+    #[arg(long = "allow-containers", value_name = "BOOL", default_value = "no")]
+    pub allow_containers: String,
+
+    /// Enable KVM device access for VMs (/dev/kvm)
+    #[arg(long = "allow-kvm", value_name = "BOOL", default_value = "no")]
+    pub allow_kvm: String,
+
+    /// Enable dynamic filesystem access control
+    #[arg(long = "seccomp", value_name = "BOOL", default_value = "no")]
+    pub seccomp: String,
+
+    /// Enable debugging operations in sandbox
+    #[arg(long = "seccomp-debug", value_name = "BOOL", default_value = "no")]
+    pub seccomp_debug: String,
+
+    /// Additional writable paths to bind mount
+    #[arg(long = "mount-rw", value_name = "PATH")]
+    pub mount_rw: Vec<PathBuf>,
+
+    /// Paths to promote to copy-on-write overlays
+    #[arg(long = "overlay", value_name = "PATH")]
+    pub overlay: Vec<PathBuf>,
 }
 
 impl TaskCommands {
@@ -145,6 +179,18 @@ impl TaskCreateArgs {
         // Success - mark as committed and don't cleanup branch
         task_committed = true;
         cleanup_branch = false;
+
+        // Validate and prepare sandbox if requested
+        let sandbox_workspace = if self.sandbox != "none" {
+            Some(self.validate_and_prepare_sandbox().await?)
+        } else {
+            None
+        };
+
+        // For now, just log the sandbox workspace preparation
+        if let Some(ref ws) = sandbox_workspace {
+            println!("Sandbox workspace prepared at: {}", ws.exec_path.display());
+        }
 
         // Handle push operations
         if let Some(push_flag) = &self.push_to_remote {
@@ -257,6 +303,34 @@ impl TaskCreateArgs {
             .current_dir(repo.root())
             .output();
     }
+
+    /// Validate sandbox parameters and prepare workspace if sandbox is enabled
+    async fn validate_and_prepare_sandbox(&self) -> Result<PreparedWorkspace> {
+        // Validate sandbox type
+        if self.sandbox != "local" {
+            anyhow::bail!("Error: Only 'local' sandbox type is currently supported");
+        }
+
+        // Parse boolean flags
+        let _allow_network = parse_bool_flag(&self.allow_network)
+            .context("Invalid --allow-network value")?;
+        let _allow_containers = parse_bool_flag(&self.allow_containers)
+            .context("Invalid --allow-containers value")?;
+        let _allow_kvm = parse_bool_flag(&self.allow_kvm)
+            .context("Invalid --allow-kvm value")?;
+        let _seccomp = parse_bool_flag(&self.seccomp)
+            .context("Invalid --seccomp value")?;
+        let _seccomp_debug = parse_bool_flag(&self.seccomp_debug)
+            .context("Invalid --seccomp-debug value")?;
+
+        // Get current working directory as the workspace to snapshot
+        let workspace_path = std::env::current_dir()
+            .context("Failed to get current working directory")?;
+
+        // Prepare writable workspace using FS snapshots
+        prepare_workspace_with_fallback(&workspace_path).await
+            .context("Failed to prepare sandbox workspace")
+    }
 }
 
 #[cfg(test)]
@@ -301,6 +375,14 @@ mod tests {
             devshell: Some("dev".to_string()),
             push_to_remote: Some("yes".to_string()),
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         assert_eq!(args.branch, Some("feature-branch".to_string()));
@@ -1176,5 +1258,33 @@ exit {}
         assert!(!editor_called);
 
         Ok(())
+    }
+
+    /// Validate sandbox parameters and prepare workspace if sandbox is enabled
+    async fn validate_and_prepare_sandbox(&self) -> Result<PreparedWorkspace> {
+        // Validate sandbox type
+        if self.sandbox != "local" {
+            anyhow::bail!("Error: Only 'local' sandbox type is currently supported");
+        }
+
+        // Parse boolean flags
+        let _allow_network = parse_bool_flag(&self.allow_network)
+            .context("Invalid --allow-network value")?;
+        let _allow_containers = parse_bool_flag(&self.allow_containers)
+            .context("Invalid --allow-containers value")?;
+        let _allow_kvm = parse_bool_flag(&self.allow_kvm)
+            .context("Invalid --allow-kvm value")?;
+        let _seccomp = parse_bool_flag(&self.seccomp)
+            .context("Invalid --seccomp value")?;
+        let _seccomp_debug = parse_bool_flag(&self.seccomp_debug)
+            .context("Invalid --seccomp-debug value")?;
+
+        // Get current working directory as the workspace to snapshot
+        let workspace_path = std::env::current_dir()
+            .context("Failed to get current working directory")?;
+
+        // Prepare writable workspace using FS snapshots
+        prepare_workspace_with_fallback(&workspace_path).await
+            .context("Failed to prepare sandbox workspace")
     }
 }

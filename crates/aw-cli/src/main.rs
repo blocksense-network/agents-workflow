@@ -10,5 +10,6 @@ async fn main() -> Result<()> {
         Commands::Agent { subcommand } => match subcommand {
             AgentCommands::Fs { subcommand: cmd } => cmd.run().await,
         },
+        Commands::Sandbox { subcommand } => subcommand.run().await,
     }
 }
