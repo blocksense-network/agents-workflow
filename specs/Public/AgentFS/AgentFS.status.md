@@ -332,19 +332,105 @@ Acceptance checklist (M10)
 - [ ] `aw agent fs branch create/bind/exec` work with session context (implementation stubbed)
 - [x] Error mapping covered by tests
 
+M10.5. FUSE Integration Testing Suite (3–4d)
+
+- Implement comprehensive FUSE mount/unmount cycle testing with real block devices
+- Create automated integration tests that exercise all AgentFS operations through actual filesystem interfaces
+- Validate control plane operations work through mounted filesystem control files
+- Success criteria (integration tests):
+  - Full mount cycle works: create device → mount → operations → unmount → cleanup
+  - All basic filesystem operations (create, read, write, delete, mkdir, rmdir, readdir) work through FUSE interface
+  - Control plane operations (snapshots, branches, binding) functional via `.agentfs/control` file
+  - pjdfstest suite passes critical filesystem compliance tests
+  - Cross-platform mounting works on Linux/macOS CI environments
+
+Reference: See [Compiling-and-Testing-FUSE-File-Systems.md](../../Research/Compiling-and-Testing-FUSE-File-Systems.md) for detailed FUSE compilation, mounting, and testing procedures.
+
+Acceptance checklist (M10.5)
+
+- [ ] Full mount cycle integration tests pass
+- [ ] All filesystem operations work through FUSE interface
+- [ ] Control plane operations functional via mounted filesystem
+- [ ] pjdfstest compliance tests pass
+- [ ] Cross-platform mounting validated
+
+M10.6. WinFsp Integration Testing Suite (3–4d)
+
+- Implement comprehensive WinFsp mount/unmount cycle testing with virtual disks
+- Create automated integration tests exercising all AgentFS operations through Windows filesystem APIs
+- Validate DeviceIoControl control plane operations work through mounted filesystem
+- Success criteria (integration tests):
+  - Full mount cycle works on Windows: create virtual disk → mount → operations → unmount → cleanup
+  - All basic filesystem operations work through WinFsp interface (CreateFile, ReadFile, WriteFile, etc.)
+  - Control plane operations functional via DeviceIoControl
+  - winfstest and IfsTest critical cases pass
+  - Share mode admission and delete-on-close semantics validated
+
+Acceptance checklist (M10.6)
+
+- [ ] Full mount cycle integration tests pass on Windows
+- [ ] All filesystem operations work through WinFsp interface
+- [ ] DeviceIoControl control operations functional
+- [ ] Windows filesystem test suites pass
+- [ ] Share modes and delete-on-close validated
+
+M10.7. FSKit Integration Testing Suite (3–4d)
+
+- Implement comprehensive FSKit mount/unmount cycle testing with real filesystem operations
+- Create automated integration tests exercising all AgentFS operations through macOS FSKit APIs
+- Validate XPC control plane operations work through filesystem-based control interface
+- Success criteria (integration tests):
+  - Full mount cycle works on macOS: register extension → mount → operations → unmount → cleanup
+  - All basic filesystem operations work through FSKit interface
+  - Control plane operations functional via `.agentfs` control directory/files
+  - FinderInfo/quarantine xattrs round-trip correctly
+  - Case-insensitive-preserving names honored
+
+Acceptance checklist (M10.7)
+
+- [ ] Full mount cycle integration tests pass on macOS
+- [ ] All filesystem operations work through FSKit interface
+- [ ] XPC/filesystem control operations functional
+- [ ] Extended attributes (xattrs) round-trip validated
+- [ ] Case sensitivity handling validated
+
+M10.9. Security and Robustness Testing (3–4d)
+
+- Implement security-focused tests including permission handling and vulnerability assessment
+- Test resistance to common filesystem attack vectors and malformed inputs
+- Validate sandboxing and privilege separation work correctly
+- Success criteria:
+  - No privilege escalation vulnerabilities in control plane operations
+  - Malformed inputs handled gracefully without crashes
+  - Proper permission checking enforced for all operations
+  - Sandbox boundaries maintained across all adapters
+
+Acceptance checklist (M10.9)
+
+- [ ] Security vulnerability assessment completed
+- [ ] Malformed input handling validated
+- [ ] Permission checking comprehensive
+- [ ] Sandbox boundaries enforced
+
 M11. Scenario, performance, and fault‑injection suites (4–7d)
 
 - Scenario tests for AW workflows (per [AgentFS-Core-Testing.md](AgentFS%20Core%20Testing.md)): multi‑process branches, repo tasks, discard/keep flows.
 - Criterion microbenchmarks; fsbench/fio macro tests; spill‑to‑disk stress; induced failures in `StorageBackend`.
+- Implement comprehensive stress testing using fs-stress, stress-filesystem, and CrashMonkey/ACE-like fault injection.
 - Success criteria:
   - Latency/throughput comparable to RAM memfs baselines; bounded degradation with spill enabled.
   - Fault injection does not violate core invariants; linearizable API boundaries maintained.
+  - Stress tests complete without filesystem corruption or crashes; crash consistency tests validate data integrity.
+  - Performance remains stable under high concurrency and large file operations; memory usage bounded.
 
 Acceptance checklist (M11)
 
 - [ ] S1 Branch-per-task scenario passes end-to-end
 - [ ] P1 microbenchmark baseline within target factors; thresholds documented
 - [ ] R1/R2 reliability plans pass (spill ENOSPC; crash safety)
+- [ ] fs-stress and stress-filesystem tools adapted and passing
+- [ ] Crash consistency testing validates data integrity
+- [ ] Performance stable under stress conditions; memory usage bounded
 
 M12. Packaging, docs, and stability gates (2–3d)
 
