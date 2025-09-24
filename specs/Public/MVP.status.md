@@ -558,7 +558,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 
 - **Verification Results**:
 
-  - [x] AW CLI Parameters: `aw sandbox` subcommand implemented with all specified CLI flags (`--type local`, `--allow-network`, `--allow-containers`, `--allow-kvm`, `--seccomp`, `--seccomp-debug`, `--mount-rw`, `--overlay`)
+  - [x] AW CLI Parameters: `aw agent sandbox` subcommand implemented with all specified CLI flags (`--type local`, `--allow-network`, `--allow-containers`, `--allow-kvm`, `--seccomp`, `--seccomp-debug`, `--mount-rw`, `--overlay`)
   - [x] FS Snapshot Pre-cloning: Implemented workspace preparation with ZFS/Btrfs/copy fallback logic using `prepare_workspace_with_fallback()` function
   - [x] AW Task Integration: Sandbox parameters added to `aw task` command with proper argument parsing and validation
   - [x] Basic Sandbox Configuration Mapping: `create_sandbox_from_args()` function maps CLI parameters to sandbox-core configuration
@@ -654,6 +654,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] Database migrations handle schema evolution per State-Persistence.md versioning
   - [ ] Task queries work correctly for listing operations using State-Persistence.md APIs
   - [ ] `AW_HOME` environment variable correctly overrides default configuration and database paths
+  - [ ] Unit tests verify high-level API provided by aw-local-db crate works as expected
   - [ ] Integration tests with temporary databases validate State-Persistence.md compliance
   - [ ] All state persistence integration tests use custom `AW_HOME` for environment isolation from user configuration
 
