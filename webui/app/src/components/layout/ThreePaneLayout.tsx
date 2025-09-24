@@ -11,17 +11,17 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
   return (
     <>
       {/* Left Pane - Repositories */}
-      <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div class="w-80 bg-white/70 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm flex flex-col overflow-hidden">
         <RepositoriesPane />
       </div>
 
       {/* Center Pane - Sessions Feed */}
-      <div class="flex-1 bg-white border-r border-gray-200 flex flex-col">
+      <div class="flex-1 bg-white/70 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm flex flex-col overflow-hidden">
         <SessionsPane selectedSessionId={props.selectedSessionId} />
       </div>
 
       {/* Right Pane - Task Details */}
-      <div class="w-96 bg-white flex flex-col">
+      <div class="w-96 bg-white/70 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm flex flex-col overflow-hidden">
         <TaskDetailsPane sessionId={props.selectedSessionId} />
       </div>
     </>

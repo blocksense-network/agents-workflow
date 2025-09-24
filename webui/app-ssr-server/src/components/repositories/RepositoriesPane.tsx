@@ -1,11 +1,54 @@
-import { Component } from "solid-js";
+import { Component, createSignal, For } from "solid-js";
+
+interface Repository {
+  id: string;
+  name: string;
+  branch: string;
+  lastCommit: string;
+}
 
 interface RepositoriesPaneProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  onRepositorySelect?: (repo: Repository) => void;
 }
 
+// Mock repository data for demo
+const mockRepositories: Repository[] = [
+  {
+    id: "1",
+    name: "agents-workflow-webui",
+    branch: "main",
+    lastCommit: "feat: Add real-time session updates"
+  },
+  {
+    id: "2",
+    name: "agents-workflow-core",
+    branch: "develop",
+    lastCommit: "refactor: Improve API error handling"
+  },
+  {
+    id: "3",
+    name: "agents-workflow-cli",
+    branch: "main",
+    lastCommit: "fix: Resolve path resolution issues"
+  },
+  {
+    id: "4",
+    name: "agents-workflow-docs",
+    branch: "main",
+    lastCommit: "docs: Update API documentation"
+  }
+];
+
 export const RepositoriesPane: Component<RepositoriesPaneProps> = (props) => {
+  const [selectedRepoId, setSelectedRepoId] = createSignal<string | null>(null);
+
+  const handleRepoSelect = (repo: Repository) => {
+    setSelectedRepoId(repo.id);
+    props.onRepositorySelect?.(repo);
+  };
+
   if (props.collapsed) {
     return (
       <div class="flex flex-col h-full">
@@ -75,14 +118,40 @@ export const RepositoriesPane: Component<RepositoriesPaneProps> = (props) => {
 
       <div class="flex-1 overflow-y-auto p-4">
         <div class="space-y-2">
-          <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div class="text-sm font-medium text-gray-900">
-              Loading repositories...
-            </div>
-            <div class="text-xs text-gray-500 mt-1">
-              This content will load with JavaScript enabled
-            </div>
-          </div>
+          <For each={mockRepositories}>
+            {(repo) => (
+              <div
+                class={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedRepoId() === repo.id
+                    ? "bg-blue-50 border-blue-200"
+                    : "bg-white border-gray-200 hover:bg-gray-50"
+                }`}
+                onClick={() => handleRepoSelect(repo)}
+              >
+                <div class="flex items-center space-x-2 mb-2">
+                  <div class="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-md flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M3 3h18v18H3V3zm16 16V5H5v14h14zM9 7h6v2H9V7zm0 4h6v2H9v-2zm0 4h4v2H9v-2z"/>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 truncate">
+                      {repo.name}
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-1 text-xs text-gray-500 mb-1">
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 6a1 1 0 011-1h8a1 1 0 011 1v1h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1h3V6zM6 8H4v10h16V8h-2v1a1 1 0 01-1 1H7a1 1 0 01-1-1V8zm2-2v1h8V6H8z"/>
+                  </svg>
+                  <span>{repo.branch}</span>
+                </div>
+                <div class="text-xs text-gray-600 truncate">
+                  {repo.lastCommit}
+                </div>
+              </div>
+            )}
+          </For>
         </div>
       </div>
     </div>

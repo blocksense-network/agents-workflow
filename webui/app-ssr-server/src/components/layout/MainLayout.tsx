@@ -1,4 +1,5 @@
 import { Component, createSignal } from "solid-js";
+import { A } from "@solidjs/router";
 
 interface MainLayoutProps {
   children: any;
@@ -67,7 +68,7 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
           </div>
 
           <nav class="flex items-center space-x-6">
-            <a
+            <A
               href="/"
               class={`text-sm font-medium transition-colors ${
                 isActive("/")
@@ -76,8 +77,8 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
               }`}
             >
               Dashboard
-            </a>
-            <a
+            </A>
+            <A
               href="/sessions"
               class={`text-sm font-medium transition-colors ${
                 isActive("/sessions")
@@ -86,8 +87,8 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
               }`}
             >
               Sessions
-            </a>
-            <a
+            </A>
+            <A
               href="/create"
               class={`text-sm font-medium transition-colors ${
                 isActive("/create")
@@ -96,8 +97,8 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
               }`}
             >
               Create Task
-            </a>
-            <a
+            </A>
+            <A
               href="/settings"
               class={`text-sm font-medium transition-colors ${
                 isActive("/settings")
@@ -106,7 +107,7 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
               }`}
             >
               Settings
-            </a>
+            </A>
           </nav>
         </div>
 

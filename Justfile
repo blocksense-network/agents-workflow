@@ -236,6 +236,14 @@ webui-format:
 webui-test:
     cd webui/e2e-tests && npm run test:e2e
 
+# Build WebUI SSR server
+webui-build-ssr:
+    cd webui/app-ssr-server && npm run build
+
+# Build WebUI client bundle
+webui-build-client:
+    cd webui/app-ssr-server && npm run build:client
+
 # Start WebUI with mock server for manual testing (cycles through 5 scenarios)
 webui-manual:
     ./scripts/webui-manual.sh
@@ -265,6 +273,7 @@ webui-check:
     just webui-lint
     just webui-type-check
     just webui-build
+    just webui-build-ssr
     just webui-build-mock
     just webui-test
 

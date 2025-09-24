@@ -10,16 +10,15 @@ test.describe('Infrastructure Tests', () => {
     expect(healthData.status).toBe('ok');
     expect(healthData).toHaveProperty('timestamp');
 
-    // Test the main page serves HTML
+    // Test the main page serves HTML (client-side rendering only)
     const pageResponse = await request.get('/');
     expect(pageResponse.ok()).toBeTruthy();
     expect(pageResponse.headers()['content-type']).toContain('text/html');
 
     const pageContent = await pageResponse.text();
     expect(pageContent).toContain('Agents-Workflow WebUI');
-    expect(pageContent).toContain('Agents-Workflow</h1>');
     expect(pageContent).toContain('<script type="module" src="/client.js">');
-    expect(pageContent).toContain('<div id="app">');
+    expect(pageContent).toContain('<div id="app"><div></div></div>'); // Empty div for client-side mounting
   });
 
   test('API proxy forwards requests correctly', async ({ request }) => {

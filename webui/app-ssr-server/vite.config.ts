@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ command, mode }) => {
   const isServer = mode === 'server';
 
   return {
-    plugins: [solidPlugin()],
+    plugins: [tailwindcss(), solidPlugin()],
     build: {
       outDir: isServer ? 'dist' : 'dist/public',
       rollupOptions: {

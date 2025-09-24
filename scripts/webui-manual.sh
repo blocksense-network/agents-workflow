@@ -9,12 +9,16 @@ echo "WebUI: http://localhost:3000"
 echo "Mock API: http://localhost:3001"
 echo ""
 
+# Build the client bundle first
+echo "Building client bundle..."
+cd webui/app-ssr-server && npm run build:client
+
 # Start mock server in background
-cd webui/mock-server && npm run dev &
+cd ../mock-server && npm run dev &
 MOCK_PID=$!
 
 # Start SSR server in background
-cd webui/app-ssr-server && npm run start &
+cd ../app-ssr-server && npm run start &
 SSR_PID=$!
 
 # Wait a moment for servers to start

@@ -6,6 +6,7 @@ import { TaskDetailsPane } from "../tasks/TaskDetailsPane.js";
 interface ThreePaneLayoutProps {
   selectedSessionId?: string;
   onSessionSelect?: (sessionId: string) => void;
+  onRepositorySelect?: (repo: { id: string; name: string; branch: string; lastCommit: string }) => void;
 }
 
 export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
@@ -67,6 +68,7 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
         <RepositoriesPane
           collapsed={repositoriesCollapsed()}
           onToggleCollapse={toggleRepositories}
+          onRepositorySelect={props.onRepositorySelect}
         />
       </div>
 

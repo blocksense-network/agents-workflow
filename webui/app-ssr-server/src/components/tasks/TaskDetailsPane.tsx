@@ -267,13 +267,22 @@ export const TaskDetailsPane: Component<TaskDetailsPaneProps> = (props) => {
 
   return (
     <div class="flex flex-col h-full">
-      <div class="p-4 border-b border-gray-200">
-        <h2 class="text-lg font-semibold text-gray-900">Task Details</h2>
-        <p class="text-sm text-gray-600 mt-1">
-          {props.sessionId
-            ? `Session ${props.sessionId.slice(-8)}`
-            : "Select a session to view details"}
-        </p>
+      <div class="p-6 border-b border-slate-200/50">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Task Details</h2>
+            <p class="text-sm text-slate-500 mt-0.5">
+              {props.sessionId
+                ? `Session ${props.sessionId.slice(-8)}`
+                : "Select a session to view details"}
+            </p>
+          </div>
+        </div>
 
         {/* Session actions */}
         <Show when={session()}>
