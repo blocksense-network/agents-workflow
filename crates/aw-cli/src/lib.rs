@@ -29,11 +29,6 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: AgentCommands,
     },
-    /// Sandbox commands
-    Sandbox {
-        #[command(subcommand)]
-        subcommand: sandbox::SandboxCommands,
-    },
 }
 
 #[derive(Subcommand)]
@@ -43,4 +38,6 @@ pub enum AgentCommands {
         #[command(subcommand)]
         subcommand: agent::fs::AgentFsCommands,
     },
+    /// Run a command in a local sandbox
+    Sandbox(sandbox::SandboxRunArgs),
 }

@@ -1,16 +1,9 @@
 use std::path::PathBuf;
-use clap::{Args, Subcommand};
+use clap::Args;
 use anyhow::{Result, Context};
-use aw_fs_snapshots::{provider_for, WorkingCopyMode, FsSnapshotProvider, PreparedWorkspace};
+use aw_fs_snapshots::{WorkingCopyMode, FsSnapshotProvider, PreparedWorkspace};
 
 use sandbox_core::Sandbox;
-
-/// Sandbox-related commands
-#[derive(Subcommand)]
-pub enum SandboxCommands {
-    /// Run a command in a local sandbox
-    Run(SandboxRunArgs),
-}
 
 /// Arguments for running a command in a sandbox
 #[derive(Args)]
@@ -50,15 +43,6 @@ pub struct SandboxRunArgs {
     /// Command and arguments to run in the sandbox
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub command: Vec<String>,
-}
-
-impl SandboxCommands {
-    /// Execute the sandbox command
-    pub async fn run(self) -> Result<()> {
-        match self {
-            SandboxCommands::Run(args) => args.run().await,
-        }
-    }
 }
 
 impl SandboxRunArgs {

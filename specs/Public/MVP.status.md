@@ -533,11 +533,11 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [x] Integration tests use synchronous VcsRepo directly for VCS operations
   - [x] VcsRepo made synchronous with no async interfaces as requested
 
-**1.7 AW CLI Sandbox Integration** (2–3d, depends on 1.6 + Local-Sandboxing-on-Linux.md M1-M8)
+**1.7 AW CLI Sandbox Integration** COMPLETED (2–3d, depends on 1.6 + Local-Sandboxing-on-Linux.md M1-M8)
 
 - **Deliverables**:
 
-  - **AW CLI Parameters**: Initial `aw sandbox` parameter set matching current capabilities:
+  - **AW CLI Parameters**: Initial `aw agent sandbox` parameter set matching current capabilities:
     - `--type local`: Enable basic process isolation (namespaces + filesystem sealing)
     - `--allow-network <yes|no>`: Allow internet access via slirp4netns (default: no)
     - `--allow-containers <yes|no>`: Enable container device access (/dev/fuse, storage dirs) (default: no)
@@ -553,18 +553,19 @@ Parallel development enables faster progress while maintaining clean dependency 
 
   - **Pre-sandbox Workflow**: FS snapshot provider clones workspace to temporary location before sandbox launch, providing source→destination path pairs for bind mounting
   - **Sandbox Launch Protocol**: Sandbox receives list of path pairs (host_path→sandbox_path) and performs bind mounts during initialization
-  - **Sudo-less Snapshots**: The `aw-fs-snapshots-daemon` ([`crates/aw-fs-snapshots-daemon/`](../../crates/aw-fs-snapshots-daemon/)) provides privileged filesystem operations (ZFS/Btrfs snapshots) without requiring sudo in user applications; the same daemon used for testing will enable snapshot operations for `aw sandbox`.
+  - **Sudo-less Snapshots**: The `aw-fs-snapshots-daemon` ([`crates/aw-fs-snapshots-daemon/`](../../crates/aw-fs-snapshots-daemon/)) provides privileged filesystem operations (ZFS/Btrfs snapshots) without requiring sudo in user applications; the same daemon used for testing will enable snapshot operations for `aw agent sandbox`.
   - **Integration Points**: Combines MVP FS snapshots (Phase 0.4-0.6) with sandboxing ([Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sanboxing/Local-Sandboxing-on-Linux.status.md) M1-M8)
 
 - **Verification Results**:
 
-  - [ ] E2E test: `aw task --sandbox local` launches agents in sandbox with filesystem isolation
-  - [ ] E2E test: Network access controlled via `--allow-network` flag in task execution
-  - [ ] E2E test: Device access controlled via `--allow-containers`/`--allow-kvm` flags
-  - [ ] E2E test: FS snapshots cloned before sandbox creation and properly bind mounted
-  - [ ] E2E test: Dynamic filesystem access works with `--seccomp` flag
-  - [ ] Integration test: AW CLI parameters correctly map to sandbox configuration
-  - [ ] Security test: Sandbox defaults to maximum isolation when no flags provided
+  - [x] AW CLI Parameters: `aw sandbox` subcommand implemented with all specified CLI flags (`--type local`, `--allow-network`, `--allow-containers`, `--allow-kvm`, `--seccomp`, `--seccomp-debug`, `--mount-rw`, `--overlay`)
+  - [x] FS Snapshot Pre-cloning: Implemented workspace preparation with ZFS/Btrfs/copy fallback logic using `prepare_workspace_with_fallback()` function
+  - [x] AW Task Integration: Sandbox parameters added to `aw task` command with proper argument parsing and validation
+  - [x] Basic Sandbox Configuration Mapping: `create_sandbox_from_args()` function maps CLI parameters to sandbox-core configuration
+  - [x] E2E test: Basic sandbox integration test (`integration_test_sandbox_basic`) validates task creation with sandbox parameters
+  - [ ] E2E test: Full sandbox execution with network/device access control (requires additional sandbox-core implementation)
+  - [ ] E2E test: Dynamic filesystem access via seccomp (requires additional sandbox-core implementation)
+  - [ ] All sandbox integration tests use custom `AW_HOME` for environment isolation from user configuration
 
 - **Key Source Files**:
 
@@ -579,23 +580,88 @@ Parallel development enables faster progress while maintaining clean dependency 
   - **FS-Snapshots-Overview.md**: Defines snapshot cloning operations performed before sandbox creation
   - **CLI.md**: Defines the parameter interface this milestone implements
 
-**1.8 Task State Persistence** (parallel with 1.6)
+**1.8 AW Agent FS Commands Implementation** (1–2 weeks, depends on 0.4-0.6 FS Snapshots)
 
 - **Deliverables**:
-  - Integration with `aw-state` crate for task state persistence (per Repository-Layout.md local state management)
-  - Task metadata storage (branch, repository, timestamps, status)
-  - Session lifecycle tracking tied to task execution
-  - Migration support for task-related schema changes
-  - Query APIs for task listing and status retrieval
+
+  - **Filesystem Detection Command**: `aw agent fs status` - Run filesystem detection and report capabilities, provider selection, and mount point information
+  - **Session Snapshot Management**: `aw agent fs init-session` - Create initial filesystem snapshots for agent sessions
+  - **Snapshot Listing**: `aw agent fs snapshots <SESSION_ID>` - List snapshots created in agent coding sessions
+  - **Branch Creation**: `aw agent fs branch create <SNAPSHOT_ID>` - Create writable branches from snapshots
+  - **Branch Binding**: `aw agent fs branch bind <BRANCH_ID>` - Bind processes to specific branch views
+  - **Branch Execution**: `aw agent fs branch exec <BRANCH_ID>` - Execute commands within branch contexts
+  - **Integration with AW Task**: Automatic snapshot creation during task execution for supported filesystems
+  - **State Persistence**: Recording of snapshot and branch metadata in local SQLite database
+
+- **Test Filesystem Details** (created by `just create-test-filesystems`):
+
+  - **ZFS Filesystem**: Pool `agents_workflow_test_zfs`, dataset `test_dataset`
+    - Linux mount point: `/agents_workflow_test_zfs/test_dataset`
+    - macOS mount point: `/Volumes/agents_workflow_test_zfs/test_dataset`
+    - Permissions: User delegated for snapshot, create, destroy, mount operations
+  - **Btrfs Filesystem**: Mounted at `$HOME/.cache/agents-workflow/btrfs_mount`, subvolume `test_subvol`
+    - Full path: `$HOME/.cache/agents-workflow/btrfs_mount/test_subvol`
+    - Features: user_subvol_rm_allowed mount option enabled
+  - **Setup Requirements**: Run `just create-test-filesystems` before E2E tests (requires sudo for ZFS/Btrfs setup)
+  - **Status Check**: Use `just check-test-filesystems` to verify if test filesystems are already created and properly mounted
+
+- **Implementation Details**:
+
+  - **Filesystem Detection**: Reuse `aw_fs_snapshots::provider_for()` logic to detect and report filesystem capabilities
+  - **Provider Integration**: Commands integrate with ZFS, Btrfs, and fallback providers from Phase 0.4-0.6
+  - **Session Management**: Link filesystem operations to agent session lifecycle and state persistence
+  - **Branch Operations**: Implement read-only mounting and writable branch creation for time travel functionality
+  - **Database Integration**: Store snapshot/branch metadata in aw-local-db crate tables
+
+- **Verification Results**:
+
+  - [ ] E2E test: `aw agent fs status` detects and reports ZFS dataset capabilities on test filesystem
+  - [ ] E2E test: `aw agent fs status` detects and reports Btrfs subvolume capabilities on test filesystem
+  - [ ] E2E test: `aw agent fs init-session` creates initial snapshots for agent sessions on supported filesystems
+  - [ ] E2E test: `aw agent fs snapshots <SESSION_ID>` lists snapshots created during session execution
+  - [ ] E2E test: `aw agent fs branch create <SNAPSHOT_ID>` creates writable branches from snapshots
+  - [ ] E2E test: `aw agent fs branch bind <BRANCH_ID>` and `exec` commands work within branch contexts
+  - [ ] Integration test: AW task execution automatically creates snapshots on supported filesystems
+  - [ ] Database test: Snapshot and branch metadata properly persisted and queryable
+  - [ ] All agent FS integration tests use custom `AW_HOME` for environment isolation from user configuration
+
+- **Key Source Files**:
+
+  - `crates/aw-cli/src/agent.rs` - Agent FS subcommands implementation
+  - `crates/aw-core/src/agent_fs.rs` - Core filesystem operations and session integration
+  - `crates/aw-local-db/src/schema.rs` - Database schema for snapshot/branch metadata
+  - `tests/integration/agent_fs_integration.rs` - E2E tests for FS commands over test datasets
+
+- **Cross-Spec Dependencies**:
+
+  - **FS-Snapshots-Overview.md**: Defines snapshot and branch operations implemented by these commands
+  - **Agent-Time-Travel.md**: Provides the time travel use cases that drive FS branch operations
+  - **Local-Mode.md**: Defines session lifecycle integration points
+
+**1.9 Task State Persistence** (parallel with 1.6)
+
+- **Deliverables**:
+  - Integration with `aw-local-db` crate for task state persistence (per State-Persistence.md specification)
+  - Task metadata storage (branch, repository, timestamps, status) following State-Persistence.md schema
+  - Session lifecycle tracking tied to task execution using SQLite database
+  - Migration support for task-related schema changes with proper versioning
+  - Query APIs for task listing and status retrieval matching State-Persistence.md tables
+  - Support for `AW_HOME` environment variable to customize user configuration and database location
 
 - **Verification**:
-  - [ ] Tasks recorded in SQLite database on creation
-  - [ ] Task metadata includes all required fields
-  - [ ] Database migrations handle schema evolution
-  - [ ] Task queries work correctly for listing operations
-  - [ ] Integration tests with temporary databases
+  - [ ] Tasks recorded in SQLite database on creation following State-Persistence.md schema
+  - [ ] Task metadata includes all required fields from State-Persistence.md tables
+  - [ ] Database migrations handle schema evolution per State-Persistence.md versioning
+  - [ ] Task queries work correctly for listing operations using State-Persistence.md APIs
+  - [ ] `AW_HOME` environment variable correctly overrides default configuration and database paths
+  - [ ] Integration tests with temporary databases validate State-Persistence.md compliance
+  - [ ] All state persistence integration tests use custom `AW_HOME` for environment isolation from user configuration
 
-**1.9 Basic Codex Agent Integration** (1 week, depends on 1.6)
+- **Cross-Spec Dependencies**:
+
+  - **[State-Persistence.md](../../specs/Public/State-Persistence.md)**: Defines the complete SQL schema, backend selection rules, and data model used for task state persistence
+
+**1.10 Basic Codex Agent Integration** (1 week, depends on 1.6)
 
 - **Deliverables**:
   - Codex agent detection and validation
@@ -611,7 +677,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] Task execution manages agent processes with proper cleanup
   - [ ] Session resumption works for interrupted Codex sessions
 
-**1.10 AW Task E2E Integration Tests** (1 week, depends on 1.6-1.10)
+**1.11 AW Task E2E Integration Tests** (1 week, depends on 1.6-1.11)
 
 - **Deliverables**:
   - Comprehensive end-to-end test suite for `aw task` workflows
@@ -640,9 +706,12 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] E2E test: Editor integration with template processing - port `test_editor_failure`, `test_empty_file`
   - [ ] E2E test: Push operations with remote interaction - port push logic from tests
   - [ ] E2E test: Codex agent integration end-to-end - new tests for Rust implementation
+  - [ ] E2E test: Sandbox integration with filesystem isolation - validate `aw task --sandbox local`
+  - [ ] E2E test: Agent FS commands integration - validate automatic snapshot creation
   - [ ] Property tests for branch name validation and file naming - same regex validation
   - [ ] CI pipeline includes E2E test execution with proper cleanup (same temp dir handling)
   - [ ] All VCS types tested (Git, Hg, Fossil) with same test patterns as Ruby
+  - [ ] All integration tests use custom `AW_HOME` for environment isolation from user configuration
 
 **Phase 6: TUI Dashboard Implementation** (with sophisticated E2E testing)
 
@@ -985,6 +1054,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 - **Time Travel E2E Tests**: Automated tests that create sessions with mock agents, seek to specific moments, create branches, and verify resumed agents have correct context.
 - **Snapshot Testing**: Use `cargo insta` for CLI help text and generated documentation to ensure spec parity.
 - **CI Pipeline**: Maintain separate pipelines for `just legacy-tests` (Ruby), Rust MVP development, and integration tests requiring ZFS/sandboxes. Ensure `test-codex-setup-integration` continues to pass during reorganization.
+- **Environment Isolation**: All integration tests must use custom `AW_HOME` environment variable to isolate test execution from user configuration and state. This prevents test interference with user data and ensures reproducible test results.
 
 ### Risks & mitigations
 

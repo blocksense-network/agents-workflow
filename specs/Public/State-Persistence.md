@@ -23,8 +23,11 @@ All behavior follows standard configuration layering (CLI flags > env > projectâ
   - Linux: `${XDG_STATE_HOME:-~/.local/state}/agents-workflow/state.db`
   - macOS: `~/Library/Application Support/Agents-Workflow/state.db`
   - Windows: `%LOCALAPPDATA%\Agents-Workflow\state.db`
+  - Custom (when `AW_HOME` is set): `$AW_HOME/state.db`
 
 SQLite is opened in WAL mode. The CLI manages `PRAGMA user_version` for migrations (see Schema Versioning).
+
+The `AW_HOME` environment variable can override the default database location. When set, the database file is located at `$AW_HOME/state.db` instead of the platform-specific default path (see [Configuration.md](Configuration.md)).
 
 ## Relationship to Prior Drafts
 

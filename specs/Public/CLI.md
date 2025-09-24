@@ -1087,7 +1087,7 @@ OPTIONS:
 
 BEHAVIOR:
 
-The `aw sandbox` command provides a seamless workflow for launching the TUI dashboard within a sandboxed environment with automatic filesystem snapshot management.
+The `aw agent sandbox` command provides a seamless workflow for launching the TUI dashboard within a sandboxed environment with automatic filesystem snapshot management.
 
 **Filesystem Detection and Snapshot Strategy:**
 
@@ -1215,6 +1215,30 @@ aw agent relay socks5 --session <ID> --bind <ADDRESS:PORT>
 Start a client-side CONNECT relay for this session (multi-hop across access points).
 
 ```
+aw agent fs status [OPTIONS]
+
+DESCRIPTION: Run filesystem detection and report capabilities, provider selection,
+             and mount point information for the current working directory or specified path.
+
+OPTIONS:
+  --path <PATH>               Path to analyze (default: current working directory)
+  --json                      Emit machine-readable JSON output
+  --verbose                   Include detailed capability information
+  --detect-only               Only perform detection without provider selection
+
+ARGUMENTS:
+  PATH                        Optional path to analyze filesystem capabilities
+```
+
+Behavior:
+
+- **Filesystem Detection**: Analyzes the filesystem type and capabilities at the specified path using the same logic as `aw_fs_snapshots::provider_for()`
+- **Provider Selection**: Reports which snapshot provider would be selected (ZFS, Btrfs, AgentFS, Git, or Copy fallback)
+- **Capability Reporting**: Shows supported operations like snapshot creation, branch creation, and time travel features
+- **Mount Point Info**: Displays mount point details, dataset names, and filesystem-specific metadata
+- **JSON Output**: Structured output for programmatic use including provider scores and capability flags
+
+```
 aw agent followers accept-connections --session <ID> [OPTIONS]
 
 DESCRIPTION: Initiate and wait for follower acks; prints per-host status.
@@ -1310,6 +1334,7 @@ ARGUMENTS:
 ```
 
 - Filesystem (AgentFS) snapshot/branch utilities:
+  - `aw agent fs status [OPTIONS]` — Run filesystem detection and report capabilities, provider selection, and mount point information.
   - `aw agent fs init-session [--name <NAME>] [--repo <name|path>] [--workspace <name>]` — Create an initial AgentFS snapshot on a mounted volume from the current state of the working copy.
   - `aw agent fs snapshots <SESSION_ID>` — List snapshots created in a particular agent coding session.
   - `aw agent fs branch create <SNAPSHOT_ID> [--name <NAME>]` — Create a writable branch from a snapshot.

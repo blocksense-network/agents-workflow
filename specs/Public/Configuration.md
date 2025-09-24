@@ -20,10 +20,13 @@ Layered configuration supports system, user, repo, and repo-user scopes. Values 
   - Linux: `$XDG_CONFIG_HOME/agents-workflow/config.toml` or `$HOME/.config/agents-workflow/config.toml`
   - macOS: `$HOME/Library/Application Support/agents-workflow/config.toml`
   - Windows: `%APPDATA%/Agents-Workflow/config.toml` (precedence is given to `~/.config` when both exist as noted below)
+  - Custom (when `AW_HOME` is set): `$AW_HOME/config.toml`
 - Repo: `<repo>/.agents/config.toml`
 - Repo‑user: `<repo>/.agents/config.user.toml` (ignored by VCS; add to `.gitignore`)
 
 Paths are illustrative; the CLI prints the exact search order in `aw config --explain` and logs them at debug level.
+
+The `AW_HOME` environment variable can override the default user configuration and data directory locations. When set, it changes the user configuration file to `$AW_HOME/config.toml` and the local SQLite database to `$AW_HOME/state.db` (see [State-Persistence.md](State-Persistence.md)).
 
 ### Admin‑enforced values
 

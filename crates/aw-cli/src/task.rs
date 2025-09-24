@@ -182,7 +182,7 @@ impl TaskCreateArgs {
 
         // Validate and prepare sandbox if requested
         let sandbox_workspace = if self.sandbox != "none" {
-            Some(self.validate_and_prepare_sandbox().await?)
+            Some(validate_and_prepare_sandbox(&self).await?)
         } else {
             None
         };
@@ -304,33 +304,6 @@ impl TaskCreateArgs {
             .output();
     }
 
-    /// Validate sandbox parameters and prepare workspace if sandbox is enabled
-    async fn validate_and_prepare_sandbox(&self) -> Result<PreparedWorkspace> {
-        // Validate sandbox type
-        if self.sandbox != "local" {
-            anyhow::bail!("Error: Only 'local' sandbox type is currently supported");
-        }
-
-        // Parse boolean flags
-        let _allow_network = parse_bool_flag(&self.allow_network)
-            .context("Invalid --allow-network value")?;
-        let _allow_containers = parse_bool_flag(&self.allow_containers)
-            .context("Invalid --allow-containers value")?;
-        let _allow_kvm = parse_bool_flag(&self.allow_kvm)
-            .context("Invalid --allow-kvm value")?;
-        let _seccomp = parse_bool_flag(&self.seccomp)
-            .context("Invalid --seccomp value")?;
-        let _seccomp_debug = parse_bool_flag(&self.seccomp_debug)
-            .context("Invalid --seccomp-debug value")?;
-
-        // Get current working directory as the workspace to snapshot
-        let workspace_path = std::env::current_dir()
-            .context("Failed to get current working directory")?;
-
-        // Prepare writable workspace using FS snapshots
-        prepare_workspace_with_fallback(&workspace_path).await
-            .context("Failed to prepare sandbox workspace")
-    }
 }
 
 #[cfg(test)]
@@ -372,8 +345,17 @@ mod tests {
             branch: Some("feature-branch".to_string()),
             prompt: Some("Implement feature X".to_string()),
             prompt_file: None,
+            
             devshell: Some("dev".to_string()),
             push_to_remote: Some("yes".to_string()),
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
             non_interactive: true,
             sandbox: "none".to_string(),
             allow_network: "no".to_string(),
@@ -402,8 +384,11 @@ mod tests {
             branch: Some("test-branch".to_string()),
             prompt: Some("Test task content".to_string()),
             prompt_file: None,
+            
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -424,9 +409,12 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
+            
             prompt_file: Some(file_path), // Use absolute path
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -445,7 +433,9 @@ mod tests {
             prompt: Some("prompt".to_string()),
             prompt_file: Some("file.txt".into()),
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -462,9 +452,12 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
+            
             prompt_file: Some(temp_dir.path().join("nonexistent.txt")),
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -480,9 +473,13 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
+            
             prompt_file: None,
+            
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -496,9 +493,13 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
+            
             prompt_file: None,
+            
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -557,8 +558,10 @@ mod tests {
             branch: Some("test-branch".to_string()),
             prompt: Some("test".to_string()),
             prompt_file: None,
+            
             devshell: Some("custom".to_string()),
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -621,9 +624,13 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
+            
             prompt_file: None,
+            
             devshell: None,
+            
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -640,8 +647,10 @@ mod tests {
             branch: None, // No branch means append to existing
             prompt: Some("test".to_string()),
             prompt_file: None,
+            
             devshell: Some("custom".to_string()),
             push_to_remote: None,
+            
             non_interactive: true,
         };
 
@@ -727,6 +736,7 @@ mod tests {
         prompt_file: Option<&std::path::Path>,
         push_to_remote: Option<bool>,
         devshell: Option<&str>,
+        sandbox: Option<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>)>, // (type, allow_network, allow_containers, allow_kvm, seccomp)
         editor_lines: Vec<&str>,
         editor_exit_code: i32,
     ) -> Result<(std::process::ExitStatus, String, bool)> {
@@ -811,6 +821,23 @@ exit {}
             cmd.arg("--push-to-remote").arg("true"); // Default to true for testing
         }
 
+        // Add sandbox parameters
+        if let Some((sandbox_type, allow_network, allow_containers, allow_kvm, seccomp)) = sandbox {
+            cmd.arg("--sandbox").arg(sandbox_type);
+            if let Some(network) = allow_network {
+                cmd.arg("--allow-network").arg(network);
+            }
+            if let Some(containers) = allow_containers {
+                cmd.arg("--allow-containers").arg(containers);
+            }
+            if let Some(kvm) = allow_kvm {
+                cmd.arg("--allow-kvm").arg(kvm);
+            }
+            if let Some(seccomp_val) = seccomp {
+                cmd.arg("--seccomp").arg(seccomp_val);
+            }
+        }
+
         let output = cmd.output()?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -881,8 +908,12 @@ exit {}
             "feature",
             Some("task"), // Use prompt instead of editor
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            
+            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -905,8 +936,12 @@ exit {}
             "p1",
             Some("prompt text"),
             None,
+            
             Some(true), // Push to remote
             None,
+            
+            
+            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -933,9 +968,13 @@ exit {}
             repo_dir.path(),
             "pf1",
             None,
+            
             Some(&prompt_file),
             Some(true), // Push to remote
             None,
+            
+            
+            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -960,9 +999,13 @@ exit {}
             repo_dir.path(),
             "bad",
             None,
+            
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // Empty editor content
             1, // Editor fails
         )?;
@@ -987,9 +1030,12 @@ exit {}
             repo_dir.path(),
             "empty",
             None,
+            
             Some(&prompt_file),
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1025,8 +1071,11 @@ exit {}
             "s1",
             Some("task"), // Use prompt instead of editor
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1070,8 +1119,11 @@ exit {}
             "s2",
             Some("task"), // Use prompt instead of editor
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1115,8 +1167,10 @@ exit {}
             "ds1",
             Some("task"),
             None,
+            
             Some(false), // Don't push to remote
             Some("custom"),
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1150,8 +1204,10 @@ exit {}
             "ds2",
             Some("task"),
             None,
+            
             Some(false), // Don't push to remote
             Some("missing"),
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1173,8 +1229,10 @@ exit {}
             "ds3",
             Some("task"),
             None,
+            
             Some(false), // Don't push to remote
             Some("any"),
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1196,8 +1254,11 @@ exit {}
             "poe",
             Some("   \n\t  "), // Empty/whitespace prompt
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1222,9 +1283,12 @@ exit {}
             repo_dir.path(),
             "pfe",
             None,
+            
             Some(&prompt_file),
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec![], // No editor needed
             0,
         )?;
@@ -1245,9 +1309,13 @@ exit {}
             repo_dir.path(),
             "inv@lid name", // Invalid branch name
             None,
+            
             None,
+            
             Some(false), // Don't push to remote
             None,
+            
+            None, // No sandbox
             vec!["task"], // Editor content
             0,
         )?;
@@ -1260,31 +1328,132 @@ exit {}
         Ok(())
     }
 
-    /// Validate sandbox parameters and prepare workspace if sandbox is enabled
-    async fn validate_and_prepare_sandbox(&self) -> Result<PreparedWorkspace> {
-        // Validate sandbox type
-        if self.sandbox != "local" {
-            anyhow::bail!("Error: Only 'local' sandbox type is currently supported");
-        }
+    #[test]
+    fn integration_test_sandbox_basic() -> Result<()> {
+        let (_temp_home, repo_dir, remote_dir) = setup_git_repo_integration()?;
 
-        // Parse boolean flags
-        let _allow_network = parse_bool_flag(&self.allow_network)
-            .context("Invalid --allow-network value")?;
-        let _allow_containers = parse_bool_flag(&self.allow_containers)
-            .context("Invalid --allow-containers value")?;
-        let _allow_kvm = parse_bool_flag(&self.allow_kvm)
-            .context("Invalid --allow-kvm value")?;
-        let _seccomp = parse_bool_flag(&self.seccomp)
-            .context("Invalid --seccomp value")?;
-        let _seccomp_debug = parse_bool_flag(&self.seccomp_debug)
-            .context("Invalid --seccomp-debug value")?;
+        let (status, _output, _editor_called) = run_aw_task_create_integration(
+            repo_dir.path(),
+            "sandbox-test",
+            Some("Test task with sandbox"),
+            None,
+            Some(false), // Don't push to remote
+            None,
+            Some(("local", None, None, None, None)), // Basic sandbox without extra features
+            None, // No sandbox
+            vec![], // No editor content needed
+            0,
+        )?;
 
-        // Get current working directory as the workspace to snapshot
-        let workspace_path = std::env::current_dir()
-            .context("Failed to get current working directory")?;
+        // Should succeed
+        assert!(status.success());
 
-        // Prepare writable workspace using FS snapshots
-        prepare_workspace_with_fallback(&workspace_path).await
-            .context("Failed to prepare sandbox workspace")
+        // Verify task branch was created
+        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-test", false)?;
+
+        Ok(())
     }
+
+    #[test]
+    fn integration_test_sandbox_with_network() -> Result<()> {
+        let (_temp_home, repo_dir, remote_dir) = setup_git_repo_integration()?;
+
+        let (status, _output, _editor_called) = run_aw_task_create_integration(
+            repo_dir.path(),
+            "sandbox-net",
+            Some("Test task with network access"),
+            None,
+            Some(false), // Don't push to remote
+            None,
+            Some(("local", Some("yes"), None, None, None)), // Sandbox with network access
+            None, // No sandbox
+            vec![], // No editor content needed
+            0,
+        )?;
+
+        // Should succeed
+        assert!(status.success());
+
+        // Verify task branch was created
+        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-net", false)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn integration_test_sandbox_with_seccomp() -> Result<()> {
+        let (_temp_home, repo_dir, remote_dir) = setup_git_repo_integration()?;
+
+        let (status, _output, _editor_called) = run_aw_task_create_integration(
+            repo_dir.path(),
+            "sandbox-seccomp",
+            Some("Test task with seccomp"),
+            None,
+            Some(false), // Don't push to remote
+            None,
+            Some(("local", None, None, None, Some("yes"))), // Sandbox with seccomp
+            None, // No sandbox
+            vec![], // No editor content needed
+            0,
+        )?;
+
+        // Should succeed
+        assert!(status.success());
+
+        // Verify task branch was created
+        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-seccomp", false)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn integration_test_sandbox_invalid_type() -> Result<()> {
+        let (_temp_home, repo_dir, _remote_dir) = setup_git_repo_integration()?;
+
+        let (status, _output, _editor_called) = run_aw_task_create_integration(
+            repo_dir.path(),
+            "sandbox-invalid",
+            Some("Test task with invalid sandbox"),
+            None,
+            Some(false), // Don't push to remote
+            None,
+            Some(("invalid", None, None, None, None)), // Invalid sandbox type
+            None, // No sandbox
+            vec![], // No editor content needed
+            0,
+        )?;
+
+        // Should fail due to invalid sandbox type
+        assert!(!status.success());
+
+        Ok(())
+    }
+}
+
+/// Validate sandbox parameters and prepare workspace if sandbox is enabled
+async fn validate_and_prepare_sandbox(args: &TaskCreateArgs) -> Result<PreparedWorkspace> {
+    // Validate sandbox type
+    if args.sandbox != "local" {
+        anyhow::bail!("Error: Only 'local' sandbox type is currently supported");
+    }
+
+    // Parse boolean flags
+    let _allow_network = parse_bool_flag(&args.allow_network)
+        .context("Invalid --allow-network value")?;
+    let _allow_containers = parse_bool_flag(&args.allow_containers)
+        .context("Invalid --allow-containers value")?;
+    let _allow_kvm = parse_bool_flag(&args.allow_kvm)
+        .context("Invalid --allow-kvm value")?;
+    let _seccomp = parse_bool_flag(&args.seccomp)
+        .context("Invalid --seccomp value")?;
+    let _seccomp_debug = parse_bool_flag(&args.seccomp_debug)
+        .context("Invalid --seccomp-debug value")?;
+
+    // Get current working directory as the workspace to snapshot
+    let workspace_path = std::env::current_dir()
+        .context("Failed to get current working directory")?;
+
+    // Prepare writable workspace using FS snapshots
+    prepare_workspace_with_fallback(&workspace_path).await
+        .context("Failed to prepare sandbox workspace")
 }
