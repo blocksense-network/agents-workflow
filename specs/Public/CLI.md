@@ -1072,7 +1072,7 @@ aw agent sandbox [OPTIONS] -- <CMD> [ARGS...]
 DESCRIPTION: Launches a process inside the configured sandbox profile. Useful for testing.
 
 OPTIONS:
-  --sandbox <local|devcontainer|vm>  Sandbox profile (default: local).
+  --type <local|devcontainer|vm>  Sandbox profile (default: local).
   --allow-egress <yes|no>        Override default egress policy (default: no).
   --allow-ingress <PORT[/PROTO]> Allow inbound tunnels on specific ports (repeatable).
   --allow-containers <yes|no>    Permit launching nested containers (default: no).
@@ -1084,6 +1084,48 @@ OPTIONS:
   --env <KEY=VALUE>...           Inject environment variables (filtered against policy).
   --timeout <DURATION>           Auto-terminate sandbox after wall clock timeout.
 ```
+
+BEHAVIOR:
+
+The `aw sandbox` command provides a seamless workflow for launching the TUI dashboard within a sandboxed environment with automatic filesystem snapshot management.
+
+**Filesystem Detection and Snapshot Strategy:**
+
+1. **Repository Detection**: First detects the VCS repository root by walking parent directories from the current working directory, supporting Git, Mercurial, Bazaar, and Fossil repositories.
+
+2. **Filesystem Provider Auto-Detection**: Analyzes the detected repository's filesystem type and capabilities:
+   - **ZFS**: Uses CoW (Copy-on-Write) overlay mode with snapshots and clones via the `aw-fs-snapshots-daemon`
+   - **Btrfs**: Uses CoW overlay mode with subvolume snapshots
+   - **Other filesystems**: Exits with an error.
+
+3. **Pre-Sandbox Snapshot Creation**: Before entering the sandbox, creates filesystem snapshots/clones to preserve the current workspace state:
+   - ZFS: Creates snapshots and clones using privileged daemon operations
+   - Btrfs: Creates subvolume snapshots
+   - Provides source→destination path pairs for bind mounting
+
+**Sandbox Entry and TUI Launch:**
+
+4. **Sandbox Environment Setup**: Launches the process within the configured sandbox profile:
+   - **Namespace isolation**: User, mount, PID, UTS, IPC, and time namespaces
+   - **Filesystem controls**: Bind mounts the pre-created snapshots, applies read-only sealing, and sets up overlay filesystems
+   - **Network isolation**: Loopback-only by default with optional slirp4netns integration
+   - **Resource limits**: Cgroups v2 controls for memory, CPU, PID limits
+   - **Device access**: Controlled access to `/dev/fuse`, `/dev/kvm` based on flags
+
+5. **TUI Dashboard Launch**: Within the sandboxed environment, automatically launches the TUI dashboard ([TUI-PRD.md](../TUI-PRD.md)) with:
+   - **Auto-multiplexer attach**: Detects and attaches to tmux/zellij/screen sessions
+   - **Project/Branch/Agent selectors**: Pre-populated with repository and agent information
+   - **Integrated workflow**: Task creation and monitoring within the isolated environment
+   - **Filesystem isolation**: All operations work within the snapshotted workspace
+
+**Integration Points:**
+
+- **FS Snapshots**: Leverages the `aw-fs-snapshots-daemon` for sudo-less privileged operations
+- **Sandbox Core**: Uses Linux sandboxing implementation from [Local-Sandboxing-on-Linux.status.md](../Sanboxing/Local-Sandboxing-on-Linux.status.md)
+- **TUI Dashboard**: Provides the interactive interface described in [TUI-PRD.md](../TUI-PRD.md)
+- **Security Model**: Maximum isolation by default with explicit opt-in for additional capabilities
+
+This command enables safe experimentation with agent workflows while preserving the host filesystem state through automatic snapshot management.
 
 TODO: Verify that these align with everything described in [Sandbox-Profiles.md](Sandbox-Profiles.md)
 

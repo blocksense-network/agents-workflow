@@ -265,15 +265,15 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 
 **Phase 1: Core Functionality** (with parallel VCS/task implementation tracks)
 
-Phase 1 focuses on implementing the core `aw task` command in local mode with Codex support, recreating the behaviors of the legacy Ruby `agent-task` command. The CLI will be implemented in the `aw-cli` crate (per Repository-Layout.md) with Clap subcommands and TUI glue. Development proceeds through 9 granular milestones with automated testing at each step, starting with VCS abstraction and task file management, then building up to full CLI integration and agent execution.
+Phase 1 focuses on implementing the core `aw task` command in local mode with Codex support, recreating the behaviors of the legacy Ruby `agent-task` command. The CLI will be implemented in the `aw-cli` crate (per Repository-Layout.md) with Clap subcommands and TUI glue. Development proceeds through 10 granular milestones with automated testing at each step, starting with VCS abstraction and task file management, then building up to full CLI integration, sandboxing, and agent execution.
 
 **Phase 1 Dependencies and Parallel Tracks**: Phase 1 implements core `aw task` functionality with proper dependency ordering. Components are organized in parallel tracks where possible:
 
 - **VCS Track**: 1.1 VCS Repository Abstraction (foundation)
-- **Task Management Track**: 1.2 Task File Management (depends on 1.1), 1.3 Editor Integration (parallel), 1.4 Devshell Integration (parallel)
-- **Remote Operations Track**: 1.5 Push Operations (depends on 1.1)
-- **CLI Integration Track**: 1.6 AW Task CLI (depends on 1.1-1.5), 1.7 Task State Persistence (depends on 1.6)
-- **Agent Integration Track**: 1.8 Basic Codex Integration (depends on 1.6), 1.9 E2E Tests (depends on 1.6-1.8)
+  - **Task Management Track**: 1.2 Task File Management (depends on 1.1), 1.3 Editor Integration (parallel), 1.4 Devshell Integration (parallel)
+  - **Remote Operations Track**: 1.5 Push Operations (depends on 1.1)
+  - **CLI Integration Track**: 1.6 AW Task CLI (depends on 1.1-1.5), 1.7 AW CLI Sandbox Integration (depends on 1.6), 1.8 Task State Persistence (depends on 1.6)
+- **Agent Integration Track**: 1.9 Basic Codex Integration (depends on 1.6), 1.10 E2E Tests (depends on 1.6-1.9)
 
 Parallel development enables faster progress while maintaining clean dependency boundaries.
 
@@ -533,7 +533,53 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [x] Integration tests use synchronous VcsRepo directly for VCS operations
   - [x] VcsRepo made synchronous with no async interfaces as requested
 
-**1.7 Task State Persistence** (parallel with 1.6)
+**1.7 AW CLI Sandbox Integration** (2–3d, depends on 1.6 + Local-Sandboxing-on-Linux.md M1-M8)
+
+- **Deliverables**:
+
+  - **AW CLI Parameters**: Initial `aw sandbox` parameter set matching current capabilities:
+    - `--type local`: Enable basic process isolation (namespaces + filesystem sealing)
+    - `--allow-network <yes|no>`: Allow internet access via slirp4netns (default: no)
+    - `--allow-containers <yes|no>`: Enable container device access (/dev/fuse, storage dirs) (default: no)
+    - `--allow-kvm <yes|no>`: Enable KVM device access for VMs (/dev/kvm) (default: no)
+    - `--seccomp <yes|no>`: Enable dynamic filesystem access control (default: no)
+    - `--seccomp-debug <yes|no>`: Enable debugging operations in sandbox (default: no)
+    - `--mount-rw <PATH>...`: Additional writable paths to bind mount
+    - `--overlay <PATH>...`: Paths to promote to copy-on-write overlays
+  - **FS Snapshot Pre-cloning**: Snapshot cloning operations performed before sandbox creation, returning path pairs for bind mounting
+  - **AW Task Integration**: Sandbox parameters added to `aw task` command for agent execution in isolated environments
+
+- **Implementation Details**:
+
+  - **Pre-sandbox Workflow**: FS snapshot provider clones workspace to temporary location before sandbox launch, providing source→destination path pairs for bind mounting
+  - **Sandbox Launch Protocol**: Sandbox receives list of path pairs (host_path→sandbox_path) and performs bind mounts during initialization
+  - **Sudo-less Snapshots**: The `aw-fs-snapshots-daemon` ([`crates/aw-fs-snapshots-daemon/`](../../crates/aw-fs-snapshots-daemon/)) provides privileged filesystem operations (ZFS/Btrfs snapshots) without requiring sudo in user applications; the same daemon used for testing will enable snapshot operations for `aw sandbox`.
+  - **Integration Points**: Combines MVP FS snapshots (Phase 0.4-0.6) with sandboxing ([Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sanboxing/Local-Sandboxing-on-Linux.status.md) M1-M8)
+
+- **Verification Results**:
+
+  - [ ] E2E test: `aw task --sandbox local` launches agents in sandbox with filesystem isolation
+  - [ ] E2E test: Network access controlled via `--allow-network` flag in task execution
+  - [ ] E2E test: Device access controlled via `--allow-containers`/`--allow-kvm` flags
+  - [ ] E2E test: FS snapshots cloned before sandbox creation and properly bind mounted
+  - [ ] E2E test: Dynamic filesystem access works with `--seccomp` flag
+  - [ ] Integration test: AW CLI parameters correctly map to sandbox configuration
+  - [ ] Security test: Sandbox defaults to maximum isolation when no flags provided
+
+- **Key Source Files**:
+
+  - `crates/aw-cli/src/task.rs` - AW task command with sandbox parameter integration
+  - `crates/aw-core/src/sandbox.rs` - Sandbox configuration mapping from CLI parameters
+  - `crates/aw-fs-snapshots/src/lib.rs` - Pre-sandbox snapshot cloning interface
+  - `tests/integration/sandbox_cli_integration.rs` - E2E tests for AW CLI sandbox integration
+
+- **Cross-Spec Dependencies**:
+
+  - **[Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sanboxing/Local-Sandboxing-on-Linux.status.md) M1-M8**: Provides the sandbox implementation this milestone integrates
+  - **FS-Snapshots-Overview.md**: Defines snapshot cloning operations performed before sandbox creation
+  - **CLI.md**: Defines the parameter interface this milestone implements
+
+**1.8 Task State Persistence** (parallel with 1.6)
 
 - **Deliverables**:
   - Integration with `aw-state` crate for task state persistence (per Repository-Layout.md local state management)
@@ -549,7 +595,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] Task queries work correctly for listing operations
   - [ ] Integration tests with temporary databases
 
-**1.8 Basic Codex Agent Integration** (1 week, depends on 1.6)
+**1.9 Basic Codex Agent Integration** (1 week, depends on 1.6)
 
 - **Deliverables**:
   - Codex agent detection and validation
@@ -565,7 +611,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] Task execution manages agent processes with proper cleanup
   - [ ] Session resumption works for interrupted Codex sessions
 
-**1.9 AW Task E2E Integration Tests** (1 week, depends on 1.6-1.8)
+**1.10 AW Task E2E Integration Tests** (1 week, depends on 1.6-1.10)
 
 - **Deliverables**:
   - Comprehensive end-to-end test suite for `aw task` workflows
@@ -758,7 +804,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 - **Phase 1.1**: VCS Repository Abstraction (shared foundation for all components)
 
 **Core Task Layer (Weeks 5-12)**:
-- **Phase 1.2-1.9**: Complete `aw task` command implementation with all features
+- **Phase 1.2-1.10**: Complete `aw task` command implementation with all features
 - **Agent-Time-Travel.md Phase 1**: Codex agent integration (adapted from Claude Code phases)
 - **Local-Sandboxing-on-Linux.md M3-M4**: Cgroups and overlay support
 
