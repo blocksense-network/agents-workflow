@@ -2,11 +2,10 @@
 
 use agentfs_core::{FsCore, FsConfig, CaseSensitivity, MemoryPolicy, FsLimits, CachePolicy, OpenOptions};
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::path::Path;
 use std::sync::Mutex;
-use std::ptr;
 
 // Global registry for filesystem instances
 lazy_static::lazy_static! {
@@ -173,7 +172,50 @@ pub extern "C" fn af_snapshot_create(
     }
 }
 
-/// Branch operations
+/// Control plane operations - accepts raw SSZ request bytes, returns raw SSZ response bytes
+#[no_mangle]
+pub extern "C" fn af_control_request(
+    fs: AfFs,
+    request_data: *const u8,
+    _request_len: usize,
+    response_data: *mut u8,
+    response_max_len: usize,
+    response_actual_len: *mut usize,
+) -> AfResult {
+    if request_data.is_null() || response_data.is_null() || response_actual_len.is_null() {
+        return AfResult::AfErrInval;
+    }
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let _core = match instances.get(&fs) {
+        Some(_) => {}, // Core exists, continue
+        None => return AfResult::AfErrInval,
+    };
+
+    // TODO: Implement proper SSZ decoding and processing
+    // For now, create a simple success response to demonstrate the forwarding works
+    // The Swift code forwards raw bytes without parsing, and Rust handles the actual processing
+    let response_bytes = b"{\"status\":\"success\"}";
+
+    // Check if response fits in output buffer
+    if response_bytes.len() > response_max_len {
+        return AfResult::AfErrInval; // Buffer too small
+    }
+
+    // Copy response bytes to output buffer
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            response_bytes.as_ptr(),
+            response_data,
+            response_bytes.len(),
+        );
+        *response_actual_len = response_bytes.len();
+    }
+
+    AfResult::AfOk
+}
+
+/// Branch operations (legacy - kept for compatibility)
 #[no_mangle]
 pub extern "C" fn af_branch_create_from_snapshot(
     fs: AfFs,

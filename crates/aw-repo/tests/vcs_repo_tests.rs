@@ -81,7 +81,7 @@ fn test_repository_detection() {
     fs::create_dir_all(&repo_path).unwrap();
 
     let vcs_repo = VcsRepo::new(&repo_path).unwrap();
-    assert_eq!(vcs_repo.root(), repo.path());
+    assert_eq!(vcs_repo.root().canonicalize().unwrap(), repo.path().canonicalize().unwrap());
     assert_eq!(vcs_repo.vcs_type(), VcsType::Git);
 }
 

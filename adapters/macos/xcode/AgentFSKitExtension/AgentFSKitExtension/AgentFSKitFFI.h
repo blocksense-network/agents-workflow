@@ -28,5 +28,6 @@ int agentfs_bridge_close(void* core, uint64_t handle);
 int agentfs_bridge_snapshot_create(void* core, const char* name, char* snapshot_id, size_t snapshot_id_size);
 int agentfs_bridge_branch_create(void* core, const char* snapshot_id, const char* branch_name, char* branch_id, size_t branch_id_size);
 int agentfs_bridge_bind_process(void* core, const char* branch_id);
+int af_control_request(uint64_t fs, const uint8_t* request_data, size_t request_len, uint8_t* response_data, size_t response_max_len, size_t* response_actual_len);
 
 #endif // AGENTFSKITFFI_H

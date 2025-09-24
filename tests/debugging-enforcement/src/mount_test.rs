@@ -2,11 +2,15 @@
 //!
 //! This test isolates the mount capability issue by creating minimal namespaces
 //! and attempting a simple mount operation.
+//!
+//! Note: This test is Linux-specific as macOS doesn't support user namespaces.
 
-use nix::mount::MsFlags;
+#[cfg(target_os = "linux")]
+use libc;
 use nix::unistd::Pid;
 use tracing::{error, info};
 
+#[cfg(target_os = "linux")]
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
@@ -30,6 +34,17 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_os = "linux"))]
+fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
+    info!("Mount test skipped - user namespaces not supported on this platform");
+    info!("This test is designed for Linux systems with user namespace support");
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 fn create_user_namespace() -> anyhow::Result<Pid> {
     // Fork to create child process that will enter namespaces
     match unsafe { nix::unistd::fork() } {
@@ -40,13 +55,13 @@ fn create_user_namespace() -> anyhow::Result<Pid> {
         Ok(nix::unistd::ForkResult::Child) => {
             info!("Child: Starting namespace creation...");
 
-            // Create user namespace
-            match nix::sched::unshare(nix::sched::CloneFlags::CLONE_NEWUSER) {
-                Ok(_) => info!("Child: User namespace created successfully"),
-                Err(e) => {
-                    error!("Child: Failed to create user namespace: {}", e);
-                    std::process::exit(1);
-                }
+            // Create user namespace using syscall
+            let result = unsafe { libc::syscall(libc::SYS_unshare, libc::CLONE_NEWUSER) };
+            if result == 0 {
+                info!("Child: User namespace created successfully");
+            } else {
+                error!("Child: Failed to create user namespace: {}", std::io::Error::last_os_error());
+                std::process::exit(1);
             }
 
             // Test simple mount operation
@@ -59,6 +74,7 @@ fn create_user_namespace() -> anyhow::Result<Pid> {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn test_simple_mount() {
     info!("Testing simple mount operation within user namespace...");
 
@@ -68,36 +84,44 @@ fn test_simple_mount() {
         return;
     }
 
-    // Try to mount a simple tmpfs
-    let result = nix::mount::mount(
-        Some("tmpfs"),
-        "/tmp/test_mount",
-        Some("tmpfs"),
-        MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-        Some("size=1m"),
-    );
+    // Try to mount a simple tmpfs using libc
+    let source = std::ffi::CString::new("tmpfs").unwrap();
+    let target = std::ffi::CString::new("/tmp/test_mount").unwrap();
+    let fstype = std::ffi::CString::new("tmpfs").unwrap();
+    let data = std::ffi::CString::new("size=1m").unwrap();
 
-    match result {
-        Ok(_) => {
-            info!("✅ Simple mount operation succeeded!");
-            info!("   This means CAP_SYS_ADMIN IS available in user namespace");
+    let flags = libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV;
 
-            // Try to unmount it
-            let _ = nix::mount::umount("/tmp/test_mount");
+    let result = unsafe {
+        libc::mount(
+            source.as_ptr(),
+            target.as_ptr(),
+            fstype.as_ptr(),
+            flags as libc::c_ulong,
+            data.as_ptr() as *const libc::c_void,
+        )
+    };
 
-            // Clean up directory
-            let _ = std::fs::remove_dir("/tmp/test_mount");
+    if result == 0 {
+        info!("✅ Simple mount operation succeeded!");
+        info!("   This means CAP_SYS_ADMIN IS available in user namespace");
+
+        // Try to unmount it
+        let umount_target = std::ffi::CString::new("/tmp/test_mount").unwrap();
+        unsafe { libc::umount(umount_target.as_ptr()) };
+
+        // Clean up directory
+        let _ = std::fs::remove_dir("/tmp/test_mount");
+    } else {
+        let err = std::io::Error::last_os_error();
+        error!("❌ Simple mount operation failed: {}", err);
+        if err.raw_os_error() == Some(libc::EPERM) {
+            error!("   This confirms CAP_SYS_ADMIN is not available in user namespace");
+        } else {
+            error!("   Unexpected error - may be mount point or other issue");
         }
-        Err(e) => {
-            error!("❌ Simple mount operation failed: {}", e);
-            if e.to_string().contains("EPERM") {
-                error!("   This confirms CAP_SYS_ADMIN is not available in user namespace");
-            } else {
-                error!("   Unexpected error - may be mount point or other issue");
-            }
 
-            // Clean up directory
-            let _ = std::fs::remove_dir("/tmp/test_mount");
-        }
+        // Clean up directory
+        let _ = std::fs::remove_dir("/tmp/test_mount");
     }
 }
