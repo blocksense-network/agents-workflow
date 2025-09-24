@@ -1,12 +1,13 @@
 import { Component, createSignal, createEffect, onMount } from "solid-js";
 import { RepositoriesPane } from "../repositories/RepositoriesPane.js";
-import { SessionsPane } from "../sessions/SessionsPane.js";
+import { TaskFeedPane } from "../sessions/TaskFeedPane.js";
 import { TaskDetailsPane } from "../tasks/TaskDetailsPane.js";
 
 interface ThreePaneLayoutProps {
   selectedSessionId?: string;
   onSessionSelect?: (sessionId: string) => void;
   onRepositorySelect?: (repo: { id: string; name: string; branch: string; lastCommit: string }) => void;
+  onCreateTaskForRepo?: (repo: { id: string; name: string; branch: string; lastCommit: string }) => void;
 }
 
 export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
@@ -69,16 +70,17 @@ export const ThreePaneLayout: Component<ThreePaneLayoutProps> = (props) => {
           collapsed={repositoriesCollapsed()}
           onToggleCollapse={toggleRepositories}
           onRepositorySelect={props.onRepositorySelect}
+          onCreateTaskForRepo={props.onCreateTaskForRepo}
         />
       </div>
 
-      {/* Center Pane - Sessions Feed */}
+      {/* Center Pane - Task Feed */}
       <div
         class={`bg-white border-r border-gray-200 flex flex-col transition-all duration-200 ${
           sessionsCollapsed() ? "w-12" : "flex-1 min-w-0"
         }`}
       >
-        <SessionsPane
+        <TaskFeedPane
           selectedSessionId={props.selectedSessionId}
           collapsed={sessionsCollapsed()}
           onToggleCollapse={toggleSessions}

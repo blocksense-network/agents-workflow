@@ -99,6 +99,36 @@ export const MainLayout: Component<MainLayoutProps> = (props) => {
               Create Task
             </A>
             <A
+              href="/agents"
+              class={`text-sm font-medium transition-colors ${
+                isActive("/agents")
+                  ? "text-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Agents
+            </A>
+            <A
+              href="/runtimes"
+              class={`text-sm font-medium transition-colors ${
+                isActive("/runtimes")
+                  ? "text-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Runtimes
+            </A>
+            <A
+              href="/hosts"
+              class={`text-sm font-medium transition-colors ${
+                isActive("/hosts")
+                  ? "text-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Hosts
+            </A>
+            <A
               href="/settings"
               class={`text-sm font-medium transition-colors ${
                 isActive("/settings")

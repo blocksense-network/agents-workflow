@@ -9,14 +9,14 @@ import {
 import { apiClient, type Session } from "../../lib/api.js";
 import { SessionCard } from "./SessionCard.js";
 
-interface SessionsPaneProps {
+interface TaskFeedPaneProps {
   selectedSessionId?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onSessionSelect?: (sessionId: string) => void;
 }
 
-export const SessionsPane: Component<SessionsPaneProps> = (props) => {
+export const TaskFeedPane: Component<TaskFeedPaneProps> = (props) => {
   const [statusFilter, setStatusFilter] = createSignal<string>("");
   const [refreshTrigger, setRefreshTrigger] = createSignal(0);
 
@@ -98,7 +98,7 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
         </div>
         <div class="flex-1 flex items-center justify-center">
           <div class="transform -rotate-90 whitespace-nowrap text-xs text-gray-500 font-medium">
-            Sessions ({sessionsData()?.pagination.total || 0})
+            Task Feed ({sessionsData()?.pagination.total || 0})
           </div>
         </div>
       </div>
@@ -110,16 +110,16 @@ export const SessionsPane: Component<SessionsPaneProps> = (props) => {
       <div class="p-4 border-b border-gray-200">
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">Sessions</h2>
+            <h2 class="text-lg font-semibold text-gray-900">Task Feed</h2>
             <p class="text-sm text-gray-600 mt-1">
-              Active and recent agent sessions
+              Chronological task feed with live status
             </p>
           </div>
           <button
             onClick={props.onToggleCollapse}
             class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-            title="Collapse Sessions"
-            aria-label="Collapse Sessions pane"
+            title="Collapse Task Feed"
+            aria-label="Collapse Task Feed pane"
           >
             <svg
               class="w-4 h-4"

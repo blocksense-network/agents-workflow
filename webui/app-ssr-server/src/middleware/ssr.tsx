@@ -35,7 +35,7 @@ export const ssrMiddleware = async (req: any, res: any, next: any) => {
   <title>Agents-Workflow WebUI</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <meta name="description" content="Web-based dashboard for creating, monitoring, and managing agent coding sessions">
-  <link rel="stylesheet" href="/client-ClHQK-XE.css">
+  <link rel="stylesheet" href="/client-C2J1EW0P.css">
   <style>
     /* Critical CSS for initial render */
     body {

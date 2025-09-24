@@ -3,6 +3,9 @@ import { Router, Route } from "@solidjs/router";
 import { Dashboard } from "./routes/Dashboard.js";
 import { Sessions } from "./routes/Sessions.js";
 import { CreateTask } from "./routes/CreateTask.js";
+import { Agents } from "./routes/Agents.js";
+import { Runtimes } from "./routes/Runtimes.js";
+import { Hosts } from "./routes/Hosts.js";
 import { Settings } from "./routes/Settings.js";
 import "./app.css";
 
@@ -15,6 +18,9 @@ function FullApp() {
       <Route path="/" component={Dashboard} />
       <Route path="/sessions" component={Sessions} />
       <Route path="/create" component={CreateTask} />
+      <Route path="/agents" component={Agents} />
+      <Route path="/runtimes" component={Runtimes} />
+      <Route path="/hosts" component={Hosts} />
       <Route path="/settings" component={Settings} />
     </Router>
   );

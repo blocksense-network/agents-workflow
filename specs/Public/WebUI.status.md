@@ -4,7 +4,7 @@ This document tracks the implementation status of the [WebUI-PRD.md](WebUI-PRD.m
 
 Goal: deliver a production-ready web-based dashboard for creating, monitoring, and managing agent coding sessions with real-time visibility, seamless IDE integration, and comprehensive governance controls.
 
-**Current Status**: W1-W4 milestones complete! All tests passing ✅
+**Current Status**: W1-W4 milestones complete, W4.5 in progress! All tests passing ✅
 **Test Results**: 46 total tests (43 passed, 3 skipped)
 **Last Updated**: September 23, 2025
 
@@ -61,6 +61,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W1. Project Setup and Mock Server** COMPLETED (1 week)
 
 - **Deliverables**:
+
   - SolidJS + Vite + TypeScript + Tailwind CSS project scaffolding
   - Comprehensive mock server implementing REST-Service.md endpoints
   - Basic project structure with component organization and routing setup
@@ -68,12 +69,14 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - CI/CD pipeline setup with automated testing
 
 - **Verification**:
+
   - [x] Infrastructure tests: SSR sidecar serves HTML correctly, health endpoint works
   - [x] API contract tests: Mock server responds to all endpoints with correct schemas and validation
   - [x] Build tests: All projects compile successfully with TypeScript strict mode
   - [x] Tooling tests: ESLint and Prettier configurations work across all projects
 
 - **Implementation Details**:
+
   - Created complete WebUI directory structure with `app/`, `mock-server/`, `e2e-tests/`, and `shared/` subdirectories
   - Set up SolidJS application with SolidStart for SSR support, Tailwind CSS for styling, and TypeScript for type safety
   - Built Express.js mock server with TypeScript implementing key REST endpoints (sessions, agents, runtimes, executors)
@@ -83,6 +86,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Created three-pane layout components (repositories, sessions, task details) following WebUI-PRD.md specifications
 
 - **Key Source Files**:
+
   - `webui/app/src/app.tsx` - Main SolidJS application with layout
   - `webui/app/src/components/layout/MainLayout.tsx` - Top-level layout component
   - `webui/app/src/components/layout/ThreePaneLayout.tsx` - Three-pane layout structure
@@ -93,6 +97,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `.github/workflows/ci.yml` - Updated CI pipeline with WebUI jobs
 
 - **Outstanding Tasks**:
+
   - Add more comprehensive mock data for edge cases and error scenarios
   - Implement SSE event streaming in mock server for real-time features
   - Add more detailed TypeScript types for API contracts
@@ -112,6 +117,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W1.5 Node.js SSR Sidecar** COMPLETED (1 week, parallel with W1)
 
 - **Deliverables**:
+
   - Node.js Express server with SolidJS client-side rendering and progressive enhancement
   - REST API proxy functionality forwarding requests to Rust REST service or mock server
   - Server-side HTML template serving for initial page loads with progressive enhancement
@@ -119,6 +125,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Client-side hydration with SolidJS for enhanced interactivity
 
 - **Verification**:
+
   - [x] SSR tests: Server-side rendering produces correct HTML structure
   - [x] Progressive enhancement tests: Basic functionality works without JavaScript
   - [x] API proxy tests: Requests are correctly forwarded to backend services
@@ -127,6 +134,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - [x] Build configuration tests: Both client and server bundles build successfully
 
 - **Implementation Details**:
+
   - Created `app-ssr-server/` directory with complete Node.js Express server implementation
   - Built REST API proxy middleware using `http-proxy-middleware` that forwards `/api/*` requests to either mock server (development) or Rust REST service (production)
   - Implemented progressive enhancement approach: server serves basic HTML with loading placeholder, client-side JavaScript hydrates with full SolidJS application
@@ -134,6 +142,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Configured Vite for both client and server builds with appropriate SolidJS plugins
 
 - **Key Source Files**:
+
   - `webui/app-ssr-server/src/server.tsx` - Main Express server with API proxy and SSR middleware
   - `webui/app-ssr-server/src/middleware/apiProxy.ts` - REST API proxy middleware
   - `webui/app-ssr-server/src/middleware/ssr.ts` - Server-side HTML template serving
@@ -142,6 +151,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `webui/app-ssr-server/src/client.tsx` - Client-side hydration entry point
 
 - **Outstanding Tasks**:
+
   - Implement progressive enhancement for navigation and form submissions (client-side routing)
   - Add session management and state hydration between server and client
   - Add more comprehensive error handling and fallback mechanisms
@@ -162,6 +172,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W2. Core Layout and Navigation** COMPLETED (1 week)
 
 - **Deliverables**:
+
   - Three-pane layout implementation (repositories, feed, details) with responsive design
   - Collapsible panes with smooth transitions and localStorage persistence
   - Enhanced top navigation with dashboard, sessions, create task, and settings sections
@@ -170,6 +181,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Basic state management for UI preferences (pane collapse states)
 
 - **Verification**:
+
   - [x] Layout tests: Three-pane layout renders correctly on desktop and mobile (SSR placeholder)
   - [x] Navigation tests: Client-side JavaScript loading verified for future navigation
   - [x] Collapsible pane tests: Infrastructure in place for collapsible functionality
@@ -179,6 +191,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - [x] Routing tests: URL routing works for SSR pages
 
 - **Implementation Details**:
+
   - Enhanced `ThreePaneLayout` component with responsive flexbox layout and collapsible functionality
   - Added `collapsed` state management with localStorage persistence for user preferences
   - Updated `MainLayout` with comprehensive navigation, global search, and active route highlighting
@@ -188,6 +201,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Integrated smooth CSS transitions for pane collapsing/expanding animations
 
 - **Key Source Files**:
+
   - `webui/app-ssr-server/src/components/layout/ThreePaneLayout.tsx` - Responsive three-pane layout with collapsible functionality
   - `webui/app-ssr-server/src/components/layout/MainLayout.tsx` - Enhanced navigation with global search
   - `webui/app-ssr-server/src/components/repositories/RepositoriesPane.tsx` - Collapsible repositories pane
@@ -196,6 +210,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `webui/app-ssr-server/src/App.tsx` - Router setup and route configuration
 
 - **Outstanding Tasks**:
+
   - Implement actual global search functionality to filter sessions and repositories
   - Add mobile-specific responsive breakpoints and navigation patterns
   - Enhance keyboard navigation and accessibility features
@@ -216,6 +231,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W3. Task Creation and Session Management** COMPLETED (2 weeks)
 
 - **Deliverables**:
+
   - Task creation form with repository selection and validation
   - Session list with filtering, sorting, and pagination
   - Session detail view with status display and basic controls
@@ -223,6 +239,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Integration with mock server for CRUD operations
 
 - **Test Coverage** (Comprehensive E2E + API Contract):
+
   - [x] API contract tests: All CRUD operations match REST-Service.md specs (existing W1-W2 tests)
   - [x] Form validation tests: Task creation form validation, error display, and submission
   - [x] Repository selection tests: URL validation, branch field validation
@@ -235,6 +252,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - [x] Accessibility tests: Form keyboard navigation and screen reader compatibility
 
 - **Verification** (Automated E2E + Manual):
+
   - [x] Playwright E2E tests: Task creation form validation and submission (task-creation.spec.ts)
   - [x] Playwright E2E tests: Session management, selection, and controls (session-management.spec.ts)
   - [x] Playwright E2E tests: Form validation edge cases and error handling (form-validation.spec.ts)
@@ -244,6 +262,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - API contract tests verify all CRUD operations match REST-Service.md specs
 
 - **Implementation Details**:
+
   - Created comprehensive `TaskCreationForm` component with repository URL input, branch selection, agent/runtime dropdowns, and delivery mode configuration
   - Implemented `SessionCard` component displaying session status, metadata, and quick action buttons (stop/cancel)
   - Enhanced `SessionsPane` with real-time session loading, status filtering, auto-refresh every 30 seconds, and pagination support
@@ -255,6 +274,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Included loading states, error boundaries, and graceful API failure handling
 
 - **Key Source Files**:
+
   - `webui/app-ssr-server/src/lib/api.ts` - API client with full REST service integration
   - `webui/app-ssr-server/src/components/tasks/TaskCreationForm.tsx` - Comprehensive task creation form
   - `webui/app-ssr-server/src/components/sessions/SessionCard.tsx` - Session card component with actions
@@ -268,6 +288,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `webui/e2e-tests/tests/session-interactions.spec.ts` - E2E tests for session interactions
 
 - **Outstanding Tasks**:
+
   - Add branch auto-completion for repository URLs (requires additional git integration)
   - Implement session sorting options beyond status filtering
   - Add bulk session operations (stop multiple sessions)
@@ -290,6 +311,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W4. Real-time Features and Live Updates** COMPLETED (2 weeks, parallel with W3)
 
 - **Deliverables**:
+
   - SSE event stream integration for live session updates
   - Real-time log streaming in session detail view
   - Optimistic UI updates for pause/stop/resume actions
@@ -297,6 +319,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Connection error handling and reconnection logic
 
 - **Test Coverage** (Comprehensive E2E + API Contract):
+
   - [x] SSE connection tests: Event streams connect and receive data correctly
   - [x] Real-time update tests: UI updates automatically when events arrive
   - [x] Log streaming tests: New log entries appear in real-time without refresh
@@ -307,6 +330,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - [x] Performance tests: Real-time updates don't cause UI lag or memory leaks
 
 - **Verification** (Automated E2E + Manual):
+
   - [x] Playwright E2E tests: SSE connection status display and indicators (real-time-features.spec.ts)
   - [x] Playwright E2E tests: Real-time log streaming without page refresh
   - [x] Playwright E2E tests: Optimistic UI updates for session controls
@@ -317,6 +341,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Manual verification: Connection status indicators show proper states
 
 - **Implementation Details**:
+
   - Enhanced mock server SSE endpoint with persistent connections and simulated real-time events
   - Implemented comprehensive SSE client with automatic reconnection (exponential backoff, max 5 attempts)
   - Added optimistic UI updates for session controls (stop/pause/resume) with immediate feedback
@@ -326,6 +351,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - **Key Technical Achievement**: SSE endpoint detects test requests vs real clients for proper test compatibility
 
 - **Key Source Files**:
+
   - `webui/mock-server/src/routes/sessions.ts` - Enhanced SSE endpoint with test detection and event streaming
   - `webui/app-ssr-server/src/lib/api.ts` - SSE client with EventSource integration and type definitions
   - `webui/app-ssr-server/src/components/tasks/TaskDetailsPane.tsx` - Real-time log streaming and connection management
@@ -333,6 +359,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `webui/e2e-tests/tests/real-time-features.spec.ts` - Comprehensive E2E tests for all real-time features
 
 - **Outstanding Tasks**:
+
   - Optimize SSE event frequency to prevent UI performance issues with high-volume events
   - Add configurable reconnection parameters (backoff multiplier, max attempts)
   - Implement event buffering for offline periods to prevent data loss
@@ -347,11 +374,81 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - [x] All W4 functionality tested via comprehensive E2E test suite
   - [x] All existing W1-W3 tests continue to pass with real-time features enabled
 
+**W4.5. Design Alignment with PRD** 🔄 **IN PROGRESS** (1 week, post-W4)
+
+- **Deliverables**:
+
+  - Navigation structure updated to match PRD (Dashboard, Sessions, Create Task, Agents, Runtimes, Hosts, Settings)
+  - Repository pane redesigned with individual + buttons for inline task creation
+  - Task Feed renamed and restructured as chronological feed per PRD specifications
+  - Repository cards show proper project metadata with distinct + button icons
+  - Missing route pages (Agents, Runtimes, Hosts) implemented with placeholder content
+  - Three-pane layout updated to match PRD terminology and structure
+
+- **Test Coverage**:
+
+  - [x] Navigation tests: All PRD-specified navigation links present and functional
+  - [x] Layout tests: Three-pane structure matches PRD (repositories, task feed, task details)
+  - [x] Repository pane tests: + buttons present and properly positioned on each repository card
+  - [x] Task feed tests: Renamed from Sessions and shows chronological task feed
+  - [x] Route tests: All PRD navigation routes implemented and accessible
+
+- **Verification** (Automated E2E):
+
+  - [x] Navigation includes all PRD-specified sections (Agents, Runtimes, Hosts, Settings)
+  - [x] Repository cards display with individual + buttons for task creation
+  - [x] Task Feed pane shows chronological task feed instead of generic sessions list
+  - [x] Three-pane layout terminology matches PRD (repositories, task feed, task details)
+  - [x] All navigation routes respond correctly with appropriate page content
+  - [x] UI components follow PRD design patterns and user interaction models
+
+- **Implementation Details**:
+
+  - Updated MainLayout navigation to include Agents, Runtimes, Hosts sections as specified in PRD
+  - Redesigned RepositoriesPane with individual repository cards containing + buttons for task creation
+  - Renamed SessionsPane to TaskFeedPane and updated descriptions to match PRD terminology
+  - Added distinct + button styling on repository cards (blue hover states, proper positioning)
+  - Implemented placeholder pages for Agents, Runtimes, and Hosts routes
+  - Updated component interfaces to support onCreateTaskForRepo callbacks for inline task creation
+  - Modified ThreePaneLayout to pass repository selection and task creation handlers
+
+- **Key Source Files**:
+
+  - `webui/app-ssr-server/src/components/layout/MainLayout.tsx` - Updated navigation structure
+  - `webui/app-ssr-server/src/components/repositories/RepositoriesPane.tsx` - Redesigned with + buttons
+  - `webui/app-ssr-server/src/components/sessions/TaskFeedPane.tsx` - Renamed and updated from SessionsPane
+  - `webui/app-ssr-server/src/components/layout/ThreePaneLayout.tsx` - Updated interfaces for PRD alignment
+  - `webui/app-ssr-server/src/routes/Agents.tsx` - New placeholder page
+  - `webui/app-ssr-server/src/routes/Runtimes.tsx` - New placeholder page
+  - `webui/app-ssr-server/src/routes/Hosts.tsx` - New placeholder page
+
+- **Outstanding Tasks**:
+
+  - Implement actual inline task creation form insertion in TaskFeedPane (currently logs to console)
+  - Add repository filtering based on selected repositories in task feed
+  - Integrate branch selection dropdown with live autocomplete in inline task creation
+  - Implement real Agents, Runtimes, and Hosts management functionality (currently placeholder pages)
+  - Add proper repository data loading from API vs mock data
+
+- **Verification Results** (Current Progress):
+  - [x] Navigation structure matches PRD exactly (Dashboard, Sessions, Create Task, Agents, Runtimes, Hosts, Settings)
+  - [x] Repository pane shows individual cards with + buttons for each repository (UI complete, functionality pending)
+  - [x] Task Feed pane properly renamed and described as chronological feed
+  - [x] Three-pane layout terminology aligns with PRD (repositories, task feed, task details)
+  - [x] All navigation routes implemented with appropriate placeholder content
+  - [x] UI components follow PRD design patterns (+ buttons positioned correctly)
+  - [x] Test suite updated and passing with new component structure
+  - [ ] Inline task creation form insertion (currently logs to console only)
+  - [ ] Repository filtering in task feed based on selected repositories
+  - [ ] Branch selection dropdown with live autocomplete
+  - [ ] Real Agents, Runtimes, and Hosts functionality (placeholder pages only)
+
 **Phase 3: Advanced Features and Polish** (3-4 weeks total)
 
 **W5. IDE Integration and Launch Helpers** (1-2 weeks)
 
 - **Deliverables**:
+
   - IDE launch button implementation for VS Code, Cursor, Windsurf
   - Workspace path resolution and IDE protocol handling
   - Platform-specific launch command generation
@@ -359,6 +456,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Integration with operating system URL schemes
 
 - **Test Coverage** (Planned):
+
   - [ ] IDE detection tests: Correct IDE detected based on platform and availability
   - [ ] Launch button tests: Buttons appear only for active sessions with valid workspaces
   - [ ] URL scheme tests: Proper URL schemes generated for each supported IDE
@@ -379,6 +477,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W6. Governance and Multi-tenancy** (2 weeks, parallel with W5)
 
 - **Deliverables**:
+
   - RBAC implementation with role-based feature visibility
   - Tenant/project selection and scoping
   - Admin panels for user and executor management
@@ -386,6 +485,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Settings management with validation
 
 - **Test Coverage** (Planned):
+
   - [ ] RBAC tests: UI elements show/hide based on user roles and permissions
   - [ ] Tenant isolation tests: Data scoped correctly per tenant/project
   - [ ] Admin panel tests: CRUD operations for users, executors, policies
@@ -408,6 +508,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W7. Comprehensive Integration Testing** (2 weeks)
 
 - **Deliverables**:
+
   - Full user journey E2E test coverage across all features
   - Accessibility testing with axe-core (WCAG AA compliance)
   - Performance testing and optimization validation
@@ -416,6 +517,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - End-to-end workflow validation (create → monitor → complete)
 
 - **Test Coverage** (Planned):
+
   - [ ] Complete user journey tests: Full workflows from task creation to completion
   - [ ] Accessibility compliance tests: axe-core checks across all pages/components
   - [ ] Performance regression tests: TTI, bundle size, and runtime performance
@@ -436,6 +538,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 **W8. Production Readiness and Local Mode** (1 week, parallel with W7)
 
 - **Deliverables**:
+
   - Local mode implementation with localhost-only binding
   - Production build optimization and bundle analysis
   - Error boundary implementation and crash reporting
@@ -443,6 +546,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - Final performance optimizations
 
 - **Test Coverage** (Planned):
+
   - [ ] Local mode tests: Server binds only to localhost, no external access
   - [ ] Production build tests: Bundle size within targets, builds successfully
   - [ ] Error boundary tests: JavaScript errors contained, app remains functional
@@ -493,11 +597,13 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 Based on W4 completion, here are the remaining tasks for WebUI development:
 
 #### **Test Infrastructure** ✅ **INFRASTRUCTURE COMPLETE**
+
 - [x] Playwright + Nix browser configuration working
 - [x] Test servers start/stop automation
 - [x] Basic test framework operational
 
 #### **API Contract Testing** ✅ **COMPLETE**
+
 - [x] All API endpoints working (GET/POST/PUT/DELETE operations)
 - [x] Complete mock server implementation with full validation:
   - POST /tasks (session creation with input validation)
@@ -511,6 +617,7 @@ Based on W4 completion, here are the remaining tasks for WebUI development:
 - [x] SSE endpoint compatibility with both test requests and real clients
 
 #### **Build Tooling & Quality** ✅ **MOSTLY COMPLETE**
+
 - [x] Projects build successfully
 - [ ] Fix TypeScript strict mode compilation errors
 - [x] Fix ESLint configuration issues
@@ -518,6 +625,7 @@ Based on W4 completion, here are the remaining tasks for WebUI development:
 - [ ] Implement Playwright config validation
 
 #### **Client-Side Application** ✅ **COMPLETED**
+
 - [x] SSR placeholder rendering
 - [x] Client-side JavaScript loading and hydration framework
 - [x] Client-side JavaScript hydration and routing
@@ -526,6 +634,7 @@ Based on W4 completion, here are the remaining tasks for WebUI development:
 - [x] Real-time updates via SSE
 
 #### **Accessibility & UX** 🔄 **IN PROGRESS**
+
 - [x] SSR HTML accessibility structure testing (lang, title, noscript, meta tags)
 - [ ] WCAG AA compliance testing (requires full client-side content)
 - [ ] Keyboard navigation implementation
@@ -534,6 +643,7 @@ Based on W4 completion, here are the remaining tasks for WebUI development:
 - [ ] Focus indicators and visual accessibility
 
 #### **Integration & Performance** 📋 **PENDING**
+
 - [ ] Real API service integration
 - [ ] Performance optimization (TTI targets)
 - [ ] Visual regression testing

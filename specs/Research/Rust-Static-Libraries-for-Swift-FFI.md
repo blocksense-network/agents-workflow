@@ -106,6 +106,6 @@ Only use if crates have completely disjoint dependencies.
 
 ## References
 
-- Rust FFI Book: https://doc.rust-lang.org/nomicon/ffi.html
-- Cargo crate-types: https://doc.rust-lang.org/cargo/reference/cargo-targets.html
+- Rust FFI Book: <https://doc.rust-lang.org/nomicon/ffi.html>
+- Cargo crate-types: <https://doc.rust-lang.org/cargo/reference/cargo-targets.html>
 - Swift-Rust integration examples: rustls-ffi, Mozilla Application Services

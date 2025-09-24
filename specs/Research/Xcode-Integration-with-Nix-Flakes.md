@@ -127,6 +127,6 @@ xcodebuild build \
 
 ## References
 
-- Nixpkgs Darwin documentation: https://github.com/NixOS/nixpkgs/blob/master/doc/languages-frameworks/darwin.section.md
-- nix-darwin: https://github.com/LnL7/nix-darwin
-- Xcode command-line tools: https://developer.apple.com/support/xcode/
+- Nixpkgs Darwin documentation: <https://github.com/NixOS/nixpkgs/blob/master/doc/languages-frameworks/darwin.section.md>
+- nix-darwin: <https://github.com/LnL7/nix-darwin>
+- Xcode command-line tools: <https://developer.apple.com/support/xcode/>
