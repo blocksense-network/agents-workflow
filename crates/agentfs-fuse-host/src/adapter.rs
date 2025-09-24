@@ -924,4 +924,3 @@ impl fuser::Filesystem for AgentFsFuse {
         reply.error(libc::ENOTSUP);
     }
 }
-}

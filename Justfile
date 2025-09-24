@@ -326,6 +326,51 @@ test-debugging:
     cargo test -p sandbox-integration-tests --verbose
     ./target/debug/debugging_test_orchestrator
 
+# FUSE Integration Testing Targets
+# ================================
+
+# Build FUSE integration test binaries
+build-fuse-integration-tests:
+    cargo build -p fuse-integration-tests --features fuse
+
+# Run all FUSE integration tests (requires FUSE support)
+test-fuse-integration:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- all
+
+# Run FUSE mount cycle tests only
+test-fuse-mount-cycle:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- mount-cycle
+
+# Run FUSE filesystem operations tests only
+test-fuse-fs-ops:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- fs-ops
+
+# Run FUSE control plane tests only
+test-fuse-control-plane:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- control-plane
+
+# Run FUSE pjdfstest compliance tests
+test-fuse-pjdfs:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- pjdfstest
+
+# Run FUSE stress tests
+test-fuse-stress:
+    just build-fuse-integration-tests
+    cargo run -p fuse-integration-tests --features fuse -- stress
+
+# Run FUSE device setup utilities
+fuse-device-setup command="list":
+    cargo run -p fuse-integration-tests --bin fuse_device_setup -- {{command}}
+
+# Run FUSE stress test utilities
+fuse-stress-test command="benchmark" duration="60" mount_point="/tmp/test":
+    cargo run -p fuse-integration-tests --bin fuse_stress_test -- {{command}} --duration {{duration}} --mount-point {{mount_point}}
+
 # Run simple mount test to verify CAP_SYS_ADMIN availability in user namespaces
 test-mount-capability:
     just build-debugging-test-binaries

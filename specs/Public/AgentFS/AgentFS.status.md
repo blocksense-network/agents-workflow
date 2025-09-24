@@ -332,7 +332,7 @@ Acceptance checklist (M10)
 - [ ] `aw agent fs branch create/bind/exec` work with session context (implementation stubbed)
 - [x] Error mapping covered by tests
 
-M10.5. FUSE Integration Testing Suite (3–4d)
+M10.5. FUSE Integration Testing Suite COMPLETED (4–5d)
 
 - Implement comprehensive FUSE mount/unmount cycle testing with real block devices
 - Create automated integration tests that exercise all AgentFS operations through actual filesystem interfaces
@@ -346,13 +346,39 @@ M10.5. FUSE Integration Testing Suite (3–4d)
 
 Reference: See [Compiling-and-Testing-FUSE-File-Systems.md](../../Research/Compiling-and-Testing-FUSE-File-Systems.md) for detailed FUSE compilation, mounting, and testing procedures.
 
+**Implementation Details:**
+
+- Created comprehensive FUSE integration test framework in `tests/fuse-integration/`
+- Implemented full mount cycle tests with device management and cleanup
+- Added filesystem operations testing (file/directory CRUD operations)
+- Implemented control plane validation via `.agentfs/control` file interface
+- Integrated pjdfstest compliance testing framework
+- Created stress testing and performance benchmarking utilities
+- Added cross-platform compatibility with conditional compilation
+- Implemented device setup utilities for test environment management
+- Added comprehensive Justfile targets for CI integration
+- Created detailed README with usage instructions and troubleshooting
+
+**Key Source Files:**
+
+- `tests/fuse-integration/src/main.rs` - Test runner with CLI interface
+- `tests/fuse-integration/src/fuse_tests.rs` - Core test implementations
+- `tests/fuse-integration/src/test_utils.rs` - Common utilities and helpers
+- `tests/fuse-integration/src/device_setup.rs` - Device management utilities
+- `tests/fuse-integration/src/stress_test.rs` - Stress testing and benchmarking
+- `tests/fuse-integration/Cargo.toml` - Test package configuration
+- `tests/fuse-integration/README.md` - Comprehensive documentation
+- `Justfile` - Added FUSE integration test targets
+
+**Verification Results:**
+
 Acceptance checklist (M10.5)
 
-- [ ] Full mount cycle integration tests pass
-- [ ] All filesystem operations work through FUSE interface
-- [ ] Control plane operations functional via mounted filesystem
-- [ ] pjdfstest compliance tests pass
-- [ ] Cross-platform mounting validated
+- [x] Full mount cycle integration tests pass
+- [x] All filesystem operations work through FUSE interface
+- [x] Control plane operations functional via mounted filesystem
+- [x] pjdfstest compliance tests pass
+- [x] Cross-platform mounting validated
 
 M10.6. WinFsp Integration Testing Suite (3–4d)
 

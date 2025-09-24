@@ -35,6 +35,7 @@ members = [
   "tests/overlay-enforcement",
   "tests/network-enforcement",
   "tests/debugging-enforcement",
+  "tests/fuse-integration",
 ]
 resolver = "2"
 

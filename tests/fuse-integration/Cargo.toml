@@ -1,0 +1,39 @@
+[package]
+name = "fuse-integration-tests"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fuse_test_runner"
+path = "src/main.rs"
+
+[[bin]]
+name = "fuse_device_setup"
+path = "src/device_setup.rs"
+
+[[bin]]
+name = "fuse_stress_test"
+path = "src/stress_test.rs"
+
+[features]
+fuse = ["agentfs-fuse-host/fuse"]
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+nix = { version = "0.27", features = ["fs", "process", "signal"] }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dependencies.agentfs-core]
+path = "../../crates/agentfs-core"
+
+[dependencies.agentfs-proto]
+path = "../../crates/agentfs-proto"
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+agentfs-fuse-host = { path = "../../crates/agentfs-fuse-host", features = ["fuse"] }
+

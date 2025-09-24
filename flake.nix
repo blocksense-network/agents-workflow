@@ -257,6 +257,9 @@
         pkgs.procps  # For process management (pgrep, kill, etc.)
         # Note: playwright and tsx are installed via npm in individual packages
 
+        # Build system tools
+        pkgs.pkg-config # For finding library headers/libs during compilation
+
         # AI Coding Assistants (available in current nixpkgs)
         pkgs.goose-cli # Goose AI coding assistant
         pkgs.claude-code # Claude Code - agentic coding tool
@@ -281,6 +284,9 @@
         # Seccomp library for sandboxing functionality
         pkgs.libseccomp # Required for seccomp-based sandboxing
         pkgs.pkg-config # Required for libseccomp-sys to find libseccomp
+        # FUSE filesystem development and testing
+        pkgs.fuse3 # libfuse 3.x for FUSE filesystem development
+        # Note: pjdfstest not available in current nixpkgs version
       ];
 
       # macOS-specific packages
@@ -305,6 +311,23 @@
       # Platform-specific shell hook additions
       linuxShellHook = if isLinux then ''
         export PUPPETEER_EXECUTABLE_PATH="${pkgs.chromium}/bin/chromium"
+        # FUSE development environment
+        export PKG_CONFIG_PATH="${pkgs.fuse3}/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+        # FUSE kernel module and permissions setup
+        if [ -w /dev/fuse ]; then
+          echo "✅ FUSE device (/dev/fuse) is accessible"
+        else
+          echo "⚠️  FUSE device (/dev/fuse) not accessible - FUSE tests may fail"
+          echo "   Try: sudo chmod 666 /dev/fuse (as root, or add user to 'fuse' group)"
+        fi
+
+        # Check if fusermount is available
+        if command -v fusermount3 >/dev/null 2>&1 || command -v fusermount >/dev/null 2>&1; then
+          echo "✅ FUSE mount utilities available"
+        else
+          echo "⚠️  fusermount not found - FUSE mounting may not work"
+        fi
       '' else "";
 
       darwinShellHook = if isDarwin then ''
