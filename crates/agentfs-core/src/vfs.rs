@@ -4,8 +4,6 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-#[cfg(unix)]
-use std::os::unix::process::parent_id;
 
 use crate::{
     Attributes, BranchId, BranchInfo, ContentId, DirEntry, EventKind, EventSink, FileMode, FileTimes, FsConfig, FsStats, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec, SubscriptionId,
@@ -992,44 +990,19 @@ impl FsCore {
                     children.remove(&name);
                 }
             }
-            // Remove the directory node itself
+        }
+
+        // Remove the directory node itself to avoid leaking nodes
+        {
+            let mut nodes = self.nodes.lock().unwrap();
             nodes.remove(&node_id);
         }
 
+        // Emit event
+        let path_str = path.to_string_lossy().to_string();
+        self.emit_event(EventKind::Removed { path: path_str });
+
         Ok(())
-    }
-
-    pub fn readdir(&self, path: &Path) -> FsResult<Vec<DirEntry>> {
-        let (node_id, _) = self.resolve_path(path)?;
-        let nodes = self.nodes.lock().unwrap();
-        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
-
-        match &node.kind {
-            NodeKind::Directory { children } => {
-                let mut entries = Vec::new();
-                for (name, child_id) in children {
-                    let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
-                    let (is_dir, is_symlink, len) = match &child_node.kind {
-                        NodeKind::Directory { .. } => (true, false, 0),
-                        NodeKind::File { streams } => {
-                            // Size is the size of the unnamed stream
-                            let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
-                            (false, false, size)
-                        }
-                        NodeKind::Symlink { target } => (false, true, target.len() as u64),
-                    };
-                    entries.push(DirEntry {
-                        name: name.clone(),
-                        is_dir,
-                        is_symlink,
-                        len,
-                    });
-                }
-                Ok(entries)
-            }
-            NodeKind::File { .. } => Err(FsError::NotADirectory),
-            NodeKind::Symlink { .. } => Err(FsError::NotADirectory),
-        }
     }
 
     // Optional readdir+ that includes attributes without extra getattr calls (libfuse pattern)
@@ -1040,8 +1013,13 @@ impl FsCore {
 
         match &node.kind {
             NodeKind::Directory { children } => {
+                // Collect and sort child names for stable ordering
+                let mut names: Vec<_> = children.keys().cloned().collect();
+                names.sort();
+
                 let mut entries = Vec::new();
-                for (name, child_id) in children {
+                for name in names {
+                    let child_id = children.get(&name).ok_or(FsError::NotFound)?;
                     let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
                     let (is_dir, is_symlink, len) = match &child_node.kind {
                         NodeKind::Directory { .. } => (true, false, 0),
@@ -1054,7 +1032,7 @@ impl FsCore {
                     };
 
                     let dir_entry = DirEntry {
-                        name: name.clone(),
+                        name: name,
                         is_dir,
                         is_symlink,
                         len,
@@ -1176,6 +1154,87 @@ impl FsCore {
         // Emit event
         let path_str = path.to_string_lossy().to_string();
         self.emit_event(EventKind::Removed { path: path_str });
+
+        Ok(())
+    }
+
+    /// Public helper to resolve path and return internal IDs for FFI consumers
+    pub fn resolve_path_public(&self, path: &Path) -> FsResult<(u64, Option<u64>)> {
+        let (node_id, parent_info) = self.resolve_path(path)?;
+        let parent_id = parent_info.map(|(pid, _name)| pid.0);
+        Ok((node_id.0, parent_id))
+    }
+
+    /// Change permissions mode on a path (basic chmod semantics)
+    pub fn set_mode(&self, path: &Path, mode: u32) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let mut nodes = self.nodes.lock().unwrap();
+        let node = nodes.get_mut(&node_id).ok_or(FsError::NotFound)?;
+        node.mode = mode;
+        // ctime changes on metadata change
+        let now = FsCore::current_timestamp();
+        node.times.ctime = now;
+        Ok(())
+    }
+
+    /// Rename a node from old path to new path. Fails if destination exists.
+    pub fn rename(&self, old: &Path, new: &Path) -> FsResult<()> {
+        // Resolve old path and its parent
+        let (old_id, old_parent) = self.resolve_path(old)?;
+        let Some((old_parent_id, old_name)) = old_parent else {
+            return Err(FsError::InvalidArgument); // Cannot rename root
+        };
+
+        // Resolve destination parent and name
+        let new_parent_path = new.parent().ok_or(FsError::InvalidArgument)?;
+        let new_name = new
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or(FsError::InvalidName)?
+            .to_string();
+
+        let (new_parent_id, _) = self.resolve_path(new_parent_path)?;
+
+        // Lock nodes for mutation
+        let mut nodes = self.nodes.lock().unwrap();
+
+        // Ensure destination does not exist
+        if let Some(parent_node) = nodes.get(&new_parent_id) {
+            if let NodeKind::Directory { children } = &parent_node.kind {
+                if children.contains_key(&new_name) {
+                    return Err(FsError::AlreadyExists);
+                }
+            } else {
+                return Err(FsError::NotADirectory);
+            }
+        } else {
+            return Err(FsError::NotFound);
+        }
+
+        // Remove from old parent's children and insert into new parent's children
+        // Also update ctime on the moved node and both directories
+        let now = FsCore::current_timestamp();
+
+        // Remove from old parent
+        if let Some(old_parent_node) = nodes.get_mut(&old_parent_id) {
+            if let NodeKind::Directory { children } = &mut old_parent_node.kind {
+                children.remove(&old_name);
+                old_parent_node.times.ctime = now;
+            }
+        }
+
+        // Insert into new parent
+        if let Some(new_parent_node) = nodes.get_mut(&new_parent_id) {
+            if let NodeKind::Directory { children } = &mut new_parent_node.kind {
+                children.insert(new_name, old_id);
+                new_parent_node.times.ctime = now;
+            }
+        }
+
+        // Update moved node's ctime
+        if let Some(node) = nodes.get_mut(&old_id) {
+            node.times.ctime = now;
+        }
 
         Ok(())
     }

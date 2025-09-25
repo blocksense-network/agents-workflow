@@ -138,6 +138,40 @@ fn fs_error_to_af_result(err: &agentfs_core::FsError) -> AfResult {
     }
 }
 
+/// Resolve a path to internal node ID and parent ID for stable identity mapping on adapters
+#[no_mangle]
+pub extern "C" fn af_resolve_id(
+    fs: AfFs,
+    path: *const c_char,
+    out_node_id: *mut u64,
+    out_parent_id: *mut u64,
+) -> AfResult {
+    if path.is_null() || out_node_id.is_null() {
+        return AfResult::AfErrInval;
+    }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+    match core.resolve_path_public(Path::new(path_str)) {
+        Ok((nid, pid_opt)) => {
+            unsafe {
+                *out_node_id = nid;
+                if !out_parent_id.is_null() {
+                    *out_parent_id = pid_opt.unwrap_or(0);
+                }
+            }
+            AfResult::AfOk
+        }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
 /// Snapshot operations
 #[no_mangle]
 pub extern "C" fn af_snapshot_create(
@@ -443,23 +477,18 @@ pub extern "C" fn af_stats(fs: AfFs, out_stats: *mut u8, stats_size: usize) -> A
 
     // Binary format: branches(u32) + snapshots(u32) + open_handles(u32) + bytes_in_memory(u64) + bytes_spilled(u64)
     // Total: 4 + 4 + 4 + 8 + 8 = 28 bytes
-    if stats_size >= 28 {
-        unsafe {
-            // Write branches (u32)
-            *(out_stats as *mut u32) = stats.branches;
-            // Write snapshots (u32)
-            *(((out_stats as usize) + 4) as *mut u32) = stats.snapshots;
-            // Write open_handles (u32)
-            *(((out_stats as usize) + 8) as *mut u32) = stats.open_handles;
-            // Write bytes_in_memory (u64)
-            *(((out_stats as usize) + 12) as *mut u64) = stats.bytes_in_memory;
-            // Write bytes_spilled (u64)
-            *(((out_stats as usize) + 20) as *mut u64) = stats.bytes_spilled;
-        }
-        AfResult::AfOk
-    } else {
-        AfResult::AfErrInval
+    if stats_size < 28 { return AfResult::AfErrInval; }
+
+    unsafe {
+        // Helper to write unaligned integers in little-endian order
+        let base = out_stats;
+        std::ptr::copy_nonoverlapping(stats.branches.to_le_bytes().as_ptr(), base.add(0), 4);
+        std::ptr::copy_nonoverlapping(stats.snapshots.to_le_bytes().as_ptr(), base.add(4), 4);
+        std::ptr::copy_nonoverlapping(stats.open_handles.to_le_bytes().as_ptr(), base.add(8), 4);
+        std::ptr::copy_nonoverlapping(stats.bytes_in_memory.to_le_bytes().as_ptr(), base.add(12), 8);
+        std::ptr::copy_nonoverlapping(stats.bytes_spilled.to_le_bytes().as_ptr(), base.add(20), 8);
     }
+    AfResult::AfOk
 }
 
 /// Get file attributes
@@ -482,28 +511,162 @@ pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, 
 
     match core.getattr(std::path::Path::new(path_str)) {
         Ok(attrs) => {
-            // Serialize to a simple binary format
-            // For now, return minimal attributes that are available
-            let file_type = if attrs.is_symlink {
-                2u8 // symlink
-            } else if attrs.is_dir {
-                1u8 // directory
-            } else {
-                0u8 // regular file
-            };
+            // Rich binary format for FSKit bridge (little endian):
+            // off 0:  len              u64
+            // off 8:  file_type        u8  (0=file,1=dir,2=symlink)
+            // off 9:  mode             u32 (POSIX mode)
+            // off 13: atime            i64 (seconds)
+            // off 21: mtime            i64
+            // off 29: ctime            i64
+            // off 37: birthtime        i64
+            // total 45 bytes; align to 48 for safety
+            let min = 48usize;
+            if attrs_size < min { return AfResult::AfErrInval; }
 
-            // Simple binary format: size(8) + file_type(1) = 9 bytes minimum
-            if attrs_size >= 9 {
-                unsafe {
-                    // Write size (u64)
-                    *(out_attrs as *mut u64) = attrs.len;
-                    // Write file_type (u8)
-                    *(((out_attrs as usize) + 8) as *mut u8) = file_type;
-                }
-                AfResult::AfOk
-            } else {
-                AfResult::AfErrInval
+            let file_type = if attrs.is_symlink { 2u8 } else if attrs.is_dir { 1u8 } else { 0u8 };
+
+            // Synthesize a POSIX-like mode from per-class FileMode and dir bit
+            let mut mode: u32 = 0;
+            let (ur, uw, ux) = (attrs.mode_user.read, attrs.mode_user.write, attrs.mode_user.exec);
+            let (gr, gw, gx) = (attrs.mode_group.read, attrs.mode_group.write, attrs.mode_group.exec);
+            let (or, ow, ox) = (attrs.mode_other.read, attrs.mode_other.write, attrs.mode_other.exec);
+            if ur { mode |= 0o400 } if uw { mode |= 0o200 } if ux { mode |= 0o100 }
+            if gr { mode |= 0o040 } if gw { mode |= 0o020 } if gx { mode |= 0o010 }
+            if or { mode |= 0o004 } if ow { mode |= 0o002 } if ox { mode |= 0o001 }
+            if attrs.is_dir { mode |= 0o040000 } else if attrs.is_symlink { mode |= 0o120000 } else { mode |= 0o100000 }
+
+            unsafe {
+                let base = out_attrs;
+                std::ptr::copy_nonoverlapping(attrs.len.to_le_bytes().as_ptr(), base.add(0), 8);
+                *base.add(8) = file_type;
+                std::ptr::copy_nonoverlapping(mode.to_le_bytes().as_ptr(), base.add(9), 4);
+                std::ptr::copy_nonoverlapping(attrs.times.atime.to_le_bytes().as_ptr(), base.add(13), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.mtime.to_le_bytes().as_ptr(), base.add(21), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.ctime.to_le_bytes().as_ptr(), base.add(29), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.birthtime.to_le_bytes().as_ptr(), base.add(37), 8);
             }
+            AfResult::AfOk
+        }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Set times (utimens-like) on a path
+#[no_mangle]
+pub extern "C" fn af_set_times(
+    fs: AfFs,
+    path: *const c_char,
+    atime: i64,
+    mtime: i64,
+    ctime: i64,
+    birthtime: i64,
+) -> AfResult {
+    if path.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let times = agentfs_core::FileTimes { atime, mtime, ctime, birthtime };
+    match core.set_times(std::path::Path::new(path_str), times) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+}
+
+/// Set mode (chmod-like)
+#[no_mangle]
+pub extern "C" fn af_set_mode(fs: AfFs, path: *const c_char, mode: u32) -> AfResult {
+    if path.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core.set_mode(std::path::Path::new(path_str), mode) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+}
+
+/// Rename path (no overwrite)
+#[no_mangle]
+pub extern "C" fn af_rename(fs: AfFs, old_path: *const c_char, new_path: *const c_char) -> AfResult {
+    if old_path.is_null() || new_path.is_null() { return AfResult::AfErrInval; }
+    let old_str = match unsafe { CStr::from_ptr(old_path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let new_str = match unsafe { CStr::from_ptr(new_path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core.rename(std::path::Path::new(old_str), std::path::Path::new(new_str)) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+}
+
+/// Enumerate directory names (NUL-delimited into buffer)
+#[no_mangle]
+pub extern "C" fn af_readdir(fs: AfFs, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+    if path.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core_ref: &agentfs_core::vfs::FsCore = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core_ref.readdir_plus(std::path::Path::new(path_str)) {
+        Ok(entries) => {
+            let mut offset = 0usize;
+            for (e, _attrs) in entries {
+                let name_bytes = e.name.as_bytes();
+                let need = name_bytes.len() + 1; // plus NUL
+                if offset + need > buf_size { break; }
+                unsafe { ptr::copy_nonoverlapping(name_bytes.as_ptr(), out_buf.add(offset), name_bytes.len()); }
+                offset += name_bytes.len();
+                unsafe { *out_buf.add(offset) = 0; }
+                offset += 1;
+            }
+            unsafe { *out_len = offset; }
+            AfResult::AfOk
+        }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Xattr get
+#[no_mangle]
+pub extern "C" fn af_xattr_get(fs: AfFs, path: *const c_char, name: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+    if path.is_null() || name.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let name_str = match unsafe { CStr::from_ptr(name) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core.xattr_get(std::path::Path::new(path_str), name_str) {
+        Ok(val) => {
+            let n = val.len().min(buf_size);
+            unsafe { ptr::copy_nonoverlapping(val.as_ptr(), out_buf, n); *out_len = n; }
+            AfResult::AfOk
+        }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Xattr set
+#[no_mangle]
+pub extern "C" fn af_xattr_set(fs: AfFs, path: *const c_char, name: *const c_char, value: *const u8, value_len: usize) -> AfResult {
+    if path.is_null() || name.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let name_str = match unsafe { CStr::from_ptr(name) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let val = if value.is_null() { Vec::new() } else { unsafe { std::slice::from_raw_parts(value, value_len).to_vec() } };
+    match core.xattr_set(std::path::Path::new(path_str), name_str, &val) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+}
+
+/// Xattr list - returns NUL-delimited names
+#[no_mangle]
+pub extern "C" fn af_xattr_list(fs: AfFs, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+    if path.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core.xattr_list(std::path::Path::new(path_str)) {
+        Ok(names) => {
+            let mut offset = 0usize;
+            for n in names {
+                let bytes = n.as_bytes();
+                let need = bytes.len() + 1;
+                if offset + need > buf_size { break; }
+                unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), out_buf.add(offset), bytes.len()); }
+                offset += bytes.len();
+                unsafe { *out_buf.add(offset) = 0; }
+                offset += 1;
+            }
+            unsafe { *out_len = offset; }
+            AfResult::AfOk
         }
         Err(e) => fs_error_to_af_result(&e),
     }

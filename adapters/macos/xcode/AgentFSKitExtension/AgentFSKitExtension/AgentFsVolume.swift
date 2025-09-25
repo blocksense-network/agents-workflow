@@ -6,8 +6,8 @@ import os
 @_silgen_name("agentfs_bridge_statfs")
 func agentfs_bridge_statfs(_ core: UnsafeMutableRawPointer?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
 
-@_silgen_name("agentfs_bridge_stat")
-func agentfs_bridge_stat(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
+@_silgen_name("agentfs_bridge_getattr")
+func agentfs_bridge_getattr(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
 
 @_silgen_name("af_stats")
 func af_stats(_ fs: UInt64, _ out_stats: UnsafeMutablePointer<UInt8>?, _ stats_size: size_t) -> Int32
@@ -16,7 +16,7 @@ func af_stats(_ fs: UInt64, _ out_stats: UnsafeMutablePointer<UInt8>?, _ stats_s
 func agentfs_bridge_mkdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
 
 @_silgen_name("agentfs_bridge_readdir")
-func agentfs_bridge_readdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
+func agentfs_bridge_readdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
 
 @_silgen_name("agentfs_bridge_open")
 func agentfs_bridge_open(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
@@ -29,10 +29,6 @@ func agentfs_bridge_write(_ core: UnsafeMutableRawPointer?, _ handle: UInt64, _ 
 
 @_silgen_name("agentfs_bridge_close")
 func agentfs_bridge_close(_ core: UnsafeMutableRawPointer?, _ handle: UInt64) -> Int32
-
-@_silgen_name("agentfs_bridge_getattr")
-func agentfs_bridge_getattr(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
-
 
 @_silgen_name("agentfs_bridge_symlink")
 func agentfs_bridge_symlink(_ core: UnsafeMutableRawPointer?, _ target: UnsafePointer<CChar>?, _ linkpath: UnsafePointer<CChar>?) -> Int32
@@ -48,6 +44,24 @@ func agentfs_bridge_rmdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointe
 
 @_silgen_name("agentfs_bridge_unlink")
 func agentfs_bridge_unlink(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?) -> Int32
+
+@_silgen_name("agentfs_bridge_set_times")
+func agentfs_bridge_set_times(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ atime: Int64, _ mtime: Int64, _ ctime: Int64, _ birthtime: Int64) -> Int32
+
+@_silgen_name("agentfs_bridge_set_mode")
+func agentfs_bridge_set_mode(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
+
+@_silgen_name("agentfs_bridge_xattr_get")
+func agentfs_bridge_xattr_get(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
+
+@_silgen_name("agentfs_bridge_xattr_set")
+func agentfs_bridge_xattr_set(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ value: UnsafeRawPointer?, _ value_len: size_t) -> Int32
+
+@_silgen_name("agentfs_bridge_xattr_list")
+func agentfs_bridge_xattr_list(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
+
+@_silgen_name("agentfs_bridge_resolve_id")
+func agentfs_bridge_resolve_id(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ node_id: UnsafeMutablePointer<UInt64>?, _ parent_id: UnsafeMutablePointer<UInt64>?) -> Int32
 
 @available(macOS 15.4, *)
 final class AgentFsVolume: FSVolume {
@@ -79,7 +93,7 @@ final class AgentFsVolume: FSVolume {
 
     private let resource: FSResource
     private let coreHandle: UnsafeMutableRawPointer?
-    private let coreHandleLock = OSAllocatedUnfairLock<Void>()
+    private let coreQueue = DispatchQueue(label: "com.agentfs.AgentFSKitExtension.core")
 
     /// Generate persistent item IDs for directory entries
     private static let itemIdCounter: OSAllocatedUnfairLock<UInt64> = {
@@ -173,9 +187,6 @@ extension AgentFsVolume: FSVolume.Operations {
         // sufficient namespace for all practical use cases
         capabilities.supports64BitObjectIDs = true
 
-        // caseFormat defaults to case sensitive (.caseSensitive) for Unix-style filesystems,
-        // which is appropriate for AgentFS as a POSIX-like filesystem
-
         return capabilities
     }
 
@@ -235,15 +246,15 @@ extension AgentFsVolume: FSVolume.Operations {
             result.totalFiles = UInt64(max(10000, Int(openHandles) * 10))
             result.freeFiles = result.totalFiles - UInt64(min(Int(result.totalFiles), Int(openHandles)))
         } else {
-            logger.warning("Failed to get AgentFS stats, using defaults: error \(statsResult)")
-            // Fallback to reasonable defaults
+            logger.warning("Failed to get AgentFS stats, using conservative defaults: error \(statsResult)")
+            // Conservative defaults: unknown sizes => report minimal non-zero units
             result.blockSize = 4096
             result.ioSize = 4096
-            result.totalBlocks = 1000000  // 4GB with 4K blocks
-            result.availableBlocks = result.totalBlocks
-            result.freeBlocks = result.totalBlocks
-            result.totalFiles = 100000
-            result.freeFiles = 100000
+            result.totalBlocks = 0
+            result.availableBlocks = 0
+            result.freeBlocks = 0
+            result.totalFiles = 0
+            result.freeFiles = 0
         }
 
         return result
@@ -270,38 +281,86 @@ extension AgentFsVolume: FSVolume.Operations {
         logger.debug("synchronize")
     }
 
+    private func fetchAttributesFor(_ agentItem: AgentFsItem) throws -> FSItem.Attributes {
+        var buffer = [CChar](repeating: 0, count: 64)
+        let ok = coreQueue.sync { () -> Bool in
+            return agentItem.path.withCString { agentfs_bridge_getattr(coreHandle, $0, &buffer, buffer.count) } == 0
+        }
+        guard ok else { throw fs_errorForPOSIXError(POSIXError.EIO.rawValue) }
+
+        let size = buffer.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
+        let fileTypeByte = buffer.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt8.self) }
+        let mode = buffer.withUnsafeBytes { $0.load(fromByteOffset: 9, as: UInt32.self) }
+        let atime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 13, as: Int64.self) }
+        let mtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 21, as: Int64.self) }
+        let ctime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 29, as: Int64.self) }
+        let birthtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 37, as: Int64.self) }
+
+        let attrs = FSItem.Attributes()
+        switch fileTypeByte {
+        case 0: attrs.type = .file
+        case 1: attrs.type = .directory
+        case 2: attrs.type = .symlink
+        default: attrs.type = .file
+        }
+        attrs.size = size
+        attrs.allocSize = size
+        attrs.mode = mode
+        attrs.parentID = agentItem.attributes.parentID
+        attrs.accessTime = timespec(tv_sec: Int(atime), tv_nsec: 0)
+        attrs.modifyTime = timespec(tv_sec: Int(mtime), tv_nsec: 0)
+        attrs.changeTime = timespec(tv_sec: Int(ctime), tv_nsec: 0)
+        attrs.birthTime = timespec(tv_sec: Int(birthtime), tv_nsec: 0)
+        return attrs
+    }
+
     func attributes(
         _ desiredAttributes: FSItem.GetAttributesRequest,
         of item: FSItem
     ) async throws -> FSItem.Attributes {
         guard let agentItem = item as? AgentFsItem else {
-            logger.debug("getItemAttributes2: \(item), \(desiredAttributes)")
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        logger.debug("getItemAttributes1: \(agentItem.name), \(desiredAttributes)")
-
-        // For the root item, return cached attributes
+        // Root: return cached
         if agentItem.attributes.fileID == FSItem.Identifier.rootDirectory {
             return agentItem.attributes
         }
 
-        // TODO: For other items, we should get attributes from Rust core
-        // For now, return cached attributes
-        return agentItem.attributes
+        return try fetchAttributesFor(agentItem)
     }
 
     func setAttributes(
         _ newAttributes: FSItem.SetAttributesRequest,
         on item: FSItem
     ) async throws -> FSItem.Attributes {
-        logger.debug("setItemAttributes: \(item), \(newAttributes)")
-        if let item = item as? AgentFsItem {
-            mergeAttributes(item.attributes, request: newAttributes)
-            return item.attributes
-        } else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+        guard let agentItem = item as? AgentFsItem else { throw fs_errorForPOSIXError(POSIXError.EIO.rawValue) }
+
+        // Support mode and times; others unsupported for now
+        if newAttributes.isValid(.mode) {
+            let mode = newAttributes.mode
+            let path = agentItem.path
+        let rc = coreQueue.sync { return path.withCString { agentfs_bridge_set_mode(coreHandle, $0, mode) } }
+            if rc != 0, let err = afResultToFSKitError(rc) { throw err }
         }
+
+        let atime = Int64(newAttributes.accessTime.tv_sec)
+        let mtime = Int64(newAttributes.modifyTime.tv_sec)
+        let ctime = Int64(newAttributes.changeTime.tv_sec)
+        let birthtime = Int64(newAttributes.birthTime.tv_sec)
+
+        var needTimes = false
+        if newAttributes.isValid(.accessTime) { needTimes = true }
+        if newAttributes.isValid(.modifyTime) { needTimes = true }
+        if newAttributes.isValid(.changeTime) { needTimes = true }
+        if newAttributes.isValid(.birthTime) { needTimes = true }
+        if needTimes {
+            let rc = coreQueue.sync { return agentItem.path.withCString { agentfs_bridge_set_times(coreHandle, $0, atime, mtime, ctime, birthtime) } }
+            if rc != 0, let err = afResultToFSKitError(rc) { throw err }
+        }
+
+        // Return fresh attributes
+        return try fetchAttributesFor(agentItem)
     }
 
     func lookupItem(
@@ -317,10 +376,17 @@ extension AgentFsVolume: FSVolume.Operations {
         // Construct the full path for the lookup
         let fullPath = constructPath(for: name, in: dirItem)
 
-        // Call Rust core to get item attributes
-        var buffer = [CChar](repeating: 0, count: 4096)
-        let result = fullPath.withCString { path_cstr in
-            agentfs_bridge_stat(coreHandle, path_cstr, &buffer, buffer.count)
+        // Resolve stable IDs for the item and its parent
+        var nodeId: UInt64 = 0
+        var parentId: UInt64 = 0
+        _ = fullPath.withCString { p in agentfs_bridge_resolve_id(coreHandle, p, &nodeId, &parentId) }
+
+        // Call Rust core to get item attributes (48-byte struct)
+        var buffer = [CChar](repeating: 0, count: 64)
+        let result = coreQueue.sync { () -> Int32 in
+            return fullPath.withCString { path_cstr in
+                agentfs_bridge_getattr(coreHandle, path_cstr, &buffer, buffer.count)
+            }
         }
 
         if result != 0 {
@@ -333,18 +399,32 @@ extension AgentFsVolume: FSVolume.Operations {
         }
 
         // Parse the attributes from the buffer
-        let item = AgentFsItem(name: name)
+        let item = AgentFsItem(name: name, id: nodeId)
         item.path = fullPath
+        item.attributes.fileID = FSItem.Identifier(rawValue: nodeId) ?? .invalid
+        if parentId != 0, let pid = FSItem.Identifier(rawValue: parentId) {
+            item.attributes.parentID = pid
+        }
 
-        // Parse attributes from buffer (size: u64, type: u8)
-        if buffer.count >= 9 {
+        // Parse attributes from buffer: size(8) + type(1) + mode(4) + times(4x i64)
+        if buffer.count >= 48 {
             let size = buffer.withUnsafeBytes { ptr in
                 ptr.load(fromByteOffset: 0, as: UInt64.self)
             }
-            let fileTypeByte = buffer[8]
+            let fileTypeByte = buffer.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt8.self) }
+            let mode = buffer.withUnsafeBytes { $0.load(fromByteOffset: 9, as: UInt32.self) }
+            let atime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 13, as: Int64.self) }
+            let mtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 21, as: Int64.self) }
+            let ctime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 29, as: Int64.self) }
+            let birthtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 37, as: Int64.self) }
 
             item.attributes.size = size
             item.attributes.allocSize = size
+            item.attributes.mode = mode
+            item.attributes.accessTime = timespec(tv_sec: Int(atime), tv_nsec: 0)
+            item.attributes.modifyTime = timespec(tv_sec: Int(mtime), tv_nsec: 0)
+            item.attributes.changeTime = timespec(tv_sec: Int(ctime), tv_nsec: 0)
+            item.attributes.birthTime = timespec(tv_sec: Int(birthtime), tv_nsec: 0)
 
             // Map file type byte to FSItem.ItemType
             switch fileTypeByte {
@@ -408,14 +488,14 @@ extension AgentFsVolume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        // Find the parent directory to construct the path
-        // For now, assume we can reconstruct the path
-        // TODO: Store path information in FSItem or implement proper path tracking
-        let linkPath = "/" + (agentItem.name.string ?? "")  // Simplified
+        // Use stored path for correct symlink location
+        let linkPath = agentItem.path
 
         var buffer = [CChar](repeating: 0, count: 4096)
-        let result = linkPath.withCString { path_cstr in
-            agentfs_bridge_readlink(coreHandle, path_cstr, &buffer, buffer.count)
+        let result = coreQueue.sync { () -> Int32 in
+            return linkPath.withCString { path_cstr in
+                agentfs_bridge_readlink(coreHandle, path_cstr, &buffer, buffer.count)
+            }
         }
 
         if result != 0 {
@@ -426,7 +506,11 @@ extension AgentFsVolume: FSVolume.Operations {
             }
         }
 
-        let targetPath = String(cString: buffer)
+        // Safely decode C buffer as UTF-8 up to first NUL
+        let targetPath: String = {
+            let bytes = Data(bytes: buffer, count: strnlen(buffer, buffer.count))
+            return String(decoding: bytes, as: UTF8.self)
+        }()
         return FSFileName(string: targetPath)
     }
 
@@ -442,7 +526,7 @@ extension AgentFsVolume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        let item = await AgentFsItem(name: name)
+        let item = AgentFsItem(name: name)
         item.path = constructPath(for: name, in: directory)
         mergeAttributes(item.attributes, request: newAttributes)
         item.attributes.parentID = directory.attributes.fileID
@@ -575,9 +659,11 @@ extension AgentFsVolume: FSVolume.Operations {
         let sourcePath = constructPath(for: sourceName, in: sourceDir)
         let destPath = constructPath(for: destinationName, in: destDir)
 
-        let result = sourcePath.withCString { src_cstr in
-            destPath.withCString { dst_cstr in
-                agentfs_bridge_rename(coreHandle, src_cstr, dst_cstr)
+        let result = coreQueue.sync { () -> Int32 in
+            return sourcePath.withCString { src_cstr in
+                destPath.withCString { dst_cstr in
+                    agentfs_bridge_rename(coreHandle, src_cstr, dst_cstr)
+                }
             }
         }
 
@@ -589,8 +675,9 @@ extension AgentFsVolume: FSVolume.Operations {
             }
         }
 
-        // Update item name for consistency (though path-based operations don't rely on this)
+        // Update item name and path to keep subsequent path-based ops correct
         agentItem.name = destinationName
+        agentItem.path = destPath
 
         return destinationName
     }
@@ -608,13 +695,16 @@ extension AgentFsVolume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        // Construct directory path
-        let dirPath = directory.name.string == "/" ? "/" : "/\(directory.name.string ?? "")"
+        // Construct directory path from stored path
+        let dirPath = directory.path
 
         // Call Rust core to read directory
-        var buffer = [CChar](repeating: 0, count: 8192) // Larger buffer for directory listing
-        let result = dirPath.withCString { path_cstr in
-            agentfs_bridge_readdir(coreHandle, path_cstr, &buffer, buffer.count)
+        var buffer = [CChar](repeating: 0, count: 16384) // Larger buffer for directory listing
+        var outLen: size_t = 0
+        let result = coreQueue.sync { () -> Int32 in
+            return dirPath.withCString { path_cstr in
+                agentfs_bridge_readdir(coreHandle, path_cstr, &buffer, buffer.count, &outLen)
+            }
         }
 
         if result != 0 {
@@ -631,10 +721,10 @@ extension AgentFsVolume: FSVolume.Operations {
         var entries: [String] = []
         var offset = 0
 
-        while offset < buffer.count {
+        while offset < outLen {
             // Find null terminator
             var endOffset = offset
-            while endOffset < buffer.count && buffer[endOffset] != 0 {
+            while endOffset < outLen && buffer[endOffset] != 0 {
                 endOffset += 1
             }
 
@@ -652,7 +742,7 @@ extension AgentFsVolume: FSVolume.Operations {
             offset = endOffset + 1
 
             // Stop if we hit a double null (end of list) or buffer end
-            if offset >= buffer.count || buffer[offset] == 0 {
+            if offset >= outLen || buffer[offset] == 0 {
                 break
             }
         }
@@ -660,7 +750,7 @@ extension AgentFsVolume: FSVolume.Operations {
         logger.debug("enumerateDirectory: found \(entries.count) entries in \(dirPath)")
 
         // Handle cookie-based enumeration
-        var currentCookie = cookie.rawValue
+        let currentCookie = cookie.rawValue
         var nextCookieValue = currentCookie
 
         // Always include "." and ".." first
@@ -703,13 +793,15 @@ extension AgentFsVolume: FSVolume.Operations {
                 // Determine entry type by trying to stat it (simplified)
                 var entryType = FSItem.ItemType.file
                 let entryPath = constructPath(for: FSFileName(string: entryName), in: directory)
-                var statBuffer = [CChar](repeating: 0, count: 4096)
-                let statResult = entryPath.withCString { path_cstr in
-                    agentfs_bridge_stat(coreHandle, path_cstr, &statBuffer, statBuffer.count)
+                var statBuffer = [CChar](repeating: 0, count: 64)
+                let statResult = coreQueue.sync { () -> Int32 in
+                    return entryPath.withCString { path_cstr in
+                        agentfs_bridge_getattr(coreHandle, path_cstr, &statBuffer, statBuffer.count)
+                    }
                 }
 
-                if statResult == 0 && statBuffer.count >= 9 {
-                    let fileTypeByte = statBuffer[8]
+                if statResult == 0 && statBuffer.count >= 48 {
+                    let fileTypeByte = statBuffer.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt8.self) }
                     switch fileTypeByte {
                     case 0: entryType = .file
                     case 1: entryType = .directory
@@ -721,17 +813,41 @@ extension AgentFsVolume: FSVolume.Operations {
                 // Create a temporary item for this entry to get attributes if requested
                 var entryAttributes: FSItem.Attributes? = nil
                 if attributes != nil {
-                    let tempItem = AgentFsItem(name: FSFileName(string: entryName))
-                    tempItem.path = entryPath
-                    tempItem.attributes.parentID = directory.attributes.fileID
-                    tempItem.attributes.type = entryType
-                    entryAttributes = tempItem.attributes
+                    // Fill from getattr for accuracy
+                    var abuf = [CChar](repeating: 0, count: 64)
+                    let ok = coreQueue.sync { () -> Bool in
+                        return entryPath.withCString { agentfs_bridge_getattr(coreHandle, $0, &abuf, abuf.count) } == 0
+                    }
+                    if ok {
+                        let size = abuf.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
+                        let mode = abuf.withUnsafeBytes { $0.load(fromByteOffset: 9, as: UInt32.self) }
+                        let atime = abuf.withUnsafeBytes { $0.load(fromByteOffset: 13, as: Int64.self) }
+                        let mtime = abuf.withUnsafeBytes { $0.load(fromByteOffset: 21, as: Int64.self) }
+                        let ctime = abuf.withUnsafeBytes { $0.load(fromByteOffset: 29, as: Int64.self) }
+                        let birthtime = abuf.withUnsafeBytes { $0.load(fromByteOffset: 37, as: Int64.self) }
+                        let attrs = FSItem.Attributes()
+                        attrs.type = entryType
+                        attrs.size = size
+                        attrs.allocSize = size
+                        attrs.mode = mode
+                        attrs.parentID = directory.attributes.fileID
+                        attrs.accessTime = timespec(tv_sec: Int(atime), tv_nsec: 0)
+                        attrs.modifyTime = timespec(tv_sec: Int(mtime), tv_nsec: 0)
+                        attrs.changeTime = timespec(tv_sec: Int(ctime), tv_nsec: 0)
+                        attrs.birthTime = timespec(tv_sec: Int(birthtime), tv_nsec: 0)
+                        entryAttributes = attrs
+                    }
                 }
+
+                // Resolve stable IDs for this entry
+                var nodeId: UInt64 = 0
+                var parentId: UInt64 = 0
+                _ = entryPath.withCString { p in agentfs_bridge_resolve_id(coreHandle, p, &nodeId, &parentId) }
 
                 let packResult = packer.packEntry(
                     name: FSFileName(string: entryName),
                     itemType: entryType,
-                    itemID: FSItem.Identifier(rawValue: AgentFsVolume.generatePersistentItemID()) ?? .invalid, // Generate persistent ID for this item
+                    itemID: FSItem.Identifier(rawValue: nodeId) ?? .invalid,
                     nextCookie: FSDirectoryCookie(nextCookieValue),
                     attributes: entryAttributes
                 )
@@ -744,7 +860,12 @@ extension AgentFsVolume: FSVolume.Operations {
         }
 
         logger.debug("enumerateDirectory: completed for \(dirPath) with \(entries.count) entries")
-        return FSDirectoryVerifier(0)
+        // Compute a simple verifier from directory path and entry count to detect changes between calls
+        var hasher = Hasher()
+        hasher.combine(dirPath)
+        hasher.combine(entries.count)
+        let v = hasher.finalize()
+        return FSDirectoryVerifier(UInt64(bitPattern: Int64(v)))
     }
 
     private func mergeAttributes(_ existing: FSItem.Attributes, request: FSItem.SetAttributesRequest) {
@@ -789,39 +910,33 @@ extension AgentFsVolume: FSVolume.Operations {
         }
 
         if request.isValid(FSItem.Attribute.accessTime) {
-            let timespec = timespec()
-            request.accessTime = timespec
-            existing.accessTime = timespec
+            let ts = timespec(tv_sec: Int(request.accessTime.tv_sec), tv_nsec: Int(request.accessTime.tv_nsec))
+            existing.accessTime = ts
         }
 
         if request.isValid(FSItem.Attribute.changeTime) {
-            let timespec = timespec()
-            request.changeTime = timespec
-            existing.changeTime = timespec
+            let ts = timespec(tv_sec: Int(request.changeTime.tv_sec), tv_nsec: Int(request.changeTime.tv_nsec))
+            existing.changeTime = ts
         }
 
         if request.isValid(FSItem.Attribute.modifyTime) {
-            let timespec = timespec()
-            request.modifyTime = timespec
-            existing.modifyTime = timespec
+            let ts = timespec(tv_sec: Int(request.modifyTime.tv_sec), tv_nsec: Int(request.modifyTime.tv_nsec))
+            existing.modifyTime = ts
         }
 
         if request.isValid(FSItem.Attribute.addedTime) {
-            let timespec = timespec()
-            request.addedTime = timespec
-            existing.addedTime = timespec
+            let ts = timespec(tv_sec: Int(request.addedTime.tv_sec), tv_nsec: Int(request.addedTime.tv_nsec))
+            existing.addedTime = ts
         }
 
         if request.isValid(FSItem.Attribute.birthTime) {
-            let timespec = timespec()
-            request.birthTime = timespec
-            existing.birthTime = timespec
+            let ts = timespec(tv_sec: Int(request.birthTime.tv_sec), tv_nsec: Int(request.birthTime.tv_nsec))
+            existing.birthTime = ts
         }
 
         if request.isValid(FSItem.Attribute.backupTime) {
-            let timespec = timespec()
-            request.backupTime = timespec
-            existing.backupTime = timespec
+            let ts = timespec(tv_sec: Int(request.backupTime.tv_sec), tv_nsec: Int(request.backupTime.tv_nsec))
+            existing.backupTime = ts
         }
     }
 }
@@ -835,7 +950,7 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
             return
         }
 
-        logger.debug("open: \(String(describing: agentItem.name.string ?? "unknown")), modes: \(String(describing: modes))")
+        logger.debug("open: \(String(describing: agentItem.name.string ?? "unknown")), modes: \(String(describing: modes)))")
 
         // Only open handles for regular files
         guard agentItem.attributes.type == .file else {
@@ -848,14 +963,22 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
             return
         }
 
-        // Open file handle using Rust FFI
+        // Map FSVolume.OpenModes to options JSON for FFI
         let itemPath = agentItem.path
         var handle: UInt64 = 0
-        let optionsJson = "{}" // Default options - could be extended for read/write modes
+        let wantsRead = modes.contains(.read)
+        let wantsWrite = modes.contains(.write)
+        // FSKit exposes create/truncate intent via GetAttributesRequest during createItem;
+        // OpenModes typically covers read/write only. Synthesize conservative defaults here.
+        let wantsCreate = false
+        let wantsTruncate = false
+        let optionsJson = "{\"read\":\(wantsRead),\"write\":\(wantsWrite),\"create\":\(wantsCreate),\"truncate\":\(wantsTruncate)}"
 
-        let result = optionsJson.withCString { options_cstr in
-            itemPath.withCString { path_cstr in
-                agentfs_bridge_open(coreHandle, path_cstr, options_cstr, &handle)
+        let result = coreQueue.sync { () -> Int32 in
+            return optionsJson.withCString { options_cstr in
+                itemPath.withCString { path_cstr in
+                    agentfs_bridge_open(coreHandle, path_cstr, options_cstr, &handle)
+                }
             }
         }
 
@@ -879,7 +1002,7 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
             return
         }
 
-        logger.debug("close: \(String(describing: agentItem.name.string ?? "unknown")), modes: \(String(describing: modes))")
+        logger.debug("close: \(String(describing: agentItem.name.string ?? "unknown")), modes: \(String(describing: modes)))")
 
         // Only close handles for regular files
         guard agentItem.attributes.type == .file else {
@@ -893,7 +1016,7 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
         }
 
         // Close file handle using Rust FFI
-        let result = agentfs_bridge_close(coreHandle, handle)
+        let result = coreQueue.sync { agentfs_bridge_close(coreHandle, handle) }
 
         if result != 0 {
             logger.warning("close: failed to close handle \(handle), error: \(result)")
@@ -927,8 +1050,10 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         var readData = Data(count: length)
         var bytesRead: UInt32 = 0
 
-        let result = readData.withUnsafeMutableBytes { bufferPtr in
-            agentfs_bridge_read(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
+        let result = coreQueue.sync { () -> Int32 in
+            return readData.withUnsafeMutableBytes { bufferPtr in
+                agentfs_bridge_read(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
+            }
         }
 
         if result != 0 {
@@ -943,7 +1068,7 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         let actualBytesRead = Int(bytesRead)
         if actualBytesRead > 0 {
             let dataToCopy = readData.prefix(actualBytesRead)
-            dataToCopy.withUnsafeBytes { srcPtr in
+            _ = dataToCopy.withUnsafeBytes { srcPtr in
                 buffer.withUnsafeMutableBytes { dstPtr in
                     memcpy(dstPtr.baseAddress, srcPtr.baseAddress, actualBytesRead)
                 }
@@ -968,8 +1093,10 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         }
 
         var bytesWritten: UInt32 = 0
-        let result = data.withUnsafeBytes { bufferPtr in
-            agentfs_bridge_write(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
+        let result = coreQueue.sync { () -> Int32 in
+            return data.withUnsafeBytes { bufferPtr in
+                agentfs_bridge_write(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
+            }
         }
 
         if result != 0 {
@@ -980,7 +1107,14 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
             }
         }
 
-        return Int(bytesWritten)
+        let written = Int(bytesWritten)
+        // Refresh attributes after write so FSKit sees updated size/times promptly
+        do {
+            let _ = try fetchAttributesFor(agentItem)
+        } catch {
+            // ignore best-effort refresh errors
+        }
+        return written
     }
 }
 
@@ -990,42 +1124,85 @@ extension AgentFsVolume: FSVolume.XattrOperations {
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         logger.debug("xattr: \(item) - \(name.string ?? "NA")")
 
-        if let item = item as? AgentFsItem {
-            return item.xattrs[name] ?? Data()
-        } else {
-            return Data()
+        guard let agentItem = item as? AgentFsItem, let key = name.string else {
+            throw fs_errorForPOSIXError(POSIXError.EINVAL.rawValue)
         }
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        var outLen: size_t = 0
+        let rc = coreQueue.sync { () -> Int32 in
+            return agentItem.path.withCString { p in
+                return key.withCString { n in
+                    return buffer.withUnsafeMutableBytes { bufPtr in
+                        agentfs_bridge_xattr_get(coreHandle, p, n, bufPtr.baseAddress, bufPtr.count, &outLen)
+                    }
+                }
+            }
+        }
+        if rc != 0, let err = afResultToFSKitError(rc) { throw err }
+        return Data(buffer.prefix(Int(outLen)))
     }
 
     func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
         logger.debug("setXattrOf: \(item)")
-
-        if let item = item as? AgentFsItem {
-            item.xattrs[name] = value
+        guard let agentItem = item as? AgentFsItem, let key = name.string else {
+            throw fs_errorForPOSIXError(POSIXError.EINVAL.rawValue)
         }
+        let rc: Int32 = coreQueue.sync { () -> Int32 in
+            return agentItem.path.withCString { p in
+                return key.withCString { n in
+                    if let value = value {
+                        return value.withUnsafeBytes { bufPtr in
+                            agentfs_bridge_xattr_set(coreHandle, p, n, bufPtr.baseAddress, bufPtr.count)
+                        }
+                    } else {
+                        return agentfs_bridge_xattr_set(coreHandle, p, n, nil, 0)
+                    }
+                }
+            }
+        }
+        if rc != 0, let err = afResultToFSKitError(rc) { throw err }
     }
 
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
         logger.debug("listXattrs: \(item)")
-
-        if let item = item as? AgentFsItem {
-            return Array(item.xattrs.keys)
-        } else {
-            return []
+        guard let agentItem = item as? AgentFsItem else { throw fs_errorForPOSIXError(POSIXError.EINVAL.rawValue) }
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        var outLen: size_t = 0
+        let rc = coreQueue.sync { () -> Int32 in
+            return agentItem.path.withCString { p in
+                return buffer.withUnsafeMutableBytes { bufPtr in
+                    agentfs_bridge_xattr_list(coreHandle, p, bufPtr.baseAddress, bufPtr.count, &outLen)
+                }
+            }
         }
+        if rc != 0, let err = afResultToFSKitError(rc) { throw err }
+        // Parse NUL-delimited names
+        var names: [FSFileName] = []
+        var start = 0
+        let total = Int(outLen)
+        while start < total {
+            var end = start
+            while end < total && buffer[end] != 0 { end += 1 }
+            if end > start {
+                let s = String(bytes: buffer[start..<end], encoding: .utf8) ?? ""
+                names.append(FSFileName(string: s))
+            }
+            start = end + 1
+        }
+        return names
     }
 }
 
-    // MARK: - Helper Methods
+// MARK: - Helper Methods
 
-    private func constructPath(for name: FSFileName, in directory: AgentFsItem) -> String {
-        // Build path relative to volume root using the directory's path
-        let nameStr = name.string ?? ""
+private func constructPath(for name: FSFileName, in directory: AgentFsItem) -> String {
+    // Build path relative to volume root using the directory's path
+    let nameStr = name.string ?? ""
 
-        // Use the directory's stored path to build the full path
-        if directory.path == "/" {
-            return "/" + nameStr
-        } else {
-            return directory.path + "/" + nameStr
-        }
+    // Use the directory's stored path to build the full path
+    if directory.path == "/" {
+        return "/" + nameStr
+    } else {
+        return directory.path + "/" + nameStr
     }
+}

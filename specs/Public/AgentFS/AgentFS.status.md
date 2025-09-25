@@ -205,6 +205,7 @@ All crates target stable Rust. Platform‑specific hosts are conditionally compi
 - [x] Event subscription receives create/remove/rename and snapshot/branch events
 - [x] Stats report non-zero counters after representative workload
 - [x] Readdir+ returns attributes without extra getattr calls
+- [x] Core `rename`, `set_mode`, and `set_times` covered by unit tests (sorted `readdir_plus` ordering verified)
 
 **M7. FUSE adapter host (Linux)** COMPLETED (4–6d)
 

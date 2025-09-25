@@ -163,8 +163,9 @@ mod tests {
         core.mkdir("/testdir".as_ref(), 0o755).unwrap();
 
         // List root directory - should contain testdir
-        let entries = core.readdir("/".as_ref()).unwrap();
-        assert!(entries.iter().any(|e| e.name == "testdir" && e.is_dir));
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+        let names: Vec<_> = entries.iter().map(|(e, _)| e.name.as_str()).collect();
+        assert!(names.contains(&"testdir"));
 
         // Create file in directory
         let h = core.create("/testdir/file.txt".as_ref(), &rw_create()).unwrap();
@@ -172,8 +173,9 @@ mod tests {
         core.close(h).unwrap();
 
         // List directory - should contain file.txt
-        let entries = core.readdir("/testdir".as_ref()).unwrap();
-        assert!(entries.iter().any(|e| e.name == "file.txt" && !e.is_dir));
+        let entries = core.readdir_plus("/testdir".as_ref()).unwrap();
+        let names: Vec<_> = entries.iter().map(|(e, _)| e.name.as_str()).collect();
+        assert!(names.contains(&"file.txt"));
 
         // Remove directory (should fail if not empty)
         assert!(core.rmdir("/testdir".as_ref()).is_err());
@@ -185,8 +187,50 @@ mod tests {
         core.rmdir("/testdir".as_ref()).unwrap();
 
         // Directory should be gone
-        let entries = core.readdir("/".as_ref()).unwrap();
-        assert!(!entries.iter().any(|e| e.name == "testdir"));
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+        let names: Vec<_> = entries.iter().map(|(e, _)| e.name.as_str()).collect();
+        assert!(!names.contains(&"testdir"));
+    }
+
+    #[test]
+    fn test_rename_and_sorted_readdir() {
+        let core = test_core();
+        core.mkdir("/dir".as_ref(), 0o755).unwrap();
+        // Create files out of order
+        let h1 = core.create("/dir/b.txt".as_ref(), &rw_create()).unwrap();
+        core.close(h1).unwrap();
+        let h2 = core.create("/dir/a.txt".as_ref(), &rw_create()).unwrap();
+        core.close(h2).unwrap();
+
+        // Sorted listing
+        let entries = core.readdir_plus("/dir".as_ref()).unwrap();
+        let names: Vec<_> = entries.iter().map(|(e, _)| e.name.as_str()).collect();
+        assert_eq!(names, vec!["a.txt", "b.txt"]);
+
+        // Rename a.txt -> c.txt
+        core.rename("/dir/a.txt".as_ref(), "/dir/c.txt".as_ref()).unwrap();
+        let entries2 = core.readdir_plus("/dir".as_ref()).unwrap();
+        let names2: Vec<_> = entries2.iter().map(|(e, _)| e.name.as_str()).collect();
+        assert_eq!(names2, vec!["b.txt", "c.txt"]);
+    }
+
+    #[test]
+    fn test_set_mode_and_times() {
+        let core = test_core();
+        let h = core.create("/file".as_ref(), &rw_create()).unwrap();
+        core.close(h).unwrap();
+
+        // Get current attributes
+        let before = core.getattr("/file".as_ref()).unwrap();
+
+        // Change mode and times
+        core.set_mode("/file".as_ref(), 0o600).unwrap();
+        let new_times = FileTimes { atime: before.times.atime + 10, mtime: before.times.mtime + 10, ctime: before.times.ctime + 10, birthtime: before.times.birthtime };
+        core.set_times("/file".as_ref(), new_times).unwrap();
+
+        // Verify
+        let after = core.getattr("/file".as_ref()).unwrap();
+        assert!(after.times.ctime >= new_times.ctime);
     }
 
     #[test]
@@ -809,10 +853,10 @@ mod tests {
         assert_eq!(target, "target.txt");
 
         // Verify symlink appears in directory listing
-        let entries = core.readdir("/".as_ref()).unwrap();
-        let link_entry = entries.iter().find(|e| e.name == "link.txt").unwrap();
-        assert!(link_entry.is_symlink);
-        assert_eq!(link_entry.len, 10); // length of "target.txt"
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+        let link_entry = entries.iter().find(|(e, _)| e.name == "link.txt").unwrap();
+        assert!(link_entry.0.is_symlink);
+        assert_eq!(link_entry.0.len, 10);
 
         // Verify symlink attributes
         let attrs = core.getattr("/link.txt".as_ref()).unwrap();
@@ -957,10 +1001,10 @@ mod tests {
         core.symlink("outside", "/testdir/inside_link".as_ref()).unwrap();
 
         // List directory contents
-        let entries = core.readdir("/testdir".as_ref()).unwrap();
+        let entries = core.readdir_plus("/testdir".as_ref()).unwrap();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "inside_link");
-        assert!(entries[0].is_symlink);
+        assert_eq!(entries[0].0.name, "inside_link");
+        assert!(entries[0].0.is_symlink);
 
         // Remove directory with symlink inside should fail
         assert!(core.rmdir("/testdir".as_ref()).is_err());
@@ -1024,8 +1068,8 @@ mod tests {
         }
 
         // Verify directory listing shows all symlinks
-        let entries = core.readdir("/".as_ref()).unwrap();
-        let symlink_count = entries.iter().filter(|e| e.is_symlink).count();
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+        let symlink_count = entries.iter().filter(|(e, _)| e.is_symlink).count();
         assert_eq!(symlink_count, 3);
     }
 }

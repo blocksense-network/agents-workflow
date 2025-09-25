@@ -18,7 +18,12 @@
       "name": "Debug Current Test File",
       "request": "launch",
       "script": "${file}",
-      "args": ["-I", "lib", "-I", "test"],
+      "args": [
+        "-I",
+        "lib",
+        "-I",
+        "test"
+      ],
       "askParameters": false,
       "cwd": "${workspaceFolder}",
       "env": {},
@@ -30,12 +35,35 @@
       "name": "Debug All Tests",
       "request": "launch",
       "script": "test/run_tests_shell.rb",
-      "args": ["-I", "lib", "-I", "test"],
+      "args": [
+        "-I",
+        "lib",
+        "-I",
+        "test"
+      ],
       "askParameters": false,
       "cwd": "${workspaceFolder}",
       "env": {},
       "useBundler": false,
       "rdbgPath": "ruby ${workspaceFolder}/scripts/rdbg-wrapper"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:AgentFS}/adapters/macos/xcode/AgentFSKitExtension",
+      "name": "Debug AgentFSKitExtension (adapters/macos/xcode/AgentFSKitExtension)",
+      "program": "${workspaceFolder:AgentFS}/adapters/macos/xcode/AgentFSKitExtension/.build/debug/AgentFSKitExtension",
+      "preLaunchTask": "swift: Build Debug AgentFSKitExtension (adapters/macos/xcode/AgentFSKitExtension)"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:AgentFS}/adapters/macos/xcode/AgentFSKitExtension",
+      "name": "Release AgentFSKitExtension (adapters/macos/xcode/AgentFSKitExtension)",
+      "program": "${workspaceFolder:AgentFS}/adapters/macos/xcode/AgentFSKitExtension/.build/release/AgentFSKitExtension",
+      "preLaunchTask": "swift: Build Release AgentFSKitExtension (adapters/macos/xcode/AgentFSKitExtension)"
     }
   ]
 }
