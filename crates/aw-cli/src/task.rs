@@ -3,11 +3,12 @@ use clap::{Args, Subcommand};
 use anyhow::{Result, Context};
 use aw_repo::VcsRepo;
 use aw_core::{
-    AgentTasks, PushHandler, PushOptions,
+    AgentTasks, DatabaseManager, PushHandler, PushOptions,
     devshell_names, parse_push_to_remote_flag,
     edit_content_interactive, EditorError
 };
 use aw_fs_snapshots::PreparedWorkspace;
+use aw_local_db::{SessionRecord, TaskRecord, FsSnapshotRecord};
 use crate::sandbox::{parse_bool_flag, prepare_workspace_with_fallback};
 
 /// Task-related commands
@@ -153,6 +154,25 @@ impl TaskCreateArgs {
             anyhow::bail!("Aborted: empty task prompt.");
         }
 
+        // Initialize database manager
+        let db_manager = DatabaseManager::new()
+            .context("Failed to initialize database")?;
+
+        // Get or create repository record
+        let repo_id = db_manager.get_or_create_repo(&repo)
+            .context("Failed to get or create repository record")?;
+
+        // Get or create agent record (for now, use placeholder "codex" agent)
+        let agent_id = db_manager.get_or_create_agent("codex", "latest")
+            .context("Failed to get or create agent record")?;
+
+        // Get or create runtime record
+        let runtime_id = db_manager.get_or_create_local_runtime()
+            .context("Failed to get or create runtime record")?;
+
+        // Generate session ID
+        let session_id = DatabaseManager::generate_session_id();
+
         // Create task and commit
         let tasks = AgentTasks::new(repo.root())
             .context("Failed to initialize agent tasks")?;
@@ -178,6 +198,50 @@ impl TaskCreateArgs {
         // Success - mark as committed and don't cleanup branch
         task_committed = true;
         cleanup_branch = false;
+
+        // Create session record
+        let session_record = SessionRecord {
+            id: session_id.clone(),
+            repo_id: Some(repo_id),
+            workspace_id: None, // No workspaces in local mode
+            agent_id: Some(agent_id),
+            runtime_id: Some(runtime_id),
+            multiplexer_kind: None, // TODO: Set when multiplexer integration is added
+            mux_session: None,
+            mux_window: None,
+            pane_left: None,
+            pane_right: None,
+            pid_agent: None,
+            status: "created".to_string(),
+            log_path: None,
+            workspace_path: None,
+            started_at: chrono::Utc::now().to_rfc3339(),
+            ended_at: None,
+        };
+
+        db_manager.create_session(&session_record)
+            .context("Failed to create session record")?;
+
+        // Create task record
+        let task_record = TaskRecord {
+            id: 0, // Will be set by autoincrement
+            session_id: session_id.clone(),
+            prompt: task_content.clone(),
+            branch: Some(actual_branch_name.clone()),
+            delivery: Some("branch".to_string()), // Default delivery method
+            instances: Some(1),
+            labels: None,
+            browser_automation: 1, // Default to enabled
+            browser_profile: None,
+            chatgpt_username: None,
+            codex_workspace: None,
+        };
+
+        let task_id = db_manager.create_task_record(&task_record)
+            .context("Failed to create task record")?;
+
+        // Log the created records for debugging
+        println!("Created session '{}' with task ID {}", session_id, task_id);
 
         // Create initial filesystem snapshot for time travel (if supported)
         // TODO: Once AgentFS integration is implemented, this will:
@@ -355,17 +419,8 @@ mod tests {
             branch: Some("feature-branch".to_string()),
             prompt: Some("Implement feature X".to_string()),
             prompt_file: None,
-            
             devshell: Some("dev".to_string()),
             push_to_remote: Some("yes".to_string()),
-            sandbox: "none".to_string(),
-            allow_network: "no".to_string(),
-            allow_containers: "no".to_string(),
-            allow_kvm: "no".to_string(),
-            seccomp: "no".to_string(),
-            seccomp_debug: "no".to_string(),
-            mount_rw: vec![],
-            overlay: vec![],
             non_interactive: true,
         };
 

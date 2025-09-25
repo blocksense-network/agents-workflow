@@ -15,6 +15,9 @@ pub enum Error {
     #[error("Serialization error: {0}")]
     Serde(#[from] serde_json::Error),
 
+    #[error("Database error: {0}")]
+    Database(#[from] aw_local_db::Error),
+
     #[error("Generic error: {0}")]
     Generic(String),
 }
