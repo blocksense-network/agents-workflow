@@ -141,7 +141,11 @@ class AgentFSControlService: NSObject, AgentFSControlProtocol, NSXPCListenerDele
         // 1. Process belongs to same team ID (requires audit token access)
         // 2. Process has specific entitlements
         // 3. Process is running as the same user
-        // For now, accept connections but log for monitoring
+        // For now, accept only same-process connections to reduce attack surface
+        if newConnection.processIdentifier != getpid() {
+            NSLog("AgentFSControl refusing XPC client pid=%d", newConnection.processIdentifier)
+            return false
+        }
         // TODO: Implement proper client authentication based on team ID or entitlements
         // Example: let clientPID = newConnection.processIdentifier
 

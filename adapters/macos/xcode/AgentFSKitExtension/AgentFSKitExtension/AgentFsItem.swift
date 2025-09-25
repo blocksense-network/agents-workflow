@@ -47,7 +47,7 @@ final class AgentFsItem: FSItem {
     init(name: FSFileName) {
         self.name = name
         self.id = AgentFsItem.generateUniqueItemID()
-        self.path = "/" // Default to root - should be set by caller
+        self.path = "/" // Default to root - must be set by caller using volume path builder
 
         // Initialize attributes after self is set up
         attributes.fileID = FSItem.Identifier(rawValue: id) ?? .invalid
