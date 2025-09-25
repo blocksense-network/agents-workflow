@@ -1,6 +1,6 @@
 
-import Foundation
-import FSKit
+@preconcurrency import Foundation
+@preconcurrency import FSKit
 import os
 
 @_silgen_name("agentfs_bridge_statfs")
@@ -81,18 +81,9 @@ final class AgentFsVolume: FSVolume {
     private let coreHandle: UnsafeMutableRawPointer?
     private let coreHandleLock = OSAllocatedUnfairLock<Void>()
 
-    /// Generate persistent item IDs for directory entries
-    private static let itemIdCounter: OSAllocatedUnfairLock<UInt64> = {
-        let lock = OSAllocatedUnfairLock<UInt64>(initialState: FSItem.Identifier.rootDirectory.rawValue + 1000) // Start high to avoid conflicts
-        return lock
-    }()
-
-    private static func generatePersistentItemID() -> UInt64 {
-        return itemIdCounter.withLock { value in
-            let result = value
-            value += 1
-            return result
-        }
+    /// Generate unique item IDs using the shared generator
+    private static func generateItemID() -> UInt64 {
+        return AgentFsItem.generateUniqueItemID()
     }
 
     private let logger = Logger(subsystem: "com.agentfs.AgentFSKitExtension", category: "AgentFsVolume")
@@ -185,7 +176,11 @@ extension AgentFsVolume: FSVolume.Operations {
         let result = FSStatFSResult(fileSystemTypeName: "AgentFS")
 
         // Get actual statistics from AgentFS core
-        guard let fsId = coreHandle?.load(as: UInt64.self) else {
+        let fsId = coreHandleLock.withLock { () -> UInt64? in
+            coreHandle?.load(as: UInt64.self)
+        }
+
+        guard let fsId = fsId else {
             logger.warning("volumeStatistics: no core handle available, using defaults")
             // Fallback to reasonable defaults
             result.blockSize = 4096
@@ -281,14 +276,90 @@ extension AgentFsVolume: FSVolume.Operations {
 
         logger.debug("getItemAttributes1: \(agentItem.name), \(desiredAttributes)")
 
-        // For the root item, return cached attributes
+        // For the root item, return cached attributes (root is immutable)
         if agentItem.attributes.fileID == FSItem.Identifier.rootDirectory {
             return agentItem.attributes
         }
 
-        // TODO: For other items, we should get attributes from Rust core
-        // For now, return cached attributes
-        return agentItem.attributes
+        // Get fresh attributes from Rust core for all other items
+        let handle = coreHandle
+        let path = agentItem.path
+        let (result, buffer) = coreHandleLock.withLock { () -> (Int32, [CChar]) in
+            var buffer = [CChar](repeating: 0, count: 4096)
+            let result = path.withCString { path_cstr in
+                agentfs_bridge_stat(handle, path_cstr, &buffer, buffer.count)
+            }
+            return (result, buffer)
+        }
+
+        if result != 0 {
+            logger.debug("attributes: failed to stat path \(agentItem.path), error: \(result)")
+            if let error = afResultToFSKitError(result) {
+                throw error
+            } else {
+                throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            }
+        }
+
+        // Create a fresh attributes object and populate it from the buffer
+        var freshAttributes = FSItem.Attributes()
+        freshAttributes.fileID = agentItem.attributes.fileID
+        freshAttributes.parentID = agentItem.attributes.parentID
+
+        // Parse attributes from buffer (size: u64, type: u8)
+        if buffer.count >= 9 {
+            let size = buffer.withUnsafeBytes { ptr in
+                ptr.load(fromByteOffset: 0, as: UInt64.self)
+            }
+            let fileTypeByte = buffer[8]
+
+            freshAttributes.size = size
+            freshAttributes.allocSize = size
+
+            // Map file type byte to FSItem.ItemType
+            switch fileTypeByte {
+            case 0: // regular file
+                freshAttributes.type = .file
+            case 1: // directory
+                freshAttributes.type = .directory
+            case 2: // symlink
+                freshAttributes.type = .symlink
+            default:
+                freshAttributes.type = .file // default fallback
+            }
+        } else {
+            // Fallback if buffer is too small
+            freshAttributes.type = .file
+            freshAttributes.size = 0
+            freshAttributes.allocSize = 0
+        }
+
+        // Preserve mode and other metadata that might be cached
+        freshAttributes.mode = agentItem.attributes.mode
+        freshAttributes.uid = agentItem.attributes.uid
+        freshAttributes.gid = agentItem.attributes.gid
+        freshAttributes.linkCount = agentItem.attributes.linkCount
+        freshAttributes.flags = agentItem.attributes.flags
+
+        // Update timestamps if not set (timespec with tv_sec=0 and tv_nsec=0 indicates unset)
+        if freshAttributes.addedTime.tv_sec == 0 && freshAttributes.addedTime.tv_nsec == 0 {
+            freshAttributes.addedTime = agentItem.attributes.addedTime
+        }
+        if freshAttributes.birthTime.tv_sec == 0 && freshAttributes.birthTime.tv_nsec == 0 {
+            freshAttributes.birthTime = agentItem.attributes.birthTime
+        }
+        if freshAttributes.changeTime.tv_sec == 0 && freshAttributes.changeTime.tv_nsec == 0 {
+            freshAttributes.changeTime = agentItem.attributes.changeTime
+        }
+        if freshAttributes.modifyTime.tv_sec == 0 && freshAttributes.modifyTime.tv_nsec == 0 {
+            freshAttributes.modifyTime = agentItem.attributes.modifyTime
+        }
+        if freshAttributes.accessTime.tv_sec == 0 && freshAttributes.accessTime.tv_nsec == 0 {
+            freshAttributes.accessTime = agentItem.attributes.accessTime
+        }
+
+        logger.debug("attributes: fresh attributes for \(agentItem.path) - size: \(freshAttributes.size), type: \(freshAttributes.type.rawValue)")
+        return freshAttributes
     }
 
     func setAttributes(
@@ -318,9 +389,12 @@ extension AgentFsVolume: FSVolume.Operations {
         let fullPath = constructPath(for: name, in: dirItem)
 
         // Call Rust core to get item attributes
-        var buffer = [CChar](repeating: 0, count: 4096)
-        let result = fullPath.withCString { path_cstr in
-            agentfs_bridge_stat(coreHandle, path_cstr, &buffer, buffer.count)
+        let (result, buffer) = coreHandleLock.withLock { () -> (Int32, [CChar]) in
+            var buffer = [CChar](repeating: 0, count: 4096)
+            let result = fullPath.withCString { path_cstr in
+                agentfs_bridge_stat(coreHandle, path_cstr, &buffer, buffer.count)
+            }
+            return (result, buffer)
         }
 
         if result != 0 {
@@ -380,11 +454,13 @@ extension AgentFsVolume: FSVolume.Operations {
         }
 
         // If this item has an open file handle, close it in the Rust core
-        if let handle = agentItem.userData as? UInt64 {
-            logger.debug("reclaimItem: closing open handle \(handle)")
-            let result = agentfs_bridge_close(coreHandle, handle)
+        if let handleValue = agentItem.userData as? UInt64 {
+            logger.debug("reclaimItem: closing open handle \(handleValue)")
+            let result = coreHandleLock.withLock { () -> Int32 in
+                agentfs_bridge_close(coreHandle, handleValue)
+            }
             if result != 0 {
-                logger.warning("reclaimItem: failed to close handle \(handle), error: \(result)")
+                logger.warning("reclaimItem: failed to close handle \(handleValue), error: \(result)")
             }
         }
 
@@ -413,9 +489,12 @@ extension AgentFsVolume: FSVolume.Operations {
         // TODO: Store path information in FSItem or implement proper path tracking
         let linkPath = "/" + (agentItem.name.string ?? "")  // Simplified
 
-        var buffer = [CChar](repeating: 0, count: 4096)
-        let result = linkPath.withCString { path_cstr in
-            agentfs_bridge_readlink(coreHandle, path_cstr, &buffer, buffer.count)
+        let (result, buffer) = coreHandleLock.withLock { () -> (Int32, [CChar]) in
+            var buffer = [CChar](repeating: 0, count: 4096)
+            let result = linkPath.withCString { path_cstr in
+                agentfs_bridge_readlink(coreHandle, path_cstr, &buffer, buffer.count)
+            }
+            return (result, buffer)
         }
 
         if result != 0 {
@@ -448,11 +527,15 @@ extension AgentFsVolume: FSVolume.Operations {
         item.attributes.parentID = directory.attributes.fileID
         item.attributes.type = type
 
-        // If creating a directory, call the Rust backend
+        // Create the item in the filesystem based on its type
         if type == .directory {
+            // Create directory in the Rust backend
             let dirPath = constructPath(for: name, in: directory)
-            let result = dirPath.withCString { path_cstr in
-                agentfs_bridge_mkdir(coreHandle, path_cstr, UInt32(newAttributes.mode))
+            let mode = UInt32(newAttributes.mode)
+            let result = coreHandleLock.withLock { () -> Int32 in
+                dirPath.withCString { path_cstr in
+                    agentfs_bridge_mkdir(coreHandle, path_cstr, mode)
+                }
             }
             if result != 0 {
                 if let error = afResultToFSKitError(result) {
@@ -461,8 +544,17 @@ extension AgentFsVolume: FSVolume.Operations {
                     throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
                 }
             }
+        } else if type == .file {
+            // For files, creation happens during open() with create/truncate flags.
+            // This is the standard pattern for most filesystems where createItem
+            // sets up metadata and open() actually instantiates the file.
+            // The file will be created when opened for writing or when explicitly created.
+            logger.debug("createItem: file creation deferred to open() operation")
+        } else if type == .symlink {
+            // Symlinks are handled by createSymbolicLink, not here
+            logger.warning("createItem called with symlink type - should use createSymbolicLink instead")
         }
-        // For files, they are created via open() with create flag, so no Rust call needed here
+
         // No need to add to in-memory children since we use path-based operations
 
         return (item, name)
@@ -484,9 +576,11 @@ extension AgentFsVolume: FSVolume.Operations {
         let linkPath = constructPath(for: name, in: directory)
         let targetPath = contents.string ?? ""
 
-        let result = linkPath.withCString { link_cstr in
-            targetPath.withCString { target_cstr in
-                agentfs_bridge_symlink(coreHandle, target_cstr, link_cstr)
+        let result = coreHandleLock.withLock { () -> Int32 in
+            linkPath.withCString { link_cstr in
+                targetPath.withCString { target_cstr in
+                    agentfs_bridge_symlink(coreHandle, target_cstr, link_cstr)
+                }
             }
         }
 
@@ -534,14 +628,16 @@ extension AgentFsVolume: FSVolume.Operations {
         // Construct full path for the item to remove
         let itemPath = constructPath(for: name, in: directory)
 
-        let result: Int32
-        if agentItem.attributes.type == .directory {
-            result = itemPath.withCString { path_cstr in
-                agentfs_bridge_rmdir(coreHandle, path_cstr)
-            }
-        } else {
-            result = itemPath.withCString { path_cstr in
-                agentfs_bridge_unlink(coreHandle, path_cstr)
+        let itemType = agentItem.attributes.type
+        let result: Int32 = coreHandleLock.withLock { () -> Int32 in
+            if itemType == .directory {
+                itemPath.withCString { path_cstr in
+                    agentfs_bridge_rmdir(coreHandle, path_cstr)
+                }
+            } else {
+                itemPath.withCString { path_cstr in
+                    agentfs_bridge_unlink(coreHandle, path_cstr)
+                }
             }
         }
 
@@ -575,9 +671,11 @@ extension AgentFsVolume: FSVolume.Operations {
         let sourcePath = constructPath(for: sourceName, in: sourceDir)
         let destPath = constructPath(for: destinationName, in: destDir)
 
-        let result = sourcePath.withCString { src_cstr in
-            destPath.withCString { dst_cstr in
-                agentfs_bridge_rename(coreHandle, src_cstr, dst_cstr)
+        let result = coreHandleLock.withLock { () -> Int32 in
+            sourcePath.withCString { src_cstr in
+                destPath.withCString { dst_cstr in
+                    agentfs_bridge_rename(coreHandle, src_cstr, dst_cstr)
+                }
             }
         }
 
@@ -612,9 +710,12 @@ extension AgentFsVolume: FSVolume.Operations {
         let dirPath = directory.name.string == "/" ? "/" : "/\(directory.name.string ?? "")"
 
         // Call Rust core to read directory
-        var buffer = [CChar](repeating: 0, count: 8192) // Larger buffer for directory listing
-        let result = dirPath.withCString { path_cstr in
-            agentfs_bridge_readdir(coreHandle, path_cstr, &buffer, buffer.count)
+        let (result, buffer) = coreHandleLock.withLock { () -> (Int32, [CChar]) in
+            var buffer = [CChar](repeating: 0, count: 8192) // Larger buffer for directory listing
+            let result = dirPath.withCString { path_cstr in
+                agentfs_bridge_readdir(coreHandle, path_cstr, &buffer, buffer.count)
+            }
+            return (result, buffer)
         }
 
         if result != 0 {
@@ -703,9 +804,12 @@ extension AgentFsVolume: FSVolume.Operations {
                 // Determine entry type by trying to stat it (simplified)
                 var entryType = FSItem.ItemType.file
                 let entryPath = constructPath(for: FSFileName(string: entryName), in: directory)
-                var statBuffer = [CChar](repeating: 0, count: 4096)
-                let statResult = entryPath.withCString { path_cstr in
-                    agentfs_bridge_stat(coreHandle, path_cstr, &statBuffer, statBuffer.count)
+                let (statResult, statBuffer) = coreHandleLock.withLock { () -> (Int32, [CChar]) in
+                    var statBuffer = [CChar](repeating: 0, count: 4096)
+                    let statResult = entryPath.withCString { path_cstr in
+                        agentfs_bridge_stat(coreHandle, path_cstr, &statBuffer, statBuffer.count)
+                    }
+                    return (statResult, statBuffer)
                 }
 
                 if statResult == 0 && statBuffer.count >= 9 {
@@ -731,7 +835,7 @@ extension AgentFsVolume: FSVolume.Operations {
                 let packResult = packer.packEntry(
                     name: FSFileName(string: entryName),
                     itemType: entryType,
-                    itemID: FSItem.Identifier(rawValue: AgentFsVolume.generatePersistentItemID()) ?? .invalid, // Generate persistent ID for this item
+                    itemID: FSItem.Identifier(rawValue: AgentFsVolume.generateItemID()) ?? .invalid, // Generate unique ID for this item
                     nextCookie: FSDirectoryCookie(nextCookieValue),
                     attributes: entryAttributes
                 )
@@ -850,13 +954,16 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
 
         // Open file handle using Rust FFI
         let itemPath = agentItem.path
-        var handle: UInt64 = 0
         let optionsJson = "{}" // Default options - could be extended for read/write modes
 
-        let result = optionsJson.withCString { options_cstr in
-            itemPath.withCString { path_cstr in
-                agentfs_bridge_open(coreHandle, path_cstr, options_cstr, &handle)
+        let (result, handle) = coreHandleLock.withLock { () -> (Int32, UInt64) in
+            var handle: UInt64 = 0
+            let result = optionsJson.withCString { options_cstr in
+                itemPath.withCString { path_cstr in
+                    agentfs_bridge_open(coreHandle, path_cstr, options_cstr, &handle)
+                }
             }
+            return (result, handle)
         }
 
         if result != 0 {
@@ -893,7 +1000,9 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
         }
 
         // Close file handle using Rust FFI
-        let result = agentfs_bridge_close(coreHandle, handle)
+        let result = coreHandleLock.withLock { () -> Int32 in
+            agentfs_bridge_close(coreHandle, handle)
+        }
 
         if result != 0 {
             logger.warning("close: failed to close handle \(handle), error: \(result)")
@@ -924,11 +1033,14 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         }
 
         // Prepare buffer for reading
-        var readData = Data(count: length)
         var bytesRead: UInt32 = 0
-
-        let result = readData.withUnsafeMutableBytes { bufferPtr in
-            agentfs_bridge_read(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
+        let (result, readData) = coreHandleLock.withLock { () -> (Int32, Data) in
+            var readData = Data(count: length)
+            var bytesRead: UInt32 = 0
+            let result = readData.withUnsafeMutableBytes { bufferPtr in
+                agentfs_bridge_read(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
+            }
+            return (result, readData)
         }
 
         if result != 0 {
@@ -967,9 +1079,12 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        var bytesWritten: UInt32 = 0
-        let result = data.withUnsafeBytes { bufferPtr in
-            agentfs_bridge_write(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
+        let (result, bytesWritten) = coreHandleLock.withLock { () -> (Int32, UInt32) in
+            var bytesWritten: UInt32 = 0
+            let result = data.withUnsafeBytes { bufferPtr in
+                agentfs_bridge_write(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
+            }
+            return (result, bytesWritten)
         }
 
         if result != 0 {

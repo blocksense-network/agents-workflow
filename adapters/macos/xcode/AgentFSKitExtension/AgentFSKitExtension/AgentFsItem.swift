@@ -11,12 +11,14 @@ import FSKit
 @available(macOS 15.4, *)
 final class AgentFsItem: FSItem {
 
+    /// Shared ID generator for all filesystem items to ensure uniqueness
     private static let idCounter: OSAllocatedUnfairLock<UInt64> = {
         let lock = OSAllocatedUnfairLock<UInt64>(initialState: FSItem.Identifier.rootDirectory.rawValue + 1)
         return lock
     }()
 
-    private static func getNextID() -> UInt64 {
+    /// Generate the next unique ID for a filesystem item
+    static func generateUniqueItemID() -> UInt64 {
         return idCounter.withLock { value in
             let current = value
             // Skip the root directory ID if we somehow reach it (wraparound protection)
@@ -44,7 +46,7 @@ final class AgentFsItem: FSItem {
 
     init(name: FSFileName) {
         self.name = name
-        self.id = AgentFsItem.getNextID()
+        self.id = AgentFsItem.generateUniqueItemID()
         self.path = "/" // Default to root - should be set by caller
 
         // Initialize attributes after self is set up
