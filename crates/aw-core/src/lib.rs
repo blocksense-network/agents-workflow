@@ -5,6 +5,7 @@
 //! transitions, and coordination with other AW components.
 
 pub mod agent_tasks;
+pub mod db;
 pub mod devshell;
 pub mod editor;
 pub mod error;
@@ -35,3 +36,6 @@ pub use devshell::devshell_names;
 
 /// Push operations and remote management utilities.
 pub use push::{PushHandler, PushOptions, parse_push_to_remote_flag};
+
+/// Database integration for persistence.
+pub use db::DatabaseManager;
