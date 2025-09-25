@@ -24,13 +24,23 @@ final class AgentFsUnary: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     // AgentFS core handle from Rust
     private var coreHandle: UnsafeMutableRawPointer?
 
+    // XPC control service
+    private var xpcService: AgentFSControlService?
+
     func probeResource(
         resource: FSResource,
         replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void
     ) {
         logger.debug("probeResource: \(resource, privacy: .public)")
 
-        // For now, accept any block device resource
+        // AgentFS can work with any resource as backing store
+        // For now, we accept any resource and treat it as usable
+        // In a full implementation, we might check for existing AgentFS metadata
+        // or validate the resource characteristics
+
+        logger.debug("Probing resource: \(resource)")
+
+        // For AgentFS, we can work with any resource type
         replyHandler(
             FSProbeResult.usable(
                 name: "AgentFS",
@@ -59,6 +69,10 @@ final class AgentFsUnary: FSUnaryFileSystem, FSUnaryFileSystemOperations {
 
         logger.info("AgentFS core initialized successfully")
 
+        // Initialize XPC control service
+        self.xpcService = AgentFSControlService(coreHandle: coreHandle)
+        logger.info("XPC control service initialized")
+
         // Create volume (synchronous for now)
         let volume = AgentFsVolume(resource: resource, coreHandle: coreHandle)
         replyHandler(volume, nil)
@@ -71,12 +85,21 @@ final class AgentFsUnary: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     ) {
         logger.debug("unloadResource: \(resource, privacy: .public)")
 
+        // Cleanup XPC service first
+        self.xpcService = nil
+        logger.info("XPC control service cleaned up")
+
         // Cleanup AgentFS core instance
         if let handle = coreHandle {
             agentfs_bridge_core_destroy(handle)
             coreHandle = nil
             logger.info("AgentFS core cleaned up")
+        } else {
+            logger.warning("unloadResource: no core handle to cleanup")
         }
+
+        // Container status is managed automatically by FSKit
+        logger.info("Container marked as unloaded")
 
         reply(nil)
     }

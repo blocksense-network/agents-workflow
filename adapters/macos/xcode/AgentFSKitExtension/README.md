@@ -19,6 +19,7 @@ Run the build script to prepare dependencies:
 ```
 
 This will:
+
 1. Build the Rust FFI crates (`agentfs-fskit-sys` and `agentfs-fskit-bridge`)
 2. Copy the static libraries to the `libs/` directory
 3. Generate C headers for Swift interop
@@ -47,6 +48,7 @@ cp ../../../target/release/libagentfs_fskit_bridge.a libs/
 ## Installation
 
 1. Enable the extension in System Settings:
+
    - Go to System Settings > General > Login Items & Extensions > File System Extensions
    - Enable "AgentFSKitExtension"
 
@@ -153,7 +155,7 @@ This extension integrates with the main AgentFS system through:
 - ✅ M13: FSKit Extension Bootstrap - Complete
 - ✅ M14: Rust-Swift FFI Bridge - Complete
 - ✅ M15: FSKit Volume Implementation - Complete (integrated with AgentFS core)
-- ✅ M16: XPC Control Plane - Complete
+- ✅ M16: XPC Control Service - Complete
 - 🔄 M17: Integration and Testing - In Progress
 
 ## Integration Status
@@ -162,7 +164,7 @@ The Swift FSKit extension is now fully integrated with the Rust AgentFS core:
 
 - **Core Lifecycle**: AgentFS core is created/destroyed via FFI during FS resource load/unload
 - **Filesystem Operations**: Volume operations call into AgentFS core for actual file operations
-- **Control Plane**: `.agentfs` directory provides filesystem-based control interface
+- **Control Plane**: XPC service provides control interface for snapshots, branches, and process binding
 - **Memory Management**: Proper cleanup of Rust objects from Swift
 
 ### Build Process

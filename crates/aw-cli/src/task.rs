@@ -357,14 +357,6 @@ mod tests {
             mount_rw: vec![],
             overlay: vec![],
             non_interactive: true,
-            sandbox: "none".to_string(),
-            allow_network: "no".to_string(),
-            allow_containers: "no".to_string(),
-            allow_kvm: "no".to_string(),
-            seccomp: "no".to_string(),
-            seccomp_debug: "no".to_string(),
-            mount_rw: vec![],
-            overlay: vec![],
         };
 
         assert_eq!(args.branch, Some("feature-branch".to_string()));
@@ -384,12 +376,17 @@ mod tests {
             branch: Some("test-branch".to_string()),
             prompt: Some("Test task content".to_string()),
             prompt_file: None,
-            
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         let content = args.get_prompt_content().await.unwrap();
@@ -409,13 +406,18 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
-            
             prompt_file: Some(file_path), // Use absolute path
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         let content = args.get_prompt_content().await.unwrap();
@@ -433,10 +435,16 @@ mod tests {
             prompt: Some("prompt".to_string()),
             prompt_file: Some("file.txt".into()),
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // The validation logic is: if both prompt and prompt_file are Some, it's an error
@@ -452,13 +460,18 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
-            
             prompt_file: Some(temp_dir.path().join("nonexistent.txt")),
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         let content = args.get_prompt_content().await;
@@ -473,14 +486,18 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
-            
             prompt_file: None,
-            
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // This would normally be tested in the run() method, but we'll test the validation logic
@@ -493,14 +510,18 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
-            
             prompt_file: None,
-            
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // This would normally be tested in the run() method, but we'll test the validation logic
@@ -558,11 +579,17 @@ mod tests {
             branch: Some("test-branch".to_string()),
             prompt: Some("test".to_string()),
             prompt_file: None,
-            
             devshell: Some("custom".to_string()),
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // This test would normally be integration-tested, but we'll verify the logic
@@ -624,14 +651,18 @@ mod tests {
         let args = TaskCreateArgs {
             branch: Some("test-branch".to_string()),
             prompt: None,
-            
             prompt_file: None,
-            
             devshell: None,
-            
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // This test verifies the logic that non-interactive mode requires --prompt or --prompt-file
@@ -647,11 +678,17 @@ mod tests {
             branch: None, // No branch means append to existing
             prompt: Some("test".to_string()),
             prompt_file: None,
-            
             devshell: Some("custom".to_string()),
             push_to_remote: None,
-            
             non_interactive: true,
+            sandbox: "none".to_string(),
+            allow_network: "no".to_string(),
+            allow_containers: "no".to_string(),
+            allow_kvm: "no".to_string(),
+            seccomp: "no".to_string(),
+            seccomp_debug: "no".to_string(),
+            mount_rw: vec![],
+            overlay: vec![],
         };
 
         // This test verifies the logic that --devshell is only allowed for new branches
@@ -1340,7 +1377,6 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", None, None, None, None)), // Basic sandbox without extra features
-            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -1366,7 +1402,6 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", Some("yes"), None, None, None)), // Sandbox with network access
-            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -1392,7 +1427,6 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", None, None, None, Some("yes"))), // Sandbox with seccomp
-            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;
@@ -1418,7 +1452,6 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("invalid", None, None, None, None)), // Invalid sandbox type
-            None, // No sandbox
             vec![], // No editor content needed
             0,
         )?;

@@ -24,6 +24,7 @@ pub(crate) enum NodeKind {
         streams: HashMap<String, (ContentId, u64)>, // stream_name -> (content_id, size)
     },
     Directory { children: HashMap<String, NodeId> },
+    Symlink { target: String },
 }
 
 /// Filesystem node
@@ -231,6 +232,14 @@ impl FsCore {
                         return Err(FsError::NotADirectory);
                     }
                 }
+                NodeKind::Symlink { .. } => {
+                    if i == components.len() - 1 {
+                        // Last component is a symlink
+                        return Ok((current_node_id, Some((current_node_id, component.to_string()))));
+                    } else {
+                        return Err(FsError::NotADirectory);
+                    }
+                }
             }
         }
 
@@ -368,20 +377,21 @@ impl FsCore {
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
-        let (len, is_dir) = match &node.kind {
+        let (len, is_dir, is_symlink) = match &node.kind {
             NodeKind::File { streams } => {
                 // Size is the size of the unnamed stream (default data stream)
                 let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
-                (size, false)
+                (size, false, false)
             }
-            NodeKind::Directory { .. } => (0, true),
+            NodeKind::Directory { .. } => (0, true, false),
+            NodeKind::Symlink { target } => (target.len() as u64, false, true),
         };
 
         Ok(Attributes {
             len,
             times: node.times,
             is_dir,
-            is_symlink: false, // TODO: Implement symlinks
+            is_symlink,
             mode_user: FileMode {
                 read: true,
                 write: true,
@@ -607,6 +617,7 @@ impl FsCore {
                 }
             }
             NodeKind::File { .. } => return Err(FsError::NotADirectory),
+            NodeKind::Symlink { .. } => return Err(FsError::NotADirectory),
         }
         drop(nodes);
 
@@ -692,6 +703,7 @@ impl FsCore {
                 }
             }
             NodeKind::Directory { .. } => Err(FsError::IsADirectory),
+            NodeKind::Symlink { .. } => Err(FsError::InvalidArgument), // Symlinks are not readable like files
         }
     }
 
@@ -737,6 +749,7 @@ impl FsCore {
                 Ok(written)
             }
             NodeKind::Directory { .. } => Err(FsError::IsADirectory),
+            NodeKind::Symlink { .. } => Err(FsError::InvalidArgument), // Symlinks are not writable like files
         }
     }
 
@@ -925,6 +938,7 @@ impl FsCore {
                 }
             }
             NodeKind::File { .. } => return Err(FsError::NotADirectory),
+            NodeKind::Symlink { .. } => return Err(FsError::NotADirectory),
         }
         drop(nodes);
 
@@ -966,6 +980,7 @@ impl FsCore {
                 }
             }
             NodeKind::File { .. } => return Err(FsError::NotADirectory),
+            NodeKind::Symlink { .. } => return Err(FsError::NotADirectory),
         }
         drop(nodes);
 
@@ -994,24 +1009,26 @@ impl FsCore {
                 let mut entries = Vec::new();
                 for (name, child_id) in children {
                     let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
-                    let (is_dir, len) = match &child_node.kind {
-                        NodeKind::Directory { .. } => (true, 0),
+                    let (is_dir, is_symlink, len) = match &child_node.kind {
+                        NodeKind::Directory { .. } => (true, false, 0),
                         NodeKind::File { streams } => {
                             // Size is the size of the unnamed stream
                             let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
-                            (false, size)
+                            (false, false, size)
                         }
+                        NodeKind::Symlink { target } => (false, true, target.len() as u64),
                     };
                     entries.push(DirEntry {
                         name: name.clone(),
                         is_dir,
-                        is_symlink: false, // TODO: Implement symlinks
+                        is_symlink,
                         len,
                     });
                 }
                 Ok(entries)
             }
             NodeKind::File { .. } => Err(FsError::NotADirectory),
+            NodeKind::Symlink { .. } => Err(FsError::NotADirectory),
         }
     }
 
@@ -1026,19 +1043,20 @@ impl FsCore {
                 let mut entries = Vec::new();
                 for (name, child_id) in children {
                     let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
-                    let (is_dir, len) = match &child_node.kind {
-                        NodeKind::Directory { .. } => (true, 0),
+                    let (is_dir, is_symlink, len) = match &child_node.kind {
+                        NodeKind::Directory { .. } => (true, false, 0),
                         NodeKind::File { streams } => {
                             // Size is the size of the unnamed stream
                             let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
-                            (false, size)
+                            (false, false, size)
                         }
+                        NodeKind::Symlink { target } => (false, true, target.len() as u64),
                     };
 
                     let dir_entry = DirEntry {
                         name: name.clone(),
                         is_dir,
-                        is_symlink: false, // TODO: Implement symlinks
+                        is_symlink,
                         len,
                     };
 
@@ -1046,7 +1064,7 @@ impl FsCore {
                         len,
                         times: child_node.times,
                         is_dir,
-                        is_symlink: false, // TODO: Implement symlinks
+                        is_symlink,
                         mode_user: FileMode { read: true, write: true, exec: is_dir },
                         mode_group: FileMode { read: true, write: false, exec: is_dir },
                         mode_other: FileMode { read: true, write: false, exec: false },
@@ -1057,6 +1075,7 @@ impl FsCore {
                 Ok(entries)
             }
             NodeKind::File { .. } => Err(FsError::NotADirectory),
+            NodeKind::Symlink { .. } => Err(FsError::NotADirectory),
         }
     }
 
@@ -1105,6 +1124,7 @@ impl FsCore {
                 Ok(stream_specs)
             }
             NodeKind::Directory { .. } => Err(FsError::IsADirectory),
+            NodeKind::Symlink { .. } => Err(FsError::InvalidArgument), // Symlinks don't have streams
         }
     }
 
@@ -1118,10 +1138,11 @@ impl FsCore {
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
-        // Check if it's a file (can't unlink directories with unlink)
+        // Check if it's a file or symlink (can't unlink directories with unlink)
         match &node.kind {
             NodeKind::Directory { .. } => return Err(FsError::IsADirectory),
             NodeKind::File { .. } => {}
+            NodeKind::Symlink { .. } => {} // Symlinks can be unlinked like files
         }
         drop(nodes);
 
@@ -1157,5 +1178,93 @@ impl FsCore {
         self.emit_event(EventKind::Removed { path: path_str });
 
         Ok(())
+    }
+
+    /// Create a symbolic link
+    pub fn symlink(&self, target: &str, linkpath: &Path) -> FsResult<()> {
+        // Check if the link path already exists
+        if self.resolve_path(linkpath).is_ok() {
+            return Err(FsError::AlreadyExists);
+        }
+
+        // Resolve parent directory
+        let parent_path = linkpath.parent().ok_or(FsError::InvalidArgument)?;
+        let link_name = linkpath.file_name()
+            .ok_or(FsError::InvalidArgument)?
+            .to_string_lossy()
+            .to_string();
+
+        let (parent_id, _) = self.resolve_path(parent_path)?;
+        let nodes = self.nodes.lock().unwrap();
+
+        // Check that parent is a directory
+        if let Some(parent_node) = nodes.get(&parent_id) {
+            match &parent_node.kind {
+                NodeKind::Directory { children } => {
+                    if children.contains_key(&link_name) {
+                        return Err(FsError::AlreadyExists);
+                    }
+                }
+                _ => return Err(FsError::NotADirectory),
+            }
+        } else {
+            return Err(FsError::NotFound);
+        }
+        drop(nodes);
+
+        // Create symlink node
+        let symlink_node_id = self.create_symlink_node(target.to_string())?;
+
+        // Add to parent directory
+        {
+            let mut nodes = self.nodes.lock().unwrap();
+            if let Some(parent_node) = nodes.get_mut(&parent_id) {
+                if let NodeKind::Directory { children } = &mut parent_node.kind {
+                    children.insert(link_name, symlink_node_id);
+                }
+            }
+        }
+
+        // Emit event
+        let path_str = linkpath.to_string_lossy().to_string();
+        self.emit_event(EventKind::Created { path: path_str });
+
+        Ok(())
+    }
+
+    /// Read a symbolic link
+    pub fn readlink(&self, path: &Path) -> FsResult<String> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+
+        match &node.kind {
+            NodeKind::Symlink { target } => Ok(target.clone()),
+            _ => Err(FsError::InvalidArgument), // Not a symlink
+        }
+    }
+
+    /// Create a symlink node
+    fn create_symlink_node(&self, target: String) -> FsResult<NodeId> {
+        let now = Self::current_timestamp();
+        let node_id = self.allocate_node_id();
+
+        let node = Node {
+            id: node_id,
+            kind: NodeKind::Symlink { target },
+            times: FileTimes {
+                atime: now,
+                mtime: now,
+                ctime: now,
+                birthtime: now,
+            },
+            mode: 0o777, // Symlinks typically have full permissions
+            xattrs: HashMap::new(),
+        };
+
+        let mut nodes = self.nodes.lock().unwrap();
+        nodes.insert(node_id, node);
+
+        Ok(node_id)
     }
 }

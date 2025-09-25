@@ -131,3 +131,4 @@ Testing ensures correctness, performance, and error handling. Use a mix of manua
 - Resources: Official libfuse docs (github.com/libfuse/libfuse), examples in `/usr/share/doc/libfuse-dev/examples` on Ubuntu or Nix store paths.
 
 If your FS code has specifics (e.g., language, features), provide more details for tailored advice.
+

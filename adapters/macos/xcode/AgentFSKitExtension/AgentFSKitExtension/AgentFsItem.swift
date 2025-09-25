@@ -11,31 +11,41 @@ import FSKit
 @available(macOS 15.4, *)
 final class AgentFsItem: FSItem {
 
-    @MainActor
-    private static var id: UInt64 = FSItem.Identifier.rootDirectory.rawValue + 1
-    private static let idLock = NSLock()
+    private static let idCounter: OSAllocatedUnfairLock<UInt64> = {
+        let lock = OSAllocatedUnfairLock<UInt64>(initialState: FSItem.Identifier.rootDirectory.rawValue + 1)
+        return lock
+    }()
 
-    @MainActor
-    static func getNextID() -> UInt64 {
-        idLock.lock()
-        defer { idLock.unlock() }
-        let current = id
-        id += 1
-        return current
+    private static func getNextID() -> UInt64 {
+        return idCounter.withLock { value in
+            let current = value
+            // Skip the root directory ID if we somehow reach it (wraparound protection)
+            if current == FSItem.Identifier.rootDirectory.rawValue {
+                value += 1
+            }
+            let result = current
+            value += 1
+            return result
+        }
     }
 
-    let name: FSFileName
+    var name: FSFileName
     let id: UInt64
+
+    // Path relative to volume root (e.g., "/foo/bar")
+    var path: String
 
     var attributes = FSItem.Attributes()
     var xattrs: [FSFileName: Data] = [:]
+
+    // Note: data and userData are kept for compatibility but should be moved to proper storage
     var data: Data?
+    var userData: Any?
 
-    private(set) var children: [FSFileName: AgentFsItem] = [:]
-
-    init(name: FSFileName) async {
+    init(name: FSFileName) {
         self.name = name
-        self.id = await AgentFsItem.getNextID()
+        self.id = AgentFsItem.getNextID()
+        self.path = "/" // Default to root - should be set by caller
 
         // Initialize attributes after self is set up
         attributes.fileID = FSItem.Identifier(rawValue: id) ?? .invalid
@@ -57,6 +67,7 @@ final class AgentFsItem: FSItem {
     init(name: FSFileName, id: UInt64) {
         self.name = name
         self.id = id
+        self.path = "/" // Default to root - should be set by caller
 
         // Initialize attributes after self is set up
         attributes.fileID = FSItem.Identifier(rawValue: id) ?? .invalid
@@ -76,7 +87,8 @@ final class AgentFsItem: FSItem {
 
     // Create root item synchronously (special case)
     static func createRoot() -> AgentFsItem {
-        let root = AgentFsItem(name: FSFileName(string: "/"), id: 0)
+        let root = AgentFsItem(name: FSFileName(string: "/"), id: FSItem.Identifier.rootDirectory.rawValue)
+        root.path = "/"
         root.attributes.parentID = FSItem.Identifier.parentOfRoot
         root.attributes.fileID = FSItem.Identifier.rootDirectory
         root.attributes.uid = 0
@@ -89,11 +101,4 @@ final class AgentFsItem: FSItem {
         return root
     }
 
-    func addItem(_ item: AgentFsItem) {
-        children[item.name] = item
-    }
-
-    func removeItem(_ item: AgentFsItem) {
-        children[item.name] = nil
-    }
 }

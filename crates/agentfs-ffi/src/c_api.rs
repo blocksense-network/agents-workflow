@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::path::Path;
+use std::ptr;
 use std::sync::Mutex;
 
 // Global registry for filesystem instances
@@ -421,6 +422,205 @@ pub extern "C" fn af_close(fs: AfFs, h: AfHandleId) -> AfResult {
 
     match core.close(agentfs_core::HandleId(h)) {
         Ok(()) => AfResult::AfOk,
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Get filesystem statistics
+#[no_mangle]
+pub extern "C" fn af_stats(fs: AfFs, out_stats: *mut u8, stats_size: usize) -> AfResult {
+    if out_stats.is_null() || stats_size == 0 {
+        return AfResult::AfErrInval;
+    }
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    let stats = core.stats();
+
+    // Binary format: branches(u32) + snapshots(u32) + open_handles(u32) + bytes_in_memory(u64) + bytes_spilled(u64)
+    // Total: 4 + 4 + 4 + 8 + 8 = 28 bytes
+    if stats_size >= 28 {
+        unsafe {
+            // Write branches (u32)
+            *(out_stats as *mut u32) = stats.branches;
+            // Write snapshots (u32)
+            *(((out_stats as usize) + 4) as *mut u32) = stats.snapshots;
+            // Write open_handles (u32)
+            *(((out_stats as usize) + 8) as *mut u32) = stats.open_handles;
+            // Write bytes_in_memory (u64)
+            *(((out_stats as usize) + 12) as *mut u64) = stats.bytes_in_memory;
+            // Write bytes_spilled (u64)
+            *(((out_stats as usize) + 20) as *mut u64) = stats.bytes_spilled;
+        }
+        AfResult::AfOk
+    } else {
+        AfResult::AfErrInval
+    }
+}
+
+/// Get file attributes
+#[no_mangle]
+pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, attrs_size: usize) -> AfResult {
+    if path.is_null() || out_attrs.is_null() || attrs_size == 0 {
+        return AfResult::AfErrInval;
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    match core.getattr(std::path::Path::new(path_str)) {
+        Ok(attrs) => {
+            // Serialize to a simple binary format
+            // For now, return minimal attributes that are available
+            let file_type = if attrs.is_symlink {
+                2u8 // symlink
+            } else if attrs.is_dir {
+                1u8 // directory
+            } else {
+                0u8 // regular file
+            };
+
+            // Simple binary format: size(8) + file_type(1) = 9 bytes minimum
+            if attrs_size >= 9 {
+                unsafe {
+                    // Write size (u64)
+                    *(out_attrs as *mut u64) = attrs.len;
+                    // Write file_type (u8)
+                    *(((out_attrs as usize) + 8) as *mut u8) = file_type;
+                }
+                AfResult::AfOk
+            } else {
+                AfResult::AfErrInval
+            }
+        }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Remove directory
+#[no_mangle]
+pub extern "C" fn af_rmdir(fs: AfFs, path: *const c_char) -> AfResult {
+    if path.is_null() {
+        return AfResult::AfErrInval;
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    match core.rmdir(std::path::Path::new(path_str)) {
+        Ok(()) => AfResult::AfOk,
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Unlink file
+#[no_mangle]
+pub extern "C" fn af_unlink(fs: AfFs, path: *const c_char) -> AfResult {
+    if path.is_null() {
+        return AfResult::AfErrInval;
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    match core.unlink(std::path::Path::new(path_str)) {
+        Ok(()) => AfResult::AfOk,
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Create symbolic link
+#[no_mangle]
+pub extern "C" fn af_symlink(fs: AfFs, target: *const c_char, linkpath: *const c_char) -> AfResult {
+    if target.is_null() || linkpath.is_null() {
+        return AfResult::AfErrInval;
+    }
+
+    let target_str = match unsafe { CStr::from_ptr(target) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let linkpath_str = match unsafe { CStr::from_ptr(linkpath) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    match core.symlink(target_str, std::path::Path::new(linkpath_str)) {
+        Ok(()) => AfResult::AfOk,
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
+/// Read symbolic link
+#[no_mangle]
+pub extern "C" fn af_readlink(
+    fs: AfFs,
+    path: *const c_char,
+    out_target: *mut c_char,
+    target_size: usize,
+) -> AfResult {
+    if path.is_null() || out_target.is_null() || target_size == 0 {
+        return AfResult::AfErrInval;
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AfResult::AfErrInval,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    match core.readlink(std::path::Path::new(path_str)) {
+        Ok(target) => {
+            let target_bytes = target.as_bytes();
+            let len = target_bytes.len().min(target_size - 1);
+
+            unsafe {
+                ptr::copy_nonoverlapping(target_bytes.as_ptr(), out_target as *mut u8, len);
+                *out_target.add(len) = 0; // null terminator
+            }
+
+            AfResult::AfOk
+        }
         Err(e) => fs_error_to_af_result(&e),
     }
 }

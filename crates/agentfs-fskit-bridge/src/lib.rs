@@ -21,6 +21,12 @@ extern "C" {
     fn af_read(fs: u64, h: u64, off: u64, buf: *mut u8, len: u32, out_read: *mut u32) -> i32;
     fn af_write(fs: u64, h: u64, off: u64, buf: *const u8, len: u32, out_written: *mut u32) -> i32;
     fn af_close(fs: u64, h: u64) -> i32;
+    fn af_control_request(fs: u64, request_data: *const u8, request_len: usize, response_data: *mut u8, response_max_len: usize, response_actual_len: *mut usize) -> i32;
+    fn af_getattr(fs: u64, path: *const libc::c_char, out_attrs: *mut u8, attrs_size: usize) -> i32;
+    fn af_rmdir(fs: u64, path: *const libc::c_char) -> i32;
+    fn af_unlink(fs: u64, path: *const libc::c_char) -> i32;
+    fn af_symlink(fs: u64, target: *const libc::c_char, linkpath: *const libc::c_char) -> i32;
+    fn af_readlink(fs: u64, path: *const libc::c_char, out_target: *mut libc::c_char, target_size: usize) -> i32;
 }
 
 // ============================================================================
@@ -471,6 +477,20 @@ pub extern "C" fn agentfs_bridge_close(core: *mut FsCore, handle: u64) -> i32 {
     result
 }
 
+/// Control request (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_control_request(fs: u64, request_data: *const u8, request_len: usize, response_data: *mut u8, response_max_len: usize, response_actual_len: *mut usize) -> i32 {
+    if request_data.is_null() || response_data.is_null() || response_actual_len.is_null() {
+        return -1;
+    }
+
+    let result = unsafe {
+        af_control_request(fs, request_data, request_len, response_data, response_max_len, response_actual_len)
+    };
+
+    result
+}
+
 /// Get file statistics (Swift-callable)
 /// Returns JSON string with file attributes
 #[no_mangle]
@@ -564,6 +584,88 @@ pub extern "C" fn agentfs_bridge_readdir(core: *mut FsCore, path: *const c_char,
     }
 
     0
+}
+
+/// Get file attributes (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_getattr(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+    if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+    let result = unsafe {
+        af_getattr(core_handle, path, buffer as *mut u8, buffer_size)
+    };
+
+    result
+}
+
+/// Create symlink (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_symlink(core: *mut FsCore, target: *const c_char, linkpath: *const c_char) -> i32 {
+    if core.is_null() || target.is_null() || linkpath.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+    let result = unsafe {
+        af_symlink(core_handle, target, linkpath)
+    };
+
+    result
+}
+
+/// Read symlink (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_readlink(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+    if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+    let result = unsafe {
+        af_readlink(core_handle, path, buffer, buffer_size)
+    };
+
+    result
+}
+
+/// Rename/move file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_rename(_core: *mut FsCore, _oldpath: *const c_char, _newpath: *const c_char) -> i32 {
+    // TODO: Implement rename in Rust core
+    -1
+}
+
+/// Remove directory (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_rmdir(core: *mut FsCore, path: *const c_char) -> i32 {
+    if core.is_null() || path.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+    let result = unsafe {
+        af_rmdir(core_handle, path)
+    };
+
+    result
+}
+
+/// Unlink file (Swift-callable)
+#[no_mangle]
+pub extern "C" fn agentfs_bridge_unlink(core: *mut FsCore, path: *const c_char) -> i32 {
+    if core.is_null() || path.is_null() {
+        return -1;
+    }
+
+    let core_handle = unsafe { (*core).handle };
+    let result = unsafe {
+        af_unlink(core_handle, path)
+    };
+
+    result
 }
 
 /// Get error message from last operation (Swift-callable)

@@ -3,7 +3,11 @@ use clap::Args;
 use anyhow::{Result, Context};
 use aw_fs_snapshots::{WorkingCopyMode, FsSnapshotProvider, PreparedWorkspace};
 
+#[cfg(target_os = "linux")]
 use sandbox_core::Sandbox;
+
+#[cfg(target_os = "linux")]
+use sandbox_seccomp;
 
 /// Arguments for running a command in a sandbox
 #[derive(Args)]
@@ -133,14 +137,15 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
 }
 
 /// Create a sandbox instance configured from CLI parameters
+#[cfg(target_os = "linux")]
 pub fn create_sandbox_from_args(
     allow_network: &str,
     allow_containers: &str,
     allow_kvm: &str,
     seccomp: &str,
     seccomp_debug: &str,
-    mount_rw: &[PathBuf],
-    overlay: &[PathBuf],
+    _mount_rw: &[PathBuf],
+    _overlay: &[PathBuf],
 ) -> Result<Sandbox> {
     let allow_network = parse_bool_flag(allow_network)?;
     let allow_containers = parse_bool_flag(allow_containers)?;
@@ -185,6 +190,20 @@ pub fn create_sandbox_from_args(
     // This would require extending sandbox-fs to accept additional bind mounts and overlays
 
     Ok(sandbox)
+}
+
+/// Create a sandbox instance configured from CLI parameters (non-Linux stub)
+#[cfg(not(target_os = "linux"))]
+pub fn create_sandbox_from_args(
+    _allow_network: &str,
+    _allow_containers: &str,
+    _allow_kvm: &str,
+    _seccomp: &str,
+    _seccomp_debug: &str,
+    _mount_rw: &[PathBuf],
+    _overlay: &[PathBuf],
+) -> Result<()> {
+    Err(anyhow::anyhow!("Sandbox functionality is only available on Linux"))
 }
 
 /// Parse a boolean flag string (yes/no, true/false, 1/0)

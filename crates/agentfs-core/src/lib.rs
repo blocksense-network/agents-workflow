@@ -790,4 +790,242 @@ mod tests {
         // Unsubscribe should still work
         core.unsubscribe_events(sub_id).unwrap();
     }
+
+    #[test]
+    fn test_symlink_basic_operations() {
+        let core = test_core();
+
+        // Create a target file
+        core.create("/target.txt".as_ref(), &rw_create()).unwrap();
+        let h = core.open("/target.txt".as_ref(), &rw()).unwrap();
+        core.write(h, 0, b"target content").unwrap();
+        core.close(h).unwrap();
+
+        // Create a symlink pointing to the target
+        core.symlink("target.txt", "/link.txt".as_ref()).unwrap();
+
+        // Read the symlink
+        let target = core.readlink("/link.txt".as_ref()).unwrap();
+        assert_eq!(target, "target.txt");
+
+        // Verify symlink appears in directory listing
+        let entries = core.readdir("/".as_ref()).unwrap();
+        let link_entry = entries.iter().find(|e| e.name == "link.txt").unwrap();
+        assert!(link_entry.is_symlink);
+        assert_eq!(link_entry.len, 10); // length of "target.txt"
+
+        // Verify symlink attributes
+        let attrs = core.getattr("/link.txt".as_ref()).unwrap();
+        assert!(attrs.is_symlink);
+        assert_eq!(attrs.len, 10); // length of "target.txt"
+
+        // Verify we can read through the symlink (though this would normally be handled by the filesystem layer)
+        // For now, just ensure the symlink exists and has correct attributes
+        assert!(core.getattr("/link.txt".as_ref()).is_ok());
+    }
+
+    #[test]
+    fn test_symlink_to_directory() {
+        let core = test_core();
+
+        // Create a target directory
+        core.mkdir("/target_dir".as_ref(), 0o755).unwrap();
+
+        // Create a symlink to the directory
+        core.symlink("target_dir", "/link_to_dir".as_ref()).unwrap();
+
+        // Verify the symlink
+        let target = core.readlink("/link_to_dir".as_ref()).unwrap();
+        assert_eq!(target, "target_dir");
+
+        // Verify symlink attributes
+        let attrs = core.getattr("/link_to_dir".as_ref()).unwrap();
+        assert!(attrs.is_symlink);
+        assert_eq!(attrs.len, 10); // length of "target_dir"
+    }
+
+    #[test]
+    fn test_symlink_unlink() {
+        let core = test_core();
+
+        // Create a symlink
+        core.symlink("nonexistent", "/test_link".as_ref()).unwrap();
+
+        // Verify it exists
+        assert!(core.getattr("/test_link".as_ref()).is_ok());
+
+        // Unlink the symlink
+        core.unlink("/test_link".as_ref()).unwrap();
+
+        // Verify it's gone
+        assert!(core.getattr("/test_link".as_ref()).is_err());
+    }
+
+    #[test]
+    fn test_symlink_relative_path() {
+        let core = test_core();
+
+        // Create a directory structure
+        core.mkdir("/dir1".as_ref(), 0o755).unwrap();
+        core.mkdir("/dir1/subdir".as_ref(), 0o755).unwrap();
+        core.create("/dir1/subdir/target.txt".as_ref(), &rw_create()).unwrap();
+
+        // Create a symlink with relative path
+        core.symlink("../target.txt", "/dir1/subdir/link.txt".as_ref()).unwrap();
+
+        // Verify the symlink
+        let target = core.readlink("/dir1/subdir/link.txt".as_ref()).unwrap();
+        assert_eq!(target, "../target.txt");
+    }
+
+    #[test]
+    fn test_symlink_errors() {
+        let core = test_core();
+
+        // Try to create symlink with existing name
+        core.create("/existing".as_ref(), &rw_create()).unwrap();
+        assert!(core.symlink("target", "/existing".as_ref()).is_err());
+
+        // Try to readlink on non-existent path
+        assert!(core.readlink("/nonexistent".as_ref()).is_err());
+
+        // Try to readlink on regular file
+        core.create("/regular.txt".as_ref(), &rw_create()).unwrap();
+        assert!(core.readlink("/regular.txt".as_ref()).is_err());
+
+        // Try to readlink on directory
+        core.mkdir("/testdir".as_ref(), 0o755).unwrap();
+        assert!(core.readlink("/testdir".as_ref()).is_err());
+
+        // Try to create symlink in non-existent directory
+        assert!(core.symlink("target", "/nonexistent/link".as_ref()).is_err());
+
+        // Try to create symlink in a file (not directory)
+        assert!(core.symlink("target", "/regular.txt/link".as_ref()).is_err());
+    }
+
+    #[test]
+    fn test_symlink_readdir_plus() {
+        let core = test_core();
+
+        // Create a target file
+        core.create("/target".as_ref(), &rw_create()).unwrap();
+
+        // Create a symlink
+        core.symlink("target", "/symlink".as_ref()).unwrap();
+
+        // Test readdir_plus
+        let entries = core.readdir_plus("/".as_ref()).unwrap();
+
+        // Find the symlink entry
+        let symlink_entry = entries.iter().find(|(e, _)| e.name == "symlink").unwrap();
+
+        assert!(symlink_entry.0.is_symlink);
+        assert_eq!(symlink_entry.0.len, 6); // length of "target"
+        assert!(symlink_entry.1.is_symlink);
+        assert_eq!(symlink_entry.1.len, 6);
+    }
+
+    #[test]
+    fn test_symlink_cannot_read_write_like_file() {
+        let core = test_core();
+
+        // Create a symlink
+        core.symlink("target", "/symlink".as_ref()).unwrap();
+
+        // Try to open symlink for reading/writing (should work at filesystem level)
+        let h = core.open("/symlink".as_ref(), &ro()).unwrap();
+        // But trying to read from it should fail at the VFS level since it's not a file
+        let mut buf = [0u8; 10];
+        assert!(core.read(h, 0, &mut buf).is_err());
+        core.close(h).unwrap();
+
+        // Writing to symlink should also fail
+        let h2 = core.open("/symlink".as_ref(), &rw()).unwrap();
+        assert!(core.write(h2, 0, b"data").is_err());
+        core.close(h2).unwrap();
+    }
+
+    #[test]
+    fn test_symlink_in_directory_operations() {
+        let core = test_core();
+
+        // Create a directory
+        core.mkdir("/testdir".as_ref(), 0o755).unwrap();
+
+        // Create a symlink inside the directory
+        core.symlink("outside", "/testdir/inside_link".as_ref()).unwrap();
+
+        // List directory contents
+        let entries = core.readdir("/testdir".as_ref()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "inside_link");
+        assert!(entries[0].is_symlink);
+
+        // Remove directory with symlink inside should fail
+        assert!(core.rmdir("/testdir".as_ref()).is_err());
+
+        // Remove the symlink first, then remove directory
+        core.unlink("/testdir/inside_link".as_ref()).unwrap();
+        core.rmdir("/testdir".as_ref()).unwrap();
+    }
+
+    #[test]
+    fn test_symlink_empty_target() {
+        let core = test_core();
+
+        // Create symlink with empty target
+        core.symlink("", "/empty_link".as_ref()).unwrap();
+
+        let target = core.readlink("/empty_link".as_ref()).unwrap();
+        assert_eq!(target, "");
+
+        let attrs = core.getattr("/empty_link".as_ref()).unwrap();
+        assert!(attrs.is_symlink);
+        assert_eq!(attrs.len, 0);
+    }
+
+    #[test]
+    fn test_symlink_long_target() {
+        let core = test_core();
+
+        // Create symlink with long target path
+        let long_target = "a".repeat(1000);
+        core.symlink(&long_target, "/long_link".as_ref()).unwrap();
+
+        let target = core.readlink("/long_link".as_ref()).unwrap();
+        assert_eq!(target, long_target);
+
+        let attrs = core.getattr("/long_link".as_ref()).unwrap();
+        assert!(attrs.is_symlink);
+        assert_eq!(attrs.len, 1000);
+    }
+
+    #[test]
+    fn test_multiple_symlinks_to_same_target() {
+        let core = test_core();
+
+        // Create a target
+        core.create("/target".as_ref(), &rw_create()).unwrap();
+
+        // Create multiple symlinks to the same target
+        core.symlink("target", "/link1".as_ref()).unwrap();
+        core.symlink("target", "/link2".as_ref()).unwrap();
+        core.symlink("target", "/link3".as_ref()).unwrap();
+
+        // Verify all symlinks work
+        for i in 1..=3 {
+            let link_name = format!("/link{}", i);
+            let target = core.readlink(link_name.as_ref()).unwrap();
+            assert_eq!(target, "target");
+
+            let attrs = core.getattr(link_name.as_ref()).unwrap();
+            assert!(attrs.is_symlink);
+        }
+
+        // Verify directory listing shows all symlinks
+        let entries = core.readdir("/".as_ref()).unwrap();
+        let symlink_count = entries.iter().filter(|e| e.is_symlink).count();
+        assert_eq!(symlink_count, 3);
+    }
 }

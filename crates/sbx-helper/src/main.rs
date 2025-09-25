@@ -1,11 +1,16 @@
 //! Sandbox helper binary that becomes PID 1 in the sandbox environment.
 
-#![cfg(target_os = "linux")]
-
 use clap::Parser;
+
+#[cfg(target_os = "linux")]
 use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
+#[cfg(target_os = "linux")]
 use sandbox_fs::{FilesystemConfig, FilesystemManager};
-use tracing::{error, info};
+
+#[cfg(target_os = "linux")]
+use tracing::{info};
+
+use tracing::{error};
 
 /// Command line arguments for sbx-helper
 #[derive(Parser, Debug)]
@@ -81,6 +86,7 @@ struct Args {
 }
 
 #[tokio::main]
+#[cfg(target_os = "linux")]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
@@ -211,4 +217,10 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn main() {
+    error!("sbx-helper is only available on Linux systems");
+    std::process::exit(1);
 }
