@@ -1,0 +1,22 @@
+[package]
+name = "aw-rest-client"
+version = "0.1.0"
+edition = "2021"
+description = "REST API client for Agents-Workflow service"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+aw-rest-api-contract = { path = "../aw-rest-api-contract" }
+tokio = { workspace = true, features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+futures = "0.3"
+url = "2.5"
+base64 = "0.22"
+eventsource-client = "0.13"
+
+[dev-dependencies]
+tokio-test = "0.4"

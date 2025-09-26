@@ -28,6 +28,10 @@ members = [
   "crates/agentfs-winfsp-host",
   "crates/agentfs-fskit-host",
   "crates/agentfs-ffi",
+  # REST API and TUI
+  "crates/aw-rest-api-contract",
+  "crates/aw-rest-client",
+  "crates/aw-tui",
   # CLI
   "crates/aw-cli",
   # Integration tests
@@ -81,6 +85,34 @@ chrono = { version = "0.4", features = ["serde"] }
 # SSZ serialization for daemon
 ethereum_ssz = "0.8"
 ethereum_ssz_derive = "0.8"
+
+# HTTP client for REST API
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# URL parsing
+url = "2.5"
+
+# Base64 encoding
+base64 = "0.22"
+
+# SSE client
+eventsource-client = "0.13"
+
+# Terminal UI
+ratatui = "0.26"
+crossterm = "0.27"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Futures utilities
+futures = "0.3"
+
+# Unicode width calculation
+unicode-width = "0.1"
 
 [profile.release]
 lto = true

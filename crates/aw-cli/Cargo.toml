@@ -34,6 +34,9 @@ aw-fs-snapshots-btrfs = { path = "../aw-fs-snapshots-btrfs" }
 sandbox-core = { path = "../sandbox-core", features = ["cgroups", "seccomp", "net", "devices"] }
 sandbox-seccomp = { path = "../sandbox-seccomp" }
 
+# REST API client for TUI
+aw-rest-client = { path = "../aw-rest-client" }
+
 # AgentFS dependencies
 agentfs-proto = { path = "../agentfs-proto" }
 # SSZ serialization (matching agentfs-proto)
