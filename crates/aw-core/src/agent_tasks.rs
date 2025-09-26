@@ -29,7 +29,7 @@ impl AgentTasks {
     ///
     /// # Errors
     /// Returns an error if the path is not within a VCS repository.
-    pub async fn new<P: AsRef<Path>>(path_in_repo: P) -> VcsResult<Self> {
+    pub fn new<P: AsRef<Path>>(path_in_repo: P) -> VcsResult<Self> {
         let repo = VcsRepo::new(path_in_repo)?;
         Ok(Self { repo })
     }
@@ -46,7 +46,7 @@ impl AgentTasks {
     /// # Errors
     /// Returns an error if not currently on an agent task branch, or if the task start
     /// commit doesn't contain exactly one file.
-    pub async fn agent_task_file_in_current_branch(&self) -> VcsResult<PathBuf> {
+    pub fn agent_task_file_in_current_branch(&self) -> VcsResult<PathBuf> {
         let start_commit_hash = self.repo.latest_agent_branch_commit()?;
         if start_commit_hash.is_empty() {
             return Err(aw_repo::VcsError::Other("You are not currently on an agent task branch".into()));
@@ -67,7 +67,7 @@ impl AgentTasks {
     ///
     /// # Returns
     /// `true` if the current branch is an agent task branch, `false` otherwise.
-    pub async fn on_task_branch(&self) -> VcsResult<bool> {
+    pub fn on_task_branch(&self) -> VcsResult<bool> {
         match self.repo.latest_agent_branch_commit() {
             Ok(commit) => Ok(!commit.is_empty()),
             Err(_) => Ok(false),
@@ -86,7 +86,7 @@ impl AgentTasks {
     ///
     /// # Errors
     /// Returns an error if file creation or VCS operations fail.
-    pub async fn record_initial_task(
+    pub fn record_initial_task(
         &self,
         task_content: &str,
         branch_name: &str,
@@ -131,7 +131,7 @@ impl AgentTasks {
     ///
     /// # Errors
     /// Returns an error if not on a task branch, or if file operations fail.
-    pub async fn append_task(&self, task_content: &str) -> VcsResult<()> {
+    pub fn append_task(&self, task_content: &str) -> VcsResult<()> {
         let start_commit = self.repo.latest_agent_branch_commit()?;
         if start_commit.is_empty() {
             return Err(aw_repo::VcsError::Other("Error: Could not locate task start commit".into()));
@@ -182,7 +182,7 @@ impl AgentTasks {
     ///
     /// # Errors
     /// Returns an error if not on a task branch, or if commit message parsing fails.
-    pub async fn setup_autopush(&self) -> VcsResult<()> {
+    pub fn setup_autopush(&self) -> VcsResult<()> {
         let first_commit_hash = self.repo.latest_agent_branch_commit()?;
         if first_commit_hash.is_empty() {
             return Err(aw_repo::VcsError::Other("Error: Could not find first commit in current branch".into()));

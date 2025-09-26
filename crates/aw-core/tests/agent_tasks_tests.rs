@@ -5,13 +5,28 @@
 //! and branch detection.
 
 use std::fs;
-use std::path::Path;
 use tempfile::TempDir;
 use aw_core::AgentTasks;
-use aw_repo::{VcsRepo, VcsType};
+use aw_repo::VcsRepo;
+
+/// Setup function to isolate git from user configuration and disable prompts.
+/// Returns a TempDir that must be kept alive for the duration of the test.
+fn setup_git_isolation() -> TempDir {
+    // Isolate git from user/system configuration and disable prompts
+    std::env::set_var("GIT_CONFIG_NOSYSTEM", "1");
+    std::env::set_var("GIT_TERMINAL_PROMPT", "0");
+    std::env::set_var("GIT_ASKPASS", "echo");
+    std::env::set_var("SSH_ASKPASS", "echo");
+
+    // Use a temporary HOME to avoid picking up user global git config
+    let temp_home = TempDir::new().expect("Failed to create temp HOME directory");
+    std::env::set_var("HOME", temp_home.path());
+
+    temp_home
+}
 
 /// Helper function to create a temporary git repository for testing.
-async fn setup_test_repo() -> (TempDir, VcsRepo) {
+fn setup_test_repo() -> (TempDir, VcsRepo) {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let repo_path = temp_dir.path();
 
@@ -57,15 +72,16 @@ async fn setup_test_repo() -> (TempDir, VcsRepo) {
 
 #[tokio::test]
 async fn test_record_initial_task_creates_correct_file_structure() {
-    let (_temp_dir, repo) = setup_test_repo().await;
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Test task content",
         "test-branch",
         Some("devshell-name")
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Check that the .agents/tasks directory structure was created
     let agents_dir = repo.root().join(".agents");
@@ -105,7 +121,8 @@ async fn test_record_initial_task_creates_correct_file_structure() {
 
 #[tokio::test]
 async fn test_record_initial_task_commit_message() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Add a remote for testing
     std::process::Command::new("git")
@@ -114,14 +131,14 @@ async fn test_record_initial_task_commit_message() {
         .output()
         .expect("Failed to add remote");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Test task content",
         "test-branch",
         Some("devshell-name")
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Check the latest commit message
     let current_branch = repo.current_branch().expect("Failed to get current branch");
@@ -135,16 +152,18 @@ async fn test_record_initial_task_commit_message() {
 
 #[tokio::test]
 async fn test_on_task_branch_false_when_not_on_task_branch() {
-    let (_temp_dir, repo) = setup_test_repo().await;
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Should not be on a task branch initially
-    assert!(!agent_tasks.on_task_branch().await.expect("Failed to check task branch"));
+    assert!(!agent_tasks.on_task_branch().expect("Failed to check task branch"));
 }
 
 #[tokio::test]
 async fn test_on_task_branch_true_after_recording_initial_task() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Create and checkout a new branch for the task
     std::process::Command::new("git")
@@ -153,25 +172,26 @@ async fn test_on_task_branch_true_after_recording_initial_task() {
         .output()
         .expect("Failed to create branch");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Should not be on a task branch before recording
-    assert!(!agent_tasks.on_task_branch().await.expect("Failed to check task branch"));
+    assert!(!agent_tasks.on_task_branch().expect("Failed to check task branch"));
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Test task content",
         "test-branch",
         None
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Should now be on a task branch
-    assert!(agent_tasks.on_task_branch().await.expect("Failed to check task branch"));
+    assert!(agent_tasks.on_task_branch().expect("Failed to check task branch"));
 }
 
 #[tokio::test]
 async fn test_agent_task_file_in_current_branch() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Create and checkout a new branch for the task
     std::process::Command::new("git")
@@ -180,18 +200,18 @@ async fn test_agent_task_file_in_current_branch() {
         .output()
         .expect("Failed to create branch");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Test task content",
         "test-branch",
         None
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Should be able to get the task file path
     let task_file_path = agent_tasks.agent_task_file_in_current_branch()
-        .await.expect("Failed to get task file path");
+        .expect("Failed to get task file path");
 
     assert!(task_file_path.exists(), "Task file should exist");
     assert!(task_file_path.to_str().unwrap().contains(".agents/tasks/"), "Task file should be in .agents/tasks/");
@@ -203,18 +223,20 @@ async fn test_agent_task_file_in_current_branch() {
 
 #[tokio::test]
 async fn test_agent_task_file_in_current_branch_error_when_not_on_task_branch() {
-    let (_temp_dir, repo) = setup_test_repo().await;
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Should fail when not on a task branch
-    let result = agent_tasks.agent_task_file_in_current_branch().await;
+    let result = agent_tasks.agent_task_file_in_current_branch();
     assert!(result.is_err(), "Should fail when not on task branch");
     assert!(result.unwrap_err().to_string().contains("not currently on an agent task branch"));
 }
 
 #[tokio::test]
 async fn test_append_task() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Create and checkout a new branch for the task
     std::process::Command::new("git")
@@ -223,22 +245,22 @@ async fn test_append_task() {
         .output()
         .expect("Failed to create branch");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Initial task content",
         "test-branch",
         None
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Append a follow-up task
     agent_tasks.append_task("Follow-up task content")
-        .await.expect("Failed to append task");
+        .expect("Failed to append task");
 
     // Check the task file content
     let task_file_path = agent_tasks.agent_task_file_in_current_branch()
-        .await.expect("Failed to get task file path");
+        .expect("Failed to get task file path");
 
     let content = fs::read_to_string(&task_file_path).expect("Failed to read task file");
     let expected = "Initial task content\n--- FOLLOW UP TASK ---\nFollow-up task content";
@@ -247,7 +269,8 @@ async fn test_append_task() {
 
 #[tokio::test]
 async fn test_append_task_commit_message() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Create and checkout a new branch for the task
     std::process::Command::new("git")
@@ -256,18 +279,18 @@ async fn test_append_task_commit_message() {
         .output()
         .expect("Failed to create branch");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Initial task content",
         "test-branch",
         None
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Append a follow-up task
     agent_tasks.append_task("Follow-up task content")
-        .await.expect("Failed to append task");
+        .expect("Failed to append task");
 
     // Check the latest commit message
     let current_branch = repo.current_branch().expect("Failed to get current branch");
@@ -279,11 +302,12 @@ async fn test_append_task_commit_message() {
 
 #[tokio::test]
 async fn test_append_task_error_when_not_on_task_branch() {
-    let (_temp_dir, repo) = setup_test_repo().await;
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Should fail when not on a task branch
-    let result = agent_tasks.append_task("Follow-up content").await;
+    let result = agent_tasks.append_task("Follow-up content");
     assert!(result.is_err(), "Should fail when not on task branch");
     assert!(result.unwrap_err().to_string().contains("Could not locate task start commit"));
 }
@@ -297,7 +321,8 @@ fn test_online_connectivity_check() {
 
 #[tokio::test]
 async fn test_setup_autopush() {
-    let (_temp_dir, repo) = setup_test_repo().await;
+    let _temp_home = setup_git_isolation();
+    let (_temp_dir, repo) = setup_test_repo();
 
     // Add a remote for testing
     std::process::Command::new("git")
@@ -313,17 +338,17 @@ async fn test_setup_autopush() {
         .output()
         .expect("Failed to create branch");
 
-    let agent_tasks = AgentTasks::new(repo.root()).await.expect("Failed to create AgentTasks");
+    let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
     agent_tasks.record_initial_task(
         "Test task content",
         "test-branch",
         None
-    ).await.expect("Failed to record initial task");
+    ).expect("Failed to record initial task");
 
     // Setup autopush
-    agent_tasks.setup_autopush().await.expect("Failed to setup autopush");
+    agent_tasks.setup_autopush().expect("Failed to setup autopush");
 
     // Verify autopush was set up by checking if the hook exists
     // This is a basic check - the actual autopush functionality would be tested separately

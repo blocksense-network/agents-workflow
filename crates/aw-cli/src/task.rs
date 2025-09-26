@@ -155,7 +155,6 @@ impl TaskCreateArgs {
 
         // Create task and commit
         let tasks = AgentTasks::new(repo.root())
-            .await
             .context("Failed to initialize agent tasks")?;
 
         let commit_result = if start_new_branch {
@@ -163,9 +162,9 @@ impl TaskCreateArgs {
                 &task_content,
                 &actual_branch_name,
                 self.devshell.as_deref()
-            ).await
+            )
         } else {
-            tasks.append_task(&task_content).await
+            tasks.append_task(&task_content)
         };
 
         if let Err(e) = commit_result {
