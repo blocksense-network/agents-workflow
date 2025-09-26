@@ -192,11 +192,15 @@ test-cgroups:
 # WebUI Development Targets
 # ========================
 
+# Install dependencies for mock server only
+mock-server-install:
+    cd webui/mock-server && npm ci
+
 # Install dependencies for all WebUI projects
 webui-install:
     cd webui/shared && npm ci
     cd webui/app && npm ci
-    cd webui/mock-server && npm ci
+    just mock-server-install
     cd webui/e2e-tests && npm ci
 
 # Build WebUI application

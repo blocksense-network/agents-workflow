@@ -47,7 +47,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 
 - **SolidJS + Tailwind CSS**: Modern reactive framework with utility-first styling for maintainable, performant UIs
 - **Node.js SSR Sidecar**: Server-side rendering server that proxies requests to the Rust REST API and handles progressive enhancement for users without JavaScript (see [Server-Side-Rendering-with-SolidJS.md](../../Research/Server-Side-Rendering-with-SolidJS.md) for implementation guide)
-- **Mock-First Development**: Start with comprehensive mock server implementing REST-Service.md for isolated development
+- **Mock-First Development**: Start with comprehensive mock server ([Mock Server README](../webui/mock-server/README.md)) implementing REST-Service.md for isolated development
 - **Playwright Testing**: Fully automated E2E testing through pre-scripted scenarios that control both the mock REST server state and UI interactions, enabling deterministic testing of complete user journeys, accessibility compliance, and performance benchmarks
 - **Progressive Enhancement**: Core functionality works without JavaScript; real-time features enhance the experience
 - **Component Architecture**: Reusable, testable components with clear prop interfaces and TypeScript typing
@@ -79,7 +79,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 
   - Created complete WebUI directory structure with `app/`, `mock-server/`, `e2e-tests/`, and `shared/` subdirectories
   - Set up SolidJS application with SolidStart for SSR support, Tailwind CSS for styling, and TypeScript for type safety
-  - Built Express.js mock server with TypeScript implementing key REST endpoints (sessions, agents, runtimes, executors)
+  - Built Express.js mock server with TypeScript implementing key REST endpoints (see [Mock Server README](../webui/mock-server/README.md) for complete API coverage)
   - **Key Technical Achievement**: Fixed critical middleware ordering issue that was preventing POST API requests from working. The API proxy middleware now runs before the body parser, allowing proper request forwarding to the mock server.
   - Configured shared ESLint and Prettier configurations across all WebUI projects for consistent code quality
   - Added comprehensive CI/CD pipeline with linting, type checking, building, and Playwright testing
@@ -90,8 +90,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
   - `webui/app/src/app.tsx` - Main SolidJS application with layout
   - `webui/app/src/components/layout/MainLayout.tsx` - Top-level layout component
   - `webui/app/src/components/layout/ThreePaneLayout.tsx` - Three-pane layout structure
-  - `webui/mock-server/src/index.ts` - Main Express server with REST endpoints
-  - `webui/mock-server/src/routes/sessions.ts` - Session management endpoints
+  - Mock server implementation (see [Mock Server README](../webui/mock-server/README.md) for source files)
   - `webui/shared/eslint.config.js` - Shared ESLint configuration
   - `webui/shared/.prettierrc.json` - Shared Prettier configuration
   - `.github/workflows/ci.yml` - Updated CI pipeline with WebUI jobs
@@ -577,7 +576,7 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 ### Deliverables
 
 - Production-ready WebUI application built with SolidJS + Tailwind CSS
-- Comprehensive mock server for development and testing
+- Comprehensive mock server ([Mock Server README](../webui/mock-server/README.md)) for development and testing
 - Distributed test coverage across all milestones with CI integration
 - Full Playwright E2E test suite covering all user journeys
 - Accessibility testing (WCAG AA compliance) with axe-core
