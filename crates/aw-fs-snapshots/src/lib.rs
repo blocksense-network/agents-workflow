@@ -39,13 +39,7 @@ pub fn provider_for(path: &Path) -> Result<Box<dyn FsSnapshotProvider>> {
         }
     }
 
-    // Always check copy provider as fallback
-    let copy_provider = CopyProvider::new();
-    let capabilities = copy_provider.detect_capabilities(path);
-    if capabilities.score > best_score {
-        best_score = capabilities.score;
-        best_provider = Some(Box::new(copy_provider));
-    }
+    // TODO: Fallback to Git provider (tracked in MVP.status.md)
 
     best_provider.ok_or_else(|| Error::provider("No suitable provider found"))
 }
@@ -82,126 +76,6 @@ fn validate_destination_path(dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Copy-based provider as a fallback when no advanced snapshot filesystem is available.
-pub struct CopyProvider {
-    _private: (),
-}
-
-impl CopyProvider {
-    /// Create a new copy provider.
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
-impl Default for CopyProvider {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl FsSnapshotProvider for CopyProvider {
-    fn kind(&self) -> SnapshotProviderKind {
-        SnapshotProviderKind::Git // Copy provider acts as Git fallback
-    }
-
-    fn detect_capabilities(&self, _repo: &Path) -> ProviderCapabilities {
-        ProviderCapabilities {
-            kind: self.kind(),
-            score: 10, // Low priority fallback
-            supports_cow_overlay: false,
-            notes: vec!["Copy-based provider - no snapshot isolation".to_string()],
-        }
-    }
-
-    async fn prepare_writable_workspace(
-        &self,
-        repo: &Path,
-        mode: WorkingCopyMode,
-    ) -> Result<PreparedWorkspace> {
-        match mode {
-            WorkingCopyMode::InPlace => {
-                // For in-place mode, just return the repo path directly
-                Ok(PreparedWorkspace {
-                    exec_path: repo.to_path_buf(),
-                    working_copy: mode,
-                    provider: self.kind(),
-                    cleanup_token: format!("copy:inplace:{}", repo.display()),
-                })
-            }
-            WorkingCopyMode::Worktree => {
-                // For worktree mode, create a copy of the repo
-                let exec_path = repo.with_extension("copy");
-                if exec_path.exists() {
-                    return Err(Error::DestinationExists {
-                        path: exec_path,
-                    });
-                }
-
-                // Copy the repository
-                tokio::process::Command::new("cp")
-                    .arg("-a")
-                    .arg("--reflink=auto")
-                    .arg(repo)
-                    .arg(&exec_path)
-                    .status()
-                    .await
-                    .map_err(|e| Error::provider(format!("Copy command failed: {}", e)))?
-                    .success()
-                    .then_some(())
-                    .ok_or_else(|| Error::provider("Copy command failed"))?;
-
-                Ok(PreparedWorkspace {
-                    exec_path,
-                    working_copy: mode,
-                    provider: self.kind(),
-                    cleanup_token: format!("copy:worktree:{}", repo.display()),
-                })
-            }
-            WorkingCopyMode::CowOverlay | WorkingCopyMode::Auto => {
-                // Fall back to worktree for copy provider
-                self.prepare_writable_workspace(repo, WorkingCopyMode::Worktree).await
-            }
-        }
-    }
-
-    async fn snapshot_now(&self, _ws: &PreparedWorkspace, _label: Option<&str>) -> Result<SnapshotRef> {
-        // Copy provider doesn't support snapshots
-        Err(Error::provider("Copy provider does not support snapshots"))
-    }
-
-    async fn mount_readonly(&self, _snap: &SnapshotRef) -> Result<PathBuf> {
-        // Copy provider doesn't support snapshots
-        Err(Error::provider("Copy provider does not support readonly mounting"))
-    }
-
-    async fn branch_from_snapshot(
-        &self,
-        _snap: &SnapshotRef,
-        _mode: WorkingCopyMode,
-    ) -> Result<PreparedWorkspace> {
-        // Copy provider doesn't support snapshots
-        Err(Error::provider("Copy provider does not support branching from snapshots"))
-    }
-
-    async fn cleanup(&self, token: &str) -> Result<()> {
-        if token.starts_with("copy:inplace:") {
-            // Nothing to cleanup for in-place mode
-            Ok(())
-        } else if token.starts_with("copy:worktree:") {
-            // Extract the path and remove it
-            let path_str = token.strip_prefix("copy:worktree:").unwrap_or(token);
-            let path = Path::new(path_str);
-            if path.exists() {
-                tokio::fs::remove_dir_all(path).await?;
-            }
-            Ok(())
-        } else {
-            Err(Error::provider(format!("Invalid cleanup token: {}", token)))
-        }
-    }
-}
 
 
 #[cfg(test)]
@@ -223,58 +97,5 @@ mod tests {
         assert!(validate_destination_path(Path::new("/run/lock")).is_err());
     }
 
-    #[test]
-    fn test_copy_provider_capabilities() {
-        let provider = CopyProvider::new();
-        let capabilities = provider.detect_capabilities(Path::new("/tmp"));
-
-        assert_eq!(capabilities.kind, SnapshotProviderKind::Git);
-        assert_eq!(capabilities.score, 10);
-        assert!(!capabilities.supports_cow_overlay);
-        assert!(!capabilities.notes.is_empty());
-    }
-
-    #[test]
-    fn test_copy_provider_prepare_inplace_workspace() {
-        let provider = CopyProvider::new();
-        let repo = Path::new("/tmp/test_repo");
-
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(
-            provider.prepare_writable_workspace(repo, WorkingCopyMode::InPlace)
-        );
-
-        assert!(result.is_ok());
-        let ws = result.unwrap();
-        assert_eq!(ws.exec_path, repo);
-        assert_eq!(ws.working_copy, WorkingCopyMode::InPlace);
-        assert_eq!(ws.provider, SnapshotProviderKind::Git);
-        assert!(ws.cleanup_token.starts_with("copy:inplace:"));
-    }
-
-    #[test]
-    fn test_copy_provider_cleanup() {
-        let provider = CopyProvider::new();
-
-        // Test inplace cleanup (should be no-op)
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(
-            provider.cleanup("copy:inplace:/some/path")
-        );
-        assert!(result.is_ok());
-
-        // Test invalid token
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(
-            provider.cleanup("invalid:token")
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_provider_for_fallback() {
-        // Since we don't have ZFS/Btrfs available in tests, it should fall back to CopyProvider
-        let result = provider_for(Path::new("/tmp"));
-        assert!(result.is_ok());
-
-        let provider = result.unwrap();
-        assert_eq!(provider.kind(), SnapshotProviderKind::Git);
-    }
+    // Note: tests referencing copy fallback were removed with provider deprecation.
 }

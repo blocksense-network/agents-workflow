@@ -214,12 +214,12 @@ The `aw task` command preserves and extends the core functionality of the existi
 - **Editor Discovery**: Uses `$EDITOR` environment variable with intelligent fallback chain (nano, pico, micro, vim, helix, vi)
 - **Prompt Sources**: Supports `--prompt` for direct text, `--prompt-file` for file input, or interactive editor session
 - **Editor Hints**: Provides helpful template text when launching editor for task input. The hint generator follows these steps, similar to how [`git commit` templates](https://www.5balloons.info/git-commit-template) use comment-prefixed guidance:
+
   1. Resolve the user’s preferred comment prefix. By default we use `#` followed by a space. When `task-editor.use-vcs-comment-string` (config option, default `true`) is enabled and we are inside a Git repository, pull the value from `git config core.commentString` so the hint matches local tooling.
 
   2. If the configuration option `task-template` is not specified, insert a blank line (no prefix) where the user will type the prompt.
 
-  If the option is specified, treat it as a file path. The configuration system ensures that relative file path are resolved in relation to the file where they appear (or the working dir when supplied from the command-line).
-  3. Render a block with: a reminder that comment lines are ignored, and mentioning how the task creation operation can be aborted (by enterin ga blank description). End with an explanation that saving the file and exiting the editor will result in the agent work being delivered according the configured delivery method (the explanation should point out the concrete method by inserting a different string depending on the active configuration options).
+  If the option is specified, treat it as a file path. The configuration system ensures that relative file path are resolved in relation to the file where they appear (or the working dir when supplied from the command-line). 3. Render a block with: a reminder that comment lines are ignored, and mentioning how the task creation operation can be aborted (by enterin ga blank description). End with an explanation that saving the file and exiting the editor will result in the agent work being delivered according the configured delivery method (the explanation should point out the concrete method by inserting a different string depending on the active configuration options).
 
   4. When the user saves, strip every line that starts with the resolved comment prefix and trim trailing whitespace; collapse multiple blank lines into a single newline before validation.
   5. If the resulting content is empty, abort with “Task prompt aborted (no content after removing comments).”
@@ -370,6 +370,7 @@ Behavior:
 - Follow‑up tasks: If currently on an agent task branch and `--branch` is NOT provided, the CLI MUST append a follow‑up task to the existing task file.
 - Task file path (when task files are enabled): `.agents/tasks/YYYY/MM/DD-HHMM-<branch>` (UTC time, zero‑padded month/day/hour/minute). The file MUST be created if this is the initial task for the branch; follow‑ups MUST append to the same file separated by the delimiter line `--- FOLLOW UP TASK ---`.
 - Initial commit message (first task commit on a branch) MUST include the following lines:
+
   - `Start-Agent-Branch: <branch>`
   - `Target-Remote: <url>` (only when a default remote URL is discoverable)
   - `Dev-Shell: <name>` (only when `--devshell` is provided)
@@ -423,7 +424,6 @@ Push to default remote? [Y/n]:
 
 **Runtime and Execution:**
 
-- Snapshot strategy (local): Prefer ZFS → Btrfs → NILFS2 → OverlayFS → copy (`cp --reflink=auto`).
 - Runtimes: `devcontainer`, `local` (sandbox profile), `disabled` (policy‑gated).
 - Multi‑OS fleets: Snapshots are taken on the leader only; followers receive synchronized state. See [Multi-OS Testing](Multi-OS%20Testing.md).
 - Fleet resolution and orchestration: When `--fleet` is provided (or a default fleet is defined in config), the `aw task` invocation produces an explicit fleet plan that assigns each member to a controller (`client` or `server`). No reachability probing is used to decide this. The client then orchestrates both local and remote execution accordingly:
@@ -510,11 +510,13 @@ See the implementation roadmap in [Plans/CLI-Cloud-Automation.status.md](Plans/C
 When tasks complete:
 
 1. **Wrapper Notification**: The thin wrapper process emits OS notifications with:
+
    - Task completion status
    - Custom `agents-workflow://` links to results
    - Platform-specific notification actions
 
 2. **WebUI Integration**: Clicking notification links:
+
    - Checks if AW WebUI server is running
    - Auto-launches WebUI server if needed
    - Opens the specific task results page
@@ -1094,6 +1096,7 @@ The `aw agent sandbox` command provides a seamless workflow for launching the TU
 1. **Repository Detection**: First detects the VCS repository root by walking parent directories from the current working directory, supporting Git, Mercurial, Bazaar, and Fossil repositories.
 
 2. **Filesystem Provider Auto-Detection**: Analyzes the detected repository's filesystem type and capabilities:
+
    - **ZFS**: Uses CoW (Copy-on-Write) overlay mode with snapshots and clones via the `aw-fs-snapshots-daemon`
    - **Btrfs**: Uses CoW overlay mode with subvolume snapshots
    - **Other filesystems**: Exits with an error.
@@ -1106,6 +1109,7 @@ The `aw agent sandbox` command provides a seamless workflow for launching the TU
 **Sandbox Entry and TUI Launch:**
 
 4. **Sandbox Environment Setup**: Launches the process within the configured sandbox profile:
+
    - **Namespace isolation**: User, mount, PID, UTS, IPC, and time namespaces
    - **Filesystem controls**: Bind mounts the pre-created snapshots, applies read-only sealing, and sets up overlay filesystems
    - **Network isolation**: Loopback-only by default with optional slirp4netns integration
@@ -1232,11 +1236,50 @@ ARGUMENTS:
 
 Behavior:
 
-- **Filesystem Detection**: Analyzes the filesystem type and capabilities at the specified path using the same logic as `aw_fs_snapshots::provider_for()`
-- **Provider Selection**: Reports which snapshot provider would be selected (ZFS, Btrfs, AgentFS, Git, or Copy fallback)
-- **Capability Reporting**: Shows supported operations like snapshot creation, branch creation, and time travel features
+- **Repository Seletion**: Selects the working directory through the standard [Repository Selection](CLI-Repository-Selection.md) logic.
+- **FS Snapshots Provider Selection**: Applies the standard [FS Snapshot Provider Selection](CLI-FS-Snapthos-Provider-Selection.md) algorithm with the repository root to select a provider.
 - **Mount Point Info**: Displays mount point details, dataset names, and filesystem-specific metadata
-- **JSON Output**: Structured output for programmatic use including provider scores and capability flags
+- **Provider Specific Details**: Each provider can contribute additional details to the output.
+- **JSON Output**: When --json is specified, provides structured output for programmatic use including provider scores and capability flags
+
+JSON output schema (example):
+
+```json
+{
+  "path": "/home/user/work/project",
+  "provider": "zfs",
+  "mount_point": "/pool/dataset",
+  "capabilities": {
+    "cow": true
+  }
+  "provider_data": {
+    "dataset": "pool/dataset"
+  }
+}
+```
+
+Implementation notes:
+
+- MUST call `aw_fs_snapshots::provider_for(path)` for provider detection and capability scoring.
+- Errors MUST be descriptive (e.g., invalid path, permission denied); `--json` mode emits `{ "error": "..." }` with non‑zero exit.
+
+Examples:
+
+```bash
+aw agent fs status --json
+aw agent fs status --path . --verbose
+```
+
+Exit codes:
+
+- 0 success; non‑zero on detection errors (invalid path, permissions) or internal errors.
+
+```
+aw agent fs init-session [OPTIONS]
+```
+
+The `init-session` command was present in earlier versions of the CLI, but it was removed.
+All remaining references to it in the code or elsewhere in this spec should be removed.
 
 ```
 aw agent followers accept-connections --session <ID> [OPTIONS]
@@ -1335,7 +1378,7 @@ ARGUMENTS:
 
 - Filesystem (AgentFS) snapshot/branch utilities:
   - `aw agent fs status [OPTIONS]` — Run filesystem detection and report capabilities, provider selection, and mount point information.
-  - `aw agent fs init-session [--name <NAME>] [--repo <name|path>] [--workspace <name>]` — Create an initial AgentFS snapshot on a mounted volume from the current state of the working copy.
+  - `aw agent fs snapshot [--name <NAME>] [--repo <PATH|URL>] [--json]` — Create a snapshot of the enclosing repository session.
   - `aw agent fs snapshots <SESSION_ID>` — List snapshots created in a particular agent coding session.
   - `aw agent fs branch create <SNAPSHOT_ID> [--name <NAME>]` — Create a writable branch from a snapshot.
   - `aw agent fs branch bind <BRANCH_ID>` — Bind the current (or specified) process to the branch view.

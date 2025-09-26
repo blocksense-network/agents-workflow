@@ -5,6 +5,7 @@ Goal: Deliver a minimum viable product (MVP) version of the Agents-Workflow CLI 
 Total estimated timeline: 10-14 months (optimized with proper parallel development tracks and dependency ordering)
 
 **Timeline Breakdown**:
+
 - **Foundation Layer**: Weeks 1-4 (parallel infrastructure development)
 - **Core Task Layer**: Weeks 5-12 (aw task command with agent integration)
 - **Advanced Features Layer**: Weeks 13-20 (time travel + advanced sandboxing)
@@ -62,6 +63,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.1 Repository Structure Reorganization** COMPLETED
 
 - Deliverables:
+
   - Reorganize repository structure according to [Repository-Layout.md](Repository-Layout.md)
   - Move existing Ruby code to `legacy/ruby/` preserving all functionality
   - Update all import paths and references in moved files
@@ -69,6 +71,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Rename all existing just targets to have a `legacy-` prefix.
 
 - Implementation Details:
+
   - Core Ruby library code moved to `legacy/ruby/lib/` and `legacy/ruby/test/`
   - Executable scripts remain in `bin/` and `scripts/` for functionality but reference legacy paths
   - Import paths updated (e.g., `bin/agent-task` now requires `../legacy/ruby/lib/agent_task/cli`)
@@ -84,6 +87,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.2 Rust Workspace & Core Crates Bootstrap** COMPLETED
 
 - Deliverables:
+
   - Create initial `Cargo.toml` workspace configuration
   - Implement `aw-core` crate skeleton with task/session lifecycle orchestration
   - Set up `aw-local-db` crate skeleton for SQLite database management
@@ -97,6 +101,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Add essential dependencies: tokio, serde, clap, rusqlite, etc.
 
 - Implementation Details:
+
   - Cargo.toml workspace configured with 25+ crates including core crates (`aw-core`, `aw-local-db`, `aw-fs-snapshots`), filesystem providers (`aw-fs-snapshots-zfs`, `aw-fs-snapshots-btrfs`), sandboxing (`aw-sandbox`, `aw-sandbox-linux`), and supporting crates
   - All crates implement proper module structure and dependencies
   - Essential dependencies configured in workspace: tokio, serde, clap, rusqlite, tracing, nix, async-trait, etc.
@@ -104,6 +109,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Sandbox crates follow subcrates pattern with platform-specific implementations
 
 - Key Source Files:
+
   - `Cargo.toml` - Workspace configuration with all crate members and shared dependencies
   - `crates/aw-core/src/lib.rs` - Task/session lifecycle orchestration skeleton
   - `crates/aw-local-db/src/lib.rs` - SQLite database management skeleton
@@ -122,6 +128,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.3 Privileged FS Operations Daemon** COMPLETED
 
 - **Deliverables**:
+
   - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server (the implementation should operate similarly to the reference implementation `bin/aw-fs-snapshots-daemon` which should be moved to the legacy/ruby folder; The new implementation should be made production-ready)
   - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../../Research/Using-SSZ.md) for implementation reference)
   - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
@@ -132,6 +139,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - **Stdin-driven mode**: daemon should provide option to accept SSZ-encoded commands from stdin as alternative to Unix socket communication
 
 - **Implementation Details**:
+
   - Created new Rust crate `aw-fs-snapshots-daemon` with async Tokio-based Unix socket server
   - Implemented proper SSZ union types for type-safe daemon communication (using `ethereum-ssz` with union behavior)
   - Added comprehensive ZFS and Btrfs operations (snapshot, clone, delete) with sudo privilege escalation and full validation
@@ -142,6 +150,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Concurrent request handling with async/await patterns
 
 - **Key Source Files**:
+
   - `crates/aw-fs-snapshots-daemon/src/main.rs` - Main binary entry point
   - `crates/aw-fs-snapshots-daemon/src/server.rs` - Unix socket server implementation
   - `crates/aw-fs-snapshots-daemon/src/operations.rs` - Filesystem operations with validation
@@ -149,6 +158,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - `Justfile` - Added `start-aw-fs-snapshots-daemon`, `stop-aw-fs-snapshots-daemon`, `check-aw-fs-snapshots-daemon` targets
 
 - **Future Enhancements** (non-blocking for MVP):
+
   - Consider alternatives to sudo requirement for privileged operations
 
 - **Verification Results**:
@@ -163,6 +173,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.4 FS Snapshots Core API** COMPLETED (parallel with 0.5-0.6)
 
 - **Deliverables**:
+
   - Complete `aw-fs-snapshots` crate with `FsSnapshotProvider` trait matching FS-Snapshots-Overview.md specification
   - `prepare_writable_workspace()`, `snapshot_now()`, `mount_readonly()`, `branch_from_snapshot()`, and `cleanup()` method implementations
   - Provider auto-detection logic (`provider_for(path)`) with capability scoring
@@ -170,16 +181,17 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Integration with daemon for privileged operations (ZFS/Btrfs providers communicate with aw-fs-snapshots-daemon)
 
 - **Implementation Details**:
+
   - Implemented complete `FsSnapshotProvider` trait with all methods specified in FS-Snapshots-Overview.md
   - Added `ProviderCapabilities`, `PreparedWorkspace`, `SnapshotRef` structs for type-safe API
   - ZFS provider supports CoW overlay mode with snapshot + clone operations via daemon
   - Btrfs provider supports CoW overlay mode with subvolume snapshots
-  - CopyProvider fallback supports Worktree and InPlace modes for non-CoW filesystems
   - Comprehensive path validation prevents workspace creation in system directories
   - Provider auto-detection scores capabilities (ZFS: 90, Btrfs: 80, Copy: 10)
   - Robust cleanup token system for idempotent resource teardown
 
 - **Key Source Files**:
+
   - `crates/aw-fs-snapshots/src/lib.rs` - Core trait definition and provider selection logic
   - `crates/aw-fs-snapshots-zfs/src/lib.rs` - ZFS provider implementation with daemon integration
   - `crates/aw-fs-snapshots-btrfs/src/lib.rs` - Btrfs provider implementation
@@ -195,6 +207,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.5 ZFS Snapshot Provider** COMPLETED (parallel with 0.3-0.4, 0.6)
 
 - **Deliverables**:
+
   - Complete `aw-fs-snapshots-zfs` crate with ZFS dataset operations
   - Dataset detection and mount point resolution
   - Snapshot creation, clone mounting, and cleanup via daemon communication
@@ -202,6 +215,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Comprehensive unit tests covering all provider functionality
 
 - **Implementation Details**:
+
   - Created separate `aw-fs-snapshots-traits` crate to avoid circular dependencies
   - ZFS provider uses daemon client for all privileged ZFS operations (snapshot, clone, destroy)
   - Supports CoW overlay mode with automatic dataset detection and mount point resolution
@@ -210,6 +224,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Proper cleanup token system for idempotent resource management
 
 - **Key Source Files**:
+
   - `crates/aw-fs-snapshots-traits/src/lib.rs` - Common traits and types
   - `crates/aw-fs-snapshots-zfs/src/lib.rs` - ZFS provider implementation
   - `crates/aw-fs-snapshots-daemon/src/client.rs` - Daemon client library
@@ -225,6 +240,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 **0.6 FS Snapshots Test Infrastructure** COMPLETED (parallel with 0.3-0.5)
 
 - **Deliverables**:
+
   - Port filesystem test helpers (`filesystem_test_helper.rb`) to Rust with `ZfsTestEnvironment` struct (focused on ZFS/Btrfs)
   - ZFS and Btrfs pool/subvolume creation for CI/testing environments with automatic cleanup (no loop device filesystems)
   - Port provider behavior tests (`provider_shared_behavior.rb`) with trait-based test organization
@@ -233,6 +249,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - **Reference existing Ruby test suite** (`test/snapshot/`) for test patterns and edge cases
 
 - **Implementation Details**:
+
   - Created `ZfsTestEnvironment` struct for managing ZFS test pools (removed loop device filesystem support per requirements)
   - Added ZFS pool creation on file-based devices with dataset setup and mounting
   - Implemented full Btrfs provider support with subvolume snapshots and CoW operations
@@ -244,6 +261,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - Enabled Btrfs support in default feature set alongside ZFS
 
 - **Key Source Files**:
+
   - `crates/aw-fs-snapshots/tests/filesystem_test_helpers.rs` - ZFS test pool management (no loop devices)
   - `crates/aw-fs-snapshots/tests/space_utils.rs` - Space measurement utilities
   - `crates/aw-fs-snapshots/tests/provider_core_behavior.rs` - Core provider test behaviors
@@ -253,15 +271,71 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
   - `Justfile` - Added `test-fs-snapshots` and `test-fs-snapshots-unit` targets
 
 - **Verification Results**:
+
   - [x] Rust test infrastructure compiles and provides ZFS/Btrfs test management
   - [x] ZFS and Btrfs providers compile and integrate correctly
-  - [x] Provider auto-detection selects best provider (ZFS > Btrfs > Copy fallback)
+  - [x] Provider auto-detection selects best provider (ZFS > Btrfs)
   - [x] Provider behavior traits ported from Ruby with equivalent functionality
   - [x] Space measurement utilities handle ZFS, Btrfs, and generic filesystems
   - [x] Integration tests created for ZFS and Btrfs provider validation
   - [x] Test targets added to Justfile for CI integration
   - [x] Loop device filesystem support removed per requirements
   - [x] Btrfs support enabled in default feature set
+
+- **Outstanding Tasks** - Git Filesystem Snapshot Provider
+
+The Git-based filesystem snapshot provider provides a portable fallback for environments without native CoW filesystems (ZFS/Btrfs). Implementation is tracked separately as it enables cross-platform time travel capabilities.
+
+#### **Git Provider Implementation Requirements** ([Git-Based-Snapshots.md](../../specs/Public/FS%20Snapshots/Git-Based-Snapshots.md))
+
+- **Deliverables**:
+
+  - Create `aw-fs-snapshots-git` crate implementing `FsSnapshotProvider` trait
+  - Shadow repository management with alternates for object sharing
+  - Session-indexed snapshots using `git commit-tree` with temporary indexes
+  - Git worktree support for writable workspaces and read-only mounting
+  - Proper cleanup of refs, worktrees, and shadow repositories
+
+- **Shadow Repository Management**:
+
+  - Create bare shadow repository with alternates to primary repo
+  - Manage per-session index files for incremental snapshots
+  - Handle repository configuration (gc.auto=0, receive.denyCurrentBranch=ignore)
+
+- **Snapshot Creation**:
+
+  - Implement staged+unstaged changes capture using temporary index
+  - Support untracked files inclusion (opt-in via config)
+  - Create commits parented to primary HEAD with proper metadata
+  - Store snapshots under namespaced refs `refs/aw/sessions/<sid>/snapshots/<n>`
+
+- **Workspace Management**:
+
+  - Restore writable working copies an worktrees from snapshot commits by copying
+    the involved files.
+  - Support read-only mounting for time travel inspection
+  - Handle worktree cleanup and ref management
+
+- **Configuration Integration**:
+
+  - Add `git.includeUntracked`, `git.worktreesDir`, `git.shadowRepoDir` config options
+  - Integrate with existing provider selection logic
+
+- **Testing Requirements**:
+
+  - Unit tests for shadow repository setup and snapshot creation
+  - Integration tests with real git repositories, covering shadow repo setup, creation of snapshots and restoration of snapshots to a working tree.
+  - Cross-platform compatibility testing (Linux/macOS/Windows)
+
+- **Implementation Status**:
+  - [ ] Create `aw-fs-snapshots-git` crate skeleton
+  - [ ] Implement shadow repository management
+  - [ ] Add session index file handling
+  - [ ] Implement snapshot creation with temporary index
+  - [ ] Add git worktree support for workspaces
+  - [ ] Integrate with provider selection in `aw-fs-snapshots` crate
+  - [ ] Add configuration options and CLI integration
+  - [ ] Comprehensive testing and documentation
 
 **Phase 1: Core Functionality** (with parallel VCS/task implementation tracks)
 
@@ -280,6 +354,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.1 VCS Repository Abstraction** COMPLETED
 
 - **Deliverables**:
+
   - Direct port of `legacy/ruby/lib/vcs_repo.rb` to Rust `aw-repo` crate (per Repository-Layout.md):
     - Multi-VCS support: Git, Mercurial, Bazaar, Fossil (same VCS types as Ruby implementation)
     - Repository root detection by walking parent directories (same logic as `find_repo_root`)
@@ -301,6 +376,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_vcs_repo_methods.rb](../../legacy/ruby/test/test_vcs_repo_methods.rb) and [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb)
 
 - **Implementation Details**:
+
   - Created `aw-repo` crate with synchronous API using std::process for all VCS operations
   - Implemented `VcsRepo` struct with methods matching Ruby implementation exactly
   - Added `VcsType` enum for Git, Hg, Bzr, Fossil support with per-VCS command builders
@@ -324,6 +400,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.2 Task File Management System** COMPLETED
 
 - **Deliverables**:
+
   - Direct port of task file logic from `legacy/ruby/lib/agent_tasks.rb` to `aw-core` crate (per Repository-Layout.md task/session lifecycle orchestration):
     - Timestamped file naming: `.agents/tasks/YYYY/MM/DD-HHMM-branch_name` (same format as `record_initial_task`)
     - Task file format with follow-up delimiter `--- FOLLOW UP TASK ---` (same as `append_task`)
@@ -337,6 +414,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) `assert_task_branch_created` helper and task file assertions
 
 - **Implementation Details**:
+
   - Created `AgentTasks` struct with async API matching `aw-repo` requirements
   - Implemented `record_initial_task()` method with timestamped file naming and directory creation
   - Implemented `append_task()` method with proper delimiter handling
@@ -346,6 +424,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - Methods are async for HTTP operations and task file I/O
 
 - **Key Source Files**:
+
   - `crates/aw-core/src/agent_tasks.rs` - AgentTasks struct and implementation
   - `crates/aw-core/tests/agent_tasks_tests.rs` - Comprehensive test suite (11 tests)
   - `crates/aw-core/Cargo.toml` - Updated with aw-repo and ureq dependencies
@@ -362,6 +441,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.3 Editor Integration** COMPLETED (depends on 1.1)
 
 - **Deliverables**:
+
   - Direct port of editor logic from `legacy/ruby/lib/agent_task/cli.rb` to Rust:
     - Editor discovery chain: `$EDITOR` → nano → pico → micro → vim → helix → vi (same order as Ruby)
     - Temporary file creation with task template `EDITOR_HINT` (exact same text as Ruby)
@@ -373,6 +453,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) `test_editor_failure` and `test_empty_file` tests
 
 - **Implementation Details**:
+
   - Created `editor.rs` module in `aw-core` crate with comprehensive editor functionality
   - Implemented `discover_editor()` function with same fallback chain as Ruby implementation
   - Created `edit_content_interactive()` function for full editing workflow with temporary files
@@ -381,6 +462,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - Added `tempfile` dependency to `aw-core` for temporary file management
 
 - **Key Source Files**:
+
   - `crates/aw-core/src/editor.rs` - Complete editor integration module
   - `crates/aw-core/src/lib.rs` - Updated exports for editor functionality
   - `crates/aw-core/Cargo.toml` - Added tempfile dependency
@@ -397,6 +479,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.4 Devshell Integration** COMPLETED (depends on 1.1)
 
 - **Deliverables**:
+
   - Direct port of devshell logic from `legacy/ruby/lib/agent_task/cli.rb` to Rust:
     - Nix flake detection and devShell parsing (same `devshell_names` function logic)
     - Devshell name validation against `flake.nix` devShells (same validation as Ruby)
@@ -408,12 +491,14 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) `test_devshell_option`, `test_devshell_option_invalid`, and `test_devshell_without_flake` tests
 
 - **Implementation Details**:
+
   - Created `devshell.rs` module in `aw-core` crate with async `devshell_names()` function
   - Implemented three-tier fallback: nix eval for current system → nix eval for all systems → regex parsing
   - Added comprehensive test suite covering all scenarios from Ruby tests
   - Integrated devshell functionality into `aw-core` lib.rs exports
 
 - **Key Source Files**:
+
   - `crates/aw-core/src/devshell.rs` - Complete devshell parsing implementation with nix eval and regex fallbacks
   - `crates/aw-core/src/lib.rs` - Updated to export `devshell_names` function
   - `crates/aw-core/Cargo.toml` - Added regex dependency for fallback parsing
@@ -431,6 +516,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.5 Push Operations & Remote Management** COMPLETED (depends on 1.1)
 
 - **Deliverables**:
+
   - Direct port of push logic from `legacy/ruby/lib/agent_task/cli.rb` to Rust:
     - Remote URL detection from VCS configuration (same as `default_remote_http_url`)
     - SSH-to-HTTPS URL conversion for Git remotes (same conversion logic)
@@ -443,6 +529,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port test patterns from VCS repo tests and task creation tests for push operations
 
 - **Implementation Details**:
+
   - Created `push.rs` module in `aw-core` crate with `PushHandler` and `PushOptions` structs
   - Implemented boolean parsing for `--push-to-remote` flag with same truthy/falsy values as Ruby (`1`, `true`, `yes`, `y` / `0`, `false`, `no`, `n`)
   - Added interactive prompt logic with exact same prompt text: "Push to default remote? [Y/n]:"
@@ -450,6 +537,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - Proper error handling for non-interactive environments (same exit behavior as Ruby)
 
 - **Key Source Files**:
+
   - `crates/aw-core/src/push.rs` - Complete push handling implementation with interactive prompts and VCS integration
   - `crates/aw-core/src/lib.rs` - Updated to export push functionality (`PushHandler`, `PushOptions`, `parse_push_to_remote_flag`)
 
@@ -467,6 +555,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.6 AW Task CLI Implementation** COMPLETED (1 week, depends on 1.1-1.5)
 
 - **Deliverables**:
+
   - Complete `aw task` command implementation in `aw-cli` crate (per Repository-Layout.md) with Clap derive API
   - Direct port of CLI argument parsing from `legacy/ruby/lib/agent_task/cli.rb` `start_task`:
     - `--prompt <TEXT>`: Direct task content (same as Ruby `--prompt` option)
@@ -483,6 +572,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Reference Tests**: Port comprehensive test patterns from [legacy/ruby/test/test_start_task.rb](../../legacy/ruby/test/test_start_task.rb) including all test cases for different VCS types
 
 - **Implementation Details**:
+
   - Created `task.rs` module in `aw-cli` crate with Clap derive API and complete workflow implementation
   - Implemented `TaskCommands` and `TaskCreateArgs` structs with all Ruby-compatible options
   - Integrated all core components: VCS repo abstraction, task file management, editor integration, devshell validation, and push operations
@@ -493,6 +583,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - Made VcsRepo synchronous with no async interfaces for cleaner integration testing
 
 - **Key Source Files**:
+
   - `crates/aw-cli/src/task.rs` - Complete task CLI implementation with argument parsing and workflow orchestration
   - `crates/aw-cli/src/lib.rs` - Updated to include task module and CLI structure
   - `crates/aw-cli/src/main.rs` - Updated to handle task subcommands
@@ -559,7 +650,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Verification Results**:
 
   - [x] AW CLI Parameters: `aw agent sandbox` subcommand implemented with all specified CLI flags (`--type local`, `--allow-network`, `--allow-containers`, `--allow-kvm`, `--seccomp`, `--seccomp-debug`, `--mount-rw`, `--overlay`)
-  - [x] FS Snapshot Pre-cloning: Implemented workspace preparation with ZFS/Btrfs/copy fallback logic using `prepare_workspace_with_fallback()` function
+  - [x] FS Snapshot Pre-cloning: Implemented workspace preparation with ZFS/Btrfs logic using `prepare_workspace_with_fallback()`
   - [x] AW Task Integration: Sandbox parameters added to `aw task` command with proper argument parsing and validation
   - [x] Basic Sandbox Configuration Mapping: `create_sandbox_from_args()` function maps CLI parameters to sandbox-core configuration
   - [x] E2E test: Basic sandbox integration test (`integration_test_sandbox_basic`) validates task creation with sandbox parameters
@@ -585,7 +676,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 - **Deliverables**:
 
   - **Filesystem Detection Command**: `aw agent fs status` - Run filesystem detection and report capabilities, provider selection, and mount point information
-  - **Session Snapshot Management**: `aw agent fs init-session` - Create initial filesystem snapshots for agent sessions
+  - **Session Snapshot Management**: `aw agent snapshot` - Create snapshots for agent sessions using standard repository and provider selection
   - **Snapshot Listing**: `aw agent fs snapshots <SESSION_ID>` - List snapshots created in agent coding sessions
   - **Branch Creation**: `aw agent fs branch create <SNAPSHOT_ID>` - Create writable branches from snapshots
   - **Branch Binding**: `aw agent fs branch bind <BRANCH_ID>` - Bind processes to specific branch views
@@ -609,7 +700,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 
   - **Filesystem Detection**: Implemented `aw agent fs status` with JSON and verbose output modes, integrating with `aw_fs_snapshots::provider_for()` logic
   - **Command Structure**: Complete Clap-based CLI implementation for all agent FS commands with proper help text and argument parsing
-  - **Database Schema**: Added `fs_snapshots` table and models to aw-local-db crate (awaiting state persistence milestone)
+  - **Note**: Snapshot metadata is authoritative in the filesystem providers (ZFS/Btrfs/Git/AgentFS). The CLI does not duplicate snapshot state in SQLite.
   - **Task Integration**: Added automatic snapshot creation placeholder in AW task workflow (awaiting AgentFS implementation)
   - **Branch Operations**: Command structures implemented for all branch operations (awaiting AgentFS integration)
 
@@ -626,10 +717,10 @@ Parallel development enables faster progress while maintaining clean dependency 
 
 - **Key Source Files**:
 
-  - `crates/aw-cli/src/agent/fs.rs` - Complete agent FS command implementations with Clap argument parsing
+  - `crates/aw-cli/src/agent/fs.rs` - Complete agent FS command implementations with Clap argument parsing (status, snapshots, branch ops) and `aw agent snapshot`
   - `crates/aw-local-db/src/models.rs` - FsSnapshotRecord and FsSnapshotStore database models and operations
-  - `crates/aw-local-db/src/schema.rs` - Database schema definitions including fs_snapshots table
-  - `crates/aw-local-db/src/migrations.rs` - Database migration scripts for fs_snapshots table
+  - `crates/aw-local-db/src/schema.rs` - Database schema definitions
+  - `crates/aw-local-db/src/migrations.rs` - Database migration scripts
   - `crates/aw-cli/src/task.rs` - Task execution workflow with snapshot integration placeholder
 
 - **Cross-Spec Dependencies**:
@@ -646,9 +737,19 @@ Parallel development enables faster progress while maintaining clean dependency 
   - All commands currently show informative messages about future functionality when AgentFS and database persistence are implemented
   - Task integration placeholder is positioned correctly in the workflow for automatic snapshot creation
 
+- **Outstanding Tasks**:
+  - Wire `aw agent fs status` to `aw_fs_snapshots::provider_for()` end‑to‑end and surface real filesystem type and mount point (platform‑specific detection).
+  - Implement `aw agent snapshot` repository discovery (walk to VCS root), provider selection, and snapshot creation for ZFS/Btrfs/Git/AgentFS.
+  - Do not persist snapshot rows in SQLite; rely on provider state. Implement human-friendly text and machine‑readable JSON output formats (`{ provider, ref, path }`).
+  - Implement `aw agent fs snapshots <SESSION_ID>` to list snapshots using the correct provider with JSON/text modes.
+  - Implement `aw agent fs branch create|bind|exec` behaviors backed by provider APIs and record branches in state.
+  - Add automated tests: unit tests for provider wiring; integration tests that exercise status/init/snapshots using temporary repos and AW_HOME‑scoped DB.
+  - Ensure all Agent FS tests run with custom `AW_HOME` to isolate environment.
+
 **1.9 Task State Persistence** (parallel with 1.6)
 
 - **Deliverables**:
+
   - Integration with `aw-local-db` crate for task state persistence (per State-Persistence.md specification)
   - Task metadata storage (branch, repository, timestamps, status) following State-Persistence.md schema
   - Session lifecycle tracking tied to task execution using SQLite database
@@ -657,6 +758,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - Support for `AW_HOME` environment variable to customize user configuration and database location
 
 - **Verification**:
+
   - [ ] Tasks recorded in SQLite database on creation following State-Persistence.md schema
   - [ ] Task metadata includes all required fields from State-Persistence.md tables
   - [ ] Database migrations handle schema evolution per State-Persistence.md versioning
@@ -666,6 +768,14 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] Integration tests with temporary databases validate State-Persistence.md compliance
   - [ ] All state persistence integration tests use custom `AW_HOME` for environment isolation from user configuration
 
+- **Outstanding Tasks**:
+
+  - Add unit tests for `aw-local-db` stores (Repo/Agent/Runtime/Session/Task/FsSnapshot/Kv) covering inserts, queries, and update paths.
+  - Add integration tests in `aw-core`/`aw-cli` that verify session + task records are written on `aw task create`, honoring `AW_HOME` override.
+  - Add migration tests to assert `schema_migrations` handling and idempotent re‑runs.
+  - Implement session status transitions and tests (created → running → completed/failed/cancelled) and timestamps.
+  - Implement automatic initial snapshot persistence hook in `aw task` when provider supports it, with tests.
+
 - **Cross-Spec Dependencies**:
 
   - **[State-Persistence.md](../../specs/Public/State-Persistence.md)**: Defines the complete SQL schema, backend selection rules, and data model used for task state persistence
@@ -673,6 +783,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.10 Basic Codex Agent Integration** (1 week, depends on 1.6)
 
 - **Deliverables**:
+
   - Codex agent detection and validation
   - Direct asciinema recording integration for session capture
   - Task execution orchestration with agent process management
@@ -689,6 +800,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **1.11 AW Task E2E Integration Tests** (1 week, depends on 1.6-1.11)
 
 - **Deliverables**:
+
   - Comprehensive end-to-end test suite for `aw task` workflows
   - Direct port of test infrastructure from `legacy/ruby/test/test_helper.rb`:
     - Temporary Git repository test fixtures (same `setup_repo` function)
@@ -715,7 +827,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - [ ] E2E test: Editor integration with template processing - port `test_editor_failure`, `test_empty_file`
   - [ ] E2E test: Push operations with remote interaction - port push logic from tests
   - [ ] E2E test: Codex agent integration end-to-end - new tests for Rust implementation
-  - [ ] E2E test: Sandbox integration with filesystem isolation - validate `aw task --sandbox local`
+  - [ ] CLI integration test: Sandbox command validation - `test_sandbox_filesystem_isolation_cli_integration` in `sandbox.rs` validates `aw agent sandbox` command parameter parsing and execution attempts
   - [ ] E2E test: Agent FS commands integration - validate automatic snapshot creation
   - [ ] Property tests for branch name validation and file naming - same regex validation
   - [ ] CI pipeline includes E2E test execution with proper cleanup (same temp dir handling)
@@ -727,6 +839,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.1 TUI Core Infrastructure**
 
 - **Deliverables**:
+
   - Create `aw-tui` crate with Ratatui-based TUI framework (per Repository-Layout.md)
   - Implement basic terminal event loop and rendering pipeline
   - Set up crossterm for input handling and screen management
@@ -743,6 +856,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.2 Multiplexer Integration**
 
 - **Deliverables**:
+
   - Implement multiplexer detection and auto-attachment logic (tmux > zellij > screen)
   - Create multiplexer session management with window/pane creation
   - Add window creation for new tasks with split panes (right=agent activity, left=editor/workspace)
@@ -759,6 +873,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.3 Dashboard Layout and Widgets**
 
 - **Deliverables**:
+
   - Implement main dashboard layout with top selectors and bottom task editor
   - Create fixed-height list widgets for Project, Branch, Agent selectors
   - Add multiline task description editor with resizable height (Ctrl+Up/Down)
@@ -775,6 +890,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.4 Selector Components and Filtering**
 
 - **Deliverables**:
+
   - Implement filtering input for each selector (prefix/substring matching)
   - Add keyboard navigation (arrows, PageUp/Down, Home/End) within fixed-height viewports
   - Connect Branch selector to VCS data (git commands in local mode, REST API in remote mode)
@@ -792,6 +908,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.5 Dynamic Footer and Hotkeys**
 
 - **Deliverables**:
+
   - Implement context-sensitive footer with actionable shortcuts
   - Add hotkey handling: Tab/Shift+Tab cycling, Ctrl+F for filters, navigation keys
   - Create help overlay (F1) showing complete keymap
@@ -809,6 +926,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.6 Error Handling and Validation**
 
 - **Deliverables**:
+
   - Add inline validation messages under selectors (branch not found, agent unsupported)
   - Implement error handling for failed operations with user-friendly messages
   - Add validation for task launch (required fields, valid selections)
@@ -825,6 +943,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.7 Persistence and Configuration**
 
 - **Deliverables**:
+
   - Implement persistence of last selections (project, agent, branch) per repo/user scope
   - Add configuration integration for TUI preferences and defaults
   - Save/restore window layout and splitter positions
@@ -841,6 +960,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.8 TUI Sophisticated E2E Testing Infrastructure**
 
 - **Deliverables**:
+
   - Set up comprehensive E2E testing framework using expectrl + portable-pty + insta
   - Create PTY-based test harness for simulating real terminal interactions
   - Implement snapshot testing for UI regression detection
@@ -857,6 +977,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 **6.9 TUI Scenario-Based E2E Tests**
 
 - **Deliverables**:
+
   - Implement E2E test scenarios for all major TUI workflows
   - Add tests for selector filtering and navigation
   - Create tests for task launch with multiplexer window creation
@@ -877,25 +998,30 @@ Parallel development enables faster progress while maintaining clean dependency 
 The MVP implementation must coordinate across multiple specifications with proper dependency ordering:
 
 **Foundation Layer (Weeks 1-4)**:
+
 - **Agent-Time-Travel.md Phase 0**: Mock Agent + Mock API Server (test harness foundation)
 - **Local-Sandboxing-on-Linux.md M1-M2**: Core sandbox infrastructure (namespaces, basic FS isolation)
 - **Phase 1.1**: VCS Repository Abstraction (shared foundation for all components)
 
 **Core Task Layer (Weeks 5-12)**:
+
 - **Phase 1.2-1.10**: Complete `aw task` command implementation with all features
 - **Agent-Time-Travel.md Phase 1**: Codex agent integration (adapted from Claude Code phases)
 - **Local-Sandboxing-on-Linux.md M3-M4**: Cgroups and overlay support
 
 **Advanced Features Layer (Weeks 13-20)**:
+
 - **Agent-Time-Travel.md Phase 2-3**: Full time travel features (seek, branch, checkpointing)
 - **Local-Sandboxing-on-Linux.md M5-M8**: Dynamic allow-list, networking, debugging, containers/VMs
 
 **Integration Layer (Weeks 21-24)**:
+
 - **Agent-Time-Travel.md Phase 4**: Cross-platform workspace binding
 - **Local-Sandboxing-on-Linux.md M9-M10**: Supervisor integration and CLI acceptance
 - **Phase 2-5**: Agent integrations, time travel UI, sandboxing polish
 
 **Key Dependency Insights**:
+
 - Mock agents must be available before real agent integration testing
 - Basic sandboxing (M1-M2) enables safe agent execution during development
 - VCS abstraction is required by task files, push operations, and devshell validation
@@ -908,6 +1034,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **2.1 Codex Agent Integration** (depends on Phase 1.6 + Agent-Time-Travel.md Phase 0, parallel with 2.2)
 
 - Deliverables:
+
   - Codex agent wrapper with rollout file parsing (JSONL format from [Codex-Session-File-Format.md](../../Research/Codex-Session-File-Format.md))
   - Integrated asciinema recording in task execution flow
   - Session timeline creation with SessionMoments for Codex
@@ -925,6 +1052,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **2.2.5 Claude Code Mock Agent Support** (depends on Agent-Time-Travel.md Phase 0)
 
 - Deliverables:
+
   - Extend mock agent (`tests/tools/mock-agent/`) to support Claude Code session format
   - Implement Claude session file creation in `~/.claude/projects/<encoded-workspace-path>/<uuid>.jsonl`
   - Add Claude-compatible API server responses for tool execution and conversation threading
@@ -942,6 +1070,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **2.2 Claude Code Agent Integration** (depends on Phase 1.6 + 2.2.5, parallel with 2.1)
 
 - Deliverables:
+
   - Claude Code agent wrapper with hook-based session recording (PostToolUse events)
   - Integrated asciinema recording in task execution flow
   - Session timeline creation with SessionMoments for Claude Code
@@ -959,6 +1088,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **2.3 Agent Runner & Session Management** (depends on 2.1 & 2.2)
 
 - Deliverables:
+
   - Agent execution coordination within main CLI for both Claude Code and Codex
   - Session management coordination between different agent types
   - Integration with mock agent for testing (`tests/tools/mock-agent/`)
@@ -975,6 +1105,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **3.1 Session Timeline Infrastructure**
 
 - Deliverables:
+
   - Session timeline data structures and storage in SQLite
   - SessionMoment creation and indexing for both Claude Code and Codex
   - Timeline navigation and seeking APIs
@@ -990,6 +1121,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **3.2 Time Travel Commands & UI** (depends on 3.1)
 
 - Deliverables:
+
   - Read-only snapshot mounting for inspection at specific moments
   - Session branching with injected messages
   - Transcript/rollout trimming for precise time travel resumption
@@ -1008,6 +1140,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **4.1 Sandbox Integration**
 
 - Deliverables:
+
   - Complete Linux sandboxing implementation (see [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md))
   - Dynamic read allow-list with seccomp notify
   - Resource limits and audit logging
@@ -1025,6 +1158,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **5.1 TUI Dashboard Implementation**
 
 - Deliverables:
+
   - Ratatui-based TUI implementation following [TUI-PRD.md](TUI-PRD.md)
   - Project/Branch/Agent selectors with filtering
   - Task description editor and launch workflow
@@ -1043,6 +1177,7 @@ The MVP implementation must coordinate across multiple specifications with prope
 **6.1 Final Integration & Documentation**
 
 - Deliverables:
+
   - Complete CLI command surface for MVP features
   - Man pages and shell completions
   - User documentation and examples

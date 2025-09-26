@@ -56,6 +56,7 @@ Testability strategy from day one:
 ### FsSnapshots and Providers (multi‑OS)
 
 - **Creation Policy**:
+
   - Default: Create an FsSnapshot at each shell command boundary and at important runtime milestones.
   - Max frequency controls and deduplication to avoid thrashing during rapid events.
   - FsSnapshots include: id, ts, label, provider, snapshotRef, notes.
@@ -65,8 +66,7 @@ Testability strategy from day one:
     - ZFS: instantaneous snapshots and cheap writable clones (SessionBranch from snapshot via clone).
     - Btrfs: subvolume snapshots (constant-time), cheap writable snapshots for SessionBranching.
     - Git fallback: capture shadow commits with a temporary index (include untracked optional); materialize branches via `git worktree` when isolation is desired.
-    - Copy fallback: `cp --reflink=auto` when possible; otherwise deep copy (last resort).
-  - macOS, Windows:
+    - Copy fallback: Present in early versions of AW, but now removed. Please clean up references to it if noticed in the code or the specs.
     - AgentFS (FSKit, WinFsp): Provide a user-space filesystem with native snapshots/branches for inspection and SessionBranching, with per-process cow-overlay (path-stable CoW) mounts.
 - **SessionBranch Semantics**:
   - Writable clones are native on ZFS/Btrfs. On macOS and Windows, SessionBranching is implemented via AgentFS (FSKit/WinFsp) rather than native OS snapshots.
@@ -96,11 +96,13 @@ Scope and assumptions:
 Baseline flows (ordered by fidelity):
 
 1. Checkpoint restore (preferred when agent supports it)
+
    - Detect a compatible checkpoint near the target `SessionMoment` via the session timeline metadata emitted during recording (e.g., `timeline.sessionMoment` with `agentCheckpointId`).
    - Create a SessionBranch from the associated FsSnapshot so the workspace matches the checkpoint’s file view.
    - Launch the agent in "resume from checkpoint" mode with the checkpoint ID and the writable branch workspace mounted as its project root. Inject the user’s new message as the first turn after resume.
 
 2. Session resume with trim (when agent persists conversation transcripts but lacks explicit checkpoints)
+
    - Identify the persisted session artifacts (location and format per agent notes). Examples: JSON/JSONL logs, SQLite stores, or proprietary directories.
    - Create a SessionBranch from the target FsSnapshot.
    - Inside the branch workspace, prepare a "trimmed session view" that logically ends at the selected `SessionMoment`:
@@ -176,6 +178,7 @@ Phase 5 — REST/TUI/WebUI integration polish
 ### REST API Extensions
 
 - `GET /api/v1/sessions/{id}/timeline`
+
   - Returns SessionMoments and FsSnapshots ordered by time.
   - Response:
 
@@ -200,21 +203,26 @@ Phase 5 — REST/TUI/WebUI integration polish
   ```
 
 - `POST /api/v1/sessions/{id}/fs-snapshots`
+
   - Create a manual FsSnapshot near a timestamp; returns snapshot ref.
 
 - `POST /api/v1/sessions/{id}/moments`
+
   - Create a manual SessionMoment at/near a timestamp.
 
 - `POST /api/v1/sessions/{id}/seek`
+
   - Parameters: `ts`, or `fsSnapshotId`.
   - Returns a short‑lived read‑only mount (host path and/or container path) for inspection; optionally pauses the session player at `ts`.
 
 - `POST /api/v1/sessions/{id}/session-branch`
+
   - Parameters: `fromTs` or `fsSnapshotId`, `name`, optional `injectedMessage`.
   - Creates a new session (SessionBranch) with a writable workspace cloned/overlaid from the FsSnapshot.
   - Response includes new `sessionId` and workspace mount info.
 
 - `GET /api/v1/sessions/{id}/fs-snapshots`
+
   - Lists underlying provider snapshots/checkpoints with metadata (for diagnostics and retention tooling).
 
 - SSE additions on `/sessions/{id}/events`

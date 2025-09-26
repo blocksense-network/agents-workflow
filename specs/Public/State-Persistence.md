@@ -35,7 +35,7 @@ Earlier drafts described PID‑like JSON session records and a local daemon. The
 
 ## SQL Schema (SQLite dialect)
 
-This schema models repositories, workspaces, tasks, sessions, runtimes, agents, events, and filesystem snapshots. It is intentionally normalized for portability to server backends.
+This schema models repositories, workspaces, tasks, sessions, runtimes, agents, and events. Filesystem snapshots are provider‑authoritative (ZFS/Btrfs/Git/AgentFS) and are not duplicated in SQLite; the CLI may record minimal references in session events for convenience.
 
 ```sql
 -- Schema versioning
@@ -125,18 +125,6 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE INDEX IF NOT EXISTS idx_events_session_ts ON events(session_id, ts);
 
--- Filesystem snapshots associated with a session (see docs/fs-snapshots)
-CREATE TABLE IF NOT EXISTS fs_snapshots (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  ts           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  provider     TEXT NOT NULL,                  -- zfs|btrfs|agentfs|git
-  ref          TEXT,                           -- dataset/subvolume id, AgentFS snapshot/branch id, git ref/commit
-  path         TEXT,                           -- mount or copy path
-  parent_id    INTEGER REFERENCES fs_snapshots(id) ON DELETE SET NULL,
-  metadata     TEXT                            -- JSON payload
-);
-
 -- Key/value subsystem for small, fast lookups (scoped configuration, caches)
 CREATE TABLE IF NOT EXISTS kv (
   scope        TEXT NOT NULL,                  -- user|repo|repo-user|system|...
@@ -145,6 +133,12 @@ CREATE TABLE IF NOT EXISTS kv (
   PRIMARY KEY (scope, k)
 );
 ```
+
+## Filesystem Snapshots
+
+- The source of truth for snapshot state is the filesystem provider (ZFS/Btrfs/Git/AgentFS). The local SQLite database does not include an `fs_snapshots` table.
+- The CLI MAY record minimal snapshot references in the `events` table (e.g., `type = "snapshot-created"`) with a JSON payload such as `{ "provider": "zfs", "ref": "pool/dataset@ts", "path": "/pool/dataset" }` to aid UX and diagnostics.
+- Any enumeration of snapshots for time‑travel or branching queries the provider directly rather than relying on a local mirror.
 
 ### Schema Versioning
 
