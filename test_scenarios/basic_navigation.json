@@ -1,0 +1,48 @@
+{
+  "name": "basic_navigation",
+  "terminal": {
+    "width": 80,
+    "height": 24
+  },
+  "steps": [
+    {
+      "type": "advanceMs",
+      "ms": 50
+    },
+    {
+      "type": "assertVm",
+      "focus": "projects",
+      "selected": 0
+    },
+    {
+      "type": "snapshot",
+      "name": "initial_dashboard"
+    },
+    {
+      "type": "key",
+      "key": "Tab"
+    },
+    {
+      "type": "assertVm",
+      "focus": "repositories",
+      "selected": 0
+    },
+    {
+      "type": "snapshot",
+      "name": "after_tab_to_repositories"
+    },
+    {
+      "type": "key",
+      "key": "Down"
+    },
+    {
+      "type": "assertVm",
+      "focus": "repositories",
+      "selected": 1
+    },
+    {
+      "type": "snapshot",
+      "name": "after_down_arrow"
+    }
+  ]
+}
