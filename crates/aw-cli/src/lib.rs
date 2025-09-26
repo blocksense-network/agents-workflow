@@ -4,6 +4,7 @@ pub mod agent;
 pub mod sandbox;
 pub mod task;
 pub mod transport;
+pub mod tui;
 
 // Re-export CLI types for testing
 pub use clap::{Parser, Subcommand};
@@ -29,6 +30,8 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: AgentCommands,
     },
+    /// Launch the Terminal User Interface
+    Tui(tui::TuiArgs),
 }
 
 #[derive(Subcommand)]
