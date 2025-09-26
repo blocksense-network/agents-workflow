@@ -3,6 +3,7 @@
 use agentfs_core::{FsCore, FsConfig, CaseSensitivity, MemoryPolicy, FsLimits, CachePolicy, OpenOptions};
 use std::collections::HashMap;
 use std::ffi::CStr;
+// use std::ffi::c_void; // not needed currently
 use std::os::raw::c_char;
 use std::path::Path;
 use std::ptr;
@@ -96,6 +97,7 @@ pub extern "C" fn af_fs_create(config_json: *const c_char, out_fs: *mut AfFs) ->
         enable_xattrs: true,
         enable_ads: false, // macOS uses xattrs instead of ADS
         track_events: true,
+        security: agentfs_core::config::SecurityPolicy::default(),
     };
 
     // Create FsCore instance
@@ -386,6 +388,27 @@ pub extern "C" fn af_open(
     }
 }
 
+/// Create child by parent id and raw name bytes (0=file,1=dir)
+#[no_mangle]
+pub extern "C" fn af_create_child_by_id(
+    fs: AfFs,
+    parent_id: u64,
+    name_ptr: *const u8,
+    name_len: usize,
+    item_type: u32,
+    mode: u32,
+    out_node_id: *mut u64,
+) -> AfResult {
+    if name_ptr.is_null() || out_node_id.is_null() { return AfResult::AfErrInval; }
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let name = unsafe { std::slice::from_raw_parts(name_ptr, name_len) };
+    match core.create_child_by_id(parent_id, name, item_type, mode) {
+        Ok(nid) => { unsafe { *out_node_id = nid; } AfResult::AfOk }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn af_read(
     fs: AfFs,
@@ -460,6 +483,37 @@ pub extern "C" fn af_close(fs: AfFs, h: AfHandleId) -> AfResult {
     }
 }
 
+/// Open by internal node id
+#[no_mangle]
+pub extern "C" fn af_open_by_id(
+    fs: AfFs,
+    node_id: u64,
+    options_json: *const c_char,
+    out_h: *mut AfHandleId,
+) -> AfResult {
+    if options_json.is_null() || out_h.is_null() { return AfResult::AfErrInval; }
+
+    let options_str = match unsafe { CStr::from_ptr(options_json) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let options: serde_json::Value = match serde_json::from_str(options_str) { Ok(o) => o, Err(_) => return AfResult::AfErrInval };
+    let open_options = OpenOptions {
+        read: options.get("read").and_then(|v| v.as_bool()).unwrap_or(false),
+        write: options.get("write").and_then(|v| v.as_bool()).unwrap_or(false),
+        create: options.get("create").and_then(|v| v.as_bool()).unwrap_or(false),
+        truncate: options.get("truncate").and_then(|v| v.as_bool()).unwrap_or(false),
+        append: options.get("append").and_then(|v| v.as_bool()).unwrap_or(false),
+        share: vec![],
+        stream: None,
+    };
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+
+    match core.open_by_id(node_id, &open_options) {
+        Ok(handle_id) => { unsafe { *out_h = handle_id.0; } AfResult::AfOk }
+        Err(e) => fs_error_to_af_result(&e),
+    }
+}
+
 /// Get filesystem statistics
 #[no_mangle]
 pub extern "C" fn af_stats(fs: AfFs, out_stats: *mut u8, stats_size: usize) -> AfResult {
@@ -515,12 +569,14 @@ pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, 
             // off 0:  len              u64
             // off 8:  file_type        u8  (0=file,1=dir,2=symlink)
             // off 9:  mode             u32 (POSIX mode)
-            // off 13: atime            i64 (seconds)
-            // off 21: mtime            i64
-            // off 29: ctime            i64
-            // off 37: birthtime        i64
-            // total 45 bytes; align to 48 for safety
-            let min = 48usize;
+            // off 13: uid              u32
+            // off 17: gid              u32
+            // off 21: atime            i64 (seconds)
+            // off 29: mtime            i64
+            // off 37: ctime            i64
+            // off 45: birthtime        i64
+            // total 53 bytes; align to 56 for safety
+            let min = 56usize;
             if attrs_size < min { return AfResult::AfErrInval; }
 
             let file_type = if attrs.is_symlink { 2u8 } else if attrs.is_dir { 1u8 } else { 0u8 };
@@ -540,10 +596,12 @@ pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, 
                 std::ptr::copy_nonoverlapping(attrs.len.to_le_bytes().as_ptr(), base.add(0), 8);
                 *base.add(8) = file_type;
                 std::ptr::copy_nonoverlapping(mode.to_le_bytes().as_ptr(), base.add(9), 4);
-                std::ptr::copy_nonoverlapping(attrs.times.atime.to_le_bytes().as_ptr(), base.add(13), 8);
-                std::ptr::copy_nonoverlapping(attrs.times.mtime.to_le_bytes().as_ptr(), base.add(21), 8);
-                std::ptr::copy_nonoverlapping(attrs.times.ctime.to_le_bytes().as_ptr(), base.add(29), 8);
-                std::ptr::copy_nonoverlapping(attrs.times.birthtime.to_le_bytes().as_ptr(), base.add(37), 8);
+                std::ptr::copy_nonoverlapping(attrs.uid.to_le_bytes().as_ptr(), base.add(13), 4);
+                std::ptr::copy_nonoverlapping(attrs.gid.to_le_bytes().as_ptr(), base.add(17), 4);
+                std::ptr::copy_nonoverlapping(attrs.times.atime.to_le_bytes().as_ptr(), base.add(21), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.mtime.to_le_bytes().as_ptr(), base.add(29), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.ctime.to_le_bytes().as_ptr(), base.add(37), 8);
+                std::ptr::copy_nonoverlapping(attrs.times.birthtime.to_le_bytes().as_ptr(), base.add(45), 8);
             }
             AfResult::AfOk
         }
@@ -579,6 +637,16 @@ pub extern "C" fn af_set_mode(fs: AfFs, path: *const c_char, mode: u32) -> AfRes
     match core.set_mode(std::path::Path::new(path_str), mode) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
+/// Set owner (chown-like)
+#[no_mangle]
+pub extern "C" fn af_set_owner(fs: AfFs, path: *const c_char, uid: u32, gid: u32) -> AfResult {
+    if path.is_null() { return AfResult::AfErrInval; }
+    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    match core.set_owner(std::path::Path::new(path_str), uid, gid) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+}
+
 /// Rename path (no overwrite)
 #[no_mangle]
 pub extern "C" fn af_rename(fs: AfFs, old_path: *const c_char, new_path: *const c_char) -> AfResult {
@@ -597,11 +665,10 @@ pub extern "C" fn af_readdir(fs: AfFs, path: *const c_char, out_buf: *mut u8, bu
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core_ref: &agentfs_core::vfs::FsCore = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core_ref.readdir_plus(std::path::Path::new(path_str)) {
+    match core_ref.readdir_plus_raw(std::path::Path::new(path_str)) {
         Ok(entries) => {
             let mut offset = 0usize;
-            for (e, _attrs) in entries {
-                let name_bytes = e.name.as_bytes();
+            for (name_bytes, _attrs) in entries {
                 let need = name_bytes.len() + 1; // plus NUL
                 if offset + need > buf_size { break; }
                 unsafe { ptr::copy_nonoverlapping(name_bytes.as_ptr(), out_buf.add(offset), name_bytes.len()); }

@@ -32,6 +32,8 @@ pub(crate) struct Node {
     pub kind: NodeKind,
     pub times: FileTimes,
     pub mode: u32,
+    pub uid: u32,
+    pub gid: u32,
     pub xattrs: HashMap<String, Vec<u8>>, // Extended attributes
 }
 
@@ -133,6 +135,8 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o755,
+            uid: self.config.security.default_uid,
+            gid: self.config.security.default_gid,
             xattrs: HashMap::new(),
         };
 
@@ -263,6 +267,8 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o644,
+            uid: self.config.security.default_uid,
+            gid: self.config.security.default_gid,
             xattrs: HashMap::new(),
         };
 
@@ -287,11 +293,147 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o755,
+            uid: self.config.security.default_uid,
+            gid: self.config.security.default_gid,
             xattrs: HashMap::new(),
         };
 
         self.nodes.lock().unwrap().insert(node_id, node);
         Ok(node_id)
+    }
+
+    /// Change ownership of a node addressed by path
+    pub fn set_owner(&self, path: &Path, uid: u32, gid: u32) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let mut nodes = self.nodes.lock().unwrap();
+        let node = nodes.get_mut(&node_id).ok_or(FsError::NotFound)?;
+        node.uid = uid;
+        node.gid = gid;
+        node.times.ctime = Self::current_timestamp();
+        Ok(())
+    }
+
+    /// Percent-encode arbitrary bytes to a safe internal string name
+    fn percent_encode_name(bytes: &[u8]) -> String {
+        let mut s = String::with_capacity(bytes.len() * 3);
+        for &b in bytes {
+            let is_safe = (b'A'..=b'Z').contains(&b)
+                || (b'a'..=b'z').contains(&b)
+                || (b'0'..=b'9').contains(&b)
+                || matches!(b, b'-' | b'_' | b'.');
+            if is_safe {
+                s.push(b as char);
+            } else {
+                s.push('%');
+                s.push_str(&format!("{:02X}", b));
+            }
+        }
+        s
+    }
+
+    /// Create a child under a parent directory by parent node id and raw name bytes.
+    /// Returns created node id.
+    pub fn create_child_by_id(
+        &self,
+        parent_id_u64: u64,
+        name_bytes: &[u8],
+        item_type: u32,
+        mode: u32,
+    ) -> FsResult<u64> {
+        let parent_id = NodeId(parent_id_u64);
+        let mut nodes = self.nodes.lock().unwrap();
+        let parent_node = nodes.get_mut(&parent_id).ok_or(FsError::NotFound)?;
+
+        // Determine internal name used for map lookup
+        let internal_name = match std::str::from_utf8(name_bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => Self::percent_encode_name(name_bytes),
+        };
+
+        // Ensure parent is a directory and the child doesn't exist
+        match &mut parent_node.kind {
+            NodeKind::Directory { children } => {
+                if children.contains_key(&internal_name) {
+                    return Err(FsError::AlreadyExists);
+                }
+            }
+            _ => return Err(FsError::NotADirectory),
+        }
+        drop(nodes);
+
+        // Create the node
+        let new_node_id = match item_type {
+            0 => {
+                // file
+                let content_id = self.storage.allocate(&[])?;
+                self.create_file_node(content_id)?
+            }
+            1 => {
+                // directory
+                self.create_directory_node()?
+            }
+            _ => return Err(FsError::InvalidArgument),
+        };
+
+        // Apply mode
+        {
+            let mut nodes = self.nodes.lock().unwrap();
+            if let Some(n) = nodes.get_mut(&new_node_id) {
+                n.mode = mode;
+                // Preserve original raw name in xattr for later round-trip
+                n.xattrs.insert(
+                    "user.agentfs.rawname".to_string(),
+                    name_bytes.to_vec(),
+                );
+            }
+        }
+
+        // Insert into parent directory
+        {
+            let mut nodes = self.nodes.lock().unwrap();
+            if let Some(parent) = nodes.get_mut(&parent_id) {
+                if let NodeKind::Directory { children } = &mut parent.kind {
+                    children.insert(internal_name, new_node_id);
+                }
+            }
+        }
+
+        Ok(new_node_id.0)
+    }
+
+    /// Get attributes of a child under a parent directory by raw name bytes
+    pub fn getattr_child_by_id_name(&self, parent_id_u64: u64, name_bytes: &[u8]) -> FsResult<Attributes> {
+        let parent_id = NodeId(parent_id_u64);
+        let internal_name = match std::str::from_utf8(name_bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => Self::percent_encode_name(name_bytes),
+        };
+
+        let nodes = self.nodes.lock().unwrap();
+        let parent = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
+        let child_id = match &parent.kind {
+            NodeKind::Directory { children } => children.get(&internal_name).ok_or(FsError::NotFound).copied()?,
+            _ => return Err(FsError::NotADirectory),
+        };
+        drop(nodes);
+        self.get_node_attributes(child_id)
+    }
+
+    /// Resolve child node id by parent id and raw name bytes
+    pub fn resolve_child_id_by_id_name(&self, parent_id_u64: u64, name_bytes: &[u8]) -> FsResult<u64> {
+        let parent_id = NodeId(parent_id_u64);
+        let internal_name = match std::str::from_utf8(name_bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => Self::percent_encode_name(name_bytes),
+        };
+
+        let nodes = self.nodes.lock().unwrap();
+        let parent = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
+        let child_id = match &parent.kind {
+            NodeKind::Directory { children } => children.get(&internal_name).ok_or(FsError::NotFound).copied()?,
+            _ => return Err(FsError::NotADirectory),
+        };
+        Ok(child_id.0)
     }
 
     /// Clone a node for copy-on-write (creates a new node with the same content)
@@ -388,6 +530,8 @@ impl FsCore {
         Ok(Attributes {
             len,
             times: node.times,
+            uid: node.uid,
+            gid: node.gid,
             is_dir,
             is_symlink,
             mode_user: FileMode {
@@ -670,6 +814,33 @@ impl FsCore {
             deleted: false,
         };
 
+        self.handles.lock().unwrap().insert(handle_id, handle);
+        Ok(handle_id)
+    }
+
+    /// Open by internal node id (adapter pathless open)
+    pub fn open_by_id(&self, node_id_u64: u64, opts: &OpenOptions) -> FsResult<HandleId> {
+        let node_id = NodeId(node_id_u64);
+
+        // Verify node exists
+        {
+            let nodes = self.nodes.lock().unwrap();
+            let _ = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+        }
+
+        // Check share mode conflicts with existing handles
+        if self.share_mode_conflicts(node_id, opts) {
+            return Err(FsError::AccessDenied);
+        }
+
+        let handle_id = self.allocate_handle_id();
+        let handle = Handle {
+            id: handle_id,
+            node_id,
+            position: 0,
+            options: opts.clone(),
+            deleted: false,
+        };
         self.handles.lock().unwrap().insert(handle_id, handle);
         Ok(handle_id)
     }
@@ -1041,6 +1212,8 @@ impl FsCore {
                     let attributes = Attributes {
                         len,
                         times: child_node.times,
+                        uid: child_node.uid,
+                        gid: child_node.gid,
                         is_dir,
                         is_symlink,
                         mode_user: FileMode { read: true, write: true, exec: is_dir },
@@ -1054,6 +1227,59 @@ impl FsCore {
             }
             NodeKind::File { .. } => Err(FsError::NotADirectory),
             NodeKind::Symlink { .. } => Err(FsError::NotADirectory),
+        }
+    }
+
+    /// Like readdir_plus, but returns raw name bytes for each entry for adapters that need exact bytes
+    pub fn readdir_plus_raw(&self, path: &Path) -> FsResult<Vec<(Vec<u8>, Attributes)>> {
+        let (node_id, _) = self.resolve_path(path)?;
+        let nodes = self.nodes.lock().unwrap();
+        let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+
+        match &node.kind {
+            NodeKind::Directory { children } => {
+                // Sort internal names for stable order
+                let mut names: Vec<_> = children.keys().cloned().collect();
+                names.sort();
+
+                let mut entries = Vec::new();
+                for name in names {
+                    let child_id = children.get(&name).ok_or(FsError::NotFound)?;
+                    let child_node = nodes.get(child_id).ok_or(FsError::NotFound)?;
+
+                    let (is_dir, is_symlink, len) = match &child_node.kind {
+                        NodeKind::Directory { .. } => (true, false, 0),
+                        NodeKind::File { streams } => {
+                            let size = streams.get("").map(|(_, size)| *size).unwrap_or(0);
+                            (false, false, size)
+                        }
+                        NodeKind::Symlink { target } => (false, true, target.len() as u64),
+                    };
+
+                    let attributes = Attributes {
+                        len,
+                        times: child_node.times,
+                        uid: child_node.uid,
+                        gid: child_node.gid,
+                        is_dir,
+                        is_symlink,
+                        mode_user: FileMode { read: true, write: true, exec: is_dir },
+                        mode_group: FileMode { read: true, write: false, exec: is_dir },
+                        mode_other: FileMode { read: true, write: false, exec: false },
+                    };
+
+                    // Prefer raw name bytes preserved at create time, fallback to internal name bytes
+                    let raw_bytes = child_node
+                        .xattrs
+                        .get("user.agentfs.rawname")
+                        .cloned()
+                        .unwrap_or_else(|| name.as_bytes().to_vec());
+
+                    entries.push((raw_bytes, attributes));
+                }
+                Ok(entries)
+            }
+            _ => Err(FsError::NotADirectory),
         }
     }
 
@@ -1318,6 +1544,8 @@ impl FsCore {
                 birthtime: now,
             },
             mode: 0o777, // Symlinks typically have full permissions
+            uid: self.config.security.default_uid,
+            gid: self.config.security.default_gid,
             xattrs: HashMap::new(),
         };
 

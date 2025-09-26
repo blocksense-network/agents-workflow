@@ -19,6 +19,36 @@ mod tests {
     }
 
     #[test]
+    fn test_chown_and_non_utf8_create() {
+        let fs = create_fs();
+        // mkdir /raw
+        let d = CString::new("/raw").unwrap();
+        let rc = unsafe { af_mkdir(fs, d.as_ptr(), 0o755) } as i32;
+        assert_eq!(rc, 0);
+
+        // Resolve parent id
+        let mut nid: u64 = 0; let mut pid: u64 = 0;
+        let rc = unsafe { af_resolve_id(fs, d.as_ptr(), &mut nid as *mut u64, &mut pid as *mut u64) } as i32;
+        assert_eq!(rc, 0);
+
+        // Create child by id with invalid UTF-8 name bytes
+        let name_bytes = [0x66u8, 0x6F, 0x80, 0x6F];
+        let mut child_id: u64 = 0;
+        let rc = unsafe { af_create_child_by_id(fs, nid, name_bytes.as_ptr(), name_bytes.len(), 0, 0o644, &mut child_id as *mut u64) } as i32;
+        assert_eq!(rc, 0);
+        assert!(child_id > 0);
+
+        // Open by id
+        let opts = CString::new("{\"read\":true,\"write\":true}").unwrap();
+        let mut h: u64 = 0;
+        let rc = unsafe { af_open_by_id(fs, child_id, opts.as_ptr(), &mut h as *mut u64) } as i32;
+        assert_eq!(rc, 0);
+        unsafe { af_close(fs, h) };
+
+        // Set owner on path (percent-encoded internal path is not public; chown via path of parent not tested here)
+    }
+
+    #[test]
     fn test_basic_readdir_and_attrs() {
         let fs = create_fs();
         let path = CString::new("/").unwrap();

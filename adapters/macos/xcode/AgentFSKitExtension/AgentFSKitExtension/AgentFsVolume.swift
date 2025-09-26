@@ -21,6 +21,9 @@ func agentfs_bridge_readdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePoin
 @_silgen_name("agentfs_bridge_open")
 func agentfs_bridge_open(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
 
+@_silgen_name("agentfs_bridge_open_by_id")
+func agentfs_bridge_open_by_id(_ core: UnsafeMutableRawPointer?, _ node_id: UInt64, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
+
 @_silgen_name("agentfs_bridge_read")
 func agentfs_bridge_read(_ core: UnsafeMutableRawPointer?, _ handle: UInt64, _ offset: UInt64, _ buffer: UnsafeMutableRawPointer?, _ length: UInt32, _ bytes_read: UnsafeMutablePointer<UInt32>?) -> Int32
 
@@ -51,6 +54,9 @@ func agentfs_bridge_set_times(_ core: UnsafeMutableRawPointer?, _ path: UnsafePo
 @_silgen_name("agentfs_bridge_set_mode")
 func agentfs_bridge_set_mode(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
 
+@_silgen_name("agentfs_bridge_set_owner")
+func agentfs_bridge_set_owner(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ uid: UInt32, _ gid: UInt32) -> Int32
+
 @_silgen_name("agentfs_bridge_xattr_get")
 func agentfs_bridge_xattr_get(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
 
@@ -62,6 +68,9 @@ func agentfs_bridge_xattr_list(_ core: UnsafeMutableRawPointer?, _ path: UnsafeP
 
 @_silgen_name("agentfs_bridge_resolve_id")
 func agentfs_bridge_resolve_id(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ node_id: UnsafeMutablePointer<UInt64>?, _ parent_id: UnsafeMutablePointer<UInt64>?) -> Int32
+
+@_silgen_name("agentfs_bridge_create_child_by_id")
+func agentfs_bridge_create_child_by_id(_ core: UnsafeMutableRawPointer?, _ parent_id: UInt64, _ name_ptr: UnsafePointer<UInt8>?, _ name_len: Int, _ item_type: UInt32, _ mode: UInt32, _ out_node_id: UnsafeMutablePointer<UInt64>?) -> Int32
 
 @available(macOS 15.4, *)
 final class AgentFsVolume: FSVolume {
@@ -286,10 +295,10 @@ extension AgentFsVolume: FSVolume.Operations {
         let size = buffer.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
         let fileTypeByte = buffer.withUnsafeBytes { $0.load(fromByteOffset: 8, as: UInt8.self) }
         let mode = buffer.withUnsafeBytes { $0.load(fromByteOffset: 9, as: UInt32.self) }
-        let atime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 13, as: Int64.self) }
-        let mtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 21, as: Int64.self) }
-        let ctime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 29, as: Int64.self) }
-        let birthtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 37, as: Int64.self) }
+        let atime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 21, as: Int64.self) }
+        let mtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 29, as: Int64.self) }
+        let ctime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 37, as: Int64.self) }
+        let birthtime = buffer.withUnsafeBytes { $0.load(fromByteOffset: 45, as: Int64.self) }
 
         let attrs = FSItem.Attributes()
         switch fileTypeByte {
@@ -336,6 +345,17 @@ extension AgentFsVolume: FSVolume.Operations {
             let mode = newAttributes.mode
             let path = agentItem.path
         let rc = coreQueue.sync { return path.withCString { agentfs_bridge_set_mode(coreHandle, $0, mode) } }
+            if rc != 0, let err = afResultToFSKitError(rc) { throw err }
+        }
+
+        if newAttributes.isValid(.uid) || newAttributes.isValid(.gid) {
+            let uid = newAttributes.uid
+            let gid = newAttributes.gid
+            let rc = coreQueue.sync { () -> Int32 in
+                return agentItem.path.withCString { p in
+                    agentfs_bridge_set_owner(coreHandle, p, uid, gid)
+                }
+            }
             if rc != 0, let err = afResultToFSKitError(rc) { throw err }
         }
 
@@ -523,42 +543,33 @@ extension AgentFsVolume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        let item = AgentFsItem(name: name)
-        item.path = constructPath(for: name, in: directory)
-        mergeAttributes(item.attributes, request: newAttributes)
-        item.attributes.parentID = directory.attributes.fileID
-        item.attributes.type = type
-
-        // Create the item in the filesystem based on its type
-        if type == .directory {
-            // Create directory in the Rust backend
-            let dirPath = constructPath(for: name, in: directory)
-            let mode = UInt32(newAttributes.mode)
-            let result = coreQueue.sync { () -> Int32 in
-                dirPath.withCString { path_cstr in
-                    agentfs_bridge_mkdir(coreHandle, path_cstr, mode)
-                }
+        // Create using byte-safe API with parent ID
+        guard let dir = directory as? AgentFsItem else {
+            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+        }
+        let parentId = dir.attributes.fileID.rawValue
+        var createdNodeId: UInt64 = 0
+        let mode = UInt32(newAttributes.mode)
+        let itemType: UInt32 = (type == .directory) ? 1 : 0
+        let result = coreQueue.sync { () -> Int32 in
+            let data = name.data
+            return data.withUnsafeBytes { rawPtr in
+                let base = rawPtr.bindMemory(to: UInt8.self).baseAddress
+                return agentfs_bridge_create_child_by_id(coreHandle, parentId, base, data.count, itemType, mode, &createdNodeId)
             }
-            if result != 0 {
-                if let error = afResultToFSKitError(result) {
-                    throw error
-                } else {
-                    throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
-                }
-            }
-        } else if type == .file {
-            // For files, creation happens during open() with create/truncate flags.
-            // This is the standard pattern for most filesystems where createItem
-            // sets up metadata and open() actually instantiates the file.
-            // The file will be created when opened for writing or when explicitly created.
-            logger.debug("createItem: file creation deferred to open() operation")
-        } else if type == .symlink {
-            // Symlinks are handled by createSymbolicLink, not here
-            logger.warning("createItem called with symlink type - should use createSymbolicLink instead")
+        }
+        if result != 0 {
+            if let error = afResultToFSKitError(result) { throw error }
+            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
 
-        // No need to add to in-memory children since we use path-based operations
-
+        // Build AgentFsItem and set path via parent + name bytes
+        let item = AgentFsItem(name: name)
+        item.path = constructPath(for: name, in: dir)
+        mergeAttributes(item.attributes, request: newAttributes)
+        item.attributes.parentID = dir.attributes.fileID
+        item.attributes.fileID = FSItem.Identifier(rawValue: createdNodeId) ?? .invalid
+        item.attributes.type = type
         return (item, name)
     }
 
@@ -978,26 +989,25 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
         }
 
         // Map FSVolume.OpenModes to options JSON for FFI
-        let itemPath = agentItem.path
         var handle: UInt64 = 0
         let wantsRead = modes.contains(.read)
         let wantsWrite = modes.contains(.write)
-        // FSKit exposes create/truncate intent via GetAttributesRequest during createItem;
-        // OpenModes typically covers read/write only. Synthesize conservative defaults here.
+        // Honor create/truncate intent when applicable: for FSKit, creation was done in createItem.
+        // Keep defaults false here.
         let wantsCreate = false
         let wantsTruncate = false
         let optionsJson = "{\"read\":\(wantsRead),\"write\":\(wantsWrite),\"create\":\(wantsCreate),\"truncate\":\(wantsTruncate)}"
 
         let result = coreQueue.sync { () -> Int32 in
             return optionsJson.withCString { options_cstr in
-                itemPath.withCString { path_cstr in
-                    agentfs_bridge_open(coreHandle, path_cstr, options_cstr, &handle)
-                }
+                // Prefer opening by node ID to avoid path decoding issues
+                let nodeId = agentItem.attributes.fileID.rawValue
+                return agentfs_bridge_open_by_id(coreHandle, nodeId, options_cstr, &handle)
             }
         }
 
         if result != 0 {
-            logger.error("open: failed to open handle for \(itemPath), error: \(result)")
+            logger.error("open: failed to open handle for id=\(agentItem.attributes.fileID.rawValue), error: \(result)")
             if let error = afResultToFSKitError(result) {
                 throw error
             } else {
@@ -1007,7 +1017,7 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
 
         // Store the handle in userData
         agentItem.userData = handle
-        logger.debug("open: opened handle \(handle) for \(itemPath)")
+        logger.debug("open: opened handle \(handle) for id=\(agentItem.attributes.fileID.rawValue)")
     }
 
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {

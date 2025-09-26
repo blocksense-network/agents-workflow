@@ -78,6 +78,7 @@ pub struct FsConfig {
     pub enable_xattrs: bool,
     pub enable_ads: bool,
     pub track_events: bool,
+    pub security: SecurityPolicy,
 }
 
 impl Default for FsConfig {
@@ -90,6 +91,31 @@ impl Default for FsConfig {
             enable_xattrs: true,
             enable_ads: false,
             track_events: false,
+            security: SecurityPolicy::default(),
+        }
+    }
+}
+
+/// Security/permissions/ownership policy
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SecurityPolicy {
+    /// If true, enforce POSIX permission checks (future)
+    pub enforce_posix_permissions: bool,
+    /// Default uid assigned to newly created nodes
+    pub default_uid: u32,
+    /// Default gid assigned to newly created nodes
+    pub default_gid: u32,
+    /// Enable Windows ACL compatibility bridge (future)
+    pub enable_windows_acl_compat: bool,
+}
+
+impl Default for SecurityPolicy {
+    fn default() -> Self {
+        Self {
+            enforce_posix_permissions: false,
+            default_uid: 0,
+            default_gid: 0,
+            enable_windows_acl_compat: false,
         }
     }
 }

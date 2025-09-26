@@ -20,12 +20,14 @@ int agentfs_bridge_getattr(void* core, const char* path, char* buffer, size_t bu
 int agentfs_bridge_mkdir(void* core, const char* path, uint32_t mode);
 int agentfs_bridge_readdir(void* core, const char* path, char* buffer, size_t buffer_size, size_t* out_len);
 int agentfs_bridge_open(void* core, const char* path, const char* options, uint64_t* handle);
+int agentfs_bridge_open_by_id(void* core, uint64_t node_id, const char* options, uint64_t* handle);
 int agentfs_bridge_read(void* core, uint64_t handle, uint64_t offset, void* buffer, uint32_t length, uint32_t* bytes_read);
 int agentfs_bridge_write(void* core, uint64_t handle, uint64_t offset, const void* buffer, uint32_t length, uint32_t* bytes_written);
 int agentfs_bridge_close(void* core, uint64_t handle);
 int agentfs_bridge_rename(void* core, const char* old_path, const char* new_path);
 int agentfs_bridge_set_times(void* core, const char* path, int64_t atime, int64_t mtime, int64_t ctime, int64_t birthtime);
 int agentfs_bridge_set_mode(void* core, const char* path, uint32_t mode);
+int agentfs_bridge_set_owner(void* core, const char* path, uint32_t uid, uint32_t gid);
 
 // Control plane operations
 int agentfs_bridge_snapshot_create(void* core, const char* name, char* snapshot_id, size_t snapshot_id_size);
@@ -34,6 +36,7 @@ int agentfs_bridge_bind_process(void* core, const char* branch_id);
 
 // Resolve IDs
 int af_resolve_id(uint64_t fs, const char* path, uint64_t* out_node_id, uint64_t* out_parent_id);
+int agentfs_bridge_create_child_by_id(void* core, uint64_t parent_id, const uint8_t* name_ptr, size_t name_len, uint32_t item_type, uint32_t mode, uint64_t* out_node_id);
 
 // Xattr
 int agentfs_bridge_xattr_get(void* core, const char* path, const char* name, void* buffer, size_t buffer_size, size_t* out_len);

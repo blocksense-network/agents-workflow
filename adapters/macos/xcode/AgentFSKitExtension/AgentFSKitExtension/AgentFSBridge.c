@@ -14,9 +14,11 @@ extern int32_t af_bind_process_to_branch(uint64_t fs, const uint8_t* branch);
 extern int32_t af_getattr(uint64_t fs, const char* path, uint8_t* out_attrs, size_t attrs_size);
 extern int32_t af_set_times(uint64_t fs, const char* path, int64_t atime, int64_t mtime, int64_t ctime, int64_t birthtime);
 extern int32_t af_set_mode(uint64_t fs, const char* path, uint32_t mode);
+extern int32_t af_set_owner(uint64_t fs, const char* path, uint32_t uid, uint32_t gid);
 extern int32_t af_rename(uint64_t fs, const char* old_path, const char* new_path);
 extern int32_t af_readdir(uint64_t fs, const char* path, uint8_t* out_buf, size_t buf_size, size_t* out_len);
 extern int32_t af_open(uint64_t fs, const char* path, const char* options_json, uint64_t* out_h);
+extern int32_t af_open_by_id(uint64_t fs, uint64_t node_id, const char* options_json, uint64_t* out_h);
 extern int32_t af_read(uint64_t fs, uint64_t h, uint64_t off, uint8_t* buf, uint32_t len, uint32_t* out_read);
 extern int32_t af_write(uint64_t fs, uint64_t h, uint64_t off, const uint8_t* buf, uint32_t len, uint32_t* out_written);
 extern int32_t af_close(uint64_t fs, uint64_t h);
@@ -28,6 +30,7 @@ extern int32_t af_xattr_get(uint64_t fs, const char* path, const char* name, uin
 extern int32_t af_xattr_set(uint64_t fs, const char* path, const char* name, const uint8_t* value, size_t value_len);
 extern int32_t af_xattr_list(uint64_t fs, const char* path, uint8_t* out_buf, size_t buf_size, size_t* out_len);
 extern int32_t af_resolve_id(uint64_t fs, const char* path, uint64_t* out_node_id, uint64_t* out_parent_id);
+extern int32_t af_create_child_by_id(uint64_t fs, uint64_t parent_id, const uint8_t* name_ptr, size_t name_len, uint32_t item_type, uint32_t mode, uint64_t* out_node_id);
 
 // C wrapper implementations
 void* agentfs_bridge_core_create(void) {
@@ -70,6 +73,11 @@ int agentfs_bridge_set_mode(void* core, const char* path, uint32_t mode) {
     return af_set_mode((uint64_t)core, path, mode);
 }
 
+int agentfs_bridge_set_owner(void* core, const char* path, uint32_t uid, uint32_t gid) {
+    if (!core || !path) return -22;
+    return af_set_owner((uint64_t)core, path, uid, gid);
+}
+
 int agentfs_bridge_rename(void* core, const char* old_path, const char* new_path) {
     if (!core || !old_path || !new_path) return -22;
     return af_rename((uint64_t)core, old_path, new_path);
@@ -83,6 +91,11 @@ int agentfs_bridge_readdir(void* core, const char* path, char* buffer, size_t bu
 int agentfs_bridge_open(void* core, const char* path, const char* options, uint64_t* handle) {
     if (!core || !path || !options || !handle) return -22;
     return af_open((uint64_t)core, path, options, handle);
+}
+
+int agentfs_bridge_open_by_id(void* core, uint64_t node_id, const char* options, uint64_t* handle) {
+    if (!core || !options || !handle) return -22;
+    return af_open_by_id((uint64_t)core, node_id, options, handle);
 }
 
 int agentfs_bridge_read(void* core, uint64_t handle, uint64_t offset, void* buffer, uint32_t length, uint32_t* bytes_read) {
@@ -107,6 +120,11 @@ int agentfs_bridge_statfs(void* core, char* buffer, size_t buffer_size) {
 int agentfs_bridge_resolve_id(void* core, const char* path, uint64_t* out_node_id, uint64_t* out_parent_id) {
     if (!core || !path || !out_node_id) return -22;
     return af_resolve_id((uint64_t)core, path, out_node_id, out_parent_id);
+}
+
+int agentfs_bridge_create_child_by_id(void* core, uint64_t parent_id, const uint8_t* name_ptr, size_t name_len, uint32_t item_type, uint32_t mode, uint64_t* out_node_id) {
+    if (!core || !name_ptr || !out_node_id) return -22;
+    return af_create_child_by_id((uint64_t)core, parent_id, name_ptr, name_len, item_type, mode, out_node_id);
 }
 
 int agentfs_bridge_mkdir(void* core, const char* path, uint32_t mode) {

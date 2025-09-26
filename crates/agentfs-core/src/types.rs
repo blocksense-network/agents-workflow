@@ -180,6 +180,8 @@ pub struct FileMode {
 pub struct Attributes {
     pub len: u64,
     pub times: FileTimes,
+    pub uid: u32,
+    pub gid: u32,
     pub is_dir: bool,
     pub is_symlink: bool,
     pub mode_user: FileMode,

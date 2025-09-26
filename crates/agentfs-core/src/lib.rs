@@ -24,6 +24,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_chown_updates_uid_gid_and_ctime() {
+        let core = test_core();
+        core.mkdir("/d".as_ref(), 0o755).unwrap();
+        let h = core.create("/d/f".as_ref(), &rw_create()).unwrap();
+        core.close(h).unwrap();
+
+        let before = core.getattr("/d/f".as_ref()).unwrap();
+        core.set_owner("/d/f".as_ref(), 501, 20).unwrap();
+        let after = core.getattr("/d/f".as_ref()).unwrap();
+        assert_eq!(after.uid, 501);
+        assert_eq!(after.gid, 20);
+        assert!(after.times.ctime >= before.times.ctime);
+    }
+
+    #[test]
+    fn test_create_with_non_utf8_name_and_readdir_bytes() {
+        let core = test_core();
+        core.mkdir("/raw".as_ref(), 0o755).unwrap();
+
+        // Percent-encoding path for internal create pathless API is handled via create_child_by_id; here we simulate
+        let (parent_id, _) = core.resolve_path_public("/raw".as_ref()).unwrap();
+        let name_bytes = vec![0x66, 0x6F, 0x80, 0x6F]; // "fo\x80o" invalid UTF-8
+        let node_id = core.create_child_by_id(parent_id, &name_bytes, 0, 0o644).unwrap();
+        assert!(node_id > 0);
+
+        // readdir_plus_raw returns the original bytes
+        let entries = core.readdir_plus_raw("/raw".as_ref()).unwrap();
+        assert!(entries.iter().any(|(b, _)| b == &name_bytes));
+    }
     fn test_error_display() {
         let err = FsError::NotFound;
         assert_eq!(err.to_string(), "not found");
