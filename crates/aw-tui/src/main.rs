@@ -2,7 +2,7 @@
 
 use aw_rest_client::AuthConfig;
 use aw_tui::App;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use std::process;
 
 /// TUI command-line arguments

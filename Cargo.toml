@@ -31,6 +31,10 @@ members = [
   # REST API and TUI
   "crates/aw-rest-api-contract",
   "crates/aw-rest-client",
+  "crates/aw-client-api",
+  "crates/aw-test-scenarios",
+  "crates/aw-rest-client-mock",
+  "crates/aw-tui-test",
   "crates/aw-tui",
   # CLI
   "crates/aw-cli",
