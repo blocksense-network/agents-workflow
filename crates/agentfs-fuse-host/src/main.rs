@@ -136,7 +136,14 @@ mod tests {
             },
             "enable_xattrs": false,
             "enable_ads": true,
-            "track_events": true
+            "track_events": true,
+            "security": {
+                "enforce_posix_permissions": false,
+                "default_uid": 0,
+                "default_gid": 0,
+                "enable_windows_acl_compat": false,
+                "root_bypass_permissions": false
+            }
         }"#;
         temp_file.write_all(config_json.as_bytes()).unwrap();
         temp_file.flush().unwrap();

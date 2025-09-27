@@ -4,6 +4,7 @@
 //! In production, this would be an Xcode FSKit extension.
 
 use agentfs_fskit_host::{FsKitAdapter, FsKitConfig};
+use agentfs_core::config::SecurityPolicy;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -70,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     enable_xattrs: true,
                     enable_ads: false,
+                    security: SecurityPolicy::default(),
                     track_events: true,
                 },
                 mount_point: mount_point.to_string_lossy().to_string(),
@@ -119,6 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     enable_xattrs: true,
                     enable_ads: false,
+                    security: SecurityPolicy::default(),
                     track_events: true,
                 },
                 mount_point: test_dir.join("mount").to_string_lossy().to_string(),
@@ -155,8 +158,8 @@ async fn run_smoke_tests(config: FsKitConfig) -> Result<(), Box<dyn std::error::
 
     // Test basic file operations
     println!("Testing file operations...");
-    core.mkdir(std::path::Path::new("/testdir"), 0o755)?;
-    let handle = core.create(std::path::Path::new("/testdir/hello.txt"), &agentfs_core::OpenOptions {
+    core.mkdir(&agentfs_core::PID::new(0), std::path::Path::new("/testdir"), 0o755)?;
+    let handle = core.create(&agentfs_core::PID::new(0), std::path::Path::new("/testdir/hello.txt"), &agentfs_core::OpenOptions {
         read: true,
         write: true,
         create: true,
@@ -167,17 +170,17 @@ async fn run_smoke_tests(config: FsKitConfig) -> Result<(), Box<dyn std::error::
     })?;
 
     let test_data = b"Hello, AgentFS FSKit!";
-    core.write(handle, 0, test_data)?;
+    core.write(&agentfs_core::PID::new(0), handle, 0, test_data)?;
 
     let mut read_buf = vec![0u8; test_data.len()];
-    let bytes_read = core.read(handle, 0, &mut read_buf)?;
+    let bytes_read = core.read(&agentfs_core::PID::new(0), handle, 0, &mut read_buf)?;
     assert_eq!(bytes_read, test_data.len());
     assert_eq!(&read_buf, test_data);
 
-    core.close(handle)?;
+    core.close(&agentfs_core::PID::new(0), handle)?;
 
     // Verify file contents
-    let attrs = core.getattr(std::path::Path::new("/testdir/hello.txt"))?;
+    let attrs = core.getattr(&agentfs_core::PID::new(0), std::path::Path::new("/testdir/hello.txt"))?;
     assert_eq!(attrs.len, test_data.len() as u64);
 
     println!("File operations test passed!");

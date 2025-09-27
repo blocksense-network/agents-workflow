@@ -26,6 +26,8 @@ Cargo.lock
 
 # Swift Package Manager build artifacts
 .build/
+
+# Xcode build artifacts (but allow generated projects)
 *.xcodeproj/
 
 # Xcode build artifacts

@@ -46,6 +46,31 @@ pub enum AfResult {
     AfErrUnsupported = 95, // ENOTSUP
 }
 
+/// Process registration functions
+#[no_mangle]
+pub extern "C" fn af_register_process(
+    fs: AfFs,
+    pid: u32,
+    parent_pid: u32,
+    uid: u32,
+    gid: u32,
+    out_pid: *mut u32,
+) -> AfResult {
+    if out_pid.is_null() {
+        return AfResult::AfErrInval;
+    }
+
+    let instances = FS_INSTANCES.lock().unwrap();
+    let core = match instances.get(&fs) {
+        Some(c) => c,
+        None => return AfResult::AfErrInval,
+    };
+
+    let registered_pid = core.register_process(pid, parent_pid, uid, gid);
+    unsafe { *out_pid = registered_pid.as_u32() };
+    AfResult::AfOk
+}
+
 /// Lifecycle functions
 #[no_mangle]
 pub extern "C" fn af_fs_create(config_json: *const c_char, out_fs: *mut AfFs) -> AfResult {
@@ -144,6 +169,7 @@ fn fs_error_to_af_result(err: &agentfs_core::FsError) -> AfResult {
 #[no_mangle]
 pub extern "C" fn af_resolve_id(
     fs: AfFs,
+    pid: u32,
     path: *const c_char,
     out_node_id: *mut u64,
     out_parent_id: *mut u64,
@@ -160,7 +186,8 @@ pub extern "C" fn af_resolve_id(
         Some(c) => c,
         None => return AfResult::AfErrInval,
     };
-    match core.resolve_path_public(Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.resolve_path_public(pid_ref, Path::new(path_str)) {
         Ok((nid, pid_opt)) => {
             unsafe {
                 *out_node_id = nid;
@@ -308,7 +335,7 @@ pub extern "C" fn af_bind_process_to_branch(fs: AfFs, branch: AfBranchId) -> AfR
 
 /// File operations (minimal set)
 #[no_mangle]
-pub extern "C" fn af_mkdir(fs: AfFs, path: *const c_char, mode: u32) -> AfResult {
+pub extern "C" fn af_mkdir(fs: AfFs, pid: u32, path: *const c_char, mode: u32) -> AfResult {
     if path.is_null() {
         return AfResult::AfErrInval;
     }
@@ -324,7 +351,8 @@ pub extern "C" fn af_mkdir(fs: AfFs, path: *const c_char, mode: u32) -> AfResult
         None => return AfResult::AfErrInval,
     };
 
-    match core.mkdir(Path::new(path_str), mode) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.mkdir(pid_ref, Path::new(path_str), mode) {
         Ok(()) => AfResult::AfOk,
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -333,6 +361,7 @@ pub extern "C" fn af_mkdir(fs: AfFs, path: *const c_char, mode: u32) -> AfResult
 #[no_mangle]
 pub extern "C" fn af_open(
     fs: AfFs,
+    pid: u32,
     path: *const c_char,
     options_json: *const c_char,
     out_h: *mut AfHandleId,
@@ -373,10 +402,11 @@ pub extern "C" fn af_open(
         None => return AfResult::AfErrInval,
     };
 
+    let pid_ref = &agentfs_core::PID::new(pid);
     let result = if open_options.create {
-        core.create(Path::new(path_str), &open_options)
+        core.create(pid_ref, Path::new(path_str), &open_options)
     } else {
-        core.open(Path::new(path_str), &open_options)
+        core.open(pid_ref, Path::new(path_str), &open_options)
     };
 
     match result {
@@ -412,6 +442,7 @@ pub extern "C" fn af_create_child_by_id(
 #[no_mangle]
 pub extern "C" fn af_read(
     fs: AfFs,
+    pid: u32,
     h: AfHandleId,
     off: u64,
     buf: *mut u8,
@@ -430,7 +461,8 @@ pub extern "C" fn af_read(
 
     let buffer = unsafe { std::slice::from_raw_parts_mut(buf, len as usize) };
 
-    match core.read(agentfs_core::HandleId(h), off, buffer) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.read(pid_ref, agentfs_core::HandleId(h), off, buffer) {
         Ok(bytes_read) => {
             unsafe { *out_read = bytes_read as u32 };
             AfResult::AfOk
@@ -442,6 +474,7 @@ pub extern "C" fn af_read(
 #[no_mangle]
 pub extern "C" fn af_write(
     fs: AfFs,
+    pid: u32,
     h: AfHandleId,
     off: u64,
     buf: *const u8,
@@ -460,7 +493,8 @@ pub extern "C" fn af_write(
 
     let buffer = unsafe { std::slice::from_raw_parts(buf, len as usize) };
 
-    match core.write(agentfs_core::HandleId(h), off, buffer) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.write(pid_ref, agentfs_core::HandleId(h), off, buffer) {
         Ok(bytes_written) => {
             unsafe { *out_written = bytes_written as u32 };
             AfResult::AfOk
@@ -470,14 +504,15 @@ pub extern "C" fn af_write(
 }
 
 #[no_mangle]
-pub extern "C" fn af_close(fs: AfFs, h: AfHandleId) -> AfResult {
+pub extern "C" fn af_close(fs: AfFs, pid: u32, h: AfHandleId) -> AfResult {
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) {
         Some(c) => c,
         None => return AfResult::AfErrInval,
     };
 
-    match core.close(agentfs_core::HandleId(h)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.close(pid_ref, agentfs_core::HandleId(h)) {
         Ok(()) => AfResult::AfOk,
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -487,6 +522,7 @@ pub extern "C" fn af_close(fs: AfFs, h: AfHandleId) -> AfResult {
 #[no_mangle]
 pub extern "C" fn af_open_by_id(
     fs: AfFs,
+    pid: u32,
     node_id: u64,
     options_json: *const c_char,
     out_h: *mut AfHandleId,
@@ -507,8 +543,9 @@ pub extern "C" fn af_open_by_id(
 
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let pid_ref = &agentfs_core::PID::new(pid);
 
-    match core.open_by_id(node_id, &open_options) {
+    match core.open_by_id(pid_ref, node_id, &open_options) {
         Ok(handle_id) => { unsafe { *out_h = handle_id.0; } AfResult::AfOk }
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -547,7 +584,7 @@ pub extern "C" fn af_stats(fs: AfFs, out_stats: *mut u8, stats_size: usize) -> A
 
 /// Get file attributes
 #[no_mangle]
-pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, attrs_size: usize) -> AfResult {
+pub extern "C" fn af_getattr(fs: AfFs, pid: u32, path: *const c_char, out_attrs: *mut u8, attrs_size: usize) -> AfResult {
     if path.is_null() || out_attrs.is_null() || attrs_size == 0 {
         return AfResult::AfErrInval;
     }
@@ -563,7 +600,8 @@ pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, 
         None => return AfResult::AfErrInval,
     };
 
-    match core.getattr(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.getattr(pid_ref, std::path::Path::new(path_str)) {
         Ok(attrs) => {
             // Rich binary format for FSKit bridge (little endian):
             // off 0:  len              u64
@@ -613,6 +651,7 @@ pub extern "C" fn af_getattr(fs: AfFs, path: *const c_char, out_attrs: *mut u8, 
 #[no_mangle]
 pub extern "C" fn af_set_times(
     fs: AfFs,
+    pid: u32,
     path: *const c_char,
     atime: i64,
     mtime: i64,
@@ -623,49 +662,54 @@ pub extern "C" fn af_set_times(
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let pid_ref = &agentfs_core::PID::new(pid);
     let times = agentfs_core::FileTimes { atime, mtime, ctime, birthtime };
-    match core.set_times(std::path::Path::new(path_str), times) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+    match core.set_times(pid_ref, std::path::Path::new(path_str), times) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
 /// Set mode (chmod-like)
 #[no_mangle]
-pub extern "C" fn af_set_mode(fs: AfFs, path: *const c_char, mode: u32) -> AfResult {
+pub extern "C" fn af_set_mode(fs: AfFs, pid: u32, path: *const c_char, mode: u32) -> AfResult {
     if path.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core.set_mode(std::path::Path::new(path_str), mode) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.set_mode(pid_ref, std::path::Path::new(path_str), mode) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
 /// Set owner (chown-like)
 #[no_mangle]
-pub extern "C" fn af_set_owner(fs: AfFs, path: *const c_char, uid: u32, gid: u32) -> AfResult {
+pub extern "C" fn af_set_owner(fs: AfFs, pid: u32, path: *const c_char, uid: u32, gid: u32) -> AfResult {
     if path.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core.set_owner(std::path::Path::new(path_str), uid, gid) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.set_owner(pid_ref, std::path::Path::new(path_str), uid, gid) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
 /// Rename path (no overwrite)
 #[no_mangle]
-pub extern "C" fn af_rename(fs: AfFs, old_path: *const c_char, new_path: *const c_char) -> AfResult {
+pub extern "C" fn af_rename(fs: AfFs, pid: u32, old_path: *const c_char, new_path: *const c_char) -> AfResult {
     if old_path.is_null() || new_path.is_null() { return AfResult::AfErrInval; }
     let old_str = match unsafe { CStr::from_ptr(old_path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let new_str = match unsafe { CStr::from_ptr(new_path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core.rename(std::path::Path::new(old_str), std::path::Path::new(new_str)) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.rename(pid_ref, std::path::Path::new(old_str), std::path::Path::new(new_str)) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
 /// Enumerate directory names (NUL-delimited into buffer)
 #[no_mangle]
-pub extern "C" fn af_readdir(fs: AfFs, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+pub extern "C" fn af_readdir(fs: AfFs, pid: u32, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
     if path.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core_ref: &agentfs_core::vfs::FsCore = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core_ref.readdir_plus_raw(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core_ref.readdir_plus_raw(pid_ref, std::path::Path::new(path_str)) {
         Ok(entries) => {
             let mut offset = 0usize;
             for (name_bytes, _attrs) in entries {
@@ -685,13 +729,14 @@ pub extern "C" fn af_readdir(fs: AfFs, path: *const c_char, out_buf: *mut u8, bu
 
 /// Xattr get
 #[no_mangle]
-pub extern "C" fn af_xattr_get(fs: AfFs, path: *const c_char, name: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+pub extern "C" fn af_xattr_get(fs: AfFs, pid: u32, path: *const c_char, name: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
     if path.is_null() || name.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let name_str = match unsafe { CStr::from_ptr(name) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core.xattr_get(std::path::Path::new(path_str), name_str) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.xattr_get(pid_ref, std::path::Path::new(path_str), name_str) {
         Ok(val) => {
             let n = val.len().min(buf_size);
             unsafe { ptr::copy_nonoverlapping(val.as_ptr(), out_buf, n); *out_len = n; }
@@ -703,24 +748,26 @@ pub extern "C" fn af_xattr_get(fs: AfFs, path: *const c_char, name: *const c_cha
 
 /// Xattr set
 #[no_mangle]
-pub extern "C" fn af_xattr_set(fs: AfFs, path: *const c_char, name: *const c_char, value: *const u8, value_len: usize) -> AfResult {
+pub extern "C" fn af_xattr_set(fs: AfFs, pid: u32, path: *const c_char, name: *const c_char, value: *const u8, value_len: usize) -> AfResult {
     if path.is_null() || name.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let name_str = match unsafe { CStr::from_ptr(name) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
+    let pid_ref = &agentfs_core::PID::new(pid);
     let val = if value.is_null() { Vec::new() } else { unsafe { std::slice::from_raw_parts(value, value_len).to_vec() } };
-    match core.xattr_set(std::path::Path::new(path_str), name_str, &val) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
+    match core.xattr_set(pid_ref, std::path::Path::new(path_str), name_str, &val) { Ok(()) => AfResult::AfOk, Err(e) => fs_error_to_af_result(&e) }
 }
 
 /// Xattr list - returns NUL-delimited names
 #[no_mangle]
-pub extern "C" fn af_xattr_list(fs: AfFs, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
+pub extern "C" fn af_xattr_list(fs: AfFs, pid: u32, path: *const c_char, out_buf: *mut u8, buf_size: usize, out_len: *mut usize) -> AfResult {
     if path.is_null() || out_buf.is_null() || out_len.is_null() { return AfResult::AfErrInval; }
     let path_str = match unsafe { CStr::from_ptr(path) }.to_str() { Ok(s) => s, Err(_) => return AfResult::AfErrInval };
     let instances = FS_INSTANCES.lock().unwrap();
     let core = match instances.get(&fs) { Some(c) => c, None => return AfResult::AfErrInval };
-    match core.xattr_list(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.xattr_list(pid_ref, std::path::Path::new(path_str)) {
         Ok(names) => {
             let mut offset = 0usize;
             for n in names {
@@ -741,7 +788,7 @@ pub extern "C" fn af_xattr_list(fs: AfFs, path: *const c_char, out_buf: *mut u8,
 
 /// Remove directory
 #[no_mangle]
-pub extern "C" fn af_rmdir(fs: AfFs, path: *const c_char) -> AfResult {
+pub extern "C" fn af_rmdir(fs: AfFs, pid: u32, path: *const c_char) -> AfResult {
     if path.is_null() {
         return AfResult::AfErrInval;
     }
@@ -757,7 +804,8 @@ pub extern "C" fn af_rmdir(fs: AfFs, path: *const c_char) -> AfResult {
         None => return AfResult::AfErrInval,
     };
 
-    match core.rmdir(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.rmdir(pid_ref, std::path::Path::new(path_str)) {
         Ok(()) => AfResult::AfOk,
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -765,7 +813,7 @@ pub extern "C" fn af_rmdir(fs: AfFs, path: *const c_char) -> AfResult {
 
 /// Unlink file
 #[no_mangle]
-pub extern "C" fn af_unlink(fs: AfFs, path: *const c_char) -> AfResult {
+pub extern "C" fn af_unlink(fs: AfFs, pid: u32, path: *const c_char) -> AfResult {
     if path.is_null() {
         return AfResult::AfErrInval;
     }
@@ -781,7 +829,8 @@ pub extern "C" fn af_unlink(fs: AfFs, path: *const c_char) -> AfResult {
         None => return AfResult::AfErrInval,
     };
 
-    match core.unlink(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.unlink(pid_ref, std::path::Path::new(path_str)) {
         Ok(()) => AfResult::AfOk,
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -789,7 +838,7 @@ pub extern "C" fn af_unlink(fs: AfFs, path: *const c_char) -> AfResult {
 
 /// Create symbolic link
 #[no_mangle]
-pub extern "C" fn af_symlink(fs: AfFs, target: *const c_char, linkpath: *const c_char) -> AfResult {
+pub extern "C" fn af_symlink(fs: AfFs, pid: u32, target: *const c_char, linkpath: *const c_char) -> AfResult {
     if target.is_null() || linkpath.is_null() {
         return AfResult::AfErrInval;
     }
@@ -810,7 +859,8 @@ pub extern "C" fn af_symlink(fs: AfFs, target: *const c_char, linkpath: *const c
         None => return AfResult::AfErrInval,
     };
 
-    match core.symlink(target_str, std::path::Path::new(linkpath_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.symlink(pid_ref, target_str, std::path::Path::new(linkpath_str)) {
         Ok(()) => AfResult::AfOk,
         Err(e) => fs_error_to_af_result(&e),
     }
@@ -820,6 +870,7 @@ pub extern "C" fn af_symlink(fs: AfFs, target: *const c_char, linkpath: *const c
 #[no_mangle]
 pub extern "C" fn af_readlink(
     fs: AfFs,
+    pid: u32,
     path: *const c_char,
     out_target: *mut c_char,
     target_size: usize,
@@ -839,7 +890,8 @@ pub extern "C" fn af_readlink(
         None => return AfResult::AfErrInval,
     };
 
-    match core.readlink(std::path::Path::new(path_str)) {
+    let pid_ref = &agentfs_core::PID::new(pid);
+    match core.readlink(pid_ref, std::path::Path::new(path_str)) {
         Ok(target) => {
             let target_bytes = target.as_bytes();
             let len = target_bytes.len().min(target_size - 1);

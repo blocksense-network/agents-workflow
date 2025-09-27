@@ -168,7 +168,7 @@ pub struct FileTimes {
 }
 
 /// File permissions
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FileMode {
     pub read: bool,
     pub write: bool,

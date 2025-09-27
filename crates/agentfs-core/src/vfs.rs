@@ -3,11 +3,17 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+#[cfg(test)]
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     Attributes, BranchId, BranchInfo, ContentId, DirEntry, EventKind, EventSink, FileMode, FileTimes, FsConfig, FsStats, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec, SubscriptionId,
 };
+#[cfg(test)]
+use std::cell::RefCell;
+#[cfg(test)]
+use std::ops::Deref;
 use crate::error::{FsError, FsResult};
 use crate::storage::StorageBackend;
 
@@ -77,6 +83,30 @@ pub(crate) struct LockManager {
     pub locks: HashMap<NodeId, Vec<ActiveLock>>,
 }
 
+/// Process identifier for type safety in the filesystem API.
+/// All filesystem operations require a registered PID obtained via `register_process`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PID(pub(crate) u32);
+
+impl PID {
+    pub fn new(pid: u32) -> Self {
+        Self(pid)
+    }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+/// User represents the security identity of a process (uid, gid, and groups)
+#[derive(Clone, Debug)]
+pub(crate) struct User {
+    pub(crate) uid: u32,
+    pub(crate) gid: u32,
+    pub(crate) groups: Vec<u32>,
+}
+
+
 /// The main filesystem core implementation
 pub struct FsCore {
     config: FsConfig,
@@ -89,6 +119,9 @@ pub struct FsCore {
     next_handle_id: Mutex<u64>,
     next_subscription_id: Mutex<u64>,
     pub(crate) process_branches: Mutex<HashMap<u32, BranchId>>, // Process ID -> Branch ID mapping
+    process_identities: Mutex<HashMap<u32, User>>, // Process ID -> security identity
+    process_children: Mutex<HashMap<u32, Vec<u32>>>, // Parent PID -> list of child PIDs
+    process_parents: Mutex<HashMap<u32, u32>>, // Child PID -> parent PID
     locks: Mutex<LockManager>, // Byte-range lock manager
     event_subscriptions: Mutex<HashMap<SubscriptionId, Arc<dyn EventSink>>>,
 }
@@ -108,6 +141,9 @@ impl FsCore {
             next_handle_id: Mutex::new(1),
             next_subscription_id: Mutex::new(1),
             process_branches: Mutex::new(HashMap::new()), // No processes initially bound
+            process_identities: Mutex::new(HashMap::new()), // No processes initially registered
+            process_children: Mutex::new(HashMap::new()), // No process hierarchy initially
+            process_parents: Mutex::new(HashMap::new()), // No process hierarchy initially
             locks: Mutex::new(LockManager {
                 locks: HashMap::new(),
             }),
@@ -178,15 +214,132 @@ impl FsCore {
         std::process::id()
     }
 
-    fn current_branch_for_process(&self) -> BranchId {
-        let pid = Self::current_process_id();
+    /// Registers a process with the filesystem, establishing its security identity and process hierarchy.
+    /// All filesystem operations require a registered PID obtained from this function.
+    ///
+    /// This function is idempotent: calling it multiple times for the same process ID will return
+    /// the same PID token without modifying the existing registration.
+    ///
+    /// The process inherits active branch bindings from its parent process (and all ancestors).
+    /// If the parent process has an active binding, this process will use the same branch.
+    ///
+    /// # Parameters
+    /// - `pid`: The process ID to register
+    /// - `parent_pid`: The parent process ID (use the same PID for root processes)
+    /// - `uid`: User ID for security identity
+    /// - `gid`: Group ID for security identity
+    ///
+    /// # Returns
+    /// A `PID` token for use in filesystem operations
+    pub fn register_process(&self, pid: u32, parent_pid: u32, uid: u32, gid: u32) -> PID {
+        let user = User {
+            uid,
+            gid,
+            groups: vec![gid], // Basic group membership - can be extended later
+        };
+
+        // Check if already registered - if so, return existing PID
+        {
+            let identities = self.process_identities.lock().unwrap();
+            if identities.contains_key(&pid) {
+                return PID(pid);
+            }
+        }
+
+        // Register the process identity
+        {
+            let mut identities = self.process_identities.lock().unwrap();
+            identities.insert(pid, user);
+        }
+
+        // Establish parent-child relationship
+        {
+            let mut children = self.process_children.lock().unwrap();
+            children.entry(parent_pid).or_insert_with(Vec::new).push(pid);
+        }
+
+        {
+            let mut parents = self.process_parents.lock().unwrap();
+            parents.insert(pid, parent_pid);
+        }
+
+        // Inherit branch binding from parent (walking up the hierarchy if needed)
+        let inherited_branch = self.find_inherited_branch(parent_pid);
+        if let Some(branch_id) = inherited_branch {
+            let mut branches = self.process_branches.lock().unwrap();
+            branches.insert(pid, branch_id);
+        }
+
+        PID(pid)
+    }
+
+    /// Finds the active branch for a process by walking up the process hierarchy.
+    /// Returns the first active branch found in the ancestry chain.
+    fn find_inherited_branch(&self, pid: u32) -> Option<BranchId> {
+        let branches = self.process_branches.lock().unwrap();
+        let parents = self.process_parents.lock().unwrap();
+
+        let mut current_pid = pid;
+        loop {
+            if let Some(branch) = branches.get(&current_pid) {
+                return Some(*branch);
+            }
+
+            // Move up to parent
+            if let Some(parent) = parents.get(&current_pid) {
+                current_pid = *parent;
+                // Prevent infinite loops in case of cycles (shouldn't happen in normal process trees)
+                if current_pid == pid {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        None
+    }
+
+    fn branch_for_process(&self, pid: &PID) -> BranchId {
         let process_branches = self.process_branches.lock().unwrap();
-        *process_branches.get(&pid).unwrap_or(&BranchId::DEFAULT)
+        *process_branches.get(&pid.0).unwrap_or(&BranchId::DEFAULT)
+    }
+
+    pub(crate) fn user_for_process(&self, pid: &PID) -> Option<User> {
+        let identities = self.process_identities.lock().unwrap();
+        identities.get(&pid.0).cloned()
+    }
+
+    fn has_group(&self, user: &User, gid: u32) -> bool {
+        user.gid == gid || user.groups.iter().any(|g| *g == gid)
+    }
+
+    fn allowed_for_user(&self, node: &Node, user: &User, want_read: bool, want_write: bool, want_exec: bool) -> bool {
+        if !self.config.security.enforce_posix_permissions {
+            return true;
+        }
+        if self.config.security.root_bypass_permissions && user.uid == 0 {
+            return true;
+        }
+
+        let (r_bit, w_bit, x_bit) = if user.uid == node.uid {
+            (0o400, 0o200, 0o100)
+        } else if self.has_group(user, node.gid) {
+            (0o040, 0o020, 0o010)
+        } else {
+            (0o004, 0o002, 0o001)
+        };
+
+        let mode = node.mode;
+        let allow_r = !want_read || (mode & r_bit) != 0;
+        let allow_w = !want_write || (mode & w_bit) != 0;
+        let allow_x = !want_exec || (mode & x_bit) != 0;
+        allow_r && allow_w && allow_x
     }
 
     /// Resolve a path to a node ID and parent information (read-only)
-    fn resolve_path(&self, path: &Path) -> FsResult<(NodeId, Option<(NodeId, String)>)> {
-        let current_branch = self.current_branch_for_process();
+    fn resolve_path(&self, pid: &PID, path: &Path) -> FsResult<(NodeId, Option<(NodeId, String)>)> {
+        let current_branch = self.branch_for_process(pid);
         let branches = self.branches.lock().unwrap();
         let branch = branches.get(&current_branch).ok_or(FsError::NotFound)?;
         let mut current_node_id = branch.root_id;
@@ -205,6 +358,11 @@ impl FsCore {
         }
 
         let nodes = self.nodes.lock().unwrap();
+        let user_opt = self.user_for_process(pid);
+        // Enforce that a process must be registered when permission checks are enabled
+        if self.config.security.enforce_posix_permissions && user_opt.is_none() {
+            return Err(FsError::AccessDenied);
+        }
         let mut parent_node_id = None;
         let mut parent_name = None;
 
@@ -213,6 +371,13 @@ impl FsCore {
 
             match &node.kind {
                 NodeKind::Directory { children } => {
+                    if self.config.security.enforce_posix_permissions {
+                        if let Some(user) = &user_opt {
+                            if !self.allowed_for_user(node, user, false, false, true) {
+                                return Err(FsError::AccessDenied);
+                            }
+                        }
+                    }
                     if let Some(child_id) = children.get(*component) {
                         if i == components.len() - 1 {
                             // Last component
@@ -303,12 +468,29 @@ impl FsCore {
     }
 
     /// Change ownership of a node addressed by path
-    pub fn set_owner(&self, path: &Path, uid: u32, gid: u32) -> FsResult<()> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn set_owner(&self, pid: &PID, path: &Path, uid: u32, gid: u32) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let mut nodes = self.nodes.lock().unwrap();
         let node = nodes.get_mut(&node_id).ok_or(FsError::NotFound)?;
+        // Only root may change owner uid; owner may change gid to a group they belong to
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let changing_uid = uid != node.uid;
+                if changing_uid && user.uid != 0 {
+                    return Err(FsError::AccessDenied);
+                }
+                if gid != node.gid && user.uid != 0 {
+                    // Owner may change gid only to a group they belong to
+                    if user.uid != node.uid || (user.gid != gid && !user.groups.iter().any(|g| *g == gid)) {
+                        return Err(FsError::AccessDenied);
+                    }
+                }
+            }
+        }
         node.uid = uid;
         node.gid = gid;
+        // Clear setuid/setgid on metadata ownership change
+        node.mode &= !0o6000;
         node.times.ctime = Self::current_timestamp();
         Ok(())
     }
@@ -512,6 +694,12 @@ impl FsCore {
         }
     }
 
+    /// Get file attributes
+    pub fn getattr(&self, pid: &PID, path: &Path) -> FsResult<Attributes> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
+        self.get_node_attributes(node_id)
+    }
+
     /// Get node attributes
     fn get_node_attributes(&self, node_id: NodeId) -> FsResult<Attributes> {
         let nodes = self.nodes.lock().unwrap();
@@ -527,6 +715,9 @@ impl FsCore {
             NodeKind::Symlink { target } => (target.len() as u64, false, true),
         };
 
+        // Extract permission bits from mode (ignore file type bits in high bits)
+        let perm_bits = node.mode & 0o777;
+
         Ok(Attributes {
             len,
             times: node.times,
@@ -535,26 +726,26 @@ impl FsCore {
             is_dir,
             is_symlink,
             mode_user: FileMode {
-                read: true,
-                write: true,
-                exec: false,
+                read: (perm_bits & 0o400) != 0,
+                write: (perm_bits & 0o200) != 0,
+                exec: (perm_bits & 0o100) != 0,
             },
             mode_group: FileMode {
-                read: true,
-                write: false,
-                exec: false,
+                read: (perm_bits & 0o040) != 0,
+                write: (perm_bits & 0o020) != 0,
+                exec: (perm_bits & 0o010) != 0,
             },
             mode_other: FileMode {
-                read: true,
-                write: false,
-                exec: false,
+                read: (perm_bits & 0o004) != 0,
+                write: (perm_bits & 0o002) != 0,
+                exec: (perm_bits & 0o001) != 0,
             },
         })
     }
 
     // Snapshot operations
     pub fn snapshot_create(&self, name: Option<&str>) -> FsResult<SnapshotId> {
-        let current_branch = self.current_branch_for_process();
+        let current_branch = self.branch_for_process(&PID::new(Self::current_process_id()));
         let branches = self.branches.lock().unwrap();
         let branch = branches.get(&current_branch).ok_or(FsError::NotFound)?;
 
@@ -627,7 +818,7 @@ impl FsCore {
     }
 
     pub fn branch_create_from_current(&self, name: Option<&str>) -> FsResult<BranchId> {
-        let current_branch = self.current_branch_for_process();
+        let current_branch = self.branch_for_process(&PID::new(Self::current_process_id()));
         let branches = self.branches.lock().unwrap();
         let branch = branches.get(&current_branch).ok_or(FsError::NotFound)?;
 
@@ -736,9 +927,9 @@ impl FsCore {
     }
 
     // File operations
-    pub fn create(&self, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
+    pub fn create(&self, pid: &PID, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
         // Check if the path already exists
-        if let Ok(_) = self.resolve_path(path) {
+        if let Ok(_) = self.resolve_path(pid, path) {
             return Err(FsError::AlreadyExists);
         }
 
@@ -748,7 +939,19 @@ impl FsCore {
             .and_then(|n| n.to_str())
             .ok_or(FsError::InvalidName)?;
 
-        let (parent_id, _) = self.resolve_path(parent_path)?;
+        let (parent_id, _) = self.resolve_path(pid, parent_path)?;
+
+        // Permission check for parent directory w+x access
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let nodes = self.nodes.lock().unwrap();
+                let parent_node = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
+                if !self.allowed_for_user(parent_node, &user, false, true, true) {
+                    return Err(FsError::AccessDenied);
+                }
+            }
+        }
+
         let nodes = self.nodes.lock().unwrap();
         let parent_node = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
 
@@ -777,6 +980,15 @@ impl FsCore {
             }
         }
 
+        // Set ownership to creating process
+        if let Some(user) = self.user_for_process(pid) {
+            let mut nodes = self.nodes.lock().unwrap();
+            if let Some(n) = nodes.get_mut(&file_node_id) {
+                n.uid = user.uid;
+                n.gid = user.gid;
+            }
+        }
+
         // Create handle
         let handle_id = self.allocate_handle_id();
         let handle = Handle {
@@ -796,8 +1008,18 @@ impl FsCore {
         Ok(handle_id)
     }
 
-    pub fn open(&self, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn open(&self, pid: &PID, path: &Path, opts: &OpenOptions) -> FsResult<HandleId> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
+
+        // Permission check
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let nodes = self.nodes.lock().unwrap();
+                let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
+                let allow = self.allowed_for_user(node, &user, opts.read, opts.write, false);
+                if !allow { return Err(FsError::AccessDenied); }
+            }
+        }
 
         // Check share mode conflicts with existing handles
         if self.share_mode_conflicts(node_id, opts) {
@@ -819,7 +1041,7 @@ impl FsCore {
     }
 
     /// Open by internal node id (adapter pathless open)
-    pub fn open_by_id(&self, node_id_u64: u64, opts: &OpenOptions) -> FsResult<HandleId> {
+    pub fn open_by_id(&self, pid: &PID, node_id_u64: u64, opts: &OpenOptions) -> FsResult<HandleId> {
         let node_id = NodeId(node_id_u64);
 
         // Verify node exists
@@ -851,9 +1073,18 @@ impl FsCore {
         true
     }
 
-    pub fn read(&self, handle_id: HandleId, offset: u64, buf: &mut [u8]) -> FsResult<usize> {
+    pub fn read(&self, pid: &PID, handle_id: HandleId, offset: u64, buf: &mut [u8]) -> FsResult<usize> {
         let handles = self.handles.lock().unwrap();
         let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
+
+        // Permission check for read
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let nodes = self.nodes.lock().unwrap();
+                let node = nodes.get(&handle.node_id).ok_or(FsError::NotFound)?;
+                if !self.allowed_for_user(node, &user, true, false, false) { return Err(FsError::AccessDenied); }
+            }
+        }
 
         if !handle.options.read {
             return Err(FsError::AccessDenied);
@@ -876,16 +1107,25 @@ impl FsCore {
         }
     }
 
-    pub fn write(&self, handle_id: HandleId, offset: u64, data: &[u8]) -> FsResult<usize> {
+    pub fn write(&self, pid: &PID, handle_id: HandleId, offset: u64, data: &[u8]) -> FsResult<usize> {
         let mut handles = self.handles.lock().unwrap();
         let handle = handles.get_mut(&handle_id).ok_or(FsError::InvalidArgument)?;
+
+        // Permission check for write
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let nodes = self.nodes.lock().unwrap();
+                let node = nodes.get(&handle.node_id).ok_or(FsError::NotFound)?;
+                if !self.allowed_for_user(node, &user, false, true, false) { return Err(FsError::AccessDenied); }
+            }
+        }
 
         if !handle.options.write {
             return Err(FsError::AccessDenied);
         }
 
         let stream_name = Self::get_stream_name(handle);
-        let current_branch_id = self.current_branch_for_process();
+        let current_branch_id = self.branch_for_process(pid);
         let _branches = self.branches.lock().unwrap();
         let _branch = _branches.get(&current_branch_id).ok_or(FsError::NotFound)?;
 
@@ -990,7 +1230,7 @@ impl FsCore {
         handle.options.stream.as_deref().unwrap_or("")
     }
 
-    pub fn close(&self, handle_id: HandleId) -> FsResult<()> {
+    pub fn close(&self, _pid: &PID, handle_id: HandleId) -> FsResult<()> {
         let mut handles = self.handles.lock().unwrap();
         let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
         let node_id = handle.node_id;
@@ -1072,21 +1312,17 @@ impl FsCore {
         Ok(())
     }
 
-    pub fn getattr(&self, path: &Path) -> FsResult<Attributes> {
-        let (node_id, _) = self.resolve_path(path)?;
-        self.get_node_attributes(node_id)
-    }
 
-    pub fn set_times(&self, path: &Path, times: FileTimes) -> FsResult<()> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn set_times(&self, pid: &PID, path: &Path, times: FileTimes) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         self.update_node_times(node_id, times);
         Ok(())
     }
 
     // Directory operations
-    pub fn mkdir(&self, path: &Path, _mode: u32) -> FsResult<()> {
+    pub fn mkdir(&self, pid: &PID, path: &Path, mode: u32) -> FsResult<()> {
         // Check if the path already exists
-        if let Ok(_) = self.resolve_path(path) {
+        if let Ok(_) = self.resolve_path(pid, path) {
             return Err(FsError::AlreadyExists);
         }
 
@@ -1096,7 +1332,19 @@ impl FsCore {
             .and_then(|n| n.to_str())
             .ok_or(FsError::InvalidName)?;
 
-        let (parent_id, _) = self.resolve_path(parent_path)?;
+        let (parent_id, _) = self.resolve_path(pid, parent_path)?;
+
+        // Permission check for parent directory write+execute access (w+x required to modify entries)
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let nodes = self.nodes.lock().unwrap();
+                let parent_node = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
+                if !self.allowed_for_user(parent_node, &user, false, true, true) {
+                    return Err(FsError::AccessDenied);
+                }
+            }
+        }
+
         let nodes = self.nodes.lock().unwrap();
         let parent_node = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
 
@@ -1113,6 +1361,18 @@ impl FsCore {
 
         // Create directory node
         let dir_node_id = self.create_directory_node()?;
+
+        // Initialize directory node ownership and mode
+        {
+            let mut nodes = self.nodes.lock().unwrap();
+            if let Some(dir_node) = nodes.get_mut(&dir_node_id) {
+                if let Some(user) = self.user_for_process(pid) {
+                    dir_node.uid = user.uid;
+                    dir_node.gid = user.gid;
+                }
+                dir_node.mode = mode;
+            }
+        }
 
         // Add to parent directory
         {
@@ -1131,8 +1391,8 @@ impl FsCore {
         Ok(())
     }
 
-    pub fn rmdir(&self, path: &Path) -> FsResult<()> {
-        let (node_id, parent_info) = self.resolve_path(path)?;
+    pub fn rmdir(&self, pid: &PID, path: &Path) -> FsResult<()> {
+        let (node_id, parent_info) = self.resolve_path(pid, path)?;
 
         let Some((parent_id, name)) = parent_info else {
             return Err(FsError::InvalidArgument); // Can't remove root
@@ -1177,13 +1437,20 @@ impl FsCore {
     }
 
     // Optional readdir+ that includes attributes without extra getattr calls (libfuse pattern)
-    pub fn readdir_plus(&self, path: &Path) -> FsResult<Vec<(DirEntry, Attributes)>> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn readdir_plus(&self, pid: &PID, path: &Path) -> FsResult<Vec<(DirEntry, Attributes)>> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
         match &node.kind {
             NodeKind::Directory { children } => {
+                if self.config.security.enforce_posix_permissions {
+                    if let Some(user) = self.user_for_process(pid) {
+                        if !self.allowed_for_user(node, &user, true, false, true) {
+                            return Err(FsError::AccessDenied);
+                        }
+                    }
+                }
                 // Collect and sort child names for stable ordering
                 let mut names: Vec<_> = children.keys().cloned().collect();
                 names.sort();
@@ -1209,6 +1476,7 @@ impl FsCore {
                         len,
                     };
 
+                    let perm_bits = child_node.mode & 0o777;
                     let attributes = Attributes {
                         len,
                         times: child_node.times,
@@ -1216,9 +1484,9 @@ impl FsCore {
                         gid: child_node.gid,
                         is_dir,
                         is_symlink,
-                        mode_user: FileMode { read: true, write: true, exec: is_dir },
-                        mode_group: FileMode { read: true, write: false, exec: is_dir },
-                        mode_other: FileMode { read: true, write: false, exec: false },
+                        mode_user: FileMode { read: (perm_bits & 0o400) != 0, write: (perm_bits & 0o200) != 0, exec: (perm_bits & 0o100) != 0 },
+                        mode_group: FileMode { read: (perm_bits & 0o040) != 0, write: (perm_bits & 0o020) != 0, exec: (perm_bits & 0o010) != 0 },
+                        mode_other: FileMode { read: (perm_bits & 0o004) != 0, write: (perm_bits & 0o002) != 0, exec: (perm_bits & 0o001) != 0 },
                     };
 
                     entries.push((dir_entry, attributes));
@@ -1231,13 +1499,20 @@ impl FsCore {
     }
 
     /// Like readdir_plus, but returns raw name bytes for each entry for adapters that need exact bytes
-    pub fn readdir_plus_raw(&self, path: &Path) -> FsResult<Vec<(Vec<u8>, Attributes)>> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn readdir_plus_raw(&self, pid: &PID, path: &Path) -> FsResult<Vec<(Vec<u8>, Attributes)>> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
         match &node.kind {
             NodeKind::Directory { children } => {
+                if self.config.security.enforce_posix_permissions {
+                    if let Some(user) = self.user_for_process(pid) {
+                        if !self.allowed_for_user(node, &user, true, false, true) {
+                            return Err(FsError::AccessDenied);
+                        }
+                    }
+                }
                 // Sort internal names for stable order
                 let mut names: Vec<_> = children.keys().cloned().collect();
                 names.sort();
@@ -1284,15 +1559,15 @@ impl FsCore {
     }
 
     // Extended attributes operations
-    pub fn xattr_get(&self, path: &Path, name: &str) -> FsResult<Vec<u8>> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn xattr_get(&self, pid: &PID, path: &Path, name: &str) -> FsResult<Vec<u8>> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
         node.xattrs.get(name).cloned().ok_or(FsError::NotFound)
     }
 
-    pub fn xattr_set(&self, path: &Path, name: &str, value: &[u8]) -> FsResult<()> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn xattr_set(&self, pid: &PID, path: &Path, name: &str, value: &[u8]) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let mut nodes = self.nodes.lock().unwrap();
         if let Some(node) = nodes.get_mut(&node_id) {
             node.xattrs.insert(name.to_string(), value.to_vec());
@@ -1302,16 +1577,16 @@ impl FsCore {
         }
     }
 
-    pub fn xattr_list(&self, path: &Path) -> FsResult<Vec<String>> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn xattr_list(&self, pid: &PID, path: &Path) -> FsResult<Vec<String>> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
         Ok(node.xattrs.keys().cloned().collect())
     }
 
     // Alternate Data Streams operations
-    pub fn streams_list(&self, path: &Path) -> FsResult<Vec<StreamSpec>> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn streams_list(&self, pid: &PID, path: &Path) -> FsResult<Vec<StreamSpec>> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 
@@ -1332,8 +1607,8 @@ impl FsCore {
         }
     }
 
-    pub fn unlink(&self, path: &Path) -> FsResult<()> {
-        let (node_id, parent_info) = self.resolve_path(path)?;
+    pub fn unlink(&self, pid: &PID, path: &Path) -> FsResult<()> {
+        let (node_id, parent_info) = self.resolve_path(pid, path)?;
 
         let Some((parent_id, name)) = parent_info else {
             return Err(FsError::InvalidArgument); // Can't unlink root
@@ -1347,6 +1622,21 @@ impl FsCore {
             NodeKind::Directory { .. } => return Err(FsError::IsADirectory),
             NodeKind::File { .. } => {}
             NodeKind::Symlink { .. } => {} // Symlinks can be unlinked like files
+        }
+        // Enforce parent directory permissions w+x and sticky semantics
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                let parent = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
+                if !self.allowed_for_user(parent, &user, false, true, true) {
+                    return Err(FsError::AccessDenied);
+                }
+                let sticky = (parent.mode & 0o1000) != 0;
+                if sticky && user.uid != 0 {
+                    if user.uid != parent.uid && user.uid != node.uid {
+                        return Err(FsError::AccessDenied);
+                    }
+                }
+            }
         }
         drop(nodes);
 
@@ -1385,17 +1675,25 @@ impl FsCore {
     }
 
     /// Public helper to resolve path and return internal IDs for FFI consumers
-    pub fn resolve_path_public(&self, path: &Path) -> FsResult<(u64, Option<u64>)> {
-        let (node_id, parent_info) = self.resolve_path(path)?;
+    pub fn resolve_path_public(&self, pid: &PID, path: &Path) -> FsResult<(u64, Option<u64>)> {
+        let (node_id, parent_info) = self.resolve_path(pid, path)?;
         let parent_id = parent_info.map(|(pid, _name)| pid.0);
         Ok((node_id.0, parent_id))
     }
 
     /// Change permissions mode on a path (basic chmod semantics)
-    pub fn set_mode(&self, path: &Path, mode: u32) -> FsResult<()> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn set_mode(&self, pid: &PID, path: &Path, mode: u32) -> FsResult<()> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let mut nodes = self.nodes.lock().unwrap();
         let node = nodes.get_mut(&node_id).ok_or(FsError::NotFound)?;
+        // Only owner or root may change mode when enforcing POSIX permissions
+        if self.config.security.enforce_posix_permissions {
+            if let Some(user) = self.user_for_process(pid) {
+                if !(user.uid == 0 || user.uid == node.uid) {
+                    return Err(FsError::AccessDenied);
+                }
+            }
+        }
         node.mode = mode;
         // ctime changes on metadata change
         let now = FsCore::current_timestamp();
@@ -1404,9 +1702,9 @@ impl FsCore {
     }
 
     /// Rename a node from old path to new path. Fails if destination exists.
-    pub fn rename(&self, old: &Path, new: &Path) -> FsResult<()> {
+    pub fn rename(&self, pid: &PID, old: &Path, new: &Path) -> FsResult<()> {
         // Resolve old path and its parent
-        let (old_id, old_parent) = self.resolve_path(old)?;
+        let (old_id, old_parent) = self.resolve_path(pid, old)?;
         let Some((old_parent_id, old_name)) = old_parent else {
             return Err(FsError::InvalidArgument); // Cannot rename root
         };
@@ -1419,7 +1717,7 @@ impl FsCore {
             .ok_or(FsError::InvalidName)?
             .to_string();
 
-        let (new_parent_id, _) = self.resolve_path(new_parent_path)?;
+        let (new_parent_id, _) = self.resolve_path(pid, new_parent_path)?;
 
         // Lock nodes for mutation
         let mut nodes = self.nodes.lock().unwrap();
@@ -1466,9 +1764,9 @@ impl FsCore {
     }
 
     /// Create a symbolic link
-    pub fn symlink(&self, target: &str, linkpath: &Path) -> FsResult<()> {
+    pub fn symlink(&self, pid: &PID, target: &str, linkpath: &Path) -> FsResult<()> {
         // Check if the link path already exists
-        if self.resolve_path(linkpath).is_ok() {
+        if self.resolve_path(pid, linkpath).is_ok() {
             return Err(FsError::AlreadyExists);
         }
 
@@ -1479,7 +1777,7 @@ impl FsCore {
             .to_string_lossy()
             .to_string();
 
-        let (parent_id, _) = self.resolve_path(parent_path)?;
+        let (parent_id, _) = self.resolve_path(pid, parent_path)?;
         let nodes = self.nodes.lock().unwrap();
 
         // Check that parent is a directory
@@ -1518,8 +1816,8 @@ impl FsCore {
     }
 
     /// Read a symbolic link
-    pub fn readlink(&self, path: &Path) -> FsResult<String> {
-        let (node_id, _) = self.resolve_path(path)?;
+    pub fn readlink(&self, pid: &PID, path: &Path) -> FsResult<String> {
+        let (node_id, _) = self.resolve_path(pid, path)?;
         let nodes = self.nodes.lock().unwrap();
         let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
 

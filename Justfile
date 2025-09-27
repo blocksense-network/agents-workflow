@@ -292,11 +292,28 @@ build-agentfs-extension:
 build-agents-workflow-xcode:
     @echo "🔨 Building AgentsWorkflow macOS app..."
     just build-agentfs-extension
+    cd apps/macos/AgentsWorkflow && (test -d AgentsWorkflow.xcodeproj || (echo "❌ Xcode project not found at apps/macos/AgentsWorkflow/AgentsWorkflow.xcodeproj" && echo "💡 Run 'just setup-agents-workflow-xcode' to create it" && exit 1))
     cd apps/macos/AgentsWorkflow && xcodebuild build -project AgentsWorkflow.xcodeproj -scheme AgentsWorkflow -configuration Debug -arch x86_64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+# Set up the Xcode project for AgentsWorkflow (run once after cloning)
+setup-agents-workflow-xcode:
+    @echo "🔧 Setting up AgentsWorkflow Xcode project..."
+    @echo "Generating Xcode project from project.yml using XcodeGen..."
+    cd apps/macos/AgentsWorkflow && xcodegen generate
+    @echo ""
+    @echo "✅ Xcode project generated successfully!"
+    @echo "You can now open AgentsWorkflow.xcodeproj in Xcode or run:"
+    @echo "  just build-agents-workflow"
 
 # Build the complete AgentsWorkflow macOS app
 build-agents-workflow:
-    just build-agents-workflow-xcode
+    just build-agentfs-extension
+    @echo "🔨 Building AgentsWorkflow macOS app with Swift Package Manager..."
+    cd apps/macos/AgentsWorkflow && swift build --configuration release
+    @echo "📦 Copying extension to app bundle..."
+    mkdir -p "apps/macos/AgentsWorkflow/.build/arm64-apple-macosx/release/AgentsWorkflow.app/Contents/PlugIns"
+    cp -R "adapters/macos/xcode/AgentFSKitExtension/AgentFSKitExtension.appex" "apps/macos/AgentsWorkflow/.build/arm64-apple-macosx/release/AgentsWorkflow.app/Contents/PlugIns/"
+    @echo "✅ AgentsWorkflow built successfully!"
 
 # Test the AgentsWorkflow macOS app (builds and validates extension)
 test-agents-workflow:

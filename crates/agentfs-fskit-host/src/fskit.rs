@@ -79,8 +79,9 @@ impl FsVolume {
             share: vec![],
             stream: None,
         };
-        let handle = self.adapter.core().create(Path::new(path), &opts)?;
-        self.adapter.core().close(handle)?;
+        let pid = &agentfs_core::PID::new(0); // Dummy PID for testing
+        let handle = self.adapter.core().create(pid, Path::new(path), &opts)?;
+        self.adapter.core().close(pid, handle)?;
         Ok(())
     }
 
@@ -94,10 +95,11 @@ impl FsVolume {
             share: vec![],
             stream: None,
         };
-        let handle = self.adapter.core().open(Path::new(path), &opts)?;
+        let pid = &agentfs_core::PID::new(0); // Dummy PID for testing
+        let handle = self.adapter.core().open(pid, Path::new(path), &opts)?;
         let bytes = data.as_bytes();
-        self.adapter.core().write(handle, 0, bytes)?;
-        self.adapter.core().close(handle)?;
+        self.adapter.core().write(pid, handle, 0, bytes)?;
+        self.adapter.core().close(pid, handle)?;
         Ok(())
     }
 
@@ -111,10 +113,11 @@ impl FsVolume {
             share: vec![],
             stream: None,
         };
-        let handle = self.adapter.core().open(Path::new(path), &opts)?;
+        let pid = &agentfs_core::PID::new(0); // Dummy PID for testing
+        let handle = self.adapter.core().open(pid, Path::new(path), &opts)?;
         let mut buffer = vec![0u8; 1024]; // Simple buffer
-        let bytes_read = self.adapter.core().read(handle, 0, &mut buffer)?;
-        self.adapter.core().close(handle)?;
+        let bytes_read = self.adapter.core().read(pid, handle, 0, &mut buffer)?;
+        self.adapter.core().close(pid, handle)?;
         Ok(String::from_utf8_lossy(&buffer[..bytes_read]).to_string())
     }
 }

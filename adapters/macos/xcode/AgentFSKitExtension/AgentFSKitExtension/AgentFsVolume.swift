@@ -2,75 +2,79 @@
 @preconcurrency import Foundation
 @preconcurrency import FSKit
 import os
+import Darwin
+
+@_silgen_name("af_register_process")
+func af_register_process(_ fs: UInt64, _ pid: UInt32, _ parent_pid: UInt32, _ uid: UInt32, _ gid: UInt32, _ out_pid: UnsafeMutablePointer<UInt32>?) -> Int32
 
 @_silgen_name("agentfs_bridge_statfs")
 func agentfs_bridge_statfs(_ core: UnsafeMutableRawPointer?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
 
-@_silgen_name("agentfs_bridge_getattr")
-func agentfs_bridge_getattr(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
+@_silgen_name("af_getattr")
+func af_getattr(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
 
 @_silgen_name("af_stats")
 func af_stats(_ fs: UInt64, _ out_stats: UnsafeMutablePointer<UInt8>?, _ stats_size: size_t) -> Int32
 
-@_silgen_name("agentfs_bridge_mkdir")
-func agentfs_bridge_mkdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
+@_silgen_name("af_mkdir")
+func af_mkdir(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
 
-@_silgen_name("agentfs_bridge_readdir")
-func agentfs_bridge_readdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
+@_silgen_name("af_readdir")
+func af_readdir(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
 
-@_silgen_name("agentfs_bridge_open")
-func agentfs_bridge_open(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
+@_silgen_name("af_open")
+func af_open(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
 
-@_silgen_name("agentfs_bridge_open_by_id")
-func agentfs_bridge_open_by_id(_ core: UnsafeMutableRawPointer?, _ node_id: UInt64, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
+@_silgen_name("af_open_by_id")
+func af_open_by_id(_ fs: UInt64, _ pid: UInt32, _ node_id: UInt64, _ options: UnsafePointer<CChar>?, _ handle: UnsafeMutablePointer<UInt64>?) -> Int32
 
-@_silgen_name("agentfs_bridge_read")
-func agentfs_bridge_read(_ core: UnsafeMutableRawPointer?, _ handle: UInt64, _ offset: UInt64, _ buffer: UnsafeMutableRawPointer?, _ length: UInt32, _ bytes_read: UnsafeMutablePointer<UInt32>?) -> Int32
+@_silgen_name("af_read")
+func af_read(_ fs: UInt64, _ pid: UInt32, _ handle: UInt64, _ offset: UInt64, _ buffer: UnsafeMutableRawPointer?, _ length: UInt32, _ bytes_read: UnsafeMutablePointer<UInt32>?) -> Int32
 
-@_silgen_name("agentfs_bridge_write")
-func agentfs_bridge_write(_ core: UnsafeMutableRawPointer?, _ handle: UInt64, _ offset: UInt64, _ buffer: UnsafeRawPointer?, _ length: UInt32, _ bytes_written: UnsafeMutablePointer<UInt32>?) -> Int32
+@_silgen_name("af_write")
+func af_write(_ fs: UInt64, _ pid: UInt32, _ handle: UInt64, _ offset: UInt64, _ buffer: UnsafeRawPointer?, _ length: UInt32, _ bytes_written: UnsafeMutablePointer<UInt32>?) -> Int32
 
-@_silgen_name("agentfs_bridge_close")
-func agentfs_bridge_close(_ core: UnsafeMutableRawPointer?, _ handle: UInt64) -> Int32
+@_silgen_name("af_close")
+func af_close(_ fs: UInt64, _ pid: UInt32, _ handle: UInt64) -> Int32
 
-@_silgen_name("agentfs_bridge_symlink")
-func agentfs_bridge_symlink(_ core: UnsafeMutableRawPointer?, _ target: UnsafePointer<CChar>?, _ linkpath: UnsafePointer<CChar>?) -> Int32
+@_silgen_name("af_symlink")
+func af_symlink(_ fs: UInt64, _ pid: UInt32, _ target: UnsafePointer<CChar>?, _ linkpath: UnsafePointer<CChar>?) -> Int32
 
-@_silgen_name("agentfs_bridge_readlink")
-func agentfs_bridge_readlink(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
+@_silgen_name("af_readlink")
+func af_readlink(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutablePointer<CChar>?, _ buffer_size: size_t) -> Int32
 
-@_silgen_name("agentfs_bridge_rename")
-func agentfs_bridge_rename(_ core: UnsafeMutableRawPointer?, _ oldpath: UnsafePointer<CChar>?, _ newpath: UnsafePointer<CChar>?) -> Int32
+@_silgen_name("af_rename")
+func af_rename(_ fs: UInt64, _ pid: UInt32, _ oldpath: UnsafePointer<CChar>?, _ newpath: UnsafePointer<CChar>?) -> Int32
 
-@_silgen_name("agentfs_bridge_rmdir")
-func agentfs_bridge_rmdir(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?) -> Int32
+@_silgen_name("af_rmdir")
+func af_rmdir(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?) -> Int32
 
-@_silgen_name("agentfs_bridge_unlink")
-func agentfs_bridge_unlink(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?) -> Int32
+@_silgen_name("af_unlink")
+func af_unlink(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?) -> Int32
 
-@_silgen_name("agentfs_bridge_set_times")
-func agentfs_bridge_set_times(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ atime: Int64, _ mtime: Int64, _ ctime: Int64, _ birthtime: Int64) -> Int32
+@_silgen_name("af_set_times")
+func af_set_times(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ atime: Int64, _ mtime: Int64, _ ctime: Int64, _ birthtime: Int64) -> Int32
 
-@_silgen_name("agentfs_bridge_set_mode")
-func agentfs_bridge_set_mode(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
+@_silgen_name("af_set_mode")
+func af_set_mode(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ mode: UInt32) -> Int32
 
-@_silgen_name("agentfs_bridge_set_owner")
-func agentfs_bridge_set_owner(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ uid: UInt32, _ gid: UInt32) -> Int32
+@_silgen_name("af_set_owner")
+func af_set_owner(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ uid: UInt32, _ gid: UInt32) -> Int32
 
-@_silgen_name("agentfs_bridge_xattr_get")
-func agentfs_bridge_xattr_get(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
+@_silgen_name("af_xattr_get")
+func af_xattr_get(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
 
-@_silgen_name("agentfs_bridge_xattr_set")
-func agentfs_bridge_xattr_set(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ value: UnsafeRawPointer?, _ value_len: size_t) -> Int32
+@_silgen_name("af_xattr_set")
+func af_xattr_set(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ name: UnsafePointer<CChar>?, _ value: UnsafeRawPointer?, _ value_len: size_t) -> Int32
 
-@_silgen_name("agentfs_bridge_xattr_list")
-func agentfs_bridge_xattr_list(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
+@_silgen_name("af_xattr_list")
+func af_xattr_list(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ buffer: UnsafeMutableRawPointer?, _ buffer_size: size_t, _ out_len: UnsafeMutablePointer<size_t>?) -> Int32
 
-@_silgen_name("agentfs_bridge_resolve_id")
-func agentfs_bridge_resolve_id(_ core: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ node_id: UnsafeMutablePointer<UInt64>?, _ parent_id: UnsafeMutablePointer<UInt64>?) -> Int32
+@_silgen_name("af_resolve_id")
+func af_resolve_id(_ fs: UInt64, _ pid: UInt32, _ path: UnsafePointer<CChar>?, _ node_id: UnsafeMutablePointer<UInt64>?, _ parent_id: UnsafeMutablePointer<UInt64>?) -> Int32
 
-@_silgen_name("agentfs_bridge_create_child_by_id")
-func agentfs_bridge_create_child_by_id(_ core: UnsafeMutableRawPointer?, _ parent_id: UInt64, _ name_ptr: UnsafePointer<UInt8>?, _ name_len: Int, _ item_type: UInt32, _ mode: UInt32, _ out_node_id: UnsafeMutablePointer<UInt64>?) -> Int32
+@_silgen_name("af_create_child_by_id")
+func af_create_child_by_id(_ fs: UInt64, _ parent_id: UInt64, _ name_ptr: UnsafePointer<UInt8>?, _ name_len: Int, _ item_type: UInt32, _ mode: UInt32, _ out_node_id: UnsafeMutablePointer<UInt64>?) -> Int32
 
 @available(macOS 15.4, *)
 final class AgentFsVolume: FSVolume {
@@ -112,6 +116,12 @@ final class AgentFsVolume: FSVolume {
     private let logger = Logger(subsystem: "com.agentfs.AgentFSKitExtension", category: "AgentFsVolume")
 
     private let root: AgentFsItem
+    private var processCache: [pid_t: UInt32] = [:] // Map from system PID to registered PID
+    private var handleToPid: [UInt64: UInt32] = [:] // Map from handle ID to registered PID
+
+    private var fsHandle: UInt64 {
+        return coreHandle?.load(as: UInt64.self) ?? 0
+    }
 
     init(resource: FSResource, coreHandle: UnsafeMutableRawPointer?) {
         self.resource = resource
@@ -124,6 +134,69 @@ final class AgentFsVolume: FSVolume {
             volumeID: FSVolume.Identifier(uuid: Constants.volumeIdentifier),
             volumeName: FSFileName(string: "AgentFS")
         )
+    }
+
+    /// Get the calling process credentials
+    /// TODO: Implement proper audit token extraction from FSKit operation context
+    private func getCallingProcessInfo() -> (pid: pid_t, uid: uid_t, gid: gid_t)? {
+        // For now, use current process credentials as fallback
+        // FSKit should provide access to calling process audit tokens
+        return (pid: getpid(), uid: getuid(), gid: getgid())
+    }
+
+    /// Get or register the calling process and return the registered PID
+    private func getRegisteredPid(forProcessInfo info: (pid: pid_t, uid: uid_t, gid: gid_t)) -> UInt32 {
+        let (systemPid, uid, gid) = info
+        return getRegisteredPid(forPid: systemPid, uid: uid, gid: gid)
+    }
+
+    /// Get or register a process and return the registered PID
+    private func getRegisteredPid(forPid systemPid: pid_t, uid: uid_t, gid: gid_t) -> UInt32 {
+        // Check cache first
+        if let registeredPid = processCache[systemPid] {
+            return registeredPid
+        }
+
+        var registeredPid: UInt32 = 0
+        let result = af_register_process(
+            fsHandle,
+            UInt32(systemPid),
+            0, // parent_pid (unknown)
+            UInt32(uid),
+            UInt32(gid),
+            &registeredPid
+        )
+
+        if result == 0 { // AfOk
+            processCache[systemPid] = registeredPid
+            logger.debug("Registered process PID \(systemPid) as \(registeredPid) with uid=\(uid), gid=\(gid)")
+            return registeredPid
+        } else {
+            logger.error("Failed to register process PID \(systemPid), result: \(result)")
+            // Fallback to system PID
+            processCache[systemPid] = UInt32(systemPid)
+            return UInt32(systemPid)
+        }
+    }
+
+    /// Get the registered PID for a handle
+    private func getPidForHandle(_ handle: UInt64) -> UInt32 {
+        if let pid = handleToPid[handle] {
+            return pid
+        }
+        // Fallback: get calling process PID
+        if let processInfo = getCallingProcessInfo() {
+            return getRegisteredPid(forProcessInfo: processInfo)
+        }
+        return getRegisteredPid(forPid: getpid(), uid: getuid(), gid: getgid())
+    }
+
+    /// Get the calling process PID, registering it if necessary
+    private func getCallingPid() -> UInt32 {
+        if let processInfo = getCallingProcessInfo() {
+            return getRegisteredPid(forProcessInfo: processInfo)
+        }
+        return getRegisteredPid(forPid: getpid(), uid: getuid(), gid: getgid())
     }
 
 }
@@ -288,7 +361,8 @@ extension AgentFsVolume: FSVolume.Operations {
     private func fetchAttributesFor(_ agentItem: AgentFsItem) throws -> FSItem.Attributes {
         var buffer = [CChar](repeating: 0, count: 64)
         let ok = coreQueue.sync { () -> Bool in
-            return agentItem.path.withCString { agentfs_bridge_getattr(coreHandle, $0, &buffer, buffer.count) } == 0
+            let callingPid = getCallingPid()
+            return agentItem.path.withCString { af_getattr(fsHandle, callingPid, $0, &buffer, buffer.count) } == 0
         }
         guard ok else { throw fs_errorForPOSIXError(POSIXError.EIO.rawValue) }
 
@@ -344,7 +418,7 @@ extension AgentFsVolume: FSVolume.Operations {
         if newAttributes.isValid(.mode) {
             let mode = newAttributes.mode
             let path = agentItem.path
-        let rc = coreQueue.sync { return path.withCString { agentfs_bridge_set_mode(coreHandle, $0, mode) } }
+        let rc = coreQueue.sync { return path.withCString { af_set_mode(fsHandle, getCallingPid(), $0, mode) } }
             if rc != 0, let err = afResultToFSKitError(rc) { throw err }
         }
 
@@ -353,7 +427,7 @@ extension AgentFsVolume: FSVolume.Operations {
             let gid = newAttributes.gid
             let rc = coreQueue.sync { () -> Int32 in
                 return agentItem.path.withCString { p in
-                    agentfs_bridge_set_owner(coreHandle, p, uid, gid)
+                    af_set_owner(fsHandle, getCallingPid(), p, uid, gid)
                 }
             }
             if rc != 0, let err = afResultToFSKitError(rc) { throw err }
@@ -370,7 +444,7 @@ extension AgentFsVolume: FSVolume.Operations {
         if newAttributes.isValid(.changeTime) { needTimes = true }
         if newAttributes.isValid(.birthTime) { needTimes = true }
         if needTimes {
-            let rc = coreQueue.sync { return agentItem.path.withCString { agentfs_bridge_set_times(coreHandle, $0, atime, mtime, ctime, birthtime) } }
+            let rc = coreQueue.sync { return agentItem.path.withCString { af_set_times(fsHandle, getCallingPid(), $0, atime, mtime, ctime, birthtime) } }
             if rc != 0, let err = afResultToFSKitError(rc) { throw err }
         }
 
@@ -394,13 +468,14 @@ extension AgentFsVolume: FSVolume.Operations {
         // Resolve stable IDs for the item and its parent
         var nodeId: UInt64 = 0
         var parentId: UInt64 = 0
-        _ = fullPath.withCString { p in agentfs_bridge_resolve_id(coreHandle, p, &nodeId, &parentId) }
+        _ = fullPath.withCString { p in af_resolve_id(fsHandle, getCallingPid(), p, &nodeId, &parentId) }
 
         // Call Rust core to get item attributes (48-byte struct)
         var buffer = [CChar](repeating: 0, count: 64)
         let result = coreQueue.sync { () -> Int32 in
             return fullPath.withCString { path_cstr in
-                agentfs_bridge_getattr(coreHandle, path_cstr, &buffer, buffer.count)
+                let callingPid = getCallingPid()
+                return af_getattr(fsHandle, callingPid, path_cstr, &buffer, buffer.count)
             }
         }
 
@@ -478,7 +553,7 @@ extension AgentFsVolume: FSVolume.Operations {
         if let handleValue = agentItem.userData as? UInt64 {
             logger.debug("reclaimItem: closing open handle \(handleValue)")
             let result = coreQueue.sync { () -> Int32 in
-                agentfs_bridge_close(coreHandle, handleValue)
+                af_close(fsHandle, getCallingPid(), handleValue)
             }
             if result != 0 {
                 logger.warning("reclaimItem: failed to close handle \(handleValue), error: \(result)")
@@ -511,7 +586,7 @@ extension AgentFsVolume: FSVolume.Operations {
         var buffer = [CChar](repeating: 0, count: 4096)
         let result = coreQueue.sync { () -> Int32 in
             return linkPath.withCString { path_cstr in
-                agentfs_bridge_readlink(coreHandle, path_cstr, &buffer, buffer.count)
+                af_readlink(fsHandle, getCallingPid(), path_cstr, &buffer, buffer.count)
             }
         }
 
@@ -555,7 +630,7 @@ extension AgentFsVolume: FSVolume.Operations {
             let data = name.data
             return data.withUnsafeBytes { rawPtr in
                 let base = rawPtr.bindMemory(to: UInt8.self).baseAddress
-                return agentfs_bridge_create_child_by_id(coreHandle, parentId, base, data.count, itemType, mode, &createdNodeId)
+                return af_create_child_by_id(fsHandle, parentId, base, data.count, itemType, mode, &createdNodeId)
             }
         }
         if result != 0 {
@@ -592,7 +667,7 @@ extension AgentFsVolume: FSVolume.Operations {
         let result = coreQueue.sync { () -> Int32 in
             linkPath.withCString { link_cstr in
                 targetPath.withCString { target_cstr in
-                    agentfs_bridge_symlink(coreHandle, target_cstr, link_cstr)
+                    af_symlink(fsHandle, getCallingPid(), target_cstr, link_cstr)
                 }
             }
         }
@@ -645,11 +720,11 @@ extension AgentFsVolume: FSVolume.Operations {
         let result: Int32 = coreQueue.sync { () -> Int32 in
             if itemType == .directory {
                 itemPath.withCString { path_cstr in
-                    agentfs_bridge_rmdir(coreHandle, path_cstr)
+                    af_rmdir(fsHandle, getCallingPid(), path_cstr)
                 }
             } else {
                 itemPath.withCString { path_cstr in
-                    agentfs_bridge_unlink(coreHandle, path_cstr)
+                    af_unlink(fsHandle, getCallingPid(), path_cstr)
                 }
             }
         }
@@ -687,7 +762,7 @@ extension AgentFsVolume: FSVolume.Operations {
         let result = coreQueue.sync { () -> Int32 in
             return sourcePath.withCString { src_cstr in
                 destPath.withCString { dst_cstr in
-                    agentfs_bridge_rename(coreHandle, src_cstr, dst_cstr)
+                    af_rename(fsHandle, getCallingPid(), src_cstr, dst_cstr)
                 }
             }
         }
@@ -728,7 +803,7 @@ extension AgentFsVolume: FSVolume.Operations {
         var outLen: size_t = 0
         let result = coreQueue.sync { () -> Int32 in
             return dirPath.withCString { path_cstr in
-                agentfs_bridge_readdir(coreHandle, path_cstr, &buffer, buffer.count, &outLen)
+                af_readdir(fsHandle, getCallingPid(), path_cstr, &buffer, buffer.count, &outLen)
             }
         }
 
@@ -821,7 +896,8 @@ extension AgentFsVolume: FSVolume.Operations {
                 var statBuffer = [CChar](repeating: 0, count: 64)
                 let statResult = coreQueue.sync { () -> Int32 in
                     return entryPath.withCString { path_cstr in
-                        agentfs_bridge_getattr(coreHandle, path_cstr, &statBuffer, statBuffer.count)
+                        let callingPid = getCallingPid()
+                        return af_getattr(fsHandle, callingPid, path_cstr, &statBuffer, statBuffer.count)
                     }
                 }
 
@@ -841,7 +917,8 @@ extension AgentFsVolume: FSVolume.Operations {
                     // Fill from getattr for accuracy
                     var abuf = [CChar](repeating: 0, count: 64)
                     let ok = coreQueue.sync { () -> Bool in
-                        return entryPath.withCString { agentfs_bridge_getattr(coreHandle, $0, &abuf, abuf.count) } == 0
+                        let callingPid = getCallingPid()
+                        return entryPath.withCString { af_getattr(fsHandle, callingPid, $0, &abuf, abuf.count) } == 0
                     }
                     if ok {
                         let size = abuf.withUnsafeBytes { $0.load(fromByteOffset: 0, as: UInt64.self) }
@@ -867,7 +944,7 @@ extension AgentFsVolume: FSVolume.Operations {
                 // Resolve stable IDs for this entry
                 var nodeId: UInt64 = 0
                 var parentId: UInt64 = 0
-                _ = entryPath.withCString { p in agentfs_bridge_resolve_id(coreHandle, p, &nodeId, &parentId) }
+                _ = entryPath.withCString { p in af_resolve_id(fsHandle, getCallingPid(), p, &nodeId, &parentId) }
 
                 let packResult = packer.packEntry(
                     name: FSFileName(string: entryName),
@@ -988,6 +1065,14 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
             return
         }
 
+        // Get calling process information and register it
+        let callingPid: UInt32
+        if let processInfo = getCallingProcessInfo() {
+            callingPid = getRegisteredPid(forProcessInfo: processInfo)
+        } else {
+            callingPid = getRegisteredPid(forPid: getpid(), uid: getuid(), gid: getgid())
+        }
+
         // Map FSVolume.OpenModes to options JSON for FFI
         var handle: UInt64 = 0
         let wantsRead = modes.contains(.read)
@@ -1002,7 +1087,7 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
             return optionsJson.withCString { options_cstr in
                 // Prefer opening by node ID to avoid path decoding issues
                 let nodeId = agentItem.attributes.fileID.rawValue
-                return agentfs_bridge_open_by_id(coreHandle, nodeId, options_cstr, &handle)
+                return af_open_by_id(fsHandle, callingPid, nodeId, options_cstr, &handle)
             }
         }
 
@@ -1017,7 +1102,9 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
 
         // Store the handle in userData
         agentItem.userData = handle
-        logger.debug("open: opened handle \(handle) for id=\(agentItem.attributes.fileID.rawValue)")
+        // Cache the PID mapping for this handle
+        handleToPid[handle] = callingPid
+        logger.debug("open: opened handle \(handle) for id=\(agentItem.attributes.fileID.rawValue) with PID \(callingPid)")
     }
 
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
@@ -1040,7 +1127,8 @@ extension AgentFsVolume: FSVolume.OpenCloseOperations {
         }
 
         // Close file handle using Rust FFI
-        let result = coreQueue.sync { agentfs_bridge_close(coreHandle, handle) }
+        let pidForHandle = getPidForHandle(handle)
+        let result = coreQueue.sync { af_close(fsHandle, pidForHandle, handle) }
 
         if result != 0 {
             logger.warning("close: failed to close handle \(handle), error: \(result)")
@@ -1074,9 +1162,10 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         var bytesRead: UInt32 = 0
         var readData = Data(count: length)
 
+        let pidForHandle = getPidForHandle(handle)
         let result = coreQueue.sync { () -> Int32 in
             return readData.withUnsafeMutableBytes { bufferPtr in
-                agentfs_bridge_read(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
+                af_read(fsHandle, pidForHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(length), &bytesRead)
             }
         }
 
@@ -1117,9 +1206,10 @@ extension AgentFsVolume: FSVolume.ReadWriteOperations {
         }
 
         var bytesWritten: UInt32 = 0
+        let pidForHandle = getPidForHandle(handle)
         let result = coreQueue.sync { () -> Int32 in
             return data.withUnsafeBytes { bufferPtr in
-                agentfs_bridge_write(coreHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
+                af_write(fsHandle, pidForHandle, handle, UInt64(offset), bufferPtr.baseAddress, UInt32(data.count), &bytesWritten)
             }
         }
 
@@ -1157,7 +1247,7 @@ extension AgentFsVolume: FSVolume.XattrOperations {
             return agentItem.path.withCString { p in
                 return key.withCString { n in
                     return buffer.withUnsafeMutableBytes { bufPtr in
-                        agentfs_bridge_xattr_get(coreHandle, p, n, bufPtr.baseAddress, bufPtr.count, &outLen)
+                        af_xattr_get(fsHandle, getCallingPid(), p, n, bufPtr.baseAddress, bufPtr.count, &outLen)
                     }
                 }
             }
@@ -1176,10 +1266,10 @@ extension AgentFsVolume: FSVolume.XattrOperations {
                 return key.withCString { n in
                     if let value = value {
                         return value.withUnsafeBytes { bufPtr in
-                            agentfs_bridge_xattr_set(coreHandle, p, n, bufPtr.baseAddress, bufPtr.count)
+                            af_xattr_set(fsHandle, getCallingPid(), p, n, bufPtr.baseAddress, bufPtr.count)
                         }
                     } else {
-                        return agentfs_bridge_xattr_set(coreHandle, p, n, nil, 0)
+                        return af_xattr_set(fsHandle, getCallingPid(), p, n, nil, 0)
                     }
                 }
             }
@@ -1195,7 +1285,7 @@ extension AgentFsVolume: FSVolume.XattrOperations {
         let rc = coreQueue.sync { () -> Int32 in
             return agentItem.path.withCString { p in
                 return buffer.withUnsafeMutableBytes { bufPtr in
-                    agentfs_bridge_xattr_list(coreHandle, p, bufPtr.baseAddress, bufPtr.count, &outLen)
+                    af_xattr_list(fsHandle, getCallingPid(), p, bufPtr.baseAddress, bufPtr.count, &outLen)
                 }
             }
         }

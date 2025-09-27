@@ -295,6 +295,8 @@
         pkgs.darwin.apple_sdk.frameworks.Security
         # macOS-specific tools
         pkgs.lima # Linux virtual machines on macOS
+        # Xcode project generation
+        pkgs.xcodegen
         # Provide a reproducible Chrome for Puppeteer on macOS (unfree)
         pkgs.google-chrome
       ];

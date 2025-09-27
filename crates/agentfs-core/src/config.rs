@@ -107,6 +107,8 @@ pub struct SecurityPolicy {
     pub default_gid: u32,
     /// Enable Windows ACL compatibility bridge (future)
     pub enable_windows_acl_compat: bool,
+    /// If true, emulate Unix root DAC override (root bypasses discretionary checks)
+    pub root_bypass_permissions: bool,
 }
 
 impl Default for SecurityPolicy {
@@ -116,6 +118,7 @@ impl Default for SecurityPolicy {
             default_uid: 0,
             default_gid: 0,
             enable_windows_acl_compat: false,
+            root_bypass_permissions: false,
         }
     }
 }
