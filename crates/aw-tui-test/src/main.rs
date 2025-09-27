@@ -3,13 +3,18 @@
 use clap::{Parser, Subcommand};
 use aw_test_scenarios::{Scenario, Step};
 use aw_rest_client_mock::MockClient;
-use aw_tui::{execute_scenario, TestRuntime};
+use aw_tui::{execute_scenario, TestRuntime, task::TaskState};
 use std::sync::Arc;
 use std::io::{self, Write};
+use crossterm::event::{self, Event, KeyCode};
+use crossterm::execute;
+use crossterm::terminal::{self, Clear, ClearType};
+use crossterm::cursor;
+use std::time::Duration;
 
 #[derive(Parser, Debug)]
 #[command(name = "tui-test")]
-#[command(about = "TUI testing runner")]
+#[command(about = "TUI testing runner - run automated tests or interactive video player")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -27,9 +32,9 @@ enum Commands {
         /// Stop after step index (inclusive)
         #[arg(long)]
         until_step: Option<usize>,
-        /// Update golden snapshots instead of asserting
+        /// Update golden files instead of asserting
         #[arg(long)]
-        update_snapshots: bool,
+        update_goldens: bool,
         /// Override terminal width
         #[arg(long)]
         terminal_width: Option<u16>,
@@ -43,7 +48,7 @@ enum Commands {
         #[arg(long)]
         report: Option<String>,
     },
-    /// Interactive player for stepping through a scenario
+    /// Interactive player for stepping through a scenario (video player style)
     Play {
         /// Path to JSON/YAML scenario
         scenario_path: String,
@@ -66,7 +71,7 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Run { scenario_path, .. } => {
+        Commands::Run { scenario_path, update_goldens, .. } => {
             let data = std::fs::read_to_string(&scenario_path)?;
             let scenario = Scenario::from_str(&data)?;
 
@@ -74,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
             let client = Arc::new(MockClient::from_scenario_name(&scenario.name));
 
             // Execute the scenario
-            match execute_scenario(client, &scenario).await {
+            match execute_scenario(client, &scenario, update_goldens).await {
                 Ok(()) => {
                     println!("✅ Scenario '{}' executed successfully", scenario.name);
                 }
@@ -104,10 +109,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|t| (t.width.unwrap_or(80), t.height.unwrap_or(24)))
                 .unwrap_or((80, 24));
 
-            let mut runtime = TestRuntime::new(client.clone(), width, height);
-
-            // Load initial data
-            runtime.load_initial_data().await.map_err(|e| anyhow::anyhow!("Failed to load initial data: {}", e))?;
+            let mut runtime = TestRuntime::new(client.clone(), width, height, false); // Interactive mode doesn't update goldens
 
             // Set up interactive session
             let mut current_step = start_step.unwrap_or(0);
@@ -132,6 +134,33 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Redraw the entire screen (TUI + status + shortcuts)
+fn redraw_screen(
+    scenario: &Scenario,
+    runtime: &TestRuntime<MockClient>,
+    current_step: usize,
+    executed_steps: usize,
+) {
+    // Clear screen
+    let mut stdout = io::stdout();
+    let _ = execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0));
+    show_tui_display(runtime);
+
+    // Show compact status
+    show_compact_status(scenario, runtime, current_step, executed_steps);
+
+    // Show keyboard shortcuts on single line at bottom
+    show_keyboard_shortcuts();
+}
+
+/// Cleanup terminal state on exit
+fn cleanup_terminal() {
+    let mut stdout = io::stdout();
+    let _ = terminal::disable_raw_mode();
+    let _ = execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), cursor::Show);
+    let _ = io::stdout().flush();
+}
+
 /// Run the interactive scenario player
 async fn run_interactive_player(
     scenario: &Scenario,
@@ -141,112 +170,160 @@ async fn run_interactive_player(
 ) -> anyhow::Result<()> {
     let mut executed_steps = 0; // Track how many steps we've actually executed
 
-    loop {
-        // Show current state
-        show_current_state(scenario, runtime, current_step, executed_steps, trace);
+    // Setup terminal for raw mode
+    terminal::enable_raw_mode().map_err(|e| {
+        cleanup_terminal();
+        e
+    })?;
 
-        // Show commands
-        println!();
-        println!("Commands:");
-        println!("  n/next       - Execute next step");
-        println!("  p/prev       - Go back one step (reset state)");
-        println!("  j <n>/jump <n> - Jump to step <n>");
-        println!("  r/reset      - Reset to beginning");
-        println!("  s/show       - Show current TUI buffer");
-        println!("  v/view       - Show detailed ViewModel state");
-        println!("  q/quit       - Exit");
-        print!("> ");
-        io::stdout().flush()?;
+    let result: anyhow::Result<()> = async {
+        // Initial display
+        redraw_screen(scenario, runtime, current_step, executed_steps);
 
-        // Read command
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim();
+        loop {
+            // Read key press (blocking)
+            let key_event = match event::read()? {
+                Event::Key(key) => key,
+                _ => continue, // Ignore non-key events
+            };
 
-        match input {
-            "n" | "next" => {
-                if current_step < scenario.steps.len() {
-                    // Execute the current step
-                    match runtime.execute_step(&scenario.steps[current_step]).await {
-                        Ok(()) => {
-                            executed_steps += 1;
-                            current_step += 1;
-                            println!("✅ Step {} executed successfully", current_step);
+            // Clear the status lines before processing command feedback
+            let mut stdout = io::stdout();
+            // Clear lines 24-26 where status and shortcuts appear
+            for line in 24..=26 {
+                let _ = execute!(stdout, cursor::MoveTo(0, line), terminal::Clear(terminal::ClearType::CurrentLine));
+            }
+            let _ = execute!(stdout, cursor::MoveTo(0, 24)); // Position cursor for command output
+            io::stdout().flush()?;
+
+            match key_event.code {
+                // Forward navigation
+                KeyCode::Char('n') | KeyCode::Right => {
+                    if current_step < scenario.steps.len() {
+                        // Execute the current step
+                        match runtime.execute_step(&scenario.steps[current_step], &scenario.name).await {
+                            Ok(()) => {
+                                executed_steps += 1;
+                                current_step += 1;
+                            }
+                            Err(e) => {
+                                // Show error briefly, then continue
+                                println!("❌ Step {} failed: {}", current_step + 1, e);
+                                std::thread::sleep(std::time::Duration::from_secs(2));
+                            }
                         }
-                        Err(e) => {
-                            println!("❌ Step {} failed: {}", current_step + 1, e);
-                            // Don't advance if step failed
-                        }
+                        // Redraw after state change
+                        redraw_screen(scenario, runtime, current_step, executed_steps);
                     }
-                } else {
-                    println!("🎯 End of scenario reached!");
                 }
-            }
-            "p" | "prev" => {
-                if executed_steps > 0 {
-                    // Reset and replay up to previous step
-                    executed_steps = executed_steps.saturating_sub(1);
-                    current_step = executed_steps;
-                    reset_and_replay(scenario, runtime, executed_steps).await?;
-                    println!("↶ Reset to step {}", executed_steps);
-                } else {
-                    println!("⚠️  Already at beginning");
+                // Backward navigation
+                KeyCode::Char('b') | KeyCode::Left => {
+                    if executed_steps > 0 {
+                        // Reset and replay up to previous step
+                        executed_steps = executed_steps.saturating_sub(1);
+                        current_step = executed_steps;
+                        if let Err(e) = reset_and_replay(scenario, runtime, executed_steps).await {
+                            println!("❌ Failed to reset: {}", e);
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                        }
+                        // Redraw after state change
+                        redraw_screen(scenario, runtime, current_step, executed_steps);
+                    }
                 }
-            }
-            "r" | "reset" => {
-                executed_steps = 0;
-                current_step = 0;
-                reset_and_replay(scenario, runtime, 0).await?;
-                println!("🔄 Reset to beginning");
-            }
-            "s" | "show" => {
-                show_tui_buffer(runtime);
-            }
-            "v" | "view" => {
-                show_viewmodel_details(runtime);
-            }
-            "q" | "quit" => {
-                println!("👋 Goodbye!");
-                break;
-            }
-            input => {
-                // Check if it's a jump command
-                if let Some(cmd) = input.strip_prefix("j ") {
-                    if let Ok(step_num) = cmd.parse::<usize>() {
+                // Fast backward (10 steps)
+                KeyCode::Up => {
+                    if executed_steps > 0 {
+                        let target_step = executed_steps.saturating_sub(10);
+                        executed_steps = target_step;
+                        current_step = target_step;
+                        if let Err(e) = reset_and_replay(scenario, runtime, target_step).await {
+                            println!("❌ Failed to jump: {}", e);
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                        }
+                        // Redraw after state change
+                        redraw_screen(scenario, runtime, current_step, executed_steps);
+                    }
+                }
+                // Fast forward (10 steps)
+                KeyCode::Down => {
+                    let target_step = (executed_steps + 10).min(scenario.steps.len());
+                    if target_step > executed_steps {
+                        // Execute multiple steps at once
+                        for step_idx in executed_steps..target_step {
+                            if let Err(e) = runtime.execute_step(&scenario.steps[step_idx], &scenario.name).await {
+                                println!("❌ Step {} failed: {}", step_idx + 1, e);
+                                std::thread::sleep(std::time::Duration::from_secs(2));
+                                break;
+                            }
+                        }
+                        executed_steps = target_step;
+                        current_step = target_step;
+                        // Redraw after state change
+                        redraw_screen(scenario, runtime, current_step, executed_steps);
+                    }
+                }
+                // Reset to beginning
+                KeyCode::Char('r') => {
+                    executed_steps = 0;
+                    current_step = 0;
+                    if let Err(e) = reset_and_replay(scenario, runtime, 0).await {
+                        println!("❌ Failed to reset: {}", e);
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    }
+                    // Redraw after state change
+                    redraw_screen(scenario, runtime, current_step, executed_steps);
+                }
+                // Show detailed buffer info
+                KeyCode::Char('s') => {
+                    // Clear screen and show detailed buffer info
+                    let mut stdout = io::stdout();
+                    let _ = execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0));
+                    show_tui_buffer(runtime);
+                    println!("\nPress any key to continue...");
+                    let _ = event::read(); // Wait for any key
+                }
+                // Show detailed ViewModel info
+                KeyCode::Char('v') => {
+                    // Clear screen and show detailed ViewModel info
+                    let mut stdout = io::stdout();
+                    let _ = execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0));
+                    show_viewmodel_details(runtime);
+                    println!("\nPress any key to continue...");
+                    let _ = event::read(); // Wait for any key
+                }
+                // Quit
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    break;
+                }
+                // Jump to step (single digit for now)
+                KeyCode::Char(c) if c.is_ascii_digit() => {
+                    if let Ok(step_num) = c.to_string().parse::<usize>() {
                         if step_num <= scenario.steps.len() {
                             executed_steps = step_num;
                             current_step = step_num;
-                            reset_and_replay(scenario, runtime, step_num).await?;
-                            println!("⏭️  Jumped to step {}", step_num);
+                            if let Err(e) = reset_and_replay(scenario, runtime, step_num).await {
+                                println!("❌ Failed to jump: {}", e);
+                                std::thread::sleep(std::time::Duration::from_secs(2));
+                            }
+                            // Redraw after state change
+                            redraw_screen(scenario, runtime, current_step, executed_steps);
                         } else {
-                            println!("❌ Invalid step number: {}", step_num);
+                            println!("❌ Invalid step number: {} (max: {})", step_num, scenario.steps.len());
+                            std::thread::sleep(std::time::Duration::from_secs(2));
                         }
-                    } else {
-                        println!("❌ Invalid jump command. Use: j <number>");
                     }
-                } else if let Some(cmd) = input.strip_prefix("jump ") {
-                    if let Ok(step_num) = cmd.parse::<usize>() {
-                        if step_num <= scenario.steps.len() {
-                            executed_steps = step_num;
-                            current_step = step_num;
-                            reset_and_replay(scenario, runtime, step_num).await?;
-                            println!("⏭️  Jumped to step {}", step_num);
-                        } else {
-                            println!("❌ Invalid step number: {}", step_num);
-                        }
-                    } else {
-                        println!("❌ Invalid jump command. Use: jump <number>");
-                    }
-                } else {
-                    println!("❌ Unknown command: {}", input);
                 }
+                // Ignore other keys
+                _ => {}
             }
         }
+        Ok(())
+    }.await;
 
-        println!();
-    }
+    // Always cleanup terminal, even on error
+    cleanup_terminal();
 
-    Ok(())
+    result
 }
 
 /// Reset the runtime and replay steps up to the specified step
@@ -263,47 +340,17 @@ async fn reset_and_replay(
         .unwrap_or((80, 24));
 
     let client = Arc::new(MockClient::from_scenario_name(&scenario.name));
-    *runtime = TestRuntime::new(client, width, height);
+    *runtime = TestRuntime::new(client, width, height, false); // Replay doesn't update goldens
 
     // Reload initial data
     runtime.load_initial_data().await.map_err(|e| anyhow::anyhow!("Failed to load initial data: {}", e))?;
 
     // Replay steps up to the target
     for i in 0..up_to_step {
-        runtime.execute_step(&scenario.steps[i]).await.map_err(|e| anyhow::anyhow!("Failed to execute step {}: {}", i, e))?;
+        runtime.execute_step(&scenario.steps[i], &scenario.name).await.map_err(|e| anyhow::anyhow!("Failed to execute step {}: {}", i, e))?;
     }
 
     Ok(())
-}
-
-/// Show current state information
-fn show_current_state(
-    scenario: &Scenario,
-    runtime: &TestRuntime<MockClient>,
-    current_step: usize,
-    executed_steps: usize,
-    trace: bool,
-) {
-    println!("📊 Current State");
-    println!("===============");
-    println!("Step: {}/{} (executed: {})", current_step, scenario.steps.len(), executed_steps);
-
-    if current_step < scenario.steps.len() {
-        println!("Next: {}", describe_step(&scenario.steps[current_step]));
-    } else {
-        println!("Next: [END OF SCENARIO]");
-    }
-
-    // Show ViewModel summary
-    let vm = runtime.view_model();
-    println!("Focus: {}", vm.focus_string());
-    if let Some(selected) = vm.selected_item_name() {
-        println!("Selected: {}", selected);
-    }
-
-    if trace {
-        println!("Buffer size: {} chars", runtime.buffer_content().len());
-    }
 }
 
 /// Describe a step in human-readable format
@@ -338,6 +385,70 @@ fn show_tui_buffer(runtime: &TestRuntime<MockClient>) {
     }
 }
 
+/// Show the current TUI display (always visible in video player mode)
+fn show_tui_display(runtime: &TestRuntime<MockClient>) {
+    let buffer = runtime.buffer_content();
+    let mut stdout = io::stdout();
+
+    // Print each line at the correct position
+    for (row, line) in buffer.lines().enumerate() {
+        let _ = execute!(stdout, cursor::MoveTo(0, row as u16), crossterm::style::Print(line));
+    }
+
+    let _ = io::stdout().flush();
+}
+
+/// Show compact status information
+fn show_compact_status(
+    scenario: &Scenario,
+    runtime: &TestRuntime<MockClient>,
+    current_step: usize,
+    executed_steps: usize,
+) {
+    let vm = runtime.view_model();
+    let mut stdout = io::stdout();
+
+    // Single line status bar at line 24 (after 24-line TUI)
+    let next_desc = if current_step < scenario.steps.len() {
+        describe_step(&scenario.steps[current_step])
+    } else {
+        "[END OF SCENARIO]".to_string()
+    };
+
+    let task_info = if let Some(task) = vm.selected_task() {
+        let status = match &task.state {
+            TaskState::Merged { .. } => "Merged",
+            TaskState::Completed { .. } => "Completed",
+            TaskState::Active { .. } => "Active",
+            TaskState::Draft { .. } => "Draft",
+            TaskState::New { .. } => "New",
+        };
+        format!("Task: {} ({})", task.id, status)
+    } else {
+        "No task selected".to_string()
+    };
+
+    let status_line = format!("📊 Step {}/{} | {} | Next: {}",
+                             current_step, scenario.steps.len(), task_info, next_desc);
+    let _ = execute!(stdout, cursor::MoveTo(0, 24), crossterm::style::Print(&status_line));
+
+    // Loading/error status on next line if present
+    if vm.loading {
+        let status_line = "   Loading...";
+        let _ = execute!(stdout, cursor::MoveTo(0, 25), crossterm::style::Print(status_line));
+    } else if let Some(error) = &vm.error_message {
+        let status_line = format!("   Error: {}", error);
+        let _ = execute!(stdout, cursor::MoveTo(0, 25), crossterm::style::Print(&status_line));
+    }
+}
+
+/// Show keyboard shortcuts on a single line
+fn show_keyboard_shortcuts() {
+    let mut stdout = io::stdout();
+    let shortcuts = "🎮 n/→:next | b/←:prev | ↑:back 10 | ↓:forward 10 | r:reset | 0-9:jump | s:show | v:view | q:quit";
+    let _ = execute!(stdout, cursor::MoveTo(0, 26), crossterm::style::Print(shortcuts));
+}
+
 /// Show detailed ViewModel state
 fn show_viewmodel_details(runtime: &TestRuntime<MockClient>) {
     println!("🔍 ViewModel Details");
@@ -345,37 +456,26 @@ fn show_viewmodel_details(runtime: &TestRuntime<MockClient>) {
 
     let vm = runtime.view_model();
 
-    println!("Focus: {}", vm.focus_string());
-    println!("Editor Height: {}", vm.editor_height);
+    println!("Tasks: {}", vm.tasks.len());
+    println!("Selected Task Index: {}", vm.selected_task_index);
+    println!("Has Unsaved Draft: {}", vm.has_unsaved_draft);
     println!("Loading: {}", vm.loading);
+
     if let Some(error) = &vm.error_message {
         println!("Error: {}", error);
     }
 
     println!();
-    println!("Projects ({}):", vm.visible_projects.len());
-    for (i, project) in vm.visible_projects.iter().enumerate() {
-        let marker = if i == vm.selected_project { "▶" } else { " " };
-        println!("  {} {}", marker, project.display_name);
-    }
-
-    println!();
-    println!("Repositories ({}):", vm.visible_repositories.len());
-    for (i, repo) in vm.visible_repositories.iter().enumerate() {
-        let marker = if i == vm.selected_repository { "▶" } else { " " };
-        println!("  {} {}", marker, repo.display_name);
-    }
-
-    println!();
-    println!("Agents ({}):", vm.visible_agents.len());
-    for (i, agent) in vm.visible_agents.iter().enumerate() {
-        let marker = if i == vm.selected_agent { "▶" } else { " " };
-        println!("  {} {}", marker, agent.agent_type);
-    }
-
-    if !vm.task_description.is_empty() {
-        println!();
-        println!("Task Description:");
-        println!("  {}", vm.task_description.replace('\n', "\n  "));
+    println!("Task List:");
+    for (i, task) in vm.tasks.iter().enumerate() {
+        let marker = if i == vm.selected_task_index { "▶" } else { " " };
+        let status = match &task.state {
+            TaskState::Merged { .. } => "Merged",
+            TaskState::Completed { .. } => "Completed",
+            TaskState::Active { .. } => "Active",
+            TaskState::Draft { .. } => "Draft",
+            TaskState::New { .. } => "New",
+        };
+        println!("  {} {} - {}", marker, task.id, status);
     }
 }

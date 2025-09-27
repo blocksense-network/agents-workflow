@@ -31,13 +31,10 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
         // Build a default AppState via a lightweight path: reuse draw_dashboard with empty data
         let state = AppState::default();
         let view_model = ViewModel::from_state(&state);
-        aw_tui::ui::draw_dashboard(
+        aw_tui::ui::draw_task_dashboard(
             f,
             area,
             &view_model,
-            &mut project_state,
-            &mut branch_state,
-            &mut agent_state,
         );
     })?;
 
@@ -49,10 +46,9 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
         .collect::<String>();
 
     // Expect the static section titles to be present
-    assert!(all_text.contains("Project Filter"));
-    assert!(all_text.contains("Repository"));
-    assert!(all_text.contains("Agent"));
-    assert!(all_text.contains("Task Description"));
+    assert!(all_text.contains("Agent Harbor"));
+    assert!(all_text.contains("New Task"));
+    assert!(all_text.contains("Description"));
 
     Ok(())
 }

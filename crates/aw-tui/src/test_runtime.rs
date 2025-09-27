@@ -10,6 +10,8 @@ use ratatui::{backend::TestBackend, Terminal};
 use std::sync::Arc;
 use tokio::time;
 
+use crate::golden::GoldenManager;
+
 use crate::{
     create_test_terminal,
     model::Model,
@@ -23,11 +25,12 @@ pub struct TestRuntime<C: ClientApi> {
     terminal: Terminal<TestBackend>,
     model: Model<C>,
     current_view_model: ViewModel,
+    golden_manager: GoldenManager,
 }
 
 impl<C: ClientApi> TestRuntime<C> {
     /// Create a new test runtime
-    pub fn new(client: Arc<C>, width: u16, height: u16) -> Self {
+    pub fn new(client: Arc<C>, width: u16, height: u16, update_goldens: bool) -> Self {
         let terminal = create_test_terminal(width, height);
         let model = Model::new(client);
 
@@ -38,6 +41,7 @@ impl<C: ClientApi> TestRuntime<C> {
             terminal,
             model,
             current_view_model,
+            golden_manager: GoldenManager::new(update_goldens),
         }
     }
 
@@ -45,7 +49,7 @@ impl<C: ClientApi> TestRuntime<C> {
     ///
     /// This is the core deterministic execution method that handles
     /// exactly one message and renders once.
-    pub async fn execute_step(&mut self, step: &Step) -> Result<(), String> {
+    pub async fn execute_step(&mut self, step: &Step, scenario_name: &str) -> Result<(), String> {
         match step {
             Step::AdvanceMs { ms } => {
                 // Advance fake time
@@ -65,10 +69,11 @@ impl<C: ClientApi> TestRuntime<C> {
                 // Run ViewModel assertion
                 self.assert_view_model(focus, *selected)?;
             }
-            Step::Snapshot { name: _ } => {
-                // Take snapshot (implemented later)
-                // For now, just render to ensure consistency
-                self.render()?;
+            Step::Snapshot { name } => {
+                // Take golden and compare with golden file
+                let buffer_content = self.buffer_content();
+                self.golden_manager.compare_golden(&scenario_name, name, &buffer_content)?;
+                self.render()?; // Still render for consistency
             }
         }
 
@@ -84,6 +89,8 @@ impl<C: ClientApi> TestRuntime<C> {
     /// Load initial data (projects, repos, agents)
     pub async fn load_initial_data(&mut self) -> Result<(), String> {
         self.model.load_initial_data().await?;
+        // Add the new task at the end like AppState::default() does
+        self.model.state.tasks.push(crate::task::Task::new());
         self.current_view_model = ViewModel::from_state(&self.model.state);
         self.render()?;
         Ok(())
@@ -96,13 +103,21 @@ impl<C: ClientApi> TestRuntime<C> {
 
     /// Get the terminal buffer as a string for snapshot comparisons
     pub fn buffer_content(&self) -> String {
-        self.terminal
-            .backend()
-            .buffer()
-            .content()
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect()
+        let buffer = self.terminal.backend().buffer();
+        let area = buffer.area();
+        let mut result = String::new();
+
+        for y in 0..area.height {
+            for x in 0..area.width {
+                let cell = buffer.get(x, y);
+                result.push_str(cell.symbol());
+            }
+            if y < area.height - 1 {
+                result.push('\n');
+            }
+        }
+
+        result
     }
 
     /// Assert ViewModel state
@@ -110,7 +125,7 @@ impl<C: ClientApi> TestRuntime<C> {
         let vm = &self.current_view_model;
 
         // Check focus
-        let actual_focus = vm.focus_string();
+        let actual_focus = "tasks"; // In the new design, we only have tasks
         if actual_focus != expected_focus {
             return Err(format!(
                 "Focus assertion failed: expected '{}', got '{}'",
@@ -121,15 +136,14 @@ impl<C: ClientApi> TestRuntime<C> {
         // Check selection if specified
         if let Some(expected_idx) = expected_selected {
             let actual_selected = match expected_focus {
-                "projects" => vm.selected_project,
-                "repositories" => vm.selected_repository,
-                "agents" => vm.selected_agent,
+                "tasks" => vm.selected_task_index as i64,
                 _ => {
                     return Err(format!("Cannot check selection for focus '{}'", expected_focus));
                 }
             };
 
-            if actual_selected != expected_idx {
+
+            if actual_selected != expected_idx as i64 {
                 return Err(format!(
                     "Selection assertion failed for {}: expected {}, got {}",
                     expected_focus, expected_idx, actual_selected
@@ -171,7 +185,7 @@ impl<C: ClientApi> TestRuntime<C> {
                 let mut branch_state = ratatui::widgets::ListState::default();
                 let mut agent_state = ratatui::widgets::ListState::default();
 
-                ui::draw_dashboard(f, area, &self.current_view_model, &mut project_state, &mut branch_state, &mut agent_state);
+                ui::draw_task_dashboard(f, area, &self.current_view_model);
             })
             .map_err(|e| format!("Render error: {}", e))?;
 
@@ -183,6 +197,7 @@ impl<C: ClientApi> TestRuntime<C> {
 pub async fn execute_scenario<C: ClientApi>(
     client: Arc<C>,
     scenario: &Scenario,
+    update_goldens: bool,
 ) -> Result<(), String> {
     // Set up fake time
     time::pause();
@@ -193,14 +208,14 @@ pub async fn execute_scenario<C: ClientApi>(
         .map(|t| (t.width.unwrap_or(80), t.height.unwrap_or(24)))
         .unwrap_or((80, 24));
 
-    let mut runtime = TestRuntime::new(client, width, height);
+    let mut runtime = TestRuntime::new(client, width, height, update_goldens);
 
     // Load initial data
     runtime.load_initial_data().await?;
 
     // Execute each step
     for step in &scenario.steps {
-        runtime.execute_step(step).await?;
+        runtime.execute_step(step, &scenario.name).await?;
     }
 
     Ok(())
