@@ -244,6 +244,9 @@
         (pkgs.nodePackages.prettier)
         pkgs.shfmt
 
+        # OpenSSL development libraries for Rust crates
+        pkgs.openssl.dev
+
         # not available in the currently pinned older nixpkgs:
         # pkgs.taplo # TOML formatter and validator
         # pkgs.nodePackages."ajv-cli" # JSON Schema validator

@@ -185,7 +185,7 @@ impl<C: ClientApi> TestRuntime<C> {
                 let mut branch_state = ratatui::widgets::ListState::default();
                 let mut agent_state = ratatui::widgets::ListState::default();
 
-                ui::draw_task_dashboard(f, area, &self.current_view_model);
+                ui::draw_task_dashboard(f, area, &self.current_view_model, None, None);
             })
             .map_err(|e| format!("Render error: {}", e))?;
 

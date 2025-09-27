@@ -6,6 +6,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph},
 };
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 
 use crate::viewmodel::ViewModel;
 use crate::task::{Task, TaskState};
@@ -78,7 +79,7 @@ impl Theme {
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(self.border))
             .padding(Padding::new(2, 2, 1, 1))
-            .style(Style::default().bg(self.surface))
+            .style(Style::default().bg(self.bg))
     }
 
     /// Style for focused elements
@@ -206,7 +207,13 @@ fn draw_task_editor(f: &mut ratatui::Frame, area: Rect, description: &str, is_fo
 }
 
 /// Draw the new task-centric dashboard with Charm-inspired theming
-pub fn draw_task_dashboard(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel) {
+pub fn draw_task_dashboard(
+    f: &mut ratatui::Frame,
+    area: Rect,
+    view_model: &ViewModel,
+    image_picker: Option<&mut Picker>,
+    logo_protocol: Option<&mut StatefulProtocol>,
+) {
     let theme = Theme::default();
 
     // Background fill with theme color
@@ -216,24 +223,67 @@ pub fn draw_task_dashboard(f: &mut ratatui::Frame, area: Rect, view_model: &View
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header (smaller, left-aligned)
-            Constraint::Min(1),      // Previous tasks (takes remaining space)
+            Constraint::Length(9),  // Header with logo (10% larger for better visibility)
+            Constraint::Min(1),     // Previous tasks (takes remaining space)
             Constraint::Length(6),  // New task entry area at bottom
             Constraint::Length(1),  // Footer with shortcuts (single line, no borders)
         ])
         .split(area);
 
     // Draw header (smaller, left-aligned)
-    draw_header(f, chunks[0], &theme);
+    draw_header(f, chunks[0], &theme, image_picker, logo_protocol);
+
+    // Add left/right padding to content areas (2 columns each side)
+    let previous_tasks_padded = if chunks[1].width >= 6 {
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),  // Left padding
+                Constraint::Min(1),     // Content area
+                Constraint::Length(2),  // Right padding
+            ])
+            .split(chunks[1]);
+        horizontal_chunks[1]
+    } else {
+        chunks[1]
+    };
+
+    let new_task_padded = if chunks[2].width >= 6 {
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),  // Left padding
+                Constraint::Min(1),     // Content area
+                Constraint::Length(2),  // Right padding
+            ])
+            .split(chunks[2]);
+        horizontal_chunks[1]
+    } else {
+        chunks[2]
+    };
+
+    let footer_padded = if chunks[3].width >= 6 {
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),  // Left padding
+                Constraint::Min(1),     // Content area
+                Constraint::Length(2),  // Right padding
+            ])
+            .split(chunks[3]);
+        horizontal_chunks[1]
+    } else {
+        chunks[3]
+    };
 
     // Draw previous tasks (excluding new task)
-    draw_previous_tasks(f, chunks[1], view_model, &theme);
+    draw_previous_tasks(f, previous_tasks_padded, view_model, &theme);
 
     // Draw new task entry at bottom
-    draw_new_task_entry(f, chunks[2], view_model, &theme);
+    draw_new_task_entry(f, new_task_padded, view_model, &theme);
 
     // Draw footer with shortcuts (single line like Lazygit)
-    draw_task_footer(f, chunks[3], view_model, &theme);
+    draw_task_footer(f, footer_padded, view_model, &theme);
 
     // Draw modal if active
     if let Some(selected_task) = view_model.selected_task() {
@@ -243,19 +293,76 @@ pub fn draw_task_dashboard(f: &mut ratatui::Frame, area: Rect, view_model: &View
     }
 }
 
+
 /// Draw the header (smaller, left-aligned)
-fn draw_header(f: &mut ratatui::Frame, area: Rect, theme: &Theme) {
-    let logo_text = Line::from(vec![
-        Span::raw("").fg(theme.primary),
-        Span::raw(" Agent Harbor ").style(Style::default().fg(theme.text).add_modifier(Modifier::BOLD)),
-        Span::raw("").fg(theme.primary),
-    ]);
+fn draw_header(
+    f: &mut ratatui::Frame,
+    area: Rect,
+    theme: &Theme,
+    image_picker: Option<&mut Picker>,
+    logo_protocol: Option<&mut StatefulProtocol>,
+) {
+    // Create padded content area within the header
+    let content_area = if area.width >= 6 && area.height >= 4 {
+        // Add padding: 1 line top/bottom, 2 columns left/right
+        let vertical_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),  // Top padding
+                Constraint::Min(1),     // Content area
+                Constraint::Length(1),  // Bottom padding
+            ])
+            .split(area);
 
-    let paragraph = Paragraph::new(logo_text)
-        .alignment(ratatui::layout::Alignment::Left)
-        .style(Style::default());
+        let middle_area = vertical_chunks[1];
 
-    f.render_widget(paragraph, area);
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),  // Left padding
+                Constraint::Min(1),     // Content area
+                Constraint::Length(2),  // Right padding
+            ])
+            .split(middle_area);
+
+        horizontal_chunks[1]
+    } else {
+        // If area is too small, use the full area (no padding)
+        area
+    };
+
+    // Try to render the logo as an image first
+    if let Some(protocol) = logo_protocol {
+        // Render the logo image using StatefulImage widget in the padded area
+        let image_widget = StatefulImage::default();
+        f.render_stateful_widget(image_widget, content_area, protocol);
+
+        // Check for encoding errors and log them (don't fail the whole UI)
+        if let Some(Err(e)) = protocol.last_encoding_result() {
+            // If image rendering fails, fall through to ASCII
+            tracing::warn!("Image logo rendering failed: {}", e);
+        } else {
+            // Image rendered successfully, we're done
+            return;
+        }
+    }
+
+    // Fallback to ASCII logo
+    let ascii_logo = generate_ascii_logo();
+
+    // Limit to available content area height
+    let mut lines = Vec::new();
+    for (i, line) in ascii_logo.iter().enumerate() {
+        if i >= content_area.height as usize {
+            break;
+        }
+        lines.push(line.clone());
+    }
+
+    let paragraph = Paragraph::new(lines)
+        .alignment(ratatui::layout::Alignment::Left);
+
+    f.render_widget(paragraph, content_area);
 }
 
 /// Draw modal dialogs with Charm styling

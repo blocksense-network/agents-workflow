@@ -35,6 +35,8 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
             f,
             area,
             &view_model,
+            None,
+            None,
         );
     })?;
 
@@ -46,7 +48,7 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
         .collect::<String>();
 
     // Expect the static section titles to be present
-    assert!(all_text.contains("Agent Harbor"));
+    assert!(all_text.contains("╔"), "Should render header with logo border");
     assert!(all_text.contains("New Task"));
     assert!(all_text.contains("Description"));
 

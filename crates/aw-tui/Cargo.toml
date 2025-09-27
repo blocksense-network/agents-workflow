@@ -12,8 +12,8 @@ aw-rest-client = { path = "../aw-rest-client" }
 aw-test-scenarios = { path = "../aw-test-scenarios" }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tokio-util = "0.7"
-ratatui = "0.26"
-crossterm = "0.27"
+ratatui = "0.29"
+crossterm = "0.28"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -25,6 +25,8 @@ unicode-width = "0.1"
 clap = { workspace = true, features = ["derive"] }
 ratatui-textarea = "0.3"
 similar = "2.5"
+ratatui-image = { version = "8", features = ["crossterm"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1,24 +1,24 @@
- Agent Harbor                                                                 
                                                                                 
+  ╔═══════════════════════════════════════════════════════════════════════════  
+  ║                                                                             
+  ║                           █████╗  ██████╗ ███████╗███╗   ██╗████████╗       
+  ║                          ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝       
+  ║                          ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║          
+  ║                          ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║          
+  ║                          ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║          
                                                                                 
-╭┤ Refactor database schema for better performance ├───────────────────────────╮
-│ ● Refactor database schema for better performance                            │
-│ Running tests [45/67 tests passed]                                           │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭┤ Add error handling for network timeouts ├───────────────────────────────────╮
-│ ✓ Add error handling for network timeouts                                    │
-│ Ready for review • 2h ago                                                    │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭┤ Update documentation for new API endpoints ├────────────────────────────────╮
-│ ● Update documentation for new API endpoints                                 │
-│ Merged 1d ago                                                                │
-╰──────────────────────────────────────────────────────────────────────────────╯
-                                                                                
-                                                                                
-╭┤ New Task ├──────────────────────────────────────────────────────────────────╮
-│                                                                              │
-│  ┌─ Description ───────────────────────────────────────────────────────────  │
-│  │ Enter task description...                                              │  │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
-↑↓ Navigate • Enter Select Task • Ctrl+C x2 Quit                                
+  ╭┤ Refactor database schema for better performance ├───────────────────────╮  
+  │ ● Refactor database schema for better performance                        │  
+  │ Running tests [45/67 tests passed]                                       │  
+  ╰──────────────────────────────────────────────────────────────────────────╯  
+  ╭┤ Add error handling for network timeouts ├───────────────────────────────╮  
+  │ ✓ Add error handling for network timeouts                                │  
+  │ Ready for review • 2h ago                                                │  
+  ╰──────────────────────────────────────────────────────────────────────────╯  
+  ╭┤ New Task ├──────────────────────────────────────────────────────────────╮  
+  │                                                                          │  
+  │  ┌─ Description ───────────────────────────────────────────────────────  │  
+  │  │ Enter task description...                                             │  
+  │                                                                          │  
+  ╰──────────────────────────────────────────────────────────────────────────╯  
+  ↑↓ Navigate • Enter Select Task • Ctrl+C x2 Quit                              

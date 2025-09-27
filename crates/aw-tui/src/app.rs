@@ -17,6 +17,9 @@ use crate::error::TuiResult;
 use crate::event::{Event, EventHandler};
 use crate::task::{Task, TaskState};
 use crate::ui;
+use ratatui_image::picker::Picker;
+use ratatui_image::protocol::StatefulProtocol;
+use image::ImageReader;
 
 /// Application state
 #[derive(Debug)]
@@ -67,6 +70,8 @@ pub struct App {
     event_handler: EventHandler,
     rest_client: Option<RestClient>,
     state: Mutex<AppState>,
+    image_picker: Option<Picker>,
+    logo_protocol: Option<StatefulProtocol>,
 }
 
 impl App {
@@ -81,12 +86,49 @@ impl App {
 
         let event_handler = EventHandler::new();
 
+        // Initialize image picker and logo protocol for logo rendering
+        let (image_picker, logo_protocol) = Self::initialize_logo_rendering();
+
         Ok(Self {
             terminal,
             event_handler,
             rest_client,
             state: Mutex::new(AppState::default()),
+            image_picker,
+            logo_protocol,
         })
+    }
+
+    /// Initialize logo rendering components (Picker and StatefulProtocol)
+    fn initialize_logo_rendering() -> (Option<Picker>, Option<StatefulProtocol>) {
+        // Try to create a picker that detects terminal graphics capabilities
+        let picker = match Picker::from_query_stdio() {
+            Ok(picker) => Some(picker),
+            Err(_) => {
+                // If we can't detect terminal capabilities, try with default font size
+                // This allows for basic image processing
+                Some(Picker::from_fontsize((8, 16)))
+            }
+        };
+
+        // Try to load and encode the logo image
+        let logo_protocol = if let Some(ref picker) = picker {
+            // Try to load the PNG logo
+            match ImageReader::open("assets/agent-harbor-logo.png") {
+                Ok(reader) => match reader.decode() {
+                    Ok(img) => {
+                        // Create a resize protocol that fits the image appropriately
+                        Some(picker.new_resize_protocol(img))
+                    }
+                    Err(_) => None,
+                },
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+
+        (picker, logo_protocol)
     }
 
     /// Load initial data from REST API
@@ -123,7 +165,7 @@ impl App {
                     // Create ViewModel from current state
                     let view_model = crate::ViewModel::from_state(&state);
 
-                    ui::draw_task_dashboard(f, size, &view_model);
+                    ui::draw_task_dashboard(f, size, &view_model, self.image_picker.as_mut(), self.logo_protocol.as_mut());
                 }
             })?;
 
