@@ -16,45 +16,92 @@ Backends:
   - Split panes: right = agent activity, left = terminal or configured editor in the workspace.
   - Devcontainer runs: panes are inside the container context.
 
-### Simplified Dashboard Layout
+### Simplified Task-Centric Layout
 
-The main TUI dashboard focuses on quick launch:
+The main TUI interface focuses on recent tasks and quick creation:
 
-- Top area: selectors for Project, Branch, Agent (fixed-height lists with filter input and arrow-key navigation).
-- Bottom area: task description editor (multiline input) with resizable height.
-- A single Start action (hotkey + button) to launch the task, which creates a new multiplexer window immediately.
+- **Header**: Compact 3-line header with "Agent Harbor" title (left-aligned with Charm-style powerline design).
+- **Previous Tasks**: List of completed, active, merged, and draft tasks displayed as bordered cards (4 lines each) above the new task area.
+- **New Task Entry**: Dedicated card at bottom with expandable text area and button-based selectors.
 
-Footer (dynamic shortcuts):
+#### Task States
 
-- A single-line footer shows context-sensitive shortcuts relevant to the current screen or prompt.
-- While an interactive prompt is active (e.g., repository/workspace/branch selection), the footer MUST include “Esc Back” and “Ctrl+C Abort” to signal safe navigation and abort of the current action; on the dashboard (no modal/prompt), it MUST include “Ctrl+C Ctrl+C Quit”. Shortcuts only appear when actionable.
+Tasks display in five different states:
 
-### Selectors and Filtering
+- **Merged**: 1-line bordered card showing task title, merge status, and timestamp with visual separator.
+- **Completed**: 4-line bordered card showing task title, completion status, result details, and timestamp.
+- **Active**: 4-line bordered card showing task title, current action, progress details, and live status.
+- **Draft**: 4-line bordered card showing task title, description preview, draft status, and timestamp.
+- **New Task**: Interactive card at bottom with expandable text area and repository/branch/model button selectors.
 
-- Fixed-height list widgets for Project, Branch, and Agent.
-- Each list includes:
-  - A text input to filter entries (prefix/substring), updated as you type.
-  - Arrow keys/PageUp/PageDown/Home/End navigation within the fixed-height viewport.
-  - Enter selects the highlighted entry.
-- Branch source:
-  - Local mode: standard git commands against the local repo (e.g., `git for-each-ref`), cached with debounce.
-  - REST mode: server capability endpoint backed by git protocol (`ls-remote`/refs) against admin-configured repository URLs.
-- Agent list: from local config or REST `/api/v1/agents`.
-- Project list:
-  - REST mode: admin-configured workspace/projects and repositories.
-  - Local mode: repositories previously used in agents-workflow (WebUI or CLI) with add/remove gestures available elsewhere in CLI.
+#### Previous Task Cards
 
-### Commands and Hotkeys (illustrative)
+Each previous task displays as a bordered card with Charm-inspired styling:
 
-- Tab/Shift+Tab: cycle between Project, Branch, Agent, Description.
-- Ctrl+F: focus filter input of the active list.
-- Ctrl+J/Ctrl+K or Arrow keys: navigate list items.
-- Ctrl+Up/Down: resize the description editor.
-- Enter in Description with modifier (e.g., Ctrl+Enter): Start task.
-- F1: Help overlay with keymap.
-- Esc: Go back to the previous window/view.
-- Ctrl+C: Abort the current prompt/action (safe abort), stay in TUI.
-- Ctrl+C (twice): Quit the TUI altogether from the dashboard or when no modal is active.
+- Rounded borders with proper padding
+- 4-line height maximizing information density
+- Status-appropriate icons and color coding
+- Visual separators between cards
+- Themed colors following Catppuccin Mocha palette
+
+#### New Task Card Details
+
+The new task card looks like a auto-expandable text area.
+
+At the bottom of the text area, there is a single line with buttons, which can be navigated to by pressing TAB or by clicking them with the mouse. When a button is activated/clicked, it display a modal dialog that looks like Telescope in vim - a fuzzy text entry, followed by matches that can be selected with the keyboard. The label of the button always matches the currently selected item.
+
+The following buttons are present:
+
+- **Repository Selector**: Telescope-like dialog selector to choose which repository to work in
+- **Branch Selector**: Telescope-like dialog to select the branch to work on
+- **Model Multi-Selector**: Telescope-like multi-select interface for choosing AI models with instance counts
+  - Left/Right arrows or +/- keys to increase/decrease instance count for selected model
+  - Multiple models can be selected with different instance counts
+- **Go Button**: Button with "⏎ Go" label to launch the task with selected configuration when activated/clicked.
+
+#### Footer (Lazygit-style)
+
+- **Single-line footer** without borders (like Lazygit) showing context-sensitive shortcuts
+- **Dashboard mode**: "↑↓ Navigate • Enter Select Task • Ctrl+C x2 Quit"
+- **Modal active**: "↑↓ Navigate • Enter Select • Esc Back • Ctrl+C Abort"
+- **Task creation**: "Tab Cycle Buttons • Enter Activate Button • Esc Back • Ctrl+C x2 Quit"
+
+### Task Management
+
+- Task list shows recent tasks ordered by recency (older near the top, newest near the bottom).
+- Each task displays with appropriate visual indicators for its state.
+- Active tasks show live streaming of agent activity.
+  This uses exactly 3 lines, showing the 2 or 3 most recent actions of the agent.
+  When the action is a though, it takes a single line - a description of the thought.
+  When the action is a file edit, it takes a single line - the name of the edited file (plus a number of added and deleted lines, similar to git git)
+  When the action is tool use, it takes two lines - the name of the launched tool and the currently last line in the output of the tool. When the tool completes, it is collapsed to a single line which is just the name of the tool use with a visual indicator for success/failure of the command (e.g. `make test` failed with a non-zero exit).
+- Draft tasks are saved locally and can be resumed later.
+- New task input supports multiline editing with Shift+Enter for line breaks.
+- The default values for project/branch/agent are the last ones being used.
+
+### Commands and Hotkeys
+
+#### Global Navigation
+- **↑↓**: Navigate between sections (previous tasks and new task entry)
+- **Ctrl+C** (twice): Quit the TUI
+
+#### Task Creation Interface
+- **Tab/Shift+Tab**: Cycle between buttons (Description, Repository, Branch, Models, Go)
+- **Enter**: Activate focused button or select item in modal
+- **Esc**: Close modal or go back; Go back to text area when the buttons are selected.
+- **Type directly**: Enter text in description area when focused
+
+#### Modal Navigation (Telescope-style)
+- **↑↓**: Navigate through options in fuzzy search
+- **Enter**: Select current item
+- **Esc**: Close modal
+- **Left/Right** or **+/-**: Adjust model instance counts in model selection
+
+#### Text Input
+- **Any key**: Type in description area when focused
+- **Backspace**: Delete characters
+- **Enter**: Activate buttons (not for newlines in description)
+- **Auto-complete menu**: When certain characters like / or @ are entered in the text area, the UI shows auto-completion menu with dynamically populated choices (@ is used for citing files, / is used to select workflows, etc).
 
 ### Error Handling and Status
 
@@ -68,7 +115,41 @@ Footer (dynamic shortcuts):
 ### Persistence
 
 - Last selections (project, agent, branch) are remembered per repo/user scope via the configuration layer.
+- Selected theme preference is persisted across sessions.
+
+### Visual Design & Theming
+
+#### Charm-Inspired Aesthetics
+
+The TUI follows Charm (Bubble Tea/Lip Gloss) design principles with multiple theme options:
+
+- **Default Theme**: Catppuccin Mocha - Dark theme with cohesive colors
+  - Background: `#11111B`
+  - Surface/Card backgrounds: `#242437`
+  - Text: `#CDD6F4`
+  - Primary: `#89B4FA` (blue for actions)
+  - Accent: `#A6E3A1` (green for success)
+  - Muted: `#7F849C` (secondary text)
+- **Multiple Theme Support**: Users can choose from various themes including:
+  - Catppuccin variants (Latte, Frappe, Macchiato, Mocha)
+  - Other popular dark themes (Nord, Dracula, Solarized Dark, etc.)
+  - High contrast accessibility theme
+- **Rounded borders**: `BorderType::Rounded` on all cards and components
+- **Proper padding**: Generous spacing with `Padding::new()` for breathing room
+- **Powerline-style titles**: ` Title ` glyphs for card headers
+- **Truecolor support**: 24-bit RGB colors for rich visual experience
+
+#### Component Styling
+
+- **Cards**: Rounded borders, themed backgrounds, proper padding
+- **Buttons**: Background color changes on focus, bold text
+- **Modals**: Shadow effects, centered positioning, fuzzy search interface
+- **Status indicators**: Color-coded icons (✓ completed, ● active, 📝 draft)
 
 ### Accessibility
 
-- High-contrast theme option; full keyboard operation; predictable focus order.
+- **Theme Selection**: Multiple themes including high-contrast accessibility theme
+- **High-contrast theme option**: Enhanced contrast ratios for better visibility
+- **Full keyboard operation**: All features accessible without mouse
+- **Predictable focus order**: Logical tab navigation through all interactive elements
+- **Charm theming**: Provides excellent contrast ratios and visual hierarchy

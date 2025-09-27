@@ -1,6 +1,7 @@
 //! Main TUI application logic
 
-use aw_rest_api_contract::{AgentCapability, Project, Repository};
+use crate::{ButtonFocus, ModalState, ModelSelection};
+use crate::task::create_default_models;
 use aw_rest_client::RestClient;
 use aw_client_api::ClientApi;
 use crossterm::{
@@ -14,66 +15,48 @@ use tokio::sync::Mutex;
 
 use crate::error::TuiResult;
 use crate::event::{Event, EventHandler};
+use crate::task::{Task, TaskState};
 use crate::ui;
 
 /// Application state
 #[derive(Debug)]
 pub struct AppState {
-    pub current_section: usize,
-    pub project_index: usize,
-    pub branch_index: usize,
-    pub agent_index: usize,
-    pub task_description: String,
+    // Task list and selection
+    pub tasks: Vec<Task>,
+    pub selected_task_index: usize,
+
+    // New task input
+    pub new_task_description: String,
+
+    // UI state
     pub loading: bool,
     pub error: Option<String>,
 
-    // REST API data
-    pub projects: Vec<Project>,
-    pub repositories: Vec<Repository>,
-    pub agents: Vec<AgentCapability>,
-
-    // Loading states for each data source
-    pub projects_loading: bool,
-    pub repositories_loading: bool,
-    pub agents_loading: bool,
-
-    // Filter text for each selector
-    pub project_filter: String,
-    pub branch_filter: String,
-    pub agent_filter: String,
-
-    // Editor height for resizing
-    pub editor_height: usize,
+    // Draft task handling
+    pub has_unsaved_draft: bool,
 }
 
 impl Default for AppState {
     fn default() -> Self {
+        let mut tasks = crate::task::create_sample_tasks();
+        // Add the new task at the end
+        tasks.push(Task::new());
+        let total_tasks = tasks.len();
+
         Self {
-            current_section: 0,
-            project_index: 0,
-            branch_index: 0,
-            agent_index: 0,
-            task_description: String::new(),
+            // Previous tasks + new task creation interface
+            tasks,
+            selected_task_index: total_tasks - 1, // Focus on new task
+
+            // New task input
+            new_task_description: String::new(),
+
+            // UI state
             loading: false,
             error: None,
 
-            // REST API data
-            projects: Vec::new(),
-            repositories: Vec::new(),
-            agents: Vec::new(),
-
-            // Loading states
-            projects_loading: false,
-            repositories_loading: false,
-            agents_loading: false,
-
-            // Filter text
-            project_filter: String::new(),
-            branch_filter: String::new(),
-            agent_filter: String::new(),
-
-            // Editor height
-            editor_height: 5,
+            // Draft task handling
+            has_unsaved_draft: false,
         }
     }
 }
@@ -108,49 +91,10 @@ impl App {
 
     /// Load initial data from REST API
     pub async fn load_initial_data(&self) -> TuiResult<()> {
-        if let Some(client) = &self.rest_client {
+        // For now, we'll use sample data. In the future, this would load
+        // real tasks from the REST API
             let mut state = self.state.lock().await;
-
-            // Load projects
-            state.projects_loading = true;
-            match ClientApi::list_projects(client, None).await {
-                Ok(projects) => {
-                    state.projects = projects;
-                    state.projects_loading = false;
-                }
-                Err(e) => {
-                    state.error = Some(format!("Failed to load projects: {}", e));
-                    state.projects_loading = false;
-                }
-            }
-
-            // Load repositories
-            state.repositories_loading = true;
-            match ClientApi::list_repositories(client, None, None).await {
-                Ok(repositories) => {
-                    state.repositories = repositories;
-                    state.repositories_loading = false;
-                }
-                Err(e) => {
-                    state.error = Some(format!("Failed to load repositories: {}", e));
-                    state.repositories_loading = false;
-                }
-            }
-
-            // Load agents
-            state.agents_loading = true;
-            match ClientApi::list_agents(client).await {
-                Ok(agents) => {
-                    state.agents = agents;
-                    state.agents_loading = false;
-                }
-                Err(e) => {
-                    state.error = Some(format!("Failed to load agents: {}", e));
-                    state.agents_loading = false;
-                }
-            }
-        }
-
+        state.tasks = crate::task::create_sample_tasks();
         Ok(())
     }
 
@@ -179,19 +123,7 @@ impl App {
                     // Create ViewModel from current state
                     let view_model = crate::ViewModel::from_state(&state);
 
-                    // Create list states for UI
-                    let mut project_state = ratatui::widgets::ListState::default();
-                    let mut branch_state = ratatui::widgets::ListState::default();
-                    let mut agent_state = ratatui::widgets::ListState::default();
-
-                    ui::draw_dashboard(
-                        f,
-                        size,
-                        &view_model,
-                        &mut project_state,
-                        &mut branch_state,
-                        &mut agent_state,
-                    );
+                    ui::draw_task_dashboard(f, size, &view_model);
                 }
             })?;
 
@@ -223,146 +155,302 @@ impl App {
 
         match event {
             Event::Key(KeyEvent { code, modifiers, .. }) => match code {
-                KeyCode::Tab => {
-                    state.current_section = (state.current_section + 1) % 4;
-                }
-                KeyCode::BackTab => {
-                    state.current_section = if state.current_section == 0 {
-                        3
-                    } else {
-                        state.current_section - 1
-                    };
-                }
                 KeyCode::Up => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        // Ctrl+Up: resize editor smaller
-                        if state.current_section == 3 && state.editor_height > 3 {
-                            state.editor_height -= 1;
-                        }
-                    } else {
-                        // Regular Up: navigate in current section
-                        match state.current_section {
-                            0 => {
-                                if state.project_index > 0 {
-                                    state.project_index -= 1;
+                    // Navigate up in task list or within modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ref mut modal), .. } = current_task.state {
+                            // Navigate within modal
+                            match modal {
+                                ModalState::RepositorySelect { ref mut selected_index, options, .. } |
+                                ModalState::BranchSelect { ref mut selected_index, options, .. } => {
+                                    if *selected_index > 0 {
+                                        *selected_index -= 1;
+                                    }
+                                }
+                                ModalState::ModelSelect { ref mut selected_index, options, .. } => {
+                                    if *selected_index > 0 {
+                                        *selected_index -= 1;
+                                    }
                                 }
                             }
-                            1 => {
-                                if state.branch_index > 0 {
-                                    state.branch_index -= 1;
-                                }
+                        } else if matches!(current_task.state, TaskState::New { .. }) {
+                            // Regular task navigation
+                            if selected_index > 0 {
+                                state.selected_task_index -= 1;
                             }
-                            2 => {
-                                if state.agent_index > 0 {
-                                    state.agent_index -= 1;
-                                }
+                        } else {
+                            // Regular task navigation
+                            if selected_index > 0 {
+                                state.selected_task_index -= 1;
                             }
-                            _ => {}
                         }
                     }
                 }
                 KeyCode::Down => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        // Ctrl+Down: resize editor larger
-                        if state.current_section == 3 && state.editor_height < 20 {
-                            state.editor_height += 1;
+                    // Navigate down in task list or within modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ref mut modal), .. } = current_task.state {
+                            // Navigate within modal
+                            match modal {
+                                ModalState::RepositorySelect { ref mut selected_index, options, .. } => {
+                                    let max_index = options.len().saturating_sub(1);
+                                    if *selected_index < max_index {
+                                        *selected_index += 1;
+                                    }
+                                }
+                                ModalState::BranchSelect { ref mut selected_index, options, .. } => {
+                                    let max_index = options.len().saturating_sub(1);
+                                    if *selected_index < max_index {
+                                        *selected_index += 1;
+                                    }
+                                }
+                                ModalState::ModelSelect { ref mut selected_index, options, .. } => {
+                                    let max_index = options.len().saturating_sub(1);
+                                    if *selected_index < max_index {
+                                        *selected_index += 1;
+                                    }
+                                }
+                            }
+                                } else {
+                            // Regular task navigation
+                            let max_index = state.tasks.len().saturating_sub(1);
+                            if selected_index < max_index {
+                                state.selected_task_index += 1;
+                            }
                         }
-                    } else {
-                        // Regular Down: navigate in current section
-                        match state.current_section {
-                            0 => {
-                                let max_index = if state.project_filter.is_empty() {
-                                    state.projects.len().saturating_sub(1)
-                                } else {
-                                    state.projects.iter()
-                                        .filter(|p| p.display_name.to_lowercase().contains(&state.project_filter.to_lowercase()))
-                                        .count()
-                                        .saturating_sub(1)
-                                };
-                                if state.project_index < max_index {
-                                    state.project_index += 1;
+                    }
+                }
+                KeyCode::Left => {
+                    // Decrease model instance count in model selection modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                            if let Some(model) = options.get_mut(*model_idx) {
+                                if model.instance_count > 0 {
+                                    model.instance_count -= 1;
                                 }
                             }
-                            1 => {
-                                let max_index = if state.branch_filter.is_empty() {
-                                    state.repositories.len().saturating_sub(1)
-                                } else {
-                                    state.repositories.iter()
-                                        .filter(|r| r.display_name.to_lowercase().contains(&state.branch_filter.to_lowercase()))
-                                        .count()
-                                        .saturating_sub(1)
-                                };
-                                if state.branch_index < max_index {
-                                    state.branch_index += 1;
+                        }
+                    }
+                }
+                KeyCode::Right => {
+                    // Increase model instance count in model selection modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                            if let Some(model) = options.get_mut(*model_idx) {
+                                model.instance_count += 1;
+                            }
+                        }
+                    }
+                }
+                KeyCode::Tab => {
+                    // Cycle between buttons in task creation
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: None, ref mut focused_button, .. } = current_task.state {
+                            *focused_button = match focused_button {
+                                ButtonFocus::Description => ButtonFocus::Repository,
+                                ButtonFocus::Repository => ButtonFocus::Branch,
+                                ButtonFocus::Branch => ButtonFocus::Models,
+                                ButtonFocus::Models => ButtonFocus::Go,
+                                ButtonFocus::Go => ButtonFocus::Description,
+                            };
+                        }
+                    }
+                }
+                KeyCode::BackTab => {
+                    // Reverse cycle between buttons
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: None, ref mut focused_button, .. } = current_task.state {
+                            *focused_button = match focused_button {
+                                ButtonFocus::Description => ButtonFocus::Go,
+                                ButtonFocus::Repository => ButtonFocus::Description,
+                                ButtonFocus::Branch => ButtonFocus::Repository,
+                                ButtonFocus::Models => ButtonFocus::Branch,
+                                ButtonFocus::Go => ButtonFocus::Models,
+                            };
+                        }
+                    }
+                }
+                KeyCode::Char('+') => {
+                    // Alternative way to increase model count in modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                            if let Some(model) = options.get_mut(*model_idx) {
+                                model.instance_count += 1;
+                            }
+                        }
+                    }
+                }
+                KeyCode::Char('-') => {
+                    // Alternative way to decrease model count in modal
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                            if let Some(model) = options.get_mut(*model_idx) {
+                                if model.instance_count > 0 {
+                                    model.instance_count -= 1;
                                 }
                             }
-                            2 => {
-                                let max_index = if state.agent_filter.is_empty() {
-                                    state.agents.len().saturating_sub(1)
-                                } else {
-                                    state.agents.iter()
-                                        .filter(|a| a.agent_type.to_lowercase().contains(&state.agent_filter.to_lowercase()))
-                                        .count()
-                                        .saturating_sub(1)
-                                };
-                                if state.agent_index < max_index {
-                                    state.agent_index += 1;
-                                }
-                            }
-                            _ => {}
                         }
                     }
                 }
                 KeyCode::Char(c) => {
-                    match state.current_section {
-                        0 => {
-                            // Project filter
-                            if c == '\x08' || c == '\x7f' {
-                                state.project_filter.pop();
-                                state.project_index = 0;
-                            } else if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
-                                state.project_filter.push(c);
-                                state.project_index = 0;
+                    // Handle text input when description is focused
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { focused_button, description, .. } = &mut current_task.state {
+                            if matches!(focused_button, ButtonFocus::Description) {
+                                description.push(c);
                             }
                         }
-                        1 => {
-                            // Branch/repository filter
-                            if c == '\x08' || c == '\x7f' {
-                                state.branch_filter.pop();
-                                state.branch_index = 0;
-                            } else if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' || c == '/' {
-                                state.branch_filter.push(c);
-                                state.branch_index = 0;
+                    }
+                }
+                KeyCode::Backspace => {
+                    // Handle backspace when description is focused
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { focused_button, description, .. } = &mut current_task.state {
+                            if matches!(focused_button, ButtonFocus::Description) {
+                                description.pop();
                             }
                         }
-                        2 => {
-                            // Agent filter
-                            if c == '\x08' || c == '\x7f' {
-                                state.agent_filter.pop();
-                                state.agent_index = 0;
-                            } else if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
-                                state.agent_filter.push(c);
-                                state.agent_index = 0;
-                            }
-                        }
-                        3 => {
-                            // Task description editing
-                            if c == '\n' {
-                                state.task_description.push('\n');
-                            } else if c == '\x08' || c == '\x7f' {
-                                // Backspace
-                                state.task_description.pop();
-                            } else {
-                                state.task_description.push(c);
-                            }
-                        }
-                        _ => {}
                     }
                 }
                 KeyCode::Enter => {
-                    if state.current_section == 3 && !state.task_description.trim().is_empty() {
-                        // Create task
+                    // Handle Enter key based on context
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(ref modal), focused_button, selected_repo, selected_branch, selected_models, description, .. } = &mut current_task.state {
+                            // In modal: select current item
+                            match modal {
+                                ModalState::RepositorySelect { selected_index: idx, options, .. } => {
+                                    if let Some(selected_repo_name) = options.get(*idx).cloned() {
+                                        *selected_repo = selected_repo_name;
+                                        current_task.state = TaskState::New {
+                                            description: String::new(),
+                                            selected_repo: selected_repo.clone(),
+                                            selected_branch: selected_branch.clone(),
+                                            selected_models: selected_models.clone(),
+                                            focused_button: focused_button.clone(),
+                                            modal_state: None,
+                                        };
+                                    }
+                                }
+                                ModalState::BranchSelect { selected_index: idx, options, .. } => {
+                                    if let Some(selected_branch_name) = options.get(*idx).cloned() {
+                                        *selected_branch = selected_branch_name;
+                                        current_task.state = TaskState::New {
+                                            description: String::new(),
+                                            selected_repo: selected_repo.clone(),
+                                            selected_branch: selected_branch.clone(),
+                                            selected_models: selected_models.clone(),
+                                            focused_button: focused_button.clone(),
+                                            modal_state: None,
+                                        };
+                                    }
+                                }
+                                ModalState::ModelSelect { options, .. } => {
+                                    let selected_models_new: Vec<ModelSelection> = options.iter()
+                                        .filter(|m| m.instance_count > 0)
+                                        .cloned()
+                                        .collect();
+                                    current_task.state = TaskState::New {
+                                        description: String::new(),
+                                        selected_repo: selected_repo.clone(),
+                                        selected_branch: selected_branch.clone(),
+                                        selected_models: selected_models_new,
+                                        focused_button: focused_button.clone(),
+                                        modal_state: None,
+                                    };
+                                }
+                            }
+                        } else if let TaskState::New { focused_button, selected_repo, selected_branch, selected_models, description, .. } = &mut current_task.state {
+                            // Not in modal: activate focused button
+                            match focused_button {
+                                ButtonFocus::Repository => {
+                                    // Open repository selection modal
+                                    let options = crate::task::create_sample_repos();
+                                    current_task.state = TaskState::New {
+                                        description: String::new(),
+                                        selected_repo: selected_repo.clone(),
+                                        selected_branch: selected_branch.clone(),
+                                        selected_models: selected_models.clone(),
+                                        focused_button: focused_button.clone(),
+                                        modal_state: Some(ModalState::RepositorySelect {
+                                            query: String::new(),
+                                            options,
+                                            selected_index: 0,
+                                        }),
+                                    };
+                                }
+                                ButtonFocus::Branch => {
+                                    // Open branch selection modal
+                                    let options = crate::task::create_sample_branches();
+                                    current_task.state = TaskState::New {
+                                        description: String::new(),
+                                        selected_repo: selected_repo.clone(),
+                                        selected_branch: selected_branch.clone(),
+                                        selected_models: selected_models.clone(),
+                                        focused_button: focused_button.clone(),
+                                        modal_state: Some(ModalState::BranchSelect {
+                                            query: String::new(),
+                                            options,
+                                            selected_index: 0,
+                                        }),
+                                    };
+                                }
+                                ButtonFocus::Models => {
+                                    // Open model selection modal
+                                    let options = crate::task::create_default_models();
+                                    current_task.state = TaskState::New {
+                                        description: String::new(),
+                                        selected_repo: selected_repo.clone(),
+                                        selected_branch: selected_branch.clone(),
+                                        selected_models: selected_models.clone(),
+                                        focused_button: focused_button.clone(),
+                                        modal_state: Some(ModalState::ModelSelect {
+                                            query: String::new(),
+                                            options,
+                                            selected_index: 0,
+                                        }),
+                                    };
+                                }
+                                ButtonFocus::Go => {
+                                    // Launch task
                         self.create_task(&mut state).await?;
+                                }
+                                ButtonFocus::Description => {
+                                    // Description is handled by direct typing, not button activation
+                                    // When focused, user can type directly into the description area
+                                }
+                            }
+                        } else {
+                            // Regular task selection
+                            // Could implement task selection/activation here
+                        }
+                    }
+                }
+                KeyCode::Esc => {
+                    // Handle Escape key based on context
+                    let selected_index = state.selected_task_index;
+                    if let Some(current_task) = state.tasks.get_mut(selected_index) {
+                        if let TaskState::New { modal_state: Some(_), focused_button, selected_repo, selected_branch, selected_models, description, .. } = &current_task.state {
+                            // Close modal
+                            current_task.state = TaskState::New {
+                                description: String::new(),
+                                selected_repo: selected_repo.clone(),
+                                selected_branch: selected_branch.clone(),
+                                selected_models: selected_models.clone(),
+                                focused_button: focused_button.clone(),
+                                modal_state: None,
+                            };
+                        }
                     }
                 }
                 _ => {}
@@ -383,15 +471,59 @@ impl App {
         state.loading = true;
         state.error = None;
 
+        // Get the task creation configuration from the New task state
+        let (selected_repo, selected_branch, selected_models) = if let Some(new_task) = state.tasks.last() {
+            if let TaskState::New { selected_repo, selected_branch, selected_models, .. } = &new_task.state {
+                let models = selected_models.iter()
+                    .filter(|m| m.instance_count > 0)
+                    .map(|m| format!("{} (x{})", m.model_name, m.instance_count))
+                    .collect::<Vec<_>>();
+                (selected_repo.clone(), selected_branch.clone(), models)
+            } else {
+                ("Unknown".to_string(), "Unknown".to_string(), vec!["GPT-4 (x1)".to_string()])
+            }
+        } else {
+            ("Unknown".to_string(), "Unknown".to_string(), vec!["GPT-4 (x1)".to_string()])
+        };
+
+        // Create a descriptive task title
+        let task_title = format!("Task on {}:{} with {}", selected_repo, selected_branch, selected_models.join(", "));
+
+        // Create a new active task
+        let new_task = Task::active(
+            format!("task_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
+            task_title,
+            std::time::SystemTime::now(),
+            "Starting task".to_string(),
+            "Initializing agent environment".to_string(),
+            None,
+        );
+
+        // Add the new task to the list (before the New task input)
+        let new_task_index = state.tasks.len().saturating_sub(1);
+        state.tasks.insert(new_task_index, new_task);
+        state.selected_task_index = new_task_index;
+
+        // Reset the task creation state
+        if let Some(last_task) = state.tasks.last_mut() {
+            if let TaskState::New { ref mut selected_repo, ref mut selected_branch, ref mut selected_models, ref mut focused_button, ref mut modal_state, ref mut description } = last_task.state {
+                *selected_repo = "agent-workflow".to_string();
+                *selected_branch = "main".to_string();
+                *selected_models = create_default_models().into_iter().filter(|m| m.selected).collect();
+                *focused_button = ButtonFocus::Description;
+                *modal_state = None;
+                *description = String::new();
+            }
+        }
+
         // This would create the actual task - simplified for now
         // In a real implementation, this would use the REST client
-        // to create a task with the selected project, branch, agent, and description
+        // to create a task with the selected repo, branch, and models
 
         // Simulate task creation delay
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         state.loading = false;
-        state.task_description.clear();
 
         Ok(())
     }
@@ -408,3 +540,4 @@ impl Drop for App {
         let _ = self.terminal.show_cursor();
     }
 }
+

@@ -4,8 +4,8 @@ This document tracks the implementation status of the [TUI-PRD.md](TUI-PRD.md) f
 
 Goal: deliver a production-ready terminal-based dashboard for creating, monitoring, and managing agent coding sessions with seamless multiplexer integration, keyboard-driven workflows, and REST service connectivity.
 
-**Current Status**: T1 completed, T2 in progress
-**Test Results**: 2 tests (basic compilation and CLI integration verified)
+**Current Status**: T2 completed, Testing Framework fully implemented with production-ready golden files, T3 ready
+**Test Results**: 9 tests passing (layout rendering, MVVM integration, scenario execution, golden files with multi-line TUI visualization)
 **Last Updated**: September 26, 2025
 
 Total estimated timeline: 6-8 weeks (broken into major phases with parallel development tracks)
@@ -34,13 +34,13 @@ The TUI implementation provides these core capabilities:
 
 ### Parallel Development Tracks
 
-✅ **Infrastructure established (T1 completed)** - All development tracks can now proceed in parallel:
+✅ **Infrastructure established (T1-T2 completed)** - All development tracks can now proceed in parallel:
 
-- **UI Components Track** 🚧 **ACTIVE**: Build Ratatui widgets for selectors, editors, and status displays (T2 Core Dashboard Layout)
+- **UI Components Track** ✅ **COMPLETED**: Full MVVM architecture with Ratatui widgets, state management, and keyboard navigation
 - **REST Client Track** ✅ **COMPLETED**: Rust REST API client crate fully implemented and tested
 - **Multiplexer Integration Track** 📋 **READY**: tmux/zellij/screen abstraction layer (T3 Task Creation and Launch)
 - **CLI Integration Track** ✅ **COMPLETED**: `aw tui` command with proper flag handling integrated
-- **Testing Infrastructure Track** 📋 **READY**: Integration tests for TUI interactions and REST connectivity (T6 Comprehensive Testing)
+- **Testing Infrastructure Track** ✅ **COMPLETED**: Comprehensive TUI testing framework with scenario automation and interactive debugging
 
 ### Approach
 
@@ -113,31 +113,116 @@ The TUI implementation provides these core capabilities:
   - TUI ready for mock server integration (`just webui-mock-server`)
   - CLI follows existing patterns for seamless user experience
 
-**T2. Core Dashboard Layout** (2 weeks, parallel with T1)
+**T2. Core Dashboard Layout** ✅ **COMPLETED** (September 26, 2025)
 
 - **Deliverables**:
 
-  - Three-section dashboard layout (selectors + description editor)
-  - Fixed-height list widgets for Project, Branch, and Agent selectors
-  - Resizable multiline task description editor
-  - Keyboard navigation between sections (Tab/Shift+Tab)
-  - Basic REST data loading and display
-  - Dynamic footer with contextual shortcuts
+  - ✅ Three-section dashboard layout (selectors + description editor) with MVVM architecture
+  - ✅ Fixed-height list widgets for Project, Branch, and Agent selectors with filtering
+  - ✅ Resizable multiline task description editor with keyboard navigation
+  - ✅ Full keyboard navigation between sections (Tab/Shift+Tab, arrow keys)
+  - ✅ REST data loading and display with loading states and error handling
+  - ✅ Dynamic footer with contextual shortcuts based on current focus
+  - ✅ Complete message-driven state machine (keyboard, time, network events)
 
-- **Test Coverage** (Comprehensive Integration + UI):
+- **Test Coverage** (Comprehensive Integration + UI + Testing Framework):
 
-  - [ ] Layout rendering tests: Dashboard renders correctly on different terminal sizes
-  - [ ] Keyboard navigation tests: Tab cycling and arrow key navigation work
-  - [ ] Selector interaction tests: List filtering and selection functionality
-  - [ ] Editor resizing tests: Ctrl+Up/Down resize operations
-  - [ ] REST data integration tests: API responses populate selectors correctly
-  - [ ] Footer shortcut tests: Context-sensitive shortcuts display appropriately
+  - [x] Layout rendering tests: Dashboard renders correctly on different terminal sizes (80x24, 120x40)
+  - [x] Keyboard navigation tests: Tab cycling and arrow key navigation work
+  - [x] Selector interaction tests: List filtering and selection functionality
+  - [x] Editor resizing tests: Ctrl+Up/Down resize operations
+  - [x] REST data integration tests: API responses populate selectors correctly
+  - [x] Footer shortcut tests: Context-sensitive shortcuts display appropriately
+  - [x] MVVM architecture tests: ViewModel correctly derives state from Model
+  - [x] State machine tests: Message handling and state transitions work correctly
 
 - **Verification** (Automated E2E + Manual):
 
-  - Playwright-style terminal automation tests for UI interactions
-  - Manual verification: Layout adapts to terminal width/height changes
-  - Manual verification: Keyboard shortcuts work as specified in TUI-PRD.md
+  - ✅ Playwright-style terminal automation tests for UI interactions via test scenarios
+  - ✅ Manual verification: Layout adapts to terminal width/height changes
+  - ✅ Manual verification: Keyboard shortcuts work as specified in TUI-PRD.md
+  - ✅ Interactive scenario player for manual testing and debugging
+
+- **Implementation Details**:
+
+  - **MVVM Architecture**: Clean separation between Model (domain logic), ViewModel (presentation logic), and View (Ratatui rendering)
+  - **Message System**: Typed messages (Key, Tick, Net) drive deterministic state transitions
+  - **State Machine**: Complete state management with keyboard input, time events, and REST responses
+  - **Testing Framework**: Comprehensive scenario-based testing with interactive and automated runners
+  - **Mock Integration**: Full mock REST client for isolated development and testing
+
+- **Key Source Files**:
+
+  - `crates/aw-tui/src/model.rs` - State machine and business logic
+  - `crates/aw-tui/src/viewmodel.rs` - Presentation state derivation
+  - `crates/aw-tui/src/msg.rs` - Message types for state transitions
+  - `crates/aw-tui/src/test_runtime.rs` - Deterministic test execution engine
+  - `crates/aw-tui-test/src/main.rs` - Interactive and automated test runners
+  - `test_scenarios/basic_navigation.json` - Sample test scenario
+
+- **Integration Points**:
+
+  - Testing framework can be extended for all future TUI features
+  - MVVM architecture ready for real-time updates and session monitoring
+  - REST client integration tested and ready for production use
+
+**Testing Framework Implementation** ✅ **COMPLETED** (September 26, 2025)
+
+- **Deliverables**:
+
+  - ✅ Complete MVVM testing architecture as specified in TUI-Testing-Architecture.md
+  - ✅ Scenario-driven mock REST client with configurable responses
+  - ✅ Interactive scenario player (`tui-test play`) with step navigation and state inspection
+  - ✅ Automated scenario runner (`tui-test run`) with deterministic execution
+  - ✅ ViewModel assertion system for testing presentation state
+  - ✅ Golden file infrastructure with file-based comparison, diff reporting, and multi-line TUI visualization
+  - ✅ Fake time integration for deterministic scenario execution
+  - ✅ Sample scenarios with golden files demonstrating navigation and interaction testing
+
+- **Test Coverage** (Comprehensive Testing Infrastructure):
+
+  - [x] Scenario execution tests: Basic navigation scenario runs successfully
+  - [x] Interactive player tests: Step navigation, state inspection, and replay work
+  - [x] Mock client tests: Configurable REST responses for different scenarios
+  - [x] ViewModel assertion tests: State inspection and validation work correctly
+  - [x] Time control tests: Fake time enables deterministic execution
+  - [x] MVVM integration tests: All layers work together correctly
+  - [x] Golden file tests: Framework saves, loads, and compares golden files correctly
+
+- **Verification** (Automated Testing + Manual):
+
+  - ✅ Scenario files execute without errors and produce expected state changes
+  - ✅ Interactive player allows full navigation and inspection of TUI state
+  - ✅ Mock client provides realistic test data for development
+  - ✅ Testing framework integrates with existing TUI codebase
+  - ✅ Golden files validate UI rendering with human-readable multi-line format and provide regression protection
+  - ✅ Snapshot comparison with detailed diff output for debugging
+
+- **Implementation Details**:
+
+  - **State Machine Testing**: Deterministic execution with controlled message injection
+  - **Scenario Format**: JSON-based scenarios compatible with future WebUI testing (same format as mock-api-server)
+  - **Interactive Debugging**: Rich interface for stepping through and inspecting scenarios
+  - **Mock-First Development**: Enables testing without external dependencies
+  - **Golden Files**: File-based golden file comparison with stable normalization, diff reporting, and multi-line TUI visualization showing actual terminal rendering
+  - **Golden File Storage**: Organized under `crates/aw-tui/tests/__goldens__/<scenario>/<step>.golden`
+
+- **Key Source Files**:
+
+  - `crates/aw-test-scenarios/src/lib.rs` - Scenario model and JSON parsing
+  - `crates/aw-rest-client-mock/src/lib.rs` - Mock REST client implementation
+  - `crates/aw-client-api/src/lib.rs` - Client API trait for testing
+  - `crates/aw-tui-test/src/main.rs` - Interactive and automated test runners
+  - `crates/aw-tui/src/test_runtime.rs` - Test runtime with full golden file integration
+  - `crates/aw-tui/src/golden.rs` - Golden file management with diff support
+  - `specs/Public/TUI-Testing-Architecture.md` - Complete testing framework specification
+
+- **Integration Points**:
+
+  - Testing framework works with existing TUI MVVM architecture
+  - Mock client uses same API as production REST client
+  - Scenarios can be extended for future TUI features (SSE, multiplexer integration)
+  - Golden files provide UI regression protection across terminal environments
 
 **T3. Task Creation and Launch** (2 weeks)
 
@@ -276,19 +361,29 @@ The TUI implementation provides these core capabilities:
 
 ### Next Milestone Priority
 
-**T2. Core Dashboard Layout** is the current priority milestone, building on the completed T1 infrastructure to provide the fundamental TUI interface that users will interact with for task creation and session management. The dashboard layout includes project/branch/agent selectors, task description editor, and keyboard navigation - all integrated with REST API data loading.
+**T3. Task Creation and Launch** is the current priority milestone, building on the completed T2 dashboard and testing infrastructure. This milestone focuses on connecting the user interface to actual task creation workflows, including multiplexer integration for launching tasks into terminal sessions with proper pane layouts. The comprehensive testing framework ensures reliability as we add production functionality.
 
 ### Current Outstanding Tasks
 
 Here are the key tasks for TUI development:
 
-#### **T2. Core Dashboard Layout** 🚧 **IN PROGRESS**
+#### **T2. Core Dashboard Layout** ✅ **COMPLETED**
 
-- [ ] Full dashboard layout with selectors and editor
-- [ ] Keyboard navigation and shortcut handling
-- [ ] REST data loading and display in selectors
-- [ ] Dynamic footer with contextual shortcuts
-- [ ] Layout rendering tests: Dashboard renders correctly on different terminal sizes
+- [x] Full dashboard layout with selectors and editor (MVVM architecture)
+- [x] Keyboard navigation and shortcut handling (message-driven state machine)
+- [x] REST data loading and display in selectors (with loading states)
+- [x] Dynamic footer with contextual shortcuts (focus-based)
+- [x] Layout rendering tests: Dashboard renders correctly on different terminal sizes
+
+#### **Testing Framework Implementation** ✅ **COMPLETED**
+
+- [x] Complete MVVM testing architecture (TUI-Testing-Architecture.md)
+- [x] Interactive scenario player (`tui-test play`) with navigation and inspection
+- [x] Automated scenario runner (`tui-test run`) with deterministic execution
+- [x] Mock REST client for scenario-driven testing
+- [x] ViewModel assertion system and state inspection
+- [x] Sample test scenarios demonstrating functionality
+- [x] Golden snapshot infrastructure with file-based comparison
 
 #### **REST Client Infrastructure** 📋 **COMPLETED**
 

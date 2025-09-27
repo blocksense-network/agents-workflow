@@ -11,8 +11,8 @@
     },
     {
       "type": "assertVm",
-      "focus": "projects",
-      "selected": 0
+      "focus": "tasks",
+      "selected": 6
     },
     {
       "type": "snapshot",
@@ -20,16 +20,16 @@
     },
     {
       "type": "key",
-      "key": "Tab"
+      "key": "Up"
     },
     {
       "type": "assertVm",
-      "focus": "repositories",
-      "selected": 0
+      "focus": "tasks",
+      "selected": 5
     },
     {
       "type": "snapshot",
-      "name": "after_tab_to_repositories"
+      "name": "after_up_arrow"
     },
     {
       "type": "key",
@@ -37,8 +37,8 @@
     },
     {
       "type": "assertVm",
-      "focus": "repositories",
-      "selected": 1
+      "focus": "tasks",
+      "selected": 6
     },
     {
       "type": "snapshot",

@@ -13,7 +13,7 @@ The architecture combines:
 - MVVM rendering separation for testability
 - Scenario-driven mock REST client using schema types from `aw-rest-api-contract`
 - Automated and interactive test runners
-- Assertions on both ViewModel state and golden snapshots rendered via Ratatui `TestBackend`
+- Assertions on both ViewModel state and golden files rendered via Ratatui `TestBackend`
 
 ### Design Principles
 
@@ -49,7 +49,7 @@ The architecture combines:
 
 4. Runners
 
-- Automated Runner: consumes a scenario head-to-tail, driving the TUI in a fixed-size `TestBackend` terminal; emits assertions and snapshots
+- Automated Runner: consumes a scenario head-to-tail, driving the TUI in a fixed-size `TestBackend` terminal; emits assertions and golden files
 - Interactive Runner: starts at a specified step (CLI option) or prompts; supports step-forward, jump-to-step, and replay
 
 ### Data & Types
@@ -81,21 +81,21 @@ Note: Concrete schema lives with `aw-test-scenarios` and is validated in CI.
 3. For each scenario step:
    - Inject keys/events or advance time
    - Call single deterministic `step()` that handles exactly one message and draws once
-   - Run assertions (ViewModel and/or snapshot)
-4. Emit report (per-step logs, failures, snapshot diffs)
+   - Run assertions (ViewModel and/or golden file)
+4. Emit report (per-step logs, failures, golden file diffs)
 
 ### Assertions
 
 - ViewModel Assertions: inspect derived state (focus, selections, error banners, footer hints)
-- Golden Snapshots: serialize Ratatui buffer from `TestBackend` and compare
-  - Prefer stable snapshots (strip volatile metadata, normalize whitespace)
-  - Store under `crates/aw-tui/tests/__snapshots__/<scenario>/<step>.snap`
+- Golden Files: serialize Ratatui buffer from `TestBackend` and compare
+  - Prefer stable golden files (strip volatile metadata, normalize whitespace)
+  - Store under `crates/aw-tui/tests/__goldens__/<scenario>/<step>.golden`
 
 ### Tooling & Libraries
 
 - Ratatui `TestBackend` for deterministic rendering
 - Tokio test with `#[tokio::test(start_paused = true)]` and `time::advance()`
-- Optional `insta` for snapshot assertions
+- Optional `insta` for golden file assertions
 - Optional PTY/E2E layer (future): `expectrl`/`portable-pty` for black-box terminal tests
 
 ### CLI
@@ -108,7 +108,7 @@ DESCRIPTION: Run the TUI against a scenario file and validate assertions
 OPTIONS:
   --start-step <n>            Start from step index n (0-based)
   --until-step <n>            Stop after step index n (inclusive)
-  --update-snapshots          Update golden snapshots on disk instead of asserting
+  --update-goldens            Update golden files on disk instead of asserting
   --terminal-width <cols>     Override terminal width (falls back to scenario)
   --terminal-height <rows>    Override terminal height (falls back to scenario)
   --seed <value>              Seed for any randomized components (if any)
@@ -140,23 +140,23 @@ ARGUMENTS:
 - `crates/aw-rest-client/` real client
 - `crates/aw-test-scenarios/` scenario loader + validator
 - `crates/aw-rest-client-mock/` client trait impl backed by scenarios
-- `crates/aw-tui/tests/` scenario-backed tests, VM assertions, snapshots
+- `crates/aw-tui/tests/` scenario-backed tests, VM assertions, golden files
 
 ### Verification Strategy
 
 - Unit Tests (Model, ViewModel): comprehensive, no terminal or async
-- Rendering Tests: minimal golden snapshots for critical screens/states
+- Rendering Tests: minimal golden files for critical screens/states
 - Scenario Tests: automated runner across curated scenarios in CI
 - Interactive Debugging: use `aw tui-test play` to diagnose failures locally
 
 ### Risks & Mitigations
 
-- Snapshot brittleness → normalize buffer output, keep snapshots minimal and focused
+- Golden file brittleness → normalize buffer output, keep golden files minimal and focused
 - Scenario drift vs API → reuse `aw-rest-api-contract` types and validate scenarios in CI
 - Flakiness → use fake time; single-draw-per-step; avoid parallel UI draws
 
 ### Future Work
 
 - Optional full PTY E2E for critical flows with `expectrl`
-- Cross-terminal visual checks (themes, contrast) via snapshot variants
+- Cross-terminal visual checks (themes, contrast) via golden file variants
 - Load testing for high-frequency SSE streams with time advancing
