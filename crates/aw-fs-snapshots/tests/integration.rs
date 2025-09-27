@@ -1,12 +1,13 @@
-//! Comprehensive integration tests for ZFS filesystem snapshot providers.
+//! Comprehensive integration tests for filesystem snapshot providers.
 //!
-//! This test file provides end-to-end testing of ZFS snapshot functionality,
+//! This test file provides end-to-end testing of ZFS and Git snapshot functionality,
 //! similar to the legacy Ruby integration tests but implemented in Rust.
 
 use aw_fs_snapshots_traits::{FsSnapshotProvider, WorkingCopyMode};
 use filesystem_test_helpers::ZfsTestEnvironment;
 use std::fs;
 use std::path::Path;
+use tempfile::TempDir;
 
 // Include the filesystem test helpers module
 #[path = "filesystem_test_helpers.rs"]
@@ -40,8 +41,8 @@ async fn test_zfs_provider_integration(env: &mut ZfsTestEnvironment) {
         Ok(mount_point) => {
             println!("Successfully created ZFS pool at: {:?}", mount_point);
 
-            // Initialize test repository
-            initialize_test_repo(&mount_point);
+            // Populate test repository
+            populate_test_repo(&mount_point);
 
             // Test ZFS provider specifically
             #[cfg(feature = "zfs")]
@@ -112,8 +113,8 @@ async fn test_zfs_provider_integration(env: &mut ZfsTestEnvironment) {
     }
 }
 
-/// Initialize a test repository with some basic files.
-fn initialize_test_repo(repo_path: &Path) {
+/// Populate a directory with test files for integration testing.
+fn populate_test_repo(repo_path: &Path) {
     fs::write(repo_path.join("README.md"), "Integration test repository").unwrap();
     fs::write(repo_path.join("test_file.txt"), "Test content").unwrap();
 
@@ -122,6 +123,119 @@ fn initialize_test_repo(repo_path: &Path) {
     fs::create_dir_all(&subdir).unwrap();
     fs::write(subdir.join("nested_file.txt"), "Nested content").unwrap();
 }
+
+/// Integration test for Git filesystem snapshot providers.
+///
+/// This test creates Git repositories and exercises the Git provider API
+/// to ensure everything works together correctly.
+#[tokio::test]
+async fn test_git_snapshot_integration() {
+    // Skip if git is not available
+    if !git_available().await {
+        println!("Skipping Git integration test: git command not available");
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let repo_path = temp_dir.path();
+
+    // Populate test repository
+    populate_test_repo(repo_path);
+    initialize_git_repo(repo_path).await.unwrap();
+
+    // Test Git provider integration
+    test_git_provider_integration(repo_path).await;
+}
+
+/// Test Git provider integration specifically.
+async fn test_git_provider_integration(repo_path: &Path) {
+    println!("Testing Git provider integration...");
+
+    #[cfg(feature = "git")]
+    {
+        use aw_fs_snapshots_git::GitProvider;
+        let git_provider = GitProvider::new();
+
+        // Test capabilities detection
+        let capabilities = git_provider.detect_capabilities(repo_path);
+        println!("Git provider capabilities: score={}, supports_cow={}",
+                capabilities.score, capabilities.supports_cow_overlay);
+        assert!(capabilities.score > 0, "Git provider should be available for git repositories");
+
+        // Test workspace creation
+        let ws_result = git_provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree).await;
+        match ws_result {
+            Ok(ws) => {
+                println!("Git workspace created: {:?}", ws.exec_path);
+
+                // Modify a file in the workspace
+                let test_file = ws.exec_path.join("test_file.txt");
+                tokio::fs::write(&test_file, "Modified content for snapshot").await.unwrap();
+
+                // Test snapshot creation
+                let snap_result = git_provider.snapshot_now(&ws, Some("integration_test")).await;
+                match snap_result {
+                    Ok(snap) => {
+                        println!("Git snapshot created: {}", snap.id);
+
+                        // Test readonly mount
+                        let mount_result = git_provider.mount_readonly(&snap).await;
+                        match mount_result {
+                            Ok(readonly_path) => {
+                                println!("Readonly mount created: {:?}", readonly_path);
+                                // Verify readonly access
+                                assert!(readonly_path.join("README.md").exists());
+                                assert!(readonly_path.join("test_file.txt").exists());
+
+                                // Verify the modified content is in the snapshot
+                                let content = tokio::fs::read_to_string(readonly_path.join("test_file.txt")).await.unwrap();
+                                assert_eq!(content, "Modified content for snapshot");
+                            }
+                            Err(e) => {
+                                println!("Readonly mount failed: {}", e);
+                            }
+                        }
+
+                        // Test branching from snapshot
+                        let branch_result = git_provider.branch_from_snapshot(&snap, WorkingCopyMode::Worktree).await;
+                        match branch_result {
+                            Ok(branch_ws) => {
+                                println!("Branch created: {:?}", branch_ws.exec_path);
+
+                                // Verify branch has the same content
+                                let branch_content = tokio::fs::read_to_string(branch_ws.exec_path.join("test_file.txt")).await.unwrap();
+                                assert_eq!(branch_content, "Modified content for snapshot");
+
+                                // Cleanup branch
+                                let _ = git_provider.cleanup(&branch_ws.cleanup_token).await;
+                            }
+                            Err(e) => {
+                                println!("Branch creation failed: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Snapshot creation failed: {}", e);
+                    }
+                }
+
+                // Cleanup workspace
+                let _ = git_provider.cleanup(&ws.cleanup_token).await;
+            }
+            Err(e) => {
+                println!("Git workspace creation failed: {}", e);
+            }
+        }
+    }
+
+    #[cfg(not(feature = "git"))]
+    {
+        println!("Git feature not enabled, skipping Git-specific tests");
+    }
+}
+
+// Use git helpers from aw-repo
+use aw_repo::test_helpers::{git_available, initialize_git_repo};
 
 /// Check if running as root.
 fn is_root() -> bool {

@@ -49,7 +49,7 @@ legacy-test:
 legacy-test-codex-setup-integration:
     ./setup-tests/test-runner.sh
 
-# Run only snapshot-related tests (ZFS, Btrfs, and Copy providers)
+# Run only snapshot-related tests (ZFS, Btrfs, and Git providers)
 legacy-test-snapshot:
     RUBYLIB=legacy/ruby/lib ruby scripts/run_snapshot_tests.rb
 

@@ -73,7 +73,7 @@ impl SandboxRunArgs {
             .context("Failed to get current working directory")?;
 
         // Prepare writable workspace using FS snapshots
-        // Try providers in order of preference: ZFS -> Btrfs -> Copy
+        // Try providers in order of preference: ZFS -> Btrfs -> Git
         let prepared_workspace = prepare_workspace_with_fallback(&workspace_path).await
             .context("Failed to prepare writable workspace with any provider")?;
 
@@ -103,7 +103,7 @@ impl SandboxRunArgs {
 
 /// Prepare a writable workspace using FS snapshots with fallback logic
 pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -> Result<PreparedWorkspace> {
-    // Try providers in order of preference: ZFS -> Btrfs -> Copy
+    // Try providers in order of preference: ZFS -> Btrfs -> Git
     let mut providers_to_try: Vec<(&str, fn() -> Result<Box<dyn FsSnapshotProvider>>)> = Vec::new();
 
     #[cfg(feature = "zfs")]
@@ -112,7 +112,8 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
     #[cfg(feature = "btrfs")]
     providers_to_try.push(("Btrfs", || -> Result<Box<dyn FsSnapshotProvider>> { Ok(Box::new(aw_fs_snapshots_btrfs::BtrfsProvider::new()) as Box<dyn FsSnapshotProvider>) }));
 
-    // TODO: Implement GitProvider as fallback when no other providers are available (tracked in MVP.status.md)
+    #[cfg(feature = "git")]
+    providers_to_try.push(("Git", || -> Result<Box<dyn FsSnapshotProvider>> { Ok(Box::new(aw_fs_snapshots_git::GitProvider::new()) as Box<dyn FsSnapshotProvider>) }));
     
     for (name, provider_fn) in providers_to_try {
         let provider = provider_fn()?;
@@ -120,14 +121,25 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
 
         if capabilities.score > 0 {
             println!("Trying {} provider (score: {})...", name, capabilities.score);
-            match provider.prepare_writable_workspace(workspace_path, WorkingCopyMode::CowOverlay).await {
-                Ok(workspace) => {
-                    println!("Successfully prepared workspace with {} provider", name);
-                    return Ok(workspace);
-                }
-                Err(e) => {
-                    println!("{} provider failed: {}", name, e);
-                    continue;
+
+            // Try CoW overlay mode first if supported, otherwise try in-place mode
+            let modes_to_try = if capabilities.supports_cow_overlay {
+                vec![WorkingCopyMode::CowOverlay]
+            } else {
+                vec![WorkingCopyMode::InPlace]
+            };
+
+            for mode in modes_to_try {
+                println!("  Trying mode: {:?}", mode);
+                match provider.prepare_writable_workspace(workspace_path, mode).await {
+                    Ok(workspace) => {
+                        println!("Successfully prepared workspace with {} provider using {:?}", name, mode);
+                        return Ok(workspace);
+                    }
+                    Err(e) => {
+                        println!("  {} provider failed with mode {:?}: {}", name, mode, e);
+                        continue;
+                    }
                 }
             }
         }

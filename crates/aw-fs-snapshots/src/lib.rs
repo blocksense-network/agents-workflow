@@ -39,7 +39,16 @@ pub fn provider_for(path: &Path) -> Result<Box<dyn FsSnapshotProvider>> {
         }
     }
 
-    // TODO: Fallback to Git provider (tracked in MVP.status.md)
+    // Check Git provider if feature is enabled (fallback for portability)
+    #[cfg(feature = "git")]
+    {
+        let git_provider = aw_fs_snapshots_git::GitProvider::new();
+        let capabilities = git_provider.detect_capabilities(path);
+        if capabilities.score > best_score {
+            best_score = capabilities.score;
+            best_provider = Some(Box::new(git_provider));
+        }
+    }
 
     best_provider.ok_or_else(|| Error::provider("No suitable provider found"))
 }
@@ -95,6 +104,34 @@ mod tests {
         assert!(validate_destination_path(Path::new("/proc/version")).is_err());
         assert!(validate_destination_path(Path::new("/sys/class")).is_err());
         assert!(validate_destination_path(Path::new("/run/lock")).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_provider_selection_git_fallback() {
+        #[cfg(feature = "git")]
+        {
+            use aw_repo::test_helpers::create_git_repo;
+
+            // Create a git repository using the test helpers
+            let repo = create_git_repo(None).await.unwrap();
+
+            // Test provider selection - should select Git provider for git repos
+            let provider_result = provider_for(&repo.path);
+            assert!(provider_result.is_ok(), "Should find a provider for git repository");
+
+            let provider = provider_result.unwrap();
+            let capabilities = provider.detect_capabilities(&repo.path);
+
+            // Should have selected Git provider (highest score for git repos)
+            assert_eq!(capabilities.kind, aw_fs_snapshots_traits::SnapshotProviderKind::Git);
+            assert!(capabilities.score > 0, "Git provider should have positive score for git repos");
+        }
+
+        #[cfg(not(feature = "git"))]
+        {
+            // If git feature is not enabled, this test should be skipped
+            println!("Git feature not enabled, skipping git provider test");
+        }
     }
 
     // Note: tests referencing copy fallback were removed with provider deprecation.

@@ -5,6 +5,7 @@
 
 pub mod error;
 pub mod repo;
+pub mod test_helpers;
 pub mod vcs_types;
 
 pub use error::{VcsError, VcsResult};

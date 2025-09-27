@@ -17,11 +17,13 @@ async-trait = "0.1"
 tempfile = "3.8"
 regex = "1.10"
 libc = "0.2"
+aw-repo = { path = "../aw-repo" }
 
 [features]
-default = ["zfs", "btrfs"]
+default = ["zfs", "btrfs", "git"]
 zfs = ["dep:aw-fs-snapshots-zfs"]
 btrfs = ["dep:aw-fs-snapshots-btrfs"]
+git = ["dep:aw-fs-snapshots-git"]
 
 [dependencies.aw-fs-snapshots-btrfs]
 path = "../aw-fs-snapshots-btrfs"
@@ -35,4 +37,8 @@ path = "../aw-fs-snapshots-traits"
 
 [dependencies.aw-fs-snapshots-zfs]
 path = "../aw-fs-snapshots-zfs"
+optional = true
+
+[dependencies.aw-fs-snapshots-git]
+path = "../aw-fs-snapshots-git"
 optional = true

@@ -33,7 +33,7 @@ pub enum SnapshotProviderKind {
 }
 
 /// Working copy modes for prepared workspaces.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WorkingCopyMode {
     /// Auto-detect the best working copy mode.
     Auto,

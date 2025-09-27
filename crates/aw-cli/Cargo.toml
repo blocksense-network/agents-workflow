@@ -29,9 +29,10 @@ tracing-subscriber = { workspace = true }
 aw-core = { path = "../aw-core" }
 aw-repo = { path = "../aw-repo" }
 aw-local-db = { path = "../aw-local-db" }
-aw-fs-snapshots = { path = "../aw-fs-snapshots", features = ["zfs", "btrfs"] }
+aw-fs-snapshots = { path = "../aw-fs-snapshots", features = ["zfs", "btrfs", "git"] }
 aw-fs-snapshots-zfs = { path = "../aw-fs-snapshots-zfs" }
 aw-fs-snapshots-btrfs = { path = "../aw-fs-snapshots-btrfs" }
+aw-fs-snapshots-git = { path = "../aw-fs-snapshots-git" }
 chrono = { version = "0.4", features = ["serde"] }
 sandbox-core = { path = "../sandbox-core", features = ["cgroups", "seccomp", "net", "devices"] }
 sandbox-seccomp = { path = "../sandbox-seccomp" }
