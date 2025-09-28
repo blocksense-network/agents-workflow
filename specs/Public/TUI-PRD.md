@@ -11,10 +11,12 @@ Backends:
 
 ### Auto-Attach and Window Model
 
-- On start, `aw tui` auto-attaches to the current multiplexer session (creating one if needed). Existing task windows are left intact.
-- Launching a new task immediately creates a new window in the multiplexer:
-  - Split panes: right = agent activity, left = terminal or configured editor in the workspace.
+- On start, `aw tui` auto-attaches to the configured multiplexer session (creating one if needed) and launches the TUI dashboard in a single window initially. Existing task windows are left intact.
+- The TUI dashboard (`aw tui dashboard`) is the main interface for task management and runs inside a multiplexer window.
+- Launching a new task from the dashboard creates a new multiplexer window with split panes:
+  - Right pane = agent activity and logs, left pane = terminal or configured editor in the workspace.
   - Devcontainer runs: panes are inside the container context.
+- The multiplexer provides the windowing environment; the TUI dashboard coordinates task creation and monitoring across windows.
 
 ### Simplified Task-Centric Layout
 
@@ -82,22 +84,26 @@ The following buttons are present:
 ### Commands and Hotkeys
 
 #### Global Navigation
+
 - **↑↓**: Navigate between sections (previous tasks and new task entry)
 - **Ctrl+C** (twice): Quit the TUI
 
 #### Task Creation Interface
+
 - **Tab/Shift+Tab**: Cycle between buttons (Description, Repository, Branch, Models, Go)
 - **Enter**: Activate focused button or select item in modal
 - **Esc**: Close modal or go back; Go back to text area when the buttons are selected.
 - **Type directly**: Enter text in description area when focused
 
 #### Modal Navigation (Telescope-style)
+
 - **↑↓**: Navigate through options in fuzzy search
 - **Enter**: Select current item
 - **Esc**: Close modal
 - **Left/Right** or **+/-**: Adjust model instance counts in model selection
 
 #### Text Input
+
 - **Any key**: Type in description area when focused
 - **Backspace**: Delete characters
 - **Enter**: Activate buttons (not for newlines in description)

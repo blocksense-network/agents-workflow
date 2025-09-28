@@ -224,6 +224,119 @@ The TUI implementation provides these core capabilities:
   - Scenarios can be extended for future TUI features (SSE, multiplexer integration)
   - Golden files provide UI regression protection across terminal environments
 
+**Multiplexer Implementation** (4 weeks total)
+
+**T3.1 Multiplexer Abstraction Layer** ✅ **COMPLETED** (September 28, 2025)
+
+- **Deliverables**:
+
+  - `aw-mux-core` crate with low-level multiplexer trait and shared types
+  - `aw-mux` crate with pure multiplexer implementations (tmux, kitty, etc.)
+  - `aw-tui-multiplexer` crate with AW-specific abstractions and layouts
+  - Core trait definitions following [specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md](specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md) specifications
+
+- **Test Coverage**:
+
+  - Unit tests for core traits and types
+  - Trait implementation validation
+  - Error handling tests
+
+- **Verification**:
+
+  - All crates compile successfully
+  - API contracts match specifications
+
+- **Implementation Details**:
+
+  - **aw-mux-core**: Complete trait definitions with WindowId/PaneId types, SplitDirection enum, WindowOptions/CommandOptions structs, and comprehensive error handling
+  - **aw-mux**: Pure multiplexer implementations with tmux backend (placeholder implementations for now)
+  - **aw-tui-multiplexer**: AW-specific adapter with LayoutHandle, PaneRole enum, LayoutConfig struct, and standard layout creation functions
+  - **Architecture**: Clean three-layer separation: core traits → multiplexer implementations → AW-specific workflows following [specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md](specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md)
+
+- **Key Source Files**:
+
+  - `crates/aw-mux-core/src/lib.rs` - Core trait definitions and types
+  - `crates/aw-mux/src/lib.rs` - Pure multiplexer implementations
+  - `crates/aw-mux/src/tmux.rs` - tmux multiplexer implementation
+  - `crates/aw-tui-multiplexer/src/lib.rs` - AW-specific adapter and layouts
+  - `specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md` - Specification reference
+
+- **Integration Points**:
+
+  - Ready for concrete multiplexer implementations (tmux, kitty, etc.)
+  - Provides foundation for TUI multiplexer integration
+  - Enables testing with mock multiplexer implementations
+
+**T3.2 tmux Support** (1.5 weeks)
+
+- **Deliverables**:
+
+  - Full tmux multiplexer implementation following [specs/Public/Terminal-Multiplexers/tmux.md](specs/Public/Terminal-Multiplexers/tmux.md)
+  - All capabilities from [specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md](specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
+    - Window/tab creation and management
+    - Horizontal/vertical pane splitting
+    - Command launching in specific panes
+    - Text sending/scripted answers via send-keys
+    - Window/pane focusing and discovery
+    - Session management and persistence
+  - AW-specific layout creation (editor + agent panes)
+  - Task window discovery and focusing
+
+- **Testing Strategy**:
+
+  - Pre-scripted child processes test a rich set of potential scenarios:
+    - Commands that fail
+    - Commands that exit quickly
+    - Commands that hang without output
+    - Commands that produce periodic output
+    - Commands that manipulate the state of the multiplexer (e.g. switch pane).
+    - Other scenarios you'll come up with
+  - Verify the expected Tmux state through tmux commands that provide instrospection into the tmux state
+  - Verify the expected screen content / visual state by launching tmux under pexpect
+  - Verify that the expected number of child processes are launched
+  - Golden file testing for rendered terminal output
+  - Session management edge cases with controlled scenarios
+  - Child process verification and cleanup
+
+- **Verification**:
+
+  - All tmux commands from [specs/Public/Terminal-Multiplexers/tmux.md](specs/Public/Terminal-Multiplexers/tmux.md) work correctly
+  - We are able to create split-pane layouts, similar to the ones defined in the TUI PRD specifications
+  - Text injection and command execution work reliably
+  - Window discovery and focusing operations succeed
+  - Error handling provides clear feedback for all failure modes
+
+**T3.3 kitty Support** (1.5 weeks)
+
+- **Deliverables**:
+
+  - Full kitty multiplexer implementation following [specs/Public/Terminal-Multiplexers/Kitty.md](specs/Public/Terminal-Multiplexers/Kitty.md)
+  - All capabilities from [specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md](specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
+    - Tab/window creation via `kitty @ launch`
+    - Pane splitting with `--location` parameter
+    - Command launching in panes via command arguments
+    - Text sending via `kitty @ send-text` and kitten send-text
+    - Window focusing and tab management
+    - Remote control socket management
+  - AW-specific layout creation with kitty's split model
+  - Task window discovery using title matching
+
+- **Testing Strategy**:
+
+  - Use the same pre-scripted child processes as tmux
+  - Verify the expected Kitty states through the Kitty introspection commands/APIs
+  - Inspect the spawned child processes to verify that they match our expectations
+  - Error handling for socket unavailability
+
+- **Verification**:
+
+  - All kitty remote control operations work as specified
+  - Layout creation matches expected pane arrangements
+  - Text sending and command execution are reliable
+  - Socket management and cleanup work correctly
+  - Error conditions are handled gracefully
+  - Multiple windows/panes can be interacted with concurrently (from multiple processes)
+
 **T3. Task Creation and Launch** (2 weeks)
 
 - **Deliverables**:
