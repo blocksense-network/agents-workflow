@@ -269,6 +269,9 @@
         # Terminal recording and sharing
         pkgs.asciinema # Terminal session recorder
         pkgs.fzf
+
+        # ASCII art tools for logo conversion
+        pkgs.chafa
       ];
 
       # Linux-specific packages

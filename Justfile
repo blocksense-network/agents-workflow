@@ -384,3 +384,6 @@ test-containers:
 test-mount-capability:
     just build-debugging-test-binaries
     ./target/debug/mount_test
+
+regen-ansi-logo:
+    chafa --format=symbols --view-size=80x50 assets/agent-harbor-logo.png | tee assets/agent-harbor-logo-80.ansi
