@@ -1,6 +1,5 @@
 //! Btrfs snapshot provider implementation for Agents Workflow.
 
-use async_trait::async_trait;
 use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -73,13 +72,12 @@ impl BtrfsProvider {
     }
 
     /// Execute a Btrfs command.
-    async fn execute_btrfs_command(&self, args: &[&str]) -> Result<String> {
-        let output = Command::new("btrfs")
+    fn execute_btrfs_command(&self, args: &[&str]) -> Result<String> {
+        let output = std::process::Command::new("btrfs")
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .output()
-            .await?;
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -103,7 +101,6 @@ impl BtrfsProvider {
     }
 }
 
-#[async_trait]
 impl FsSnapshotProvider for BtrfsProvider {
     fn kind(&self) -> SnapshotProviderKind {
         SnapshotProviderKind::Btrfs
@@ -151,7 +148,7 @@ impl FsSnapshotProvider for BtrfsProvider {
         }
     }
 
-    async fn prepare_writable_workspace(
+    fn prepare_writable_workspace(
         &self,
         repo: &Path,
         mode: WorkingCopyMode,
@@ -172,7 +169,7 @@ impl FsSnapshotProvider for BtrfsProvider {
                 let snapshot_path = repo.with_file_name(format!("aw_snapshot_{}", unique_id));
 
                 // Create readonly snapshot
-                self.execute_btrfs_command(&["subvolume", "snapshot", "-r", repo.to_str().unwrap(), snapshot_path.to_str().unwrap()]).await?;
+                self.execute_btrfs_command(&["subvolume", "snapshot", "-r", repo.to_str().unwrap(), snapshot_path.to_str().unwrap()])?;
 
                 Ok(PreparedWorkspace {
                     exec_path: snapshot_path.clone(),
@@ -188,12 +185,12 @@ impl FsSnapshotProvider for BtrfsProvider {
         }
     }
 
-    async fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
+    fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
         let unique_id = self.generate_unique_id();
         let snapshot_path = ws.exec_path.with_file_name(format!("aw_session_snapshot_{}", unique_id));
 
         // Create readonly snapshot of the current workspace
-        self.execute_btrfs_command(&["subvolume", "snapshot", "-r", ws.exec_path.to_str().unwrap(), snapshot_path.to_str().unwrap()]).await?;
+        self.execute_btrfs_command(&["subvolume", "snapshot", "-r", ws.exec_path.to_str().unwrap(), snapshot_path.to_str().unwrap()])?;
 
         let mut meta = HashMap::new();
         meta.insert("source_path".to_string(), ws.exec_path.to_string_lossy().to_string());
@@ -208,7 +205,7 @@ impl FsSnapshotProvider for BtrfsProvider {
         })
     }
 
-    async fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
+    fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
         // For Btrfs, the snapshot is already a readonly subvolume mounted at its path
         if let Some(snapshot_path) = snap.meta.get("snapshot_path") {
             let path = PathBuf::from(snapshot_path);
@@ -222,7 +219,7 @@ impl FsSnapshotProvider for BtrfsProvider {
         }
     }
 
-    async fn branch_from_snapshot(
+    fn branch_from_snapshot(
         &self,
         snap: &SnapshotRef,
         mode: WorkingCopyMode,
@@ -235,7 +232,7 @@ impl FsSnapshotProvider for BtrfsProvider {
                     .unwrap_or_else(|| PathBuf::from(format!("aw_branch_{}", unique_id)));
 
                 // Create a writable snapshot from the readonly snapshot
-                self.execute_btrfs_command(&["subvolume", "snapshot", snap.meta.get("snapshot_path").unwrap(), branch_path.to_str().unwrap()]).await?;
+                self.execute_btrfs_command(&["subvolume", "snapshot", snap.meta.get("snapshot_path").unwrap(), branch_path.to_str().unwrap()])?;
 
                 Ok(PreparedWorkspace {
                     exec_path: branch_path.clone(),
@@ -248,7 +245,7 @@ impl FsSnapshotProvider for BtrfsProvider {
         }
     }
 
-    async fn cleanup(&self, token: &str) -> Result<()> {
+    fn cleanup(&self, token: &str) -> Result<()> {
         if token.starts_with("btrfs:inplace:") {
             // Nothing to cleanup for in-place mode
             Ok(())
@@ -259,7 +256,7 @@ impl FsSnapshotProvider for BtrfsProvider {
 
             if path.exists() {
                 // Delete the subvolume
-                let _ = self.execute_btrfs_command(&["subvolume", "delete", snapshot_path]).await;
+                let _ = self.execute_btrfs_command(&["subvolume", "delete", snapshot_path]);
             }
             Ok(())
         } else if token.starts_with("btrfs:branch:") {
@@ -269,7 +266,7 @@ impl FsSnapshotProvider for BtrfsProvider {
 
             if path.exists() {
                 // Delete the subvolume
-                let _ = self.execute_btrfs_command(&["subvolume", "delete", branch_path]).await;
+                let _ = self.execute_btrfs_command(&["subvolume", "delete", branch_path]);
             }
             Ok(())
         } else {

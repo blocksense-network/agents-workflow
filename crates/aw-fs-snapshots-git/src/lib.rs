@@ -5,12 +5,10 @@
 //! like ZFS or Btrfs. It uses shadow repositories with object sharing and
 //! git worktrees for efficient workspace management.
 
-use async_trait::async_trait;
 use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use tokio::process::Command;
+use std::process::{Command, Stdio};
 
 /// Git-based snapshot provider implementation.
 pub struct GitProvider {
@@ -87,12 +85,12 @@ impl GitProvider {
     }
 
     /// Ensure the shadow repository exists and is properly configured.
-    async fn ensure_shadow_repo(&self, primary_repo: &Path) -> Result<PathBuf> {
-        let shadow_path = self.shadow_repo_path(primary_repo);
+    fn ensure_shadow_repo(&self, repo_path: &Path) -> Result<PathBuf> {
+        let shadow_path = self.shadow_repo_path(repo_path);
 
         if !shadow_path.exists() {
             // Create shadow repository
-            tokio::fs::create_dir_all(&shadow_path).await
+            std::fs::create_dir_all(&shadow_path)
                 .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create shadow repo directory: {}", e)))?;
 
             // Initialize bare repository
@@ -102,7 +100,6 @@ impl GitProvider {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
-                .await
                 .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to init shadow repo: {}", e)))?;
 
             if !status.success() {
@@ -122,7 +119,6 @@ impl GitProvider {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .await
                     .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to configure shadow repo: {}", e)))?;
 
                 if !status.success() {
@@ -130,19 +126,46 @@ impl GitProvider {
                 }
             }
 
-            // Add alternates to share objects with primary repo
-            let primary_git_dir = primary_repo.join(".git");
+            // Get the main repository's .git/objects path
+            let main_git_objects = self.get_main_repo_objects_path(repo_path)?;
+
+            // Add alternates to share objects with main repo
             let alternates_file = shadow_path.join("objects").join("info").join("alternates");
 
-            tokio::fs::create_dir_all(alternates_file.parent().unwrap()).await
+            std::fs::create_dir_all(alternates_file.parent().unwrap())
                 .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create alternates dir: {}", e)))?;
 
-            let alternates_content = format!("{}\n", primary_git_dir.join("objects").display());
-            tokio::fs::write(&alternates_file, alternates_content).await
+            let alternates_content = format!("{}\n", main_git_objects.display());
+            std::fs::write(&alternates_file, alternates_content)
                 .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to write alternates file: {}", e)))?;
         }
 
         Ok(shadow_path)
+    }
+
+    /// Get the path to the main repository's .git/objects directory
+    fn get_main_repo_objects_path(&self, repo_path: &Path) -> Result<PathBuf> {
+        // Use git rev-parse --git-common-dir to get the main repo path
+        let output = Command::new("git")
+            .args(["rev-parse", "--git-common-dir"])
+            .current_dir(repo_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to get git common dir: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(aw_fs_snapshots_traits::Error::provider("Failed to get git common directory"));
+        }
+
+        let common_dir = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        let main_git_dir = if common_dir.is_absolute() {
+            common_dir
+        } else {
+            repo_path.join(common_dir)
+        };
+
+        Ok(main_git_dir.join("objects"))
     }
 
     /// Generate a unique identifier for resources.
@@ -156,45 +179,60 @@ impl GitProvider {
     }
 
     /// Create a snapshot commit in the shadow repository.
-    async fn create_snapshot_commit(&self, primary_repo: &Path, shadow_repo: &Path, label: Option<&str>) -> Result<String> {
+    fn create_snapshot_commit(&self, worktree_repo: &Path, shadow_repo: &Path, label: Option<&str>) -> Result<String> {
         // Create a temporary index for staging changes
         let temp_index = tempfile::NamedTempFile::new()
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create temp index: {}", e)))?;
         let temp_index_path = temp_index.path();
-        let primary_repo_str = primary_repo.to_string_lossy();
 
-        // Get the current HEAD commit from primary repo
+        // Get the current HEAD commit from worktree repo
         let head_commit = Command::new("git")
-            .args(["-C", &primary_repo_str, "rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
+            .current_dir(worktree_repo)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .output()
-            .await
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to get HEAD commit: {}", e)))?;
 
         if !head_commit.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to get HEAD commit from primary repository"));
+            return Err(aw_fs_snapshots_traits::Error::provider("Failed to get HEAD commit from worktree repository"));
         }
 
         let head_commit = String::from_utf8_lossy(&head_commit.stdout).trim().to_string();
 
+        // Initialize the temporary index with the current HEAD tree
+        let read_tree_output = Command::new("git")
+            .args(["read-tree", &head_commit])
+            .current_dir(worktree_repo)
+            .env("GIT_INDEX_FILE", temp_index_path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to initialize index: {}", e)))?;
+
+        if !read_tree_output.status.success() {
+            let stderr = String::from_utf8_lossy(&read_tree_output.stderr);
+            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to initialize index: {}", stderr)));
+        }
+
         // Stage all changes using git add
-        let mut add_args = vec!["-C", &primary_repo_str, "add", "--all"];
+        let mut add_args = vec!["add", "--all"];
         if self.include_untracked {
             add_args.push("--no-ignore-removal");
         }
 
-        let status = Command::new("git")
+        let output = Command::new("git")
             .args(&add_args)
+            .current_dir(worktree_repo)
             .env("GIT_INDEX_FILE", temp_index_path)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await
+            .stderr(Stdio::piped())
+            .output()
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to stage changes: {}", e)))?;
 
-        if !status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to stage changes for snapshot"));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to stage changes for snapshot: {}", stderr)));
         }
 
         // Create commit message
@@ -213,16 +251,16 @@ impl GitProvider {
         // Read the tree from the temporary index
         let tree_output = Command::new("git")
             .args(["write-tree"])
+            .current_dir(worktree_repo)
             .env("GIT_INDEX_FILE", temp_index_path)
-            .current_dir(primary_repo)
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .output()
-            .await
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to write tree: {}", e)))?;
 
         if !tree_output.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to write tree from index"));
+            let stderr = String::from_utf8_lossy(&tree_output.stderr);
+            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to write tree from index: {}", stderr)));
         }
 
         let tree_hash = String::from_utf8_lossy(&tree_output.stdout).trim().to_string();
@@ -232,20 +270,19 @@ impl GitProvider {
             .args(&commit_tree_args)
             .current_dir(shadow_repo)
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .output()
-            .await
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create commit: {}", e)))?;
 
         if !commit_output.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to create snapshot commit"));
+            let stderr = String::from_utf8_lossy(&commit_output.stderr);
+            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to create snapshot commit: {}", stderr)));
         }
 
         Ok(String::from_utf8_lossy(&commit_output.stdout).trim().to_string())
     }
 }
 
-#[async_trait]
 impl FsSnapshotProvider for GitProvider {
     fn kind(&self) -> SnapshotProviderKind {
         SnapshotProviderKind::Git
@@ -282,7 +319,7 @@ impl FsSnapshotProvider for GitProvider {
         }
     }
 
-    async fn prepare_writable_workspace(
+    fn prepare_writable_workspace(
         &self,
         repo: &Path,
         mode: WorkingCopyMode,
@@ -306,16 +343,15 @@ impl FsSnapshotProvider for GitProvider {
                 // Create worktree
                 let status = Command::new("git")
                     .args([
-                        "-C", &repo.to_string_lossy(),
                         "worktree", "add",
                         "--detach",
                         &worktree_path.to_string_lossy(),
                         "HEAD"
                     ])
+                    .current_dir(repo)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .await
                     .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create worktree: {}", e)))?;
 
                 if !status.success() {
@@ -331,14 +367,14 @@ impl FsSnapshotProvider for GitProvider {
             }
             WorkingCopyMode::CowOverlay | WorkingCopyMode::Auto => {
                 // Fall back to worktree mode for Git
-                Box::pin(self.prepare_writable_workspace(repo, WorkingCopyMode::Worktree)).await
+                self.prepare_writable_workspace(repo, WorkingCopyMode::Worktree)
             }
         }
     }
 
-    async fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
-        let shadow_repo = self.ensure_shadow_repo(&ws.exec_path).await?;
-        let commit_hash = self.create_snapshot_commit(&ws.exec_path, &shadow_repo, label).await?;
+    fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
+        let shadow_repo = self.ensure_shadow_repo(&ws.exec_path)?;
+        let commit_hash = self.create_snapshot_commit(&ws.exec_path, &shadow_repo, label)?;
 
         let mut meta = HashMap::new();
         meta.insert("shadow_repo".to_string(), shadow_repo.to_string_lossy().to_string());
@@ -352,7 +388,7 @@ impl FsSnapshotProvider for GitProvider {
         })
     }
 
-    async fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
+    fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
         // For Git, create a temporary worktree at the snapshot commit
         let shadow_repo = PathBuf::from(snap.meta.get("shadow_repo").as_ref()
             .ok_or_else(|| aw_fs_snapshots_traits::Error::provider("Missing shadow_repo in snapshot metadata"))?);
@@ -371,7 +407,6 @@ impl FsSnapshotProvider for GitProvider {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .await
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create readonly worktree: {}", e)))?;
 
         if !status.success() {
@@ -381,7 +416,7 @@ impl FsSnapshotProvider for GitProvider {
         Ok(worktree_path)
     }
 
-    async fn branch_from_snapshot(
+    fn branch_from_snapshot(
         &self,
         snap: &SnapshotRef,
         mode: WorkingCopyMode,
@@ -407,7 +442,6 @@ impl FsSnapshotProvider for GitProvider {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .await
                     .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create branch worktree: {}", e)))?;
 
                 if !status.success() {
@@ -425,7 +459,7 @@ impl FsSnapshotProvider for GitProvider {
         }
     }
 
-    async fn cleanup(&self, token: &str) -> Result<()> {
+    fn cleanup(&self, token: &str) -> Result<()> {
         if token.starts_with("git:inplace:") {
             // Nothing to cleanup for in-place mode
             Ok(())
@@ -443,11 +477,10 @@ impl FsSnapshotProvider for GitProvider {
                     .arg(&worktree_path)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
-                    .status()
-                    .await;
+                    .status();
 
                 // Remove worktree directory if it still exists
-                let _ = tokio::fs::remove_dir_all(&worktree_path).await;
+                let _ = std::fs::remove_dir_all(&worktree_path);
             }
             Ok(())
         } else if token.starts_with("git:branch:") {
@@ -464,11 +497,10 @@ impl FsSnapshotProvider for GitProvider {
                     .arg(&worktree_path)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
-                    .status()
-                    .await;
+                    .status();
 
                 // Remove worktree directory if it still exists
-                let _ = tokio::fs::remove_dir_all(&worktree_path).await;
+                let _ = std::fs::remove_dir_all(&worktree_path);
             }
             Ok(())
         } else {
@@ -487,8 +519,8 @@ mod tests {
         assert_eq!(provider.kind(), SnapshotProviderKind::Git);
     }
 
-    #[tokio::test]
-    async fn test_git_capabilities_on_non_git_path() {
+    #[test]
+    fn test_git_capabilities_on_non_git_path() {
         let provider = GitProvider::new();
         let capabilities = provider.detect_capabilities(Path::new("/tmp"));
 
@@ -498,12 +530,12 @@ mod tests {
         assert!(!capabilities.supports_cow_overlay);
     }
 
-    #[tokio::test]
-    async fn test_git_inplace_workspace_creation() {
+    #[test]
+    fn test_git_inplace_workspace_creation() {
         let provider = GitProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::InPlace).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::InPlace);
 
         // Should succeed even without git repo
         assert!(result.is_ok());
@@ -513,41 +545,41 @@ mod tests {
         assert!(ws.cleanup_token.starts_with("git:inplace:"));
     }
 
-    #[tokio::test]
-    async fn test_git_worktree_mode_not_implemented() {
+    #[test]
+    fn test_git_worktree_mode_not_implemented() {
         let provider = GitProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree);
 
         // Should fail without a real git repo
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn test_git_auto_mode_falls_back_to_worktree() {
+    #[test]
+    fn test_git_auto_mode_falls_back_to_worktree() {
         let provider = GitProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Auto).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Auto);
 
         // Should fail (same as worktree without real repo)
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn test_cleanup_invalid_token() {
+    #[test]
+    fn test_cleanup_invalid_token() {
         let provider = GitProvider::new();
-        let result = provider.cleanup("invalid:token").await;
+        let result = provider.cleanup("invalid:token");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid Git cleanup token"));
     }
 
-    #[tokio::test]
-    async fn test_cleanup_inplace_token() {
+    #[test]
+    fn test_cleanup_inplace_token() {
         let provider = GitProvider::new();
-        let result = provider.cleanup("git:inplace:/some/path").await;
+        let result = provider.cleanup("git:inplace:/some/path");
 
         // Should succeed (no-op)
         assert!(result.is_ok());
@@ -567,8 +599,8 @@ mod tests {
         assert!(id1.contains(&pid));
     }
 
-    #[tokio::test]
-    async fn test_shadow_repo_path_deterministic() {
+    #[test]
+    fn test_shadow_repo_path_deterministic() {
         let provider = GitProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 

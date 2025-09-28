@@ -84,7 +84,7 @@ mod tests {
             use aw_fs_snapshots_zfs::ZfsProvider;
             let zfs_provider = ZfsProvider::new();
 
-            let ws_result = zfs_provider.prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree).await;
+            let ws_result = zfs_provider.prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree);
             match ws_result {
                 Ok(ws) => {
                     println!("ZFS workspace created: {:?}", ws.exec_path);
@@ -102,7 +102,7 @@ mod tests {
                     assert!(!mount_point.join("integration_test.txt").exists());
 
                     // Cleanup
-                    let _ = zfs_provider.cleanup(&ws.cleanup_token).await;
+                    let _ = zfs_provider.cleanup(&ws.cleanup_token);
                 }
                 Err(e) => {
                     println!("ZFS workspace creation failed: {}", e);

@@ -2,9 +2,9 @@
 
 use crate::types::{Request, Response};
 use ssz::{Decode, Encode};
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
 use std::path::Path;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
 
 /// Default path to the daemon socket.
 pub const DEFAULT_SOCKET_PATH: &str = "/tmp/agent-workflow/aw-fs-snapshots-daemon";
@@ -36,9 +36,8 @@ impl DaemonClient {
     }
 
     /// Send a request to the daemon and wait for a response.
-    pub async fn send_request(&self, request: Request) -> Result<Response, DaemonError> {
+    pub fn send_request(&self, request: Request) -> Result<Response, DaemonError> {
         let mut stream = UnixStream::connect(&self.socket_path)
-            .await
             .map_err(|e| DaemonError::ConnectionError(format!("Failed to connect to daemon socket: {}", e)))?;
 
         // Encode request as SSZ bytes and hex
@@ -46,14 +45,14 @@ impl DaemonClient {
         let request_hex = hex::encode(&request_bytes);
 
         // Send request
-        stream.write_all(format!("{}\n", request_hex).as_bytes()).await
+        stream.write_all(format!("{}\n", request_hex).as_bytes())
             .map_err(|e| DaemonError::CommunicationError(format!("Failed to send request: {}", e)))?;
 
         // Read response
-        let mut reader = tokio::io::BufReader::new(stream);
+        let mut reader = BufReader::new(stream);
         let mut response_line = String::new();
 
-        reader.read_line(&mut response_line).await
+        reader.read_line(&mut response_line)
             .map_err(|e| DaemonError::CommunicationError(format!("Failed to read response: {}", e)))?;
 
         let response_hex = response_line.trim();
@@ -69,8 +68,8 @@ impl DaemonClient {
     }
 
     /// Ping the daemon to check if it's alive and responsive.
-    pub async fn ping(&self) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::ping()).await?;
+    pub fn ping(&self) -> Result<(), DaemonError> {
+        let response = self.send_request(Request::ping())?;
 
         match response {
             Response::Success(_) => Ok(()),
@@ -80,8 +79,8 @@ impl DaemonClient {
     }
 
     /// Create a ZFS snapshot.
-    pub async fn snapshot_zfs(&self, source: &str, snapshot: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::snapshot_zfs(source.to_string(), snapshot.to_string())).await?;
+    pub fn snapshot_zfs(&self, source: &str, snapshot: &str) -> Result<(), DaemonError> {
+        let response = self.send_request(Request::snapshot_zfs(source.to_string(), snapshot.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(()),
@@ -91,8 +90,8 @@ impl DaemonClient {
     }
 
     /// Clone a ZFS snapshot.
-    pub async fn clone_zfs(&self, snapshot: &str, clone: &str) -> Result<Option<String>, DaemonError> {
-        let response = self.send_request(Request::clone_zfs(snapshot.to_string(), clone.to_string())).await?;
+    pub fn clone_zfs(&self, snapshot: &str, clone: &str) -> Result<Option<String>, DaemonError> {
+        let response = self.send_request(Request::clone_zfs(snapshot.to_string(), clone.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(None),
@@ -103,8 +102,8 @@ impl DaemonClient {
     }
 
     /// Delete a ZFS dataset.
-    pub async fn delete_zfs(&self, target: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::delete_zfs(target.to_string())).await?;
+    pub fn delete_zfs(&self, target: &str) -> Result<(), DaemonError> {
+        let response = self.send_request(Request::delete_zfs(target.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(()),
@@ -114,8 +113,8 @@ impl DaemonClient {
     }
 
     /// Create a Btrfs snapshot.
-    pub async fn snapshot_btrfs(&self, source: &str, destination: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::snapshot_btrfs(source.to_string(), destination.to_string())).await?;
+    pub fn snapshot_btrfs(&self, source: &str, destination: &str) -> Result<(), DaemonError> {
+        let response = self.send_request(Request::snapshot_btrfs(source.to_string(), destination.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(()),
@@ -125,8 +124,8 @@ impl DaemonClient {
     }
 
     /// Clone a Btrfs subvolume.
-    pub async fn clone_btrfs(&self, source: &str, destination: &str) -> Result<Option<String>, DaemonError> {
-        let response = self.send_request(Request::clone_btrfs(source.to_string(), destination.to_string())).await?;
+    pub fn clone_btrfs(&self, source: &str, destination: &str) -> Result<Option<String>, DaemonError> {
+        let response = self.send_request(Request::clone_btrfs(source.to_string(), destination.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(None),
@@ -137,8 +136,8 @@ impl DaemonClient {
     }
 
     /// Delete a Btrfs subvolume.
-    pub async fn delete_btrfs(&self, target: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::delete_btrfs(target.to_string())).await?;
+    pub fn delete_btrfs(&self, target: &str) -> Result<(), DaemonError> {
+        let response = self.send_request(Request::delete_btrfs(target.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(()),
@@ -174,8 +173,8 @@ pub enum DaemonError {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_client_creation() {
+    #[test]
+    fn test_client_creation() {
         let client = DaemonClient::new();
         assert_eq!(client.socket_path, DEFAULT_SOCKET_PATH);
 
@@ -184,8 +183,8 @@ mod tests {
         assert_eq!(custom_client.socket_path, custom_path);
     }
 
-    #[tokio::test]
-    async fn test_request_construction() {
+    #[test]
+    fn test_request_construction() {
         let ping_req = Request::ping();
         assert!(matches!(ping_req, Request::Ping(_)));
 

@@ -10,13 +10,12 @@ use tempfile::TempDir;
 use tokio::process::Command;
 
 /// Check if git is available on the system.
-pub async fn git_available() -> bool {
-    Command::new("git")
+pub fn git_available() -> bool {
+    std::process::Command::new("git")
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .await
         .map(|s| s.success())
         .unwrap_or(false)
 }
@@ -148,7 +147,7 @@ pub async fn create_git_repo_with_remote(
     }
 
     // Create local repository and commit
-    initialize_git_repo_with_config(&local_path, &config).await?;
+    initialize_git_repo_with_config(&local_path, &config)?;
 
     // Add remote
     let status = Command::new("git")
@@ -179,24 +178,23 @@ pub async fn create_git_repo(
     let repo = TempDir::new()?;
     let path = repo.path().to_path_buf();
 
-    initialize_git_repo_with_config(&path, &config).await?;
+    initialize_git_repo_with_config(&path, &config)?;
 
     Ok(SimpleGitRepo { repo, path })
 }
 
 /// Initialize git repository on an existing directory with the given configuration.
-pub async fn initialize_git_repo_with_config(
+pub fn initialize_git_repo_with_config(
     repo_path: &Path,
     config: &GitRepoConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Initialize git repo
-    let status = Command::new("git")
+    let status = std::process::Command::new("git")
         .args(["init", "-b", "main"])
         .current_dir(repo_path)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .await?;
+        .status()?;
 
     if !status.success() {
         return Err("Failed to initialize git repository".into());
@@ -214,13 +212,12 @@ pub async fn initialize_git_repo_with_config(
     }
 
     for args in config_commands {
-        let status = Command::new("git")
+        let status = std::process::Command::new("git")
             .args(&args)
             .current_dir(repo_path)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .status()
-            .await?;
+            .status()?;
 
         if !status.success() {
             return Err(format!("Failed to configure git: {:?}", args).into());
@@ -229,24 +226,22 @@ pub async fn initialize_git_repo_with_config(
 
     // Create initial commit if requested
     if config.create_initial_commit {
-        tokio::fs::write(repo_path.join("README.md"), "Initial content").await?;
-        let status = Command::new("git")
+        std::fs::write(repo_path.join("README.md"), "Initial content")?;
+        let status = std::process::Command::new("git")
             .args(["add", "README.md"])
             .current_dir(repo_path)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .status()
-            .await?;
+            .status()?;
 
         if !status.success() {
             return Err("Failed to stage initial file".into());
         }
 
-        let output = Command::new("git")
+        let output = std::process::Command::new("git")
             .args(["commit", "-m", &config.initial_commit_message])
             .current_dir(repo_path)
-            .output()
-            .await?;
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -258,8 +253,8 @@ pub async fn initialize_git_repo_with_config(
 }
 
 /// Initialize git repository on an existing directory with default configuration.
-pub async fn initialize_git_repo(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    initialize_git_repo_with_config(repo_path, &GitRepoConfig::default()).await
+pub fn initialize_git_repo(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    initialize_git_repo_with_config(repo_path, &GitRepoConfig::default())
 }
 
 
@@ -385,7 +380,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_git_repo_creation() {
-        if !git_available().await {
+        if !git_available() {
             println!("Skipping Git test: git command not available");
             return;
         }
@@ -412,7 +407,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_git_test_repo_creation() {
-        if !git_available().await {
+        if !git_available() {
             println!("Skipping Git test: git command not available");
             return;
         }
@@ -442,7 +437,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_git_repo_commit_creation() {
-        if !git_available().await {
+        if !git_available() {
             println!("Skipping Git test: git command not available");
             return;
         }
@@ -469,7 +464,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_git_repo_staging() {
-        if !git_available().await {
+        if !git_available() {
             println!("Skipping Git test: git command not available");
             return;
         }
@@ -484,7 +479,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_git_repo_uncommitted() {
-        if !git_available().await {
+        if !git_available() {
             println!("Skipping Git test: git command not available");
             return;
         }

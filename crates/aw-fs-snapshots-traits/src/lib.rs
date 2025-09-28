@@ -3,7 +3,6 @@
 //! This crate contains the shared abstractions used by all filesystem snapshot providers
 //! to avoid circular dependencies between the main crate and provider implementations.
 
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -85,7 +84,6 @@ pub struct SnapshotRef {
 }
 
 /// Core trait for filesystem snapshot providers.
-#[async_trait]
 pub trait FsSnapshotProvider: Send + Sync {
     /// Return the kind of this provider.
     fn kind(&self) -> SnapshotProviderKind;
@@ -94,25 +92,25 @@ pub trait FsSnapshotProvider: Send + Sync {
     fn detect_capabilities(&self, repo: &Path) -> ProviderCapabilities;
 
     /// Create a session workspace (independent or in-place) for the selected working-copy mode.
-    async fn prepare_writable_workspace(
+    fn prepare_writable_workspace(
         &self,
         repo: &Path,
         mode: WorkingCopyMode,
     ) -> Result<PreparedWorkspace>;
 
     /// Snapshot current workspace state; label is optional UI hint.
-    async fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef>;
+    fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef>;
 
     /// Read-only inspection mount for a snapshot (optional).
-    async fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf>;
+    fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf>;
 
     /// Create a new writable workspace (branch) from a snapshot.
-    async fn branch_from_snapshot(
+    fn branch_from_snapshot(
         &self,
         snap: &SnapshotRef,
         mode: WorkingCopyMode,
     ) -> Result<PreparedWorkspace>;
 
     /// Cleanup/destroy any resources created by this provider (workspaces, mounts).
-    async fn cleanup(&self, token: &str) -> Result<()>;
+    fn cleanup(&self, token: &str) -> Result<()>;
 }

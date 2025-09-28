@@ -1,6 +1,5 @@
 //! ZFS snapshot provider implementation for Agents Workflow.
 
-use async_trait::async_trait;
 use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
 use aw_fs_snapshots_daemon::client::{DaemonClient, DaemonError};
 use std::collections::HashMap;
@@ -99,8 +98,8 @@ impl ZfsProvider {
     }
 
     /// Check if daemon is available and responsive.
-    async fn daemon_available(&self) -> bool {
-        self.daemon_client.ping().await.is_ok()
+    fn daemon_available(&self) -> bool {
+        self.daemon_client.ping().is_ok()
     }
 
     /// Generate a unique identifier for ZFS resources.
@@ -114,7 +113,6 @@ impl ZfsProvider {
     }
 }
 
-#[async_trait]
 impl FsSnapshotProvider for ZfsProvider {
     fn kind(&self) -> SnapshotProviderKind {
         SnapshotProviderKind::Zfs
@@ -162,7 +160,7 @@ impl FsSnapshotProvider for ZfsProvider {
         }
     }
 
-    async fn prepare_writable_workspace(
+    fn prepare_writable_workspace(
         &self,
         repo: &Path,
         mode: WorkingCopyMode,
@@ -179,7 +177,7 @@ impl FsSnapshotProvider for ZfsProvider {
             }
             WorkingCopyMode::CowOverlay => {
                 // Check if daemon is available before proceeding
-                if !self.daemon_available().await {
+                if !self.daemon_available() {
                     return Err(aw_fs_snapshots_traits::Error::provider(
                         "ZFS daemon not available - required for privileged operations"
                     ));
@@ -191,12 +189,12 @@ impl FsSnapshotProvider for ZfsProvider {
                 let snapshot_name = format!("{}@aw_snapshot_{}", dataset, unique_id);
                 let clone_name = format!("{}-aw_clone_{}", dataset, unique_id);
 
-                // Create snapshot via daemon
-                self.daemon_client.snapshot_zfs(&dataset, &snapshot_name).await
-                    .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create ZFS snapshot: {}", e)))?;
+        // Create snapshot via daemon
+        self.daemon_client.snapshot_zfs(&dataset, &snapshot_name)
+            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create ZFS snapshot: {}", e)))?;
 
                 // Create clone via daemon
-                let mountpoint = self.daemon_client.clone_zfs(&snapshot_name, &clone_name).await
+                let mountpoint = self.daemon_client.clone_zfs(&snapshot_name, &clone_name)
                     .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create ZFS clone: {}", e)))?;
 
                 let exec_path = match mountpoint {
@@ -224,13 +222,13 @@ impl FsSnapshotProvider for ZfsProvider {
         }
     }
 
-    async fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
+    fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
         let dataset = self.get_dataset_for_path(&ws.exec_path)?;
         let unique_id = self.generate_unique_id();
         let snapshot_name = format!("{}@aw_session_{}", dataset, unique_id);
 
         // Create snapshot via daemon
-        self.daemon_client.snapshot_zfs(&dataset, &snapshot_name).await
+        self.daemon_client.snapshot_zfs(&dataset, &snapshot_name)
             .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create ZFS snapshot: {}", e)))?;
 
         let mut meta = HashMap::new();
@@ -245,7 +243,7 @@ impl FsSnapshotProvider for ZfsProvider {
         })
     }
 
-    async fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
+    fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
         // For ZFS, snapshots are typically accessed by mounting the snapshot directly
         // This is a simplified implementation
         let snapshot_path = format!("{}/.zfs/snapshot/{}", snap.meta.get("dataset").unwrap_or(&"".to_string()), snap.id.split('@').next_back().unwrap_or(""));
@@ -258,7 +256,7 @@ impl FsSnapshotProvider for ZfsProvider {
         }
     }
 
-    async fn branch_from_snapshot(
+    fn branch_from_snapshot(
         &self,
         snap: &SnapshotRef,
         mode: WorkingCopyMode,
@@ -269,7 +267,7 @@ impl FsSnapshotProvider for ZfsProvider {
                 let clone_name = format!("{}-aw_branch_{}", snap.meta.get("dataset").unwrap_or(&"".to_string()), unique_id);
 
                 // Create clone from the snapshot via daemon
-                let mountpoint = self.daemon_client.clone_zfs(&snap.id, &clone_name).await
+                let mountpoint = self.daemon_client.clone_zfs(&snap.id, &clone_name)
                     .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create ZFS clone: {}", e)))?;
 
                 let exec_path = match mountpoint {
@@ -292,7 +290,7 @@ impl FsSnapshotProvider for ZfsProvider {
         }
     }
 
-    async fn cleanup(&self, token: &str) -> Result<()> {
+    fn cleanup(&self, token: &str) -> Result<()> {
         if token.starts_with("zfs:inplace:") {
             // Nothing to cleanup for in-place mode
             Ok(())
@@ -304,14 +302,14 @@ impl FsSnapshotProvider for ZfsProvider {
                 let clone = parts[3];
 
                 // Destroy clone first, then snapshot via daemon
-                let _ = self.daemon_client.delete_zfs(clone).await;
-                let _ = self.daemon_client.delete_zfs(snapshot).await;
+                let _ = self.daemon_client.delete_zfs(clone);
+                let _ = self.daemon_client.delete_zfs(snapshot);
             }
             Ok(())
         } else if token.starts_with("zfs:branch:") {
             // Format: zfs:branch:clone_name
             let clone = token.strip_prefix("zfs:branch:").unwrap_or(token);
-            let _ = self.daemon_client.delete_zfs(clone).await;
+            let _ = self.daemon_client.delete_zfs(clone);
             Ok(())
         } else {
             Err(aw_fs_snapshots_traits::Error::provider(format!("Invalid ZFS cleanup token: {}", token)))
@@ -330,8 +328,8 @@ mod tests {
         assert_eq!(provider.kind(), SnapshotProviderKind::Zfs);
     }
 
-    #[tokio::test]
-    async fn test_zfs_capabilities_on_non_zfs_path() {
+    #[test]
+    fn test_zfs_capabilities_on_non_zfs_path() {
         let provider = ZfsProvider::new();
         let capabilities = provider.detect_capabilities(Path::new("/tmp"));
 
@@ -341,12 +339,12 @@ mod tests {
         assert!(!capabilities.supports_cow_overlay);
     }
 
-    #[tokio::test]
-    async fn test_zfs_inplace_workspace_creation() {
+    #[test]
+    fn test_zfs_inplace_workspace_creation() {
         let provider = ZfsProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::InPlace).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::InPlace);
 
         // Should succeed even without ZFS
         assert!(result.is_ok());
@@ -356,41 +354,41 @@ mod tests {
         assert!(ws.cleanup_token.starts_with("zfs:inplace:"));
     }
 
-    #[tokio::test]
-    async fn test_zfs_worktree_mode_not_implemented() {
+    #[test]
+    fn test_zfs_worktree_mode_not_implemented() {
         let provider = ZfsProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree);
 
         // Should fail with not implemented error
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn test_zfs_auto_mode_falls_back_to_worktree() {
+    #[test]
+    fn test_zfs_auto_mode_falls_back_to_worktree() {
         let provider = ZfsProvider::new();
         let repo_path = Path::new("/tmp/test_repo");
 
-        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Auto).await;
+        let result = provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Auto);
 
         // Should fail with not implemented error (same as worktree)
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn test_cleanup_invalid_token() {
+    #[test]
+    fn test_cleanup_invalid_token() {
         let provider = ZfsProvider::new();
-        let result = provider.cleanup("invalid:token").await;
+        let result = provider.cleanup("invalid:token");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid ZFS cleanup token"));
     }
 
-    #[tokio::test]
-    async fn test_cleanup_inplace_token() {
+    #[test]
+    fn test_cleanup_inplace_token() {
         let provider = ZfsProvider::new();
-        let result = provider.cleanup("zfs:inplace:/some/path").await;
+        let result = provider.cleanup("zfs:inplace:/some/path");
 
         // Should succeed (no-op)
         assert!(result.is_ok());
