@@ -131,7 +131,7 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
 
             for mode in modes_to_try {
                 println!("  Trying mode: {:?}", mode);
-                match provider.prepare_writable_workspace(workspace_path, mode).await {
+                match provider.prepare_writable_workspace(workspace_path, mode) {
                     Ok(workspace) => {
                         println!("Successfully prepared workspace with {} provider using {:?}", name, mode);
                         return Ok(workspace);

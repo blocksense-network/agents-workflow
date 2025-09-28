@@ -23,4 +23,7 @@ pub enum Error {
     #[cfg(feature = "cgroups")]
     #[error("Cgroup error: {0}")]
     Cgroup(#[from] sandbox_cgroups::error::Error),
+
+    #[error("Filesystem error: {0}")]
+    Filesystem(#[from] sandbox_fs::error::Error),
 }

@@ -207,7 +207,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Execute the process as PID 1 in child process, wait for completion
     // Parent process will return after child completes
-    match sandbox.exec_process() {
+    match sandbox.exec_process().await {
         Ok(_) => {
             info!("Sandbox execution completed successfully");
             std::process::exit(0);

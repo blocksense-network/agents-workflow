@@ -2,7 +2,7 @@
 
 #![cfg(target_os = "linux")]
 
-use nix::mount::{mount, MsFlags};
+use nix::mount::{mount, umount2, MntFlags, MsFlags};
 use std::path::{Path, PathBuf};
 use std::fs;
 use tracing::{debug, info, warn};
@@ -161,6 +161,30 @@ impl FilesystemManager {
     pub async fn cleanup_mounts(&self) -> Result<()> {
         debug!("Starting filesystem cleanup");
 
+        // First, unmount overlays in reverse order (most nested first)
+        for overlay_path in self.config.overlay_paths.iter().rev() {
+            debug!("Attempting to unmount overlay at: {}", overlay_path);
+            match umount2(overlay_path.as_str(), MntFlags::MNT_DETACH) {
+                Ok(()) => debug!("Successfully unmounted overlay: {}", overlay_path),
+                Err(e) => {
+                    // Try lazy unmount if regular unmount fails
+                    match umount2(overlay_path.as_str(), MntFlags::MNT_DETACH | MntFlags::MNT_FORCE) {
+                        Ok(()) => debug!("Successfully force-unmounted overlay: {}", overlay_path),
+                        Err(e2) => debug!("Failed to unmount overlay {}: {} (force unmount also failed: {})", overlay_path, e, e2),
+                    }
+                }
+            }
+        }
+
+        // Unmount bind mounts in reverse order
+        for (source, target) in self.config.bind_mounts.iter().rev() {
+            debug!("Attempting to unmount bind mount: {} -> {}", source, target);
+            match umount2(target.as_str(), MntFlags::MNT_DETACH) {
+                Ok(()) => debug!("Successfully unmounted bind mount: {}", target),
+                Err(e) => debug!("Failed to unmount bind mount {}: {}", target, e),
+            }
+        }
+
         // Clean up overlay directories if they exist
         if let Ok(session_dir) = self.ensure_session_state_dir() {
             for overlay_path in &self.config.overlay_paths {
@@ -195,8 +219,6 @@ impl FilesystemManager {
             }
         }
 
-        // TODO: Implement mount unmounting - this would involve tracking mounts
-        // and unmounting them in reverse order
         debug!("Filesystem cleanup complete");
         Ok(())
     }
