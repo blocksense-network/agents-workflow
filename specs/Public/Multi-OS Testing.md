@@ -119,9 +119,9 @@ This is done through the `aw agent followers slurp` command which takes a list o
 
 The files paths and globs specify files that will be fetched from the followers. File paths and globs MUST be relative to the workspace directory.
 
-By default, each requested file set is considered optional, unless it's marked as required. Typically, these would be build artificats which have unique names per platform, so a single follower will respond with the requested file set.
+By default, each requested file set is considered optional, unless it's marked as required. Typically, these would be build artifacts which have unique names per platform, so a single follower will respond with the requested file set.
 
-If multiple responses are present, the results are written in the destination folder under a sub-directory `<fileset-name>/<follower-name>`. Please note that a different destination folder can be specified for each requested file set. The donwloaded files are first written to a temporary location until their unique/non-unique status is resolved and then they are moved to their final destination.
+If multiple responses are present, the results are written in the destination folder under a sub-directory `<fileset-name>/<follower-name>`. Please note that a different destination folder can be specified for each requested file set. The downloaded files are first written to a temporary location until their unique/non-unique status is resolved and then they are moved to their final destination.
 
 Compression is determined per-file by the sender by examining the format of the requested files; checksum verification runs after each host finishes.
 

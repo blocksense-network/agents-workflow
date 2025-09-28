@@ -8,5 +8,3 @@ aw-rest-api-contract = { path = "../aw-rest-api-contract" }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-
-

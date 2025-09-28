@@ -173,7 +173,7 @@ The Swift FSKit extension is now fully integrated with the Rust AgentFS core:
 2. **Prepare libraries**: `./build.sh` copies Rust libraries to Swift project
 3. **Build Swift**: `swift build` or open in Xcode
 
-### Testing
+### Integration Testing
 
 Run the integration test: `./test-integration.sh`
 

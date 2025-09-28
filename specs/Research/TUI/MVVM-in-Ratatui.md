@@ -114,7 +114,7 @@ pub fn render(f: &mut Frame<'_>, vm: &ViewModel) {
 
 # How to test this (fast!)
 
-### 1) Pure unit tests for Model and ViewModel
+## 1) Pure unit tests for Model and ViewModel
 
 These don’t need `Terminal` or `TestBackend`. They’re lightning-fast and cover most logic.
 
@@ -152,7 +152,7 @@ fn view_model_formats_status_and_selection() {
 }
 ```
 
-### 2) (Optional) End-to-end with `TestBackend`
+## 2) (Optional) End-to-end with `TestBackend`
 
 Use these sparingly, just to ensure your view renders as expected.
 

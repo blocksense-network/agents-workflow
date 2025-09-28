@@ -16,8 +16,8 @@ A lightweight, deterministic mock "coding agent" that can impersonate both Codex
 
 The agent can impersonate different tools via the `--format` flag:
 
-- **Codex Format** (`--format codex`, default): Compatible with [Codex Session File Format](../../specs/Research/Codex-Session-File-Format.md)
-- **Claude Format** (`--format claude`): Compatible with [Claude Session File Format](../../specs/Research/Claude-Session-File-Format.md)
+- **Codex Format** (`--format codex`, default): Compatible with [Codex Session File Format](../../../specs/Research/Codex-Session-File-Format.md)
+- **Claude Format** (`--format claude`): Compatible with [Claude Session File Format](../../../specs/Research/Claude-Session-File-Format.md)
 
 Each format creates session files in the appropriate directory structure with tool-specific metadata, conversation threading, and environment context.
 
@@ -253,7 +253,7 @@ Mimics Claude Code's session format with rich conversation threading and context
 - **Features**: Git integration, environment tracking, usage statistics, tool result metadata
 - **Use Case**: Testing applications that integrate with Claude Code
 
-See [Codex Session File Format](../../specs/Research/Codex-Session-File-Format.md) and [Claude Session File Format](../../specs/Research/Claude-Session-File-Format.md) for detailed specifications.
+See [Codex Session File Format](../../../specs/Research/Codex-Session-File-Format.md) and [Claude Session File Format](../../../specs/Research/Claude-Session-File-Format.md) for detailed specifications.
 
 ## Scenario Format
 

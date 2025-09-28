@@ -26,17 +26,20 @@ class TestZfsProvider < Minitest::Test
     @dataset_name = "#{@pool_name}/test_dataset"
 
     unless zfs_pool_exists?(@pool_name)
-      skip "ZFS test pool '#{@pool_name}' not found. Run 'just create-test-filesystems' to set up reusable test filesystems."
+      skip "ZFS test pool '#{@pool_name}' not found. " \
+           "Run 'just create-test-filesystems' to set up reusable test filesystems."
     end
 
     unless zfs_dataset_exists?(@dataset_name)
-      skip "ZFS test dataset '#{@dataset_name}' not found. Run 'just create-test-filesystems' to set up reusable test filesystems."
+      skip "ZFS test dataset '#{@dataset_name}' not found. " \
+           "Run 'just create-test-filesystems' to set up reusable test filesystems."
     end
 
     # Use the pre-created dataset for testing
     @repo_dir = zfs_get_mountpoint(@dataset_name)
     unless @repo_dir && Dir.exist?(@repo_dir)
-      skip "ZFS test dataset '#{@dataset_name}' is not mounted. Run 'just create-test-filesystems' to set up reusable test filesystems."
+      skip "ZFS test dataset '#{@dataset_name}' is not mounted. " \
+           "Run 'just create-test-filesystems' to set up reusable test filesystems."
     end
 
     # Initialize the repo with test content if it doesn't exist
@@ -87,7 +90,8 @@ class TestZfsProvider < Minitest::Test
     end
 
     # Also clean up any agent snapshots without PID (legacy)
-    `zfs list -H -o name -t snapshot 2>/dev/null | grep "^agents_workflow_test_zfs/test_dataset@agent[0-9]"`.each_line do |snapshot|
+    `zfs list -H -o name -t snapshot 2>/dev/null | grep "^agents_workflow_test_zfs/test_dataset@agent[0-9]"`
+      .each_line do |snapshot|
       snapshots_to_destroy << snapshot.strip!
     end
 
@@ -327,7 +331,8 @@ class TestZfsProvider < Minitest::Test
 
   def test_zfs_snapshot_and_clone_operations
     unless zfs_mounting_available?
-      skip 'ZFS mounting not available for regular users. Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
+      skip 'ZFS mounting not available for regular users. ' \
+           'Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
     end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
     workspace_dir = create_workspace_destination('clone_test')
@@ -371,7 +376,8 @@ class TestZfsProvider < Minitest::Test
 
   def test_zfs_error_conditions
     unless zfs_mounting_available?
-      skip 'ZFS mounting not available for regular users. Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
+      skip 'ZFS mounting not available for regular users. ' \
+           'Start the daemon with `just legacy-start-aw-fs-snapshots-daemon`'
     end
     provider = Snapshot::ZfsProvider.new(@repo_dir)
 

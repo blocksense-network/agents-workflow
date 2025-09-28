@@ -12,7 +12,7 @@ require 'etc'
 class TestMockAgentPerformance < Minitest::Test
   private
 
-  def get_process_memory
+  def process_memory
     # Get memory usage in KB using ps command
     output = `ps -o rss= -p #{Process.pid}`.strip
     output.to_i
@@ -163,7 +163,7 @@ class TestMockAgentPerformance < Minitest::Test
 
     # Only run this test on systems with memory monitoring
     if system('which ps > /dev/null 2>&1')
-      initial_memory = get_process_memory
+      initial_memory = process_memory
 
       num_agents = 6
       workspaces = (1..num_agents).map { |i| create_workspace("memory_#{i}") }
@@ -185,7 +185,7 @@ class TestMockAgentPerformance < Minitest::Test
       max_memory = initial_memory
       monitor_thread = Thread.new do
         while threads.any?(&:alive?)
-          current_memory = get_process_memory
+          current_memory = process_memory
           max_memory = [max_memory, current_memory].max
           sleep(0.1)
         end
@@ -194,7 +194,7 @@ class TestMockAgentPerformance < Minitest::Test
       threads.each(&:join)
       monitor_thread.kill
 
-      final_memory = get_process_memory
+      final_memory = process_memory
       memory_increase = max_memory - initial_memory
 
       puts "  Initial memory: #{initial_memory} KB"
@@ -386,14 +386,5 @@ class TestMockAgentPerformance < Minitest::Test
   def cleanup_workspaces
     @workspaces.each { |ws| cleanup_workspace(ws) }
     @workspaces.clear
-  end
-
-  def process_memory
-    # Get memory usage of current process in KB
-    pid = Process.pid
-    memory_line = `ps -o rss= -p #{pid}`.strip
-    memory_line.to_i
-  rescue StandardError
-    0
   end
 end

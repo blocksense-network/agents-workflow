@@ -233,7 +233,7 @@ The TUI implementation provides these core capabilities:
   - `aw-mux-core` crate with low-level multiplexer trait and shared types
   - `aw-mux` crate with pure multiplexer implementations (tmux, kitty, etc.)
   - `aw-tui-multiplexer` crate with AW-specific abstractions and layouts
-  - Core trait definitions following [specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md](specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md) specifications
+  - Core trait definitions following [TUI-Multiplexers-Overview.md](Terminal-Multiplexers/TUI-Multiplexers-Overview.md) specifications
 
 - **Test Coverage**:
 
@@ -251,7 +251,7 @@ The TUI implementation provides these core capabilities:
   - **aw-mux-core**: Complete trait definitions with WindowId/PaneId types, SplitDirection enum, WindowOptions/CommandOptions structs, and comprehensive error handling
   - **aw-mux**: Pure multiplexer implementations with tmux backend (placeholder implementations for now)
   - **aw-tui-multiplexer**: AW-specific adapter with LayoutHandle, PaneRole enum, LayoutConfig struct, and standard layout creation functions
-  - **Architecture**: Clean three-layer separation: core traits → multiplexer implementations → AW-specific workflows following [specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md](specs/Public/Terminal-Multiplexers/TUI-Multiplexers-Overview.md)
+  - **Architecture**: Clean three-layer separation: core traits → multiplexer implementations → AW-specific workflows following [TUI-Multiplexers-Overview.md](Terminal-Multiplexers/TUI-Multiplexers-Overview.md)
 
 - **Key Source Files**:
 
@@ -271,8 +271,8 @@ The TUI implementation provides these core capabilities:
 
 - **Deliverables**:
 
-  - Full tmux multiplexer implementation following [specs/Public/Terminal-Multiplexers/tmux.md](specs/Public/Terminal-Multiplexers/tmux.md)
-  - All capabilities from [specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md](specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
+  - Full tmux multiplexer implementation following [tmux.md](Terminal-Multiplexers/tmux.md)
+  - All capabilities from [Multiplexers-Description-Template.md](Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
     - Window/tab creation and management
     - Horizontal/vertical pane splitting
     - Command launching in specific panes
@@ -300,7 +300,7 @@ The TUI implementation provides these core capabilities:
 
 - **Verification**:
 
-  - All tmux commands from [specs/Public/Terminal-Multiplexers/tmux.md](specs/Public/Terminal-Multiplexers/tmux.md) work correctly
+  - All tmux commands from [tmux.md](Terminal-Multiplexers/tmux.md) work correctly
   - We are able to create split-pane layouts, similar to the ones defined in the TUI PRD specifications
   - Text injection and command execution work reliably
   - Window discovery and focusing operations succeed
@@ -310,8 +310,8 @@ The TUI implementation provides these core capabilities:
 
 - **Deliverables**:
 
-  - Full kitty multiplexer implementation following [specs/Public/Terminal-Multiplexers/Kitty.md](specs/Public/Terminal-Multiplexers/Kitty.md)
-  - All capabilities from [specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md](specs/Public/Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
+  - Full kitty multiplexer implementation following [Kitty.md](Terminal-Multiplexers/Kitty.md)
+  - All capabilities from [Multiplexers-Description-Template.md](Terminal-Multiplexers/Multiplexer-Description-Template.md) implemented:
     - Tab/window creation via `kitty @ launch`
     - Pane splitting with `--location` parameter
     - Command launching in panes via command arguments

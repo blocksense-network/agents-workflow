@@ -1,0 +1,5 @@
+# Ignore specs directory to preserve code block alignment
+specs/**/*.md
+
+# Add other problematic markdown files here as needed
+# docs/with-code-blocks.md

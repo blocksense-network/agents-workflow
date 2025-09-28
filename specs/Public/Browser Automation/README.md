@@ -1,6 +1,6 @@
 ## Browser Automation
 
-Each document in this folder describes an automation targeting a specific site that agents‑workflow interacts with. Automations share the Agent Browser Profiles convention in [../Agent-Browsers/Agent-Browser-Profiles.md](../Agent-Browsers/Agent-Browser-Profiles.md) for persistent, named profiles.
+Each document in this folder describes an automation targeting a specific site that agents‑workflow interacts with. Automations share the Agent Browser Profiles convention in [../Agent Browsers/Agent-Browser-Profiles.md](../Agent Browsers/Agent-Browser-Profiles.md) for persistent, named profiles.
 
 Browser automation serves as the foundation for cloud agent support, enabling seamless integration between local CLI workflows and cloud-based AI platforms. All cloud agents currently require browser automation for authentication, task submission, and progress monitoring.
 

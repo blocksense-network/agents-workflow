@@ -8,7 +8,7 @@ Approach: Build reusable Rust components for browser automation and provider ada
 
 ### Component architecture (parallel tracks)
 
-- `crates/agent-browser-profiles`: Core library for discovering, validating, and managing browser profiles per [Agent-Browser-Profiles.md](../Agent-Browsers/Agent-Browser-Profiles.md).
+- `crates/agent-browser-profiles`: Core library for discovering, validating, and managing browser profiles per [Agent-Browser-Profiles.md](Agent Browsers/Agent-Browser-Profiles.md).
 - `crates/cloud-automation-core`: Core browser automation engine and session handling.
 - `crates/cloud-providers`: Provider-specific adapters with custom streaming for monitoring and control (OpenAI Codex, GitHub Copilot, Cursor Claude, Google Jules).
 - `bins/cloud-worker`: Rust binary for browser automation workers with isolated execution.
@@ -19,7 +19,7 @@ All crates target stable Rust with cross-platform browser automation support.
 
 M0. Agent browser profiles crate and project bootstrap (3–4d)
 
-- Create `crates/agent-browser-profiles` crate implementing the [Agent-Browser-Profiles.md](../Agent-Browsers/Agent-Browser-Profiles.md) specification.
+- Create `crates/agent-browser-profiles` crate implementing the [Agent-Browser-Profiles.md](Agent Browsers/Agent-Browser-Profiles.md) specification.
 - Implement profile discovery, validation, and management APIs.
 - Add cross-platform base directory resolution (Linux/macOS/Windows).
 - Initialize Cargo workspace for remaining cloud automation crates.
@@ -160,6 +160,6 @@ Acceptance checklist (M4)
 
 ### References
 
-- See [CLI.md](../CLI.md) for cloud agent command specifications.
-- See [Agent-Browser-Profiles.md](../Agent-Browsers/Agent-Browser-Profiles.md) for profile integration requirements.
+- See [CLI.md](CLI.md) for cloud agent command specifications.
+- See [Agent-Browser-Profiles.md](Agent Browsers/Agent-Browser-Profiles.md) for profile integration requirements.
 - Reference implementations in `reference_projects/` for browser automation patterns.

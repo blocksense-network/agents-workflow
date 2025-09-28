@@ -4,7 +4,7 @@ status: Early-Draft, Needs-Expansion
 
 Sandbox profiles define how local executions are isolated. They are orthogonal to UI and to local/remote mode. The profile is resolved from config or flags and determines the executor that hosts the agent and its per‑task workspace.
 
-See [Agents-Workflow-Sandboxing-Strategies](Sanboxing/Agents-Workflow-Sandboxing-Strategies.md) for cross‑platform requirements and design principles that apply to all sandboxing approaches.
+See [Agents-Workflow-Sandboxing-Strategies](Sandboxing/Agents-Workflow-Sandboxing-Strategies.md) for cross‑platform requirements and design principles that apply to all sandboxing approaches.
 
 Why sandboxes (threats and safety):
 
@@ -23,7 +23,7 @@ Profile types (predefined):
 
 - container: OCI container (Docker/Podman). Options include image, user/uid, mounts, network, seccomp/apparmor.
 - vm: Lightweight Linux VM (Lima/Colima, Apple Virtualization.framework, WSL2/Hyper‑V). Options include image, resources, networking.
-- local: Local process sandbox using OS namespaces and primitives (Linux: user namespaces, cgroups v2, seccomp with dynamic file access control). See [Local-Sandboxing-on-Linux](Sanboxing/Local-Sandboxing-on-Linux.md) for detailed Linux implementation. Cross-platform support via equivalent isolation primitives.
+- local: Local process sandbox using OS namespaces and primitives (Linux: user namespaces, cgroups v2, seccomp with dynamic file access control). See [Local-Sandboxing-on-Linux](Sandboxing/Local-Sandboxing-on-Linux.md) for detailed Linux implementation. Cross-platform support via equivalent isolation primitives.
 - firejail: Linux Firejail profile with caps/seccomp filters.
 - disabled: Run directly on host (policy‑gated, for already isolated environments like dedicated VMs).
 

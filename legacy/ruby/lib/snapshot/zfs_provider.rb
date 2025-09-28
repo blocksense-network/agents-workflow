@@ -161,24 +161,6 @@ module Snapshot
 
     private
 
-    def daemon_available?
-      File.socket?(DAEMON_SOCKET_PATH)
-    end
-
-    def send_daemon_request(request)
-      return nil unless daemon_available?
-
-      UNIXSocket.open(DAEMON_SOCKET_PATH) do |socket|
-        socket.puts(request.to_json)
-        response = socket.gets
-        return nil unless response
-
-        JSON.parse(response)
-      end
-    rescue StandardError
-      nil
-    end
-
     def validate_destination_path(dest)
       # Check if the destination path can be created as a directory
       begin
@@ -202,7 +184,9 @@ module Snapshot
     def dataset_for(path)
       list = `zfs list -H -o name,mountpoint 2>/dev/null`
       candidates = list.lines.map(&:split)
-                       .select { |_name, mount| mount != 'none' && mount != 'legacy' && mount != '/' && path.start_with?(mount) }
+                       .select do |_name, mount|
+                         mount != 'none' && mount != 'legacy' && mount != '/' && path.start_with?(mount)
+                       end
 
       # Find the dataset with the longest mountpoint that actually contains the path
       best = candidates.max_by { |_, mount| mount.length }

@@ -46,8 +46,8 @@ Multiple development tracks can proceed in parallel once the core infrastructure
 ### Approach
 
 - **SolidJS + Tailwind CSS**: Modern reactive framework with utility-first styling for maintainable, performant UIs
-- **Node.js SSR Sidecar**: Server-side rendering server that proxies requests to the Rust REST API and handles progressive enhancement for users without JavaScript (see [Server-Side-Rendering-with-SolidJS.md](../../Research/Server-Side-Rendering-with-SolidJS.md) for implementation guide)
-- **Mock-First Development**: Start with comprehensive mock server ([Mock Server README](../webui/mock-server/README.md)) implementing REST-Service.md for isolated development
+- **Node.js SSR Sidecar**: Server-side rendering server that proxies requests to the Rust REST API and handles progressive enhancement for users without JavaScript (see [Server-Side-Rendering-with-SolidJS.md](../Research/Server-Side-Rendering-with-SolidJS.md) for implementation guide)
+- **Mock-First Development**: Start with comprehensive mock server implementing REST-Service.md for isolated development
 - **Playwright Testing**: Fully automated E2E testing through pre-scripted scenarios that control both the mock REST server state and UI interactions, enabling deterministic testing of complete user journeys, accessibility compliance, and performance benchmarks
 - **Progressive Enhancement**: Core functionality works without JavaScript; real-time features enhance the experience
 - **Component Architecture**: Reusable, testable components with clear prop interfaces and TypeScript typing

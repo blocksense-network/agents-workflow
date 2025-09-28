@@ -29,3 +29,11 @@ config:
   MD012: false
   # Heading blank lines not enforced strictly in legacy content
   MD022: false
+  # Allow text fragment links (#:~:text=...) used for URL anchoring
+  MD051:
+    ignored_pattern: '^:~:text='
+  # Configure trailing spaces rule to preserve code block formatting
+  MD009:
+    br_spaces: 2
+    list_item_empty_lines: true
+    strict: false

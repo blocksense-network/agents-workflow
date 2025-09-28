@@ -34,7 +34,6 @@ if command -v zfs >/dev/null 2>&1; then
     echo "ZFS backing file already exists."
   fi
 
-
   # Create pool if it doesn't exist
   if ! zpool list "$ZFS_POOL" >/dev/null 2>&1; then
     echo "Creating ZFS pool (requires sudo)..."

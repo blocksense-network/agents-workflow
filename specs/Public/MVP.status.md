@@ -130,7 +130,7 @@ Once the Rust workspace bootstrap (M0.2) and core infrastructure (M0.3-M0.6) are
 - **Deliverables**:
 
   - Rust daemon binary (`bins/aw-fs-snapshots-daemon`) with Unix socket server (the implementation should operate similarly to the reference implementation `bin/aw-fs-snapshots-daemon` which should be moved to the legacy/ruby folder; The new implementation should be made production-ready)
-  - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../../Research/Using-SSZ.md) for implementation reference)
+  - Length-prefixed SSZ marshaling format for communication (see [Using-SSZ.md](../Research/Using-SSZ.md) for implementation reference)
   - Basic ZFS operations (snapshot, clone, delete) with sudo privilege escalation
   - Async tokio runtime for concurrent request handling
   - Tracing library for structured logging
@@ -631,7 +631,7 @@ Parallel development enables faster progress while maintaining clean dependency 
   - **Pre-sandbox Workflow**: FS snapshot provider clones workspace to temporary location before sandbox launch, providing source→destination path pairs for bind mounting
   - **Sandbox Launch Protocol**: Sandbox receives list of path pairs (host_path→sandbox_path) and performs bind mounts during initialization
   - **Sudo-less Snapshots**: The `aw-fs-snapshots-daemon` ([`crates/aw-fs-snapshots-daemon/`](../../crates/aw-fs-snapshots-daemon/)) provides privileged filesystem operations (ZFS/Btrfs snapshots) without requiring sudo in user applications; the same daemon used for testing will enable snapshot operations for `aw agent sandbox`.
-  - **Integration Points**: Combines MVP FS snapshots (Phase 0.4-0.6) with sandboxing ([Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sanboxing/Local-Sandboxing-on-Linux.status.md) M1-M8)
+  - **Integration Points**: Combines MVP FS snapshots (Phase 0.4-0.6) with sandboxing ([Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sandboxing/Local-Sandboxing-on-Linux.status.md) M1-M8)
 
 - **Verification Results**:
 
@@ -653,7 +653,7 @@ Parallel development enables faster progress while maintaining clean dependency 
 
 - **Cross-Spec Dependencies**:
 
-  - **[Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sanboxing/Local-Sandboxing-on-Linux.status.md) M1-M8**: Provides the sandbox implementation this milestone integrates
+  - **[Local-Sandboxing-on-Linux.status.md](../../specs/Public/Sandboxing/Local-Sandboxing-on-Linux.status.md) M1-M8**: Provides the sandbox implementation this milestone integrates
   - **FS-Snapshots-Overview.md**: Defines snapshot cloning operations performed before sandbox creation
   - **CLI.md**: Defines the parameter interface this milestone implements
 
@@ -1126,15 +1126,14 @@ The MVP implementation must coordinate across multiple specifications with prope
 **4.1 Sandbox Integration**
 
 - Deliverables:
-
-  - Complete Linux sandboxing implementation (see [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md))
+  - Complete Linux sandboxing implementation (see [Local-Sandboxing-on-Linux.status.md](Sandboxing/Local-Sandboxing-on-Linux.status.md))
   - Dynamic read allow-list with seccomp notify
   - Resource limits and audit logging
   - `aw session audit` command integration
   - Sandboxed agent execution with time travel
 
 - Verification:
-  - All sandbox milestones from [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md)
+  - All sandbox milestones from [Local-Sandboxing-on-Linux.status.md](Sandboxing/Local-Sandboxing-on-Linux.status.md)
   - Agents run in isolated namespaces with proper resource limits
   - Audit logs capture file access decisions and sandbox events
   - Time travel works within sandboxed environments
@@ -1193,4 +1192,4 @@ The MVP implementation must coordinate across multiple specifications with prope
 - **Codex Rollout Complexity**: Mitigated by thorough testing of JSONL parsing and trimming logic; the rollout file format specification provides clear parsing rules to follow.
 - **Repository Reorganization**: Mitigated by preserving all existing functionality in `legacy/` during transition; `test-codex-setup-integration` tests must pass unchanged.
 - **Complex Time Travel Logic**: Mitigated by building extensive integration tests from day one; both transcript and rollout trimming logic will be thoroughly tested with synthetic session files.
-- **Sandbox Complexity**: Mitigated by following the detailed milestone plan in [Local-Sandboxing-on-Linux.status.md](Sanboxing/Local-Sandboxing-on-Linux.status.md); each component tested in isolation before integration.
+- **Sandbox Complexity**: Mitigated by following the detailed milestone plan in [Local-Sandboxing-on-Linux.status.md](Sandboxing/Local-Sandboxing-on-Linux.status.md); each component tested in isolation before integration.

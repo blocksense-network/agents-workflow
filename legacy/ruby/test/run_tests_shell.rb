@@ -52,8 +52,9 @@ class ShellTestRunner
       ruby_executable = RbConfig.ruby
       # Pass through any test filtering arguments
       args = ARGV.map { |arg| Shellwords.escape(arg) }.join(' ')
-      command = "cd #{Shellwords.escape(test_dir)} && RUBYLIB=#{ENV.fetch('RUBYLIB',
-                                                                          nil)} #{ruby_executable} #{escaped_script} #{args} > #{escaped_output} 2>&1"
+      command = "cd #{Shellwords.escape(test_dir)} && " \
+                "RUBYLIB=#{ENV.fetch('RUBYLIB', nil)} #{ruby_executable} " \
+                "#{escaped_script} #{args} > #{escaped_output} 2>&1"
 
       success = system(command)
       exit_code = $CHILD_STATUS.exitstatus

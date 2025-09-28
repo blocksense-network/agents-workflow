@@ -11,7 +11,7 @@ Both formats use JSON Lines (JSONL) format where each line is a valid JSON objec
 
 ## 1. Rollout Files (Core Session Persistence)
 
-### File Location and Naming
+### Rollout File Location and Naming
 ```
 ~/.codex/sessions/YYYY/MM/DD/rollout-YYYY-MM-DDThh-mm-ss-<uuid>.jsonl
 ```
@@ -20,7 +20,7 @@ Both formats use JSON Lines (JSONL) format where each line is a valid JSON objec
 - Filename includes timestamp and conversation UUID
 - Used for session resumption and conversation replay
 
-### File Structure
+### Rollout File Structure
 
 Each line in a rollout file is a JSON object with this structure:
 
@@ -214,7 +214,7 @@ Rollout files contain these types of items:
 
 ## 2. Session Log Files (UI Interaction Logs)
 
-### File Location and Naming
+### Session Log File Location and Naming
 ```
 ~/.codex/logs/session-YYYYMMDDTHHMMSSZ.jsonl
 ```
@@ -223,7 +223,7 @@ Rollout files contain these types of items:
 - Captures all UI interactions and events
 - Used for debugging and session analysis
 
-### File Structure
+### Session Log File Structure
 
 Each line is a JSON object with this structure:
 

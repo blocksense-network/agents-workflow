@@ -12,7 +12,7 @@ Goals:
 References:
 
 - [Lima VM Images](Lima-VM-Images.md)
-- [Multi-OS Testing](Multi-OS-Testing.md)
+- [Multi-OS Testing](Multi-OS Testing.md)
 - [REST Service](REST-Service.md) (for fleet planner integration)
 
 ### Component layout (parallel tracks)

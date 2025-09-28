@@ -47,7 +47,7 @@ Shell completions are provided via the `aw shell-completion` command group. They
 - One tool for both the TUI dashboard and automation-ready commands
 - First-class support for:
   - Local state mode (SQLite only)
-  - Remote REST service mode (on-prem/private cloud), aligned with [docs/rest-service.md](../docs/rest-service.md)
+  - Remote REST service mode (on-prem/private cloud), aligned with [REST-Service.md](REST-Service.md)
   - Terminal multiplexers: tmux, zellij, screen
   - Devcontainers and local runtimes (including nosandbox, policy-gated)
   - IDE integrations (VS Code, Cursor, Windsurf) and terminal-based agents
@@ -126,7 +126,7 @@ Notes:
 
 #### Multiple Agent Support
 
-The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS-Snapshots-Overview](FS%20Snapshots/FS-Snapshots-Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
+The `--agent` flag can be supplied more than once to launch multiple agents working in parallel in isolated FS branches (see [FS-Snapshots-Overview](../Public/FS Snapshots/FS-Snapshots-Overview.md)). Each `--agent` parameter specifies a different agent type that will run concurrently on the same task.
 
 **Usage Patterns:**
 
@@ -192,16 +192,16 @@ Behavior overview:
 
 - Local vs Remote: With a configured/provided `remote-server`, AW calls the server's REST API to create/manage the task. Otherwise, AW runs locally.
 - Third‑party clouds: Some agents can run on external clouds (e.g., Google Jules, OpenAI Cloud Codex). In such cases, flags like `--instances`, `--browser-*`, or `--codex-workspace` apply only when supported by the selected agent/platform. AW surfaces capabilities via discovery and validates flags accordingly.
-- Sandbox/runtime: Local runs honor `--sandbox`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `disabled` (policy‑gated, direct host process execution). See [Sandbox-Profiles](Sandbox-Profiles.md) and [FS-Snapshots-Overview](FS%20Snapshots/FS-Snapshots-Overview.md).
+- Sandbox/runtime: Local runs honor `--sandbox`: `devcontainer` (when available), `local` (default, process sandbox/profile), or `disabled` (policy‑gated, direct host process execution). See [Sandbox-Profiles](Sandbox-Profiles.md) and [FS-Snapshots-Overview](../Public/FS Snapshots/FS-Snapshots-Overview.md).
 - Target branch: `--target-branch` specifies the branch where agent results should be delivered/pushed (used with `--delivery branch` or `--delivery pr` modes).
 
 #### Preserved `agent-task` Behaviors
 
 The `aw task` command preserves and extends the core functionality of the existing `agent-task` command. The preserved behavior is implemented in the following Ruby modules:
 
-- **CLI Implementation**: [`lib/agent_task/cli.rb`](../../lib/agent_task/cli.rb) - Core CLI functionality and command processing
-- **VCS Operations**: [`lib/vcs_repo.rb`](../../lib/vcs_repo.rb) - Repository detection, branch management, and VCS integration
-- **Task Management**: [`lib/agent_task.rb`](../../lib/agent_task.rb) - Main module coordinating task operations
+- **CLI Implementation**: [`legacy/ruby/lib/agent_task/cli.rb`](../../legacy/ruby/lib/agent_task/cli.rb) - Core CLI functionality and command processing
+- **VCS Operations**: [`legacy/ruby/lib/vcs_repo.rb`](../../legacy/ruby/lib/vcs_repo.rb) - Repository detection, branch management, and VCS integration
+- **Task Management**: [`legacy/ruby/lib/agent_task.rb`](../../legacy/ruby/lib/agent_task.rb) - Main module coordinating task operations
 
 **Branch and Task Management:**
 
@@ -215,13 +215,13 @@ The `aw task` command preserves and extends the core functionality of the existi
 
 - **Editor Discovery**: Uses `$EDITOR` environment variable with intelligent fallback chain (nano, pico, micro, vim, helix, vi)
 - **Prompt Sources**: Supports `--prompt` for direct text, `--prompt-file` for file input, or interactive editor session
-- **Editor Hints**: Provides helpful template text when launching editor for task input. The hint generator follows these steps, similar to how [`git commit` templates](https://www.5balloons.info/git-commit-template) use comment-prefixed guidance:
-
+- **Editor Hints**: Provides helpful template text when launching editor for task input. The hint generator follows these steps, similar to how [`git commit` templates](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---templatelttemplategt) use comment-prefixed guidance:
   1. Resolve the user’s preferred comment prefix. By default we use `#` followed by a space. When `task-editor.use-vcs-comment-string` (config option, default `true`) is enabled and we are inside a Git repository, pull the value from `git config core.commentString` so the hint matches local tooling.
 
   2. If the configuration option `task-template` is not specified, insert a blank line (no prefix) where the user will type the prompt.
 
-  If the option is specified, treat it as a file path. The configuration system ensures that relative file path are resolved in relation to the file where they appear (or the working dir when supplied from the command-line). 3. Render a block with: a reminder that comment lines are ignored, and mentioning how the task creation operation can be aborted (by enterin ga blank description). End with an explanation that saving the file and exiting the editor will result in the agent work being delivered according the configured delivery method (the explanation should point out the concrete method by inserting a different string depending on the active configuration options).
+  If the option is specified, treat it as a file path. The configuration system ensures that relative file path are resolved in relation to the file where they appear (or the working dir when supplied from the command-line).
+  3. Render a block with: a reminder that comment lines are ignored, and mentioning how the task creation operation can be aborted (by entering a blank description). End with an explanation that saving the file and exiting the editor will result in the agent work being delivered according the configured delivery method (the explanation should point out the concrete method by inserting a different string depending on the active configuration options).
 
   4. When the user saves, strip every line that starts with the resolved comment prefix and trim trailing whitespace; collapse multiple blank lines into a single newline before validation.
   5. If the resulting content is empty, abort with “Task prompt aborted (no content after removing comments).”
@@ -495,7 +495,7 @@ When agents are spawned, the execution follows this detailed process:
 
 ##### Cloud Agent Execution
 
-See the implementation roadmap in [Plans/CLI-Cloud-Automation.status.md](Plans/CLI-Cloud-Automation.status.md) for detailed milestones covering browser automation workers, access-point tunnels, and CLI integration.
+See the implementation roadmap in [Cloud-Automation.status.md](Cloud-Automation.status.md) for detailed milestones covering browser automation workers, access-point tunnels, and CLI integration.
 
 1. **Browser Automation Launch**: Cloud agents are launched using browser automation that:
    - Handles authentication and session management
@@ -657,7 +657,7 @@ OPTIONS:
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
                                            Supported agent types (default: all)
   --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
-                                           in [.agents/dynamic-instructions.md](.agents/dynamic-instructions.md) (default: yes)
+                                           in `.agents/dynamic-instructions.md` (default: yes)
 ARGUMENTS:
   PROJECT-DESCRIPTION                      Description of the project
 ```
@@ -679,9 +679,9 @@ The whole repo initialization is performed as an agentic task. The `aw repo` too
 
 ### Repo init templates
 
-1. The provided template may include a slot for the project desecription. When a slot desecription is not provided, the project description follows the text in the template.
+1. The provided template may include a slot for the project description. When a slot description is not provided, the project description follows the text in the template.
 2. The provided template declares variables that the user can provide as command-line flags. The flags listed above are merely the variables of the default template.
-3. The CLI parser should allow arbitrary name/value pairs to supplied to this command. Supplying a parameter that's not declarated in the template is an error. If a parameter doesn't have a default value specified in the template, not suppying it on the command-line is considered an error.
+3. The CLI parser should allow arbitrary name/value pairs to supplied to this command. Supplying a parameter that's not declared in the template is an error. If a parameter doesn't have a default value specified in the template, not supplying it on the command-line is considered an error.
 4. The syntax of the GitHub slug is `org/repo:file`. `org:file` is also a valid syntax. The repo then is assumed to be named `repository-templates`. Supplying just `org` is also a valid syntax. The template is then assumed to be `repository-templates:default`.
 5. The template is passed as an initial prompt to the agent. Typically, it will instruct the agent to ask clarifying questions before initializing the repository.
 6. Once the repository is initialized, `aw repo instructions link` is automatically executed to create agent instruction symlinks.
@@ -707,14 +707,14 @@ aw repo instructions create [OPTIONS]
 
 OPTIONS:
   --dynamic-agent-instructions <yes|no>    Creates agent instructions files from a single file stored
-                                           in [.agents/dynamic-instructions.md](.agents/dynamic-instructions.md) (default: yes)
+                                           in `.agents/dynamic-instructions.md` (default: yes)
   --supported-agents <all|codex|claude|cursor|windsurf|zed|copilot|...>
                                            Supported agent types (default: all)
 ```
 
 Behavior:
 
-- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates [dynamic-instructions.md](dynamic-instructions.md) or [AGENTS.md](../AGENTS.md) with task‑runner specific instructions and then creates agent instruction symlinks for the specified supported agents.
+- Similar to `repo init`, but intended for existing repositories. The agent is explicitly instructed to review the repo before collecting additional details from the user and to propose testing frameworks and linters if missing or misconfigured. Upon approval, writes or updates `dynamic-instructions.md` or [AGENTS.md](../AGENTS.md) with task‑runner specific instructions and then creates agent instruction symlinks for the specified supported agents.
 
 Output and exit codes:
 
@@ -862,7 +862,7 @@ aw config --show-origin
 aw config --user ui.theme dark
 ```
 
-Mirrors [docs/configuration.md](../docs/configuration.md) including provenance, precedence, and Windows behavior.
+Mirrors [Configuration.md](Configuration.md) including provenance, precedence, and Windows behavior.
 
 #### 8) Service and WebUI (local developer convenience)
 
@@ -1118,7 +1118,7 @@ The `aw agent sandbox` command provides a seamless workflow for launching the TU
    - **Resource limits**: Cgroups v2 controls for memory, CPU, PID limits
    - **Device access**: Controlled access to `/dev/fuse`, `/dev/kvm` based on flags
 
-5. **TUI Dashboard Launch**: Within the sandboxed environment, automatically launches the TUI dashboard ([TUI-PRD.md](../TUI-PRD.md)) with:
+5. **TUI Dashboard Launch**: Within the sandboxed environment, automatically launches the TUI dashboard ([TUI-PRD.md](TUI-PRD.md)) with:
    - **Auto-multiplexer attach**: Detects and attaches to tmux/zellij/screen sessions
    - **Project/Branch/Agent selectors**: Pre-populated with repository and agent information
    - **Integrated workflow**: Task creation and monitoring within the isolated environment
@@ -1127,8 +1127,8 @@ The `aw agent sandbox` command provides a seamless workflow for launching the TU
 **Integration Points:**
 
 - **FS Snapshots**: Leverages the `aw-fs-snapshots-daemon` for sudo-less privileged operations
-- **Sandbox Core**: Uses Linux sandboxing implementation from [Local-Sandboxing-on-Linux.status.md](../Sanboxing/Local-Sandboxing-on-Linux.status.md)
-- **TUI Dashboard**: Provides the interactive interface described in [TUI-PRD.md](../TUI-PRD.md)
+- **Sandbox Core**: Uses Linux sandboxing implementation from [Local-Sandboxing-on-Linux.status.md](../Sandboxing/Local-Sandboxing-on-Linux.status.md)
+- **TUI Dashboard**: Provides the interactive interface described in [TUI-PRD.md](TUI-PRD.md)
 - **Security Model**: Maximum isolation by default with explicit opt-in for additional capabilities
 
 This command enables safe experimentation with agent workflows while preserving the host filesystem state through automatic snapshot management.
@@ -1238,8 +1238,8 @@ ARGUMENTS:
 
 Behavior:
 
-- **Repository Seletion**: Selects the working directory through the standard [Repository Selection](CLI-Repository-Selection.md) logic.
-- **FS Snapshots Provider Selection**: Applies the standard [FS Snapshot Provider Selection](CLI-FS-Snapthos-Provider-Selection.md) algorithm with the repository root to select a provider.
+- **Repository Selection**: Selects the working directory through the standard [Repository Selection](CLI-Repository-Selection.md) logic.
+- **FS Snapshots Provider Selection**: Applies the standard [FS Snapshot Provider Selection](CLI-FS-Snapshot-Provider-Selection.md) algorithm with the repository root to select a provider.
 - **Mount Point Info**: Displays mount point details, dataset names, and filesystem-specific metadata
 - **Provider Specific Details**: Each provider can contribute additional details to the output.
 - **JSON Output**: When --json is specified, provides structured output for programmatic use including provider scores and capability flags
@@ -1390,7 +1390,7 @@ TODO: Use the consistent style used in the rest of the document when describing 
 
 ### Local State
 
-Local enumeration and management of running sessions is backed by the canonical state database described in [docs/state-persistence.md](../docs/state-persistence.md). The SQLite database is authoritative; no PID files are used.
+Local enumeration and management of running sessions is backed by the canonical state database described in [State-Persistence.md](State-Persistence.md). The SQLite database is authoritative; no PID files are used.
 
 ### Daemonization
 
@@ -1420,7 +1420,7 @@ Devcontainers:
 
 ### Runtime and Workspace Behavior
 
-- Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See [specs/Public/FS Snapshots/FS-Snapshots-Overview.md](../FS%20Snapshots/FS-Snapshots-Overview.md).
+- Snapshot selection (auto): ZFS → Btrfs → AgentFS → Git. See [FS-Snapshots-Overview](../Public/FS Snapshots/FS-Snapshots-Overview.md).
 - In-place runs: `--working-copy in-place` (or `working-copy = "in-place"`) executes directly on the user’s working copy. Snapshots remain available when the selected provider supports in‑place capture (e.g., Git shadow commits, ZFS/Btrfs snapshots). If `--fs-snapshots disable` is set, snapshots are off regardless of working-copy mode. The updated flow above reflects that `fs-snapshots` can still be enabled in in‑place mode.
 
 Commit step details:
@@ -1508,7 +1508,7 @@ OPTIONS:
   --tail <N>             Return only the most recent N entries
   --follow               Stream live audit events until interrupted
 
-See [Sanboxing/Local-Sandboxing-on-Linux.md](Sanboxing/Local-Sandboxing-on-Linux.md) for policy configuration and event schema details.
+See [Sandboxing/Local-Sandboxing-on-Linux.md](Sandboxing/Local-Sandboxing-on-Linux.md) for policy configuration and event schema details.
 ```
 
 Run the TUI against a REST service:
@@ -1534,4 +1534,4 @@ For detailed exit codes specific to the `aw task` command, see the [Exit Codes](
 
 - Honors admin-enforced config. Secrets never printed. `nosandbox` runtime gated and requires explicit opt-in.
 
-Implementation roadmap: see [CLI.status.md](CLI.status.md) for phased delivery of the CLI/TUI, daemon runtime, sandbox commands, and packaging milestones.
+Implementation roadmap: TBD - phased delivery of the CLI/TUI, daemon runtime, sandbox commands, and packaging milestones.

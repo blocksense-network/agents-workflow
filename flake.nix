@@ -31,9 +31,9 @@
       preCommit = git-hooks.lib.${system}.run {
         src = ./.;
         hooks = {
-          # Markdown formatting (run first)
+          # Markdown formatting (run first) - DISABLED due to code block whitespace issues
           prettier-md = {
-            enable = true;
+            enable = false;
             name = "prettier --write (Markdown)";
             entry = "prettier --loglevel warn --write";
             language = "system";
@@ -124,7 +124,7 @@
           lychee-fast = {
             enable = true;
             name = "lychee (changed files)";
-            entry = "lychee --no-progress --require-https --cache";
+            entry = "lychee --no-progress --require-https --cache --config .lychee.toml";
             language = "system";
             pass_filenames = true;
             files = "\\.md$";
@@ -243,12 +243,11 @@
         (pkgs.nodePackages.cspell)
         (pkgs.nodePackages.prettier)
         pkgs.shfmt
+        pkgs.taplo
 
         # OpenSSL development libraries for Rust crates
         pkgs.openssl.dev
 
-        # not available in the currently pinned older nixpkgs:
-        # pkgs.taplo # TOML formatter and validator
         # pkgs.nodePackages."ajv-cli" # JSON Schema validator
 
         # WebUI testing

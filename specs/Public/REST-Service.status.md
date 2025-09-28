@@ -156,8 +156,8 @@ Exit criteria
 This section elaborates concrete topologies, milestones, and automated scenarios that align with:
 
 - CLI.md (fleet orchestration, local vs remote)
-- [Multi-OS-Testing.md](../Multi-OS%20Testing.md) (leader/followers, sync‑fence, run‑everywhere)
-- [Multi-OS-Testing.md](../Multi-OS%20Testing.md) (QUIC control plane, SSH over CONNECT, client‑side relay)
+- [Multi-OS Testing.md](Multi-OS Testing.md) (leader/followers, sync‑fence, run‑everywhere)
+- [Multi-OS Testing.md](Multi-OS Testing.md) (QUIC control plane, SSH over CONNECT, client‑side relay)
 
 ### Topologies Under Test
 

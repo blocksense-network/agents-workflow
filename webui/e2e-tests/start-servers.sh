@@ -40,5 +40,3 @@ cd ../e2e-tests
 npx playwright test "$@"
 
 # Cleanup happens via trap
-
-

@@ -14,7 +14,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 clap = { version = "4.0", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] } # For async XPC operations
+tokio = { version = "1.0", features = ["full"] }   # For async XPC operations
 libc = "0.2"
 # SSZ serialization (matching agentfs-proto)
 ethereum_ssz = "0.8"
@@ -26,7 +26,7 @@ objc = "0.2"
 objc-foundation = "0.1"
 objc_id = "0.1"
 block = "0.1"
-dispatch = "0.2" # For Grand Central Dispatch
+dispatch = "0.2"        # For Grand Central Dispatch
 
 [features]
 default = []

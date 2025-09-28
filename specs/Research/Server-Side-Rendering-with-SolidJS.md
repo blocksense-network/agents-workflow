@@ -4,7 +4,7 @@ Solid is really good at Server-Side Rendering. Here’s a practical way to get *
 
 SolidStart is Solid’s full-stack meta-framework. It gives you SSR (including streaming), routing, data loaders, and **forms/actions that degrade to plain HTML**. ([docs.solidjs.com][1])
 
-### 1) Scaffold a project
+## 1) Scaffold a project
 
 ```bash
 npm create solid@latest

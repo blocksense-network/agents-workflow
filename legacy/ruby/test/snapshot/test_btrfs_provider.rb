@@ -29,11 +29,13 @@ class TestBtrfsProvider < Minitest::Test
     @subvolume_path = File.join(@cache_dir, 'btrfs_mount', 'test_subvol')
 
     unless btrfs_mounted?(@btrfs_loop)
-      skip "Btrfs test filesystem not mounted at #{@btrfs_loop}. Run 'just create-test-filesystems' to set up reusable test filesystems."
+      skip "Btrfs test filesystem not mounted at #{@btrfs_loop}. " \
+           "Run 'just create-test-filesystems' to set up reusable test filesystems."
     end
 
     unless Dir.exist?(@subvolume_path)
-      skip "Btrfs test subvolume not found at #{@subvolume_path}. Run 'just create-test-filesystems' to set up reusable test filesystems."
+      skip "Btrfs test subvolume not found at #{@subvolume_path}. " \
+           "Run 'just create-test-filesystems' to set up reusable test filesystems."
     end
 
     # Use the pre-created subvolume for testing
