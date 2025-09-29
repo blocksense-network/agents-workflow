@@ -45,11 +45,7 @@ pub fn parse_size_to_bytes(size_string: &str) -> u64 {
 /// # Returns
 /// Used space in bytes, or 0 if measurement fails.
 pub fn btrfs_filesystem_used_space(mount_point: &Path) -> u64 {
-    let output = Command::new("btrfs")
-        .arg("filesystem")
-        .arg("usage")
-        .arg(mount_point)
-        .output();
+    let output = Command::new("btrfs").arg("filesystem").arg("usage").arg(mount_point).output();
 
     let output = match output {
         Ok(out) => out,
@@ -109,10 +105,7 @@ pub fn zfs_pool_used_space(pool_name: &str) -> u64 {
 /// # Returns
 /// Used space in bytes, or 0 if measurement fails.
 pub fn df_filesystem_used_space(mount_point: &Path) -> u64 {
-    let output = Command::new("df")
-        .arg("-B1")
-        .arg(mount_point)
-        .output();
+    let output = Command::new("df").arg("-B1").arg(mount_point).output();
 
     let output = match output {
         Ok(out) => out,
@@ -184,4 +177,3 @@ mod tests {
         assert_eq!(parse_size_to_bytes("1.5INVALID"), 1); // Invalid unit defaults to bytes
     }
 }
-

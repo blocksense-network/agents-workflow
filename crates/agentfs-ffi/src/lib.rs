@@ -27,21 +27,41 @@ mod tests {
         assert_eq!(rc, 0);
 
         // Resolve parent id
-        let mut nid: u64 = 0; let mut pid: u64 = 0;
-        let rc = unsafe { af_resolve_id(fs, 0, d.as_ptr(), &mut nid as *mut u64, &mut pid as *mut u64) } as i32;
+        let mut nid: u64 = 0;
+        let mut pid: u64 = 0;
+        let rc = unsafe {
+            af_resolve_id(
+                fs,
+                0,
+                d.as_ptr(),
+                &mut nid as *mut u64,
+                &mut pid as *mut u64,
+            )
+        } as i32;
         assert_eq!(rc, 0);
 
         // Create child by id with invalid UTF-8 name bytes
         let name_bytes = [0x66u8, 0x6F, 0x80, 0x6F];
         let mut child_id: u64 = 0;
-        let rc = unsafe { af_create_child_by_id(fs, nid, name_bytes.as_ptr(), name_bytes.len(), 0, 0o644, &mut child_id as *mut u64) } as i32;
+        let rc = unsafe {
+            af_create_child_by_id(
+                fs,
+                nid,
+                name_bytes.as_ptr(),
+                name_bytes.len(),
+                0,
+                0o644,
+                &mut child_id as *mut u64,
+            )
+        } as i32;
         assert_eq!(rc, 0);
         assert!(child_id > 0);
 
         // Open by id
         let opts = CString::new("{\"read\":true,\"write\":true}").unwrap();
         let mut h: u64 = 0;
-        let rc = unsafe { af_open_by_id(fs, 0, child_id, opts.as_ptr(), &mut h as *mut u64) } as i32;
+        let rc =
+            unsafe { af_open_by_id(fs, 0, child_id, opts.as_ptr(), &mut h as *mut u64) } as i32;
         assert_eq!(rc, 0);
         unsafe { af_close(fs, 0, h) };
 
@@ -54,7 +74,16 @@ mod tests {
         let path = CString::new("/").unwrap();
         let mut buf = vec![0u8; 4096];
         let mut out_len: usize = 0;
-        let rc = unsafe { af_readdir(fs, 0, path.as_ptr(), buf.as_mut_ptr(), buf.len(), &mut out_len as *mut usize) } as i32;
+        let rc = unsafe {
+            af_readdir(
+                fs,
+                0,
+                path.as_ptr(),
+                buf.as_mut_ptr(),
+                buf.len(),
+                &mut out_len as *mut usize,
+            )
+        } as i32;
         assert_eq!(rc, 0);
 
         // getattr root
@@ -68,9 +97,11 @@ mod tests {
         let fs = create_fs();
         let fname = CString::new("/file").unwrap();
         // Create via open(create=true)
-        let opts = CString::new("{\"read\":true,\"write\":true,\"create\":true,\"truncate\":true}").unwrap();
+        let opts = CString::new("{\"read\":true,\"write\":true,\"create\":true,\"truncate\":true}")
+            .unwrap();
         let mut h: u64 = 0;
-        let rc = unsafe { af_open(fs, 0, fname.as_ptr(), opts.as_ptr(), &mut h as *mut u64) } as i32;
+        let rc =
+            unsafe { af_open(fs, 0, fname.as_ptr(), opts.as_ptr(), &mut h as *mut u64) } as i32;
         assert_eq!(rc, 0);
         unsafe { af_close(fs, 0, h) };
 
@@ -84,16 +115,37 @@ mod tests {
         // xattr set/get/list
         let key = CString::new("user.test").unwrap();
         let val = b"value";
-        let rc = unsafe { af_xattr_set(fs, 0, fname.as_ptr(), key.as_ptr(), val.as_ptr(), val.len()) } as i32;
+        let rc =
+            unsafe { af_xattr_set(fs, 0, fname.as_ptr(), key.as_ptr(), val.as_ptr(), val.len()) }
+                as i32;
         assert_eq!(rc, 0);
         let mut vbuf = vec![0u8; 32];
         let mut vlen: usize = 0;
-        let rc = unsafe { af_xattr_get(fs, 0, fname.as_ptr(), key.as_ptr(), vbuf.as_mut_ptr(), vbuf.len(), &mut vlen as *mut usize) } as i32;
+        let rc = unsafe {
+            af_xattr_get(
+                fs,
+                0,
+                fname.as_ptr(),
+                key.as_ptr(),
+                vbuf.as_mut_ptr(),
+                vbuf.len(),
+                &mut vlen as *mut usize,
+            )
+        } as i32;
         assert_eq!(rc, 0);
         assert_eq!(&vbuf[..vlen], val);
         let mut lbuf = vec![0u8; 64];
         let mut llen: usize = 0;
-        let rc = unsafe { af_xattr_list(fs, 0, fname.as_ptr(), lbuf.as_mut_ptr(), lbuf.len(), &mut llen as *mut usize) } as i32;
+        let rc = unsafe {
+            af_xattr_list(
+                fs,
+                0,
+                fname.as_ptr(),
+                lbuf.as_mut_ptr(),
+                lbuf.len(),
+                &mut llen as *mut usize,
+            )
+        } as i32;
         assert_eq!(rc, 0);
 
         // rename

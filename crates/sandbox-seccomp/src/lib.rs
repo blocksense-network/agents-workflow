@@ -72,7 +72,10 @@ impl SeccompManager {
             .block_filesystem_operations()?
             .allow_basic_operations()?
             .set_debug_mode(self.config.debug_mode)?;
-        info!("Seccomp filter configured with debug_mode={}", self.config.debug_mode);
+        info!(
+            "Seccomp filter configured with debug_mode={}",
+            self.config.debug_mode
+        );
 
         let filter = filter_builder.build()?;
         self.filter = Some(filter);
@@ -82,10 +85,8 @@ impl SeccompManager {
 
         // Start notification handler if we have a supervisor channel
         if let Some(supervisor_tx) = &self.config.supervisor_tx {
-            let handler = NotificationHandler::new(
-                supervisor_tx.clone(),
-                self.path_resolver.clone(),
-            );
+            let handler =
+                NotificationHandler::new(supervisor_tx.clone(), self.path_resolver.clone());
 
             // Start the notification handler in background
             tokio::spawn(async move {

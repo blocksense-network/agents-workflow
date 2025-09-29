@@ -128,7 +128,11 @@ impl DeviceConfig {
     /// Check if a device path is allowed
     pub fn is_device_allowed(&self, device_path: &str) -> bool {
         // Prohibited devices take precedence
-        if self.prohibited_devices.iter().any(|p| device_path.starts_with(p) || device_path == p) {
+        if self
+            .prohibited_devices
+            .iter()
+            .any(|p| device_path.starts_with(p) || device_path == p)
+        {
             return false;
         }
 
@@ -145,7 +149,9 @@ impl DeviceConfig {
         }
 
         // Check explicit allowlist
-        self.allowed_devices.iter().any(|d| device_path.starts_with(d) || device_path == d)
+        self.allowed_devices
+            .iter()
+            .any(|d| device_path.starts_with(d) || device_path == d)
     }
 
     /// Get the list of devices that should be accessible
@@ -236,11 +242,12 @@ impl DeviceManager {
     async fn ensure_dev_directory(&self) -> Result<()> {
         let dev_path = Path::new("/dev");
         if !dev_path.exists() {
-            tokio::fs::create_dir_all(dev_path).await
-                .map_err(|e| error::Error::Io(std::io::Error::new(
+            tokio::fs::create_dir_all(dev_path).await.map_err(|e| {
+                error::Error::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    format!("Failed to create /dev directory: {}", e)
-                )))?;
+                    format!("Failed to create /dev directory: {}", e),
+                ))
+            })?;
         }
         Ok(())
     }
@@ -262,7 +269,10 @@ impl DeviceManager {
                 // For now, we just ensure the devices exist and are accessible
                 debug!("Basic device {} is available", device);
             } else {
-                warn!("Basic device {} not found, some functionality may be limited", device);
+                warn!(
+                    "Basic device {} not found, some functionality may be limited",
+                    device
+                );
             }
         }
 
@@ -310,7 +320,10 @@ impl DeviceManager {
             } else {
                 // Create directory if it doesn't exist
                 if let Err(e) = tokio::fs::create_dir_all(path).await {
-                    warn!("Failed to create container storage directory {}: {}", dir, e);
+                    warn!(
+                        "Failed to create container storage directory {}: {}",
+                        dir, e
+                    );
                 } else {
                     debug!("Created container storage directory {}", dir);
                 }

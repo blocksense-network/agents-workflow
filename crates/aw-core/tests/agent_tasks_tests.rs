@@ -4,10 +4,10 @@
 //! of the Ruby AgentTasks class, including task file creation, appending,
 //! and branch detection.
 
-use std::fs;
-use tempfile::TempDir;
 use aw_core::AgentTasks;
 use aw_repo::VcsRepo;
+use std::fs;
+use tempfile::TempDir;
 
 /// Setup function to isolate git from user configuration and disable prompts.
 /// Returns a TempDir that must be kept alive for the duration of the test.
@@ -77,11 +77,9 @@ async fn test_record_initial_task_creates_correct_file_structure() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Test task content",
-        "test-branch",
-        Some("devshell-name")
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Test task content", "test-branch", Some("devshell-name"))
+        .expect("Failed to record initial task");
 
     // Check that the .agents/tasks directory structure was created
     let agents_dir = repo.root().join(".agents");
@@ -91,17 +89,25 @@ async fn test_record_initial_task_creates_correct_file_structure() {
     assert!(tasks_dir.exists(), ".agents/tasks directory should exist");
 
     // Find the task file (should be in YYYY/MM/ directory)
-    let year_dir = tasks_dir.read_dir().expect("Failed to read tasks dir")
+    let year_dir = tasks_dir
+        .read_dir()
+        .expect("Failed to read tasks dir")
         .find(|entry| entry.as_ref().unwrap().file_type().unwrap().is_dir())
         .expect("Should have a year directory")
         .unwrap();
 
-    let month_dir = year_dir.path().read_dir().expect("Failed to read year dir")
+    let month_dir = year_dir
+        .path()
+        .read_dir()
+        .expect("Failed to read year dir")
         .find(|entry| entry.as_ref().unwrap().file_type().unwrap().is_dir())
         .expect("Should have a month directory")
         .unwrap();
 
-    let task_files: Vec<_> = month_dir.path().read_dir().expect("Failed to read month dir")
+    let task_files: Vec<_> = month_dir
+        .path()
+        .read_dir()
+        .expect("Failed to read month dir")
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.is_file())
         .collect();
@@ -112,7 +118,11 @@ async fn test_record_initial_task_creates_correct_file_structure() {
     let filename = task_file.file_name().unwrap().to_str().unwrap();
 
     // Filename should match pattern: DD-HHMM-branch_name
-    assert!(filename.ends_with("-test-branch"), "Filename should end with branch name: {}", filename);
+    assert!(
+        filename.ends_with("-test-branch"),
+        "Filename should end with branch name: {}",
+        filename
+    );
 
     // Check file content
     let content = fs::read_to_string(task_file).expect("Failed to read task file");
@@ -126,7 +136,12 @@ async fn test_record_initial_task_commit_message() {
 
     // Add a remote for testing
     std::process::Command::new("git")
-        .args(&["remote", "add", "origin", "https://github.com/test/repo.git"])
+        .args(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/test/repo.git",
+        ])
         .current_dir(repo.root())
         .output()
         .expect("Failed to add remote");
@@ -134,20 +149,33 @@ async fn test_record_initial_task_commit_message() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Test task content",
-        "test-branch",
-        Some("devshell-name")
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Test task content", "test-branch", Some("devshell-name"))
+        .expect("Failed to record initial task");
 
     // Check the latest commit message
     let current_branch = repo.current_branch().expect("Failed to get current branch");
     let latest_commit = repo.tip_commit(&current_branch).expect("Failed to get tip commit");
-    let commit_msg = repo.commit_message(&latest_commit).expect("Failed to get commit message").unwrap();
+    let commit_msg = repo
+        .commit_message(&latest_commit)
+        .expect("Failed to get commit message")
+        .unwrap();
 
-    assert!(commit_msg.contains("Start-Agent-Branch: test-branch"), "Commit message should contain branch: {}", commit_msg);
-    assert!(commit_msg.contains("Target-Remote: https://github.com/test/repo.git"), "Commit message should contain remote: {}", commit_msg);
-    assert!(commit_msg.contains("Dev-Shell: devshell-name"), "Commit message should contain devshell: {}", commit_msg);
+    assert!(
+        commit_msg.contains("Start-Agent-Branch: test-branch"),
+        "Commit message should contain branch: {}",
+        commit_msg
+    );
+    assert!(
+        commit_msg.contains("Target-Remote: https://github.com/test/repo.git"),
+        "Commit message should contain remote: {}",
+        commit_msg
+    );
+    assert!(
+        commit_msg.contains("Dev-Shell: devshell-name"),
+        "Commit message should contain devshell: {}",
+        commit_msg
+    );
 }
 
 #[tokio::test]
@@ -178,11 +206,9 @@ async fn test_on_task_branch_true_after_recording_initial_task() {
     assert!(!agent_tasks.on_task_branch().expect("Failed to check task branch"));
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Test task content",
-        "test-branch",
-        None
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Test task content", "test-branch", None)
+        .expect("Failed to record initial task");
 
     // Should now be on a task branch
     assert!(agent_tasks.on_task_branch().expect("Failed to check task branch"));
@@ -203,18 +229,20 @@ async fn test_agent_task_file_in_current_branch() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Test task content",
-        "test-branch",
-        None
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Test task content", "test-branch", None)
+        .expect("Failed to record initial task");
 
     // Should be able to get the task file path
-    let task_file_path = agent_tasks.agent_task_file_in_current_branch()
+    let task_file_path = agent_tasks
+        .agent_task_file_in_current_branch()
         .expect("Failed to get task file path");
 
     assert!(task_file_path.exists(), "Task file should exist");
-    assert!(task_file_path.to_str().unwrap().contains(".agents/tasks/"), "Task file should be in .agents/tasks/");
+    assert!(
+        task_file_path.to_str().unwrap().contains(".agents/tasks/"),
+        "Task file should be in .agents/tasks/"
+    );
 
     // Check content
     let content = fs::read_to_string(&task_file_path).expect("Failed to read task file");
@@ -230,7 +258,10 @@ async fn test_agent_task_file_in_current_branch_error_when_not_on_task_branch() 
     // Should fail when not on a task branch
     let result = agent_tasks.agent_task_file_in_current_branch();
     assert!(result.is_err(), "Should fail when not on task branch");
-    assert!(result.unwrap_err().to_string().contains("not currently on an agent task branch"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("not currently on an agent task branch"));
 }
 
 #[tokio::test]
@@ -248,18 +279,18 @@ async fn test_append_task() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Initial task content",
-        "test-branch",
-        None
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Initial task content", "test-branch", None)
+        .expect("Failed to record initial task");
 
     // Append a follow-up task
-    agent_tasks.append_task("Follow-up task content")
+    agent_tasks
+        .append_task("Follow-up task content")
         .expect("Failed to append task");
 
     // Check the task file content
-    let task_file_path = agent_tasks.agent_task_file_in_current_branch()
+    let task_file_path = agent_tasks
+        .agent_task_file_in_current_branch()
         .expect("Failed to get task file path");
 
     let content = fs::read_to_string(&task_file_path).expect("Failed to read task file");
@@ -282,20 +313,22 @@ async fn test_append_task_commit_message() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Initial task content",
-        "test-branch",
-        None
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Initial task content", "test-branch", None)
+        .expect("Failed to record initial task");
 
     // Append a follow-up task
-    agent_tasks.append_task("Follow-up task content")
+    agent_tasks
+        .append_task("Follow-up task content")
         .expect("Failed to append task");
 
     // Check the latest commit message
     let current_branch = repo.current_branch().expect("Failed to get current branch");
     let latest_commit = repo.tip_commit(&current_branch).expect("Failed to get tip commit");
-    let commit_msg = repo.commit_message(&latest_commit).expect("Failed to get commit message").unwrap();
+    let commit_msg = repo
+        .commit_message(&latest_commit)
+        .expect("Failed to get commit message")
+        .unwrap();
 
     assert_eq!(commit_msg, "Follow-up task");
 }
@@ -326,7 +359,12 @@ async fn test_setup_autopush() {
 
     // Add a remote for testing
     std::process::Command::new("git")
-        .args(&["remote", "add", "origin", "https://github.com/test/repo.git"])
+        .args(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/test/repo.git",
+        ])
         .current_dir(repo.root())
         .output()
         .expect("Failed to add remote");
@@ -341,11 +379,9 @@ async fn test_setup_autopush() {
     let agent_tasks = AgentTasks::new(repo.root()).expect("Failed to create AgentTasks");
 
     // Record an initial task
-    agent_tasks.record_initial_task(
-        "Test task content",
-        "test-branch",
-        None
-    ).expect("Failed to record initial task");
+    agent_tasks
+        .record_initial_task("Test task content", "test-branch", None)
+        .expect("Failed to record initial task");
 
     // Setup autopush
     agent_tasks.setup_autopush().expect("Failed to setup autopush");

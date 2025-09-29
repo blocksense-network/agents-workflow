@@ -230,19 +230,13 @@ pub extern "C" fn agentfs_bind_process(
 
 /// Free a directory entry array
 #[no_mangle]
-pub extern "C" fn agentfs_free_dir_entries(
-    _entries: *mut AgentFsDirEntry,
-    _count: size_t,
-) {
+pub extern "C" fn agentfs_free_dir_entries(_entries: *mut AgentFsDirEntry, _count: size_t) {
     // TODO: Implement proper memory management
 }
 
 /// Get last error message
 #[no_mangle]
-pub extern "C" fn agentfs_get_error_message(
-    _buffer: *mut c_char,
-    _buffer_size: size_t,
-) -> size_t {
+pub extern "C" fn agentfs_get_error_message(_buffer: *mut c_char, _buffer_size: size_t) -> size_t {
     // TODO: Implement error message retrieval
     0
 }

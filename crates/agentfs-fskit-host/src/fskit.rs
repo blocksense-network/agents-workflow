@@ -1,8 +1,8 @@
 //! FSKit implementation for macOS
 
 use super::{FsKitAdapter, FsKitConfig};
-use agentfs_core::{Attributes, DirEntry, HandleId, OpenOptions};
 use agentfs_core::error::FsResult;
+use agentfs_core::{Attributes, DirEntry, HandleId, OpenOptions};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -33,7 +33,9 @@ struct FsFileName {
 
 impl FsFileName {
     fn from_string(s: &str) -> Self {
-        Self { name: s.to_string() }
+        Self {
+            name: s.to_string(),
+        }
     }
 
     fn as_str(&self) -> &str {

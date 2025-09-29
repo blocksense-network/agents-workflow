@@ -123,8 +123,7 @@ impl EventHandler {
                 ..
             }) => true,
             CrosstermEvent::Key(KeyEvent {
-                code: KeyCode::Esc,
-                ..
+                code: KeyCode::Esc, ..
             }) => true,
             _ => false,
         }

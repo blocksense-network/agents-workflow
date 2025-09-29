@@ -152,7 +152,7 @@ Duplicate directives or values are ignored.
 
 This workflow supports setup for multiple AI coding agent systems:
 
-- **[Codex](https://openai.com/blog/openai-codex)** - OpenAI's code generation model
+- **[Codex](https://openai.com/codex)** - OpenAI's code generation model
 - **[Jules](https://jules.google.com/)** - AI pair programming assistant
 - **[Goose](https://github.com/square/goose)** - AI-powered development tool
 - **[Open Hands](https://github.com/All-Hands-AI/OpenHands)** - Open-source AI coding assistant

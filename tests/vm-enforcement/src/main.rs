@@ -19,11 +19,7 @@ struct TestResult {
 async fn run_test(test_name: &str, command: &mut Command) -> TestResult {
     info!("Running test: {}", test_name);
 
-    let output = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await;
+    let output = command.stdout(Stdio::piped()).stderr(Stdio::piped()).output().await;
 
     match output {
         Ok(output) => {
@@ -92,7 +88,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!("\n=== VM Test Results ===");
     for result in &results {
-        println!("{}: {}", result.name, if result.passed { "PASS" } else { "FAIL" });
+        println!(
+            "{}: {}",
+            result.name,
+            if result.passed { "PASS" } else { "FAIL" }
+        );
         if !result.passed {
             println!("  Output: {}", result.output);
         }

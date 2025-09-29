@@ -8,8 +8,8 @@ use ratatui::{
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 
-use crate::viewmodel::ViewModel;
 use crate::task::{Task, TaskState};
+use crate::viewmodel::ViewModel;
 
 /// Charm-inspired theme with cohesive colors and styling
 #[derive(Debug, Clone)]
@@ -31,16 +31,16 @@ impl Default for Theme {
     fn default() -> Self {
         Self {
             // Dark theme inspired by Catppuccin Mocha with Charm aesthetics
-            bg: Color::Rgb(17, 17, 27),        // Base background
-            surface: Color::Rgb(24, 24, 37),    // Card/surface background
-            text: Color::Rgb(205, 214, 244),    // Main text
-            muted: Color::Rgb(127, 132, 156),   // Secondary text
-            primary: Color::Rgb(137, 180, 250), // Blue for primary actions
-            accent: Color::Rgb(166, 218, 149),  // Green for success/accent
-            success: Color::Rgb(166, 218, 149), // Green
-            warning: Color::Rgb(250, 179, 135), // Orange/yellow
-            error: Color::Rgb(243, 139, 168),   // Red/pink
-            border: Color::Rgb(49, 50, 68),     // Subtle borders
+            bg: Color::Rgb(17, 17, 27),                // Base background
+            surface: Color::Rgb(24, 24, 37),           // Card/surface background
+            text: Color::Rgb(205, 214, 244),           // Main text
+            muted: Color::Rgb(127, 132, 156),          // Secondary text
+            primary: Color::Rgb(137, 180, 250),        // Blue for primary actions
+            accent: Color::Rgb(166, 218, 149),         // Green for success/accent
+            success: Color::Rgb(166, 218, 149),        // Green
+            warning: Color::Rgb(250, 179, 135),        // Orange/yellow
+            error: Color::Rgb(243, 139, 168),          // Red/pink
+            border: Color::Rgb(49, 50, 68),            // Subtle borders
             border_focused: Color::Rgb(137, 180, 250), // Blue for focus
         }
     }
@@ -68,7 +68,8 @@ impl Theme {
     pub fn card_block(&self, title: &str) -> Block {
         let title_line = Line::from(vec![
             Span::raw("┤").fg(self.border),
-            Span::raw(format!(" {} ", title)).style(Style::default().fg(self.text).add_modifier(Modifier::BOLD)),
+            Span::raw(format!(" {} ", title))
+                .style(Style::default().fg(self.text).add_modifier(Modifier::BOLD)),
             Span::raw("├").fg(self.border),
         ]);
 
@@ -144,9 +145,11 @@ fn draw_selector_with_filter(
         Style::default().fg(Color::White)
     };
 
-    let filter_paragraph = Paragraph::new(filter_text)
-        .style(filter_style)
-        .block(Block::default().borders(Borders::TOP | Borders::LEFT | Borders::RIGHT).title(format!("{} Filter", title)));
+    let filter_paragraph = Paragraph::new(filter_text).style(filter_style).block(
+        Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .title(format!("{} Filter", title)),
+    );
 
     f.render_widget(filter_paragraph, chunks[0]);
 
@@ -154,7 +157,8 @@ fn draw_selector_with_filter(
     let filtered_items: Vec<&str> = if filter.is_empty() {
         items.to_vec()
     } else {
-        items.iter()
+        items
+            .iter()
             .filter(|item| item.to_lowercase().contains(&filter.to_lowercase()))
             .copied()
             .collect()
@@ -165,10 +169,7 @@ fn draw_selector_with_filter(
     } else if filtered_items.is_empty() && !filter.is_empty() {
         vec![ListItem::new("No matches found")]
     } else {
-        filtered_items
-            .iter()
-            .map(|item| ListItem::new(*item))
-            .collect()
+        filtered_items.iter().map(|item| ListItem::new(*item)).collect()
     };
 
     let block_style = if is_focused {
@@ -178,18 +179,19 @@ fn draw_selector_with_filter(
     };
 
     let list = List::new(list_items)
-        .block(Block::default().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT).style(block_style).title(title))
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+                .style(block_style)
+                .title(title),
+        )
         .highlight_style(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
 
     f.render_stateful_widget(list, chunks[1], state);
 }
-
 
 /// Draw the task description editor
 fn draw_task_editor(f: &mut ratatui::Frame, area: Rect, description: &str, is_focused: bool) {
@@ -200,7 +202,12 @@ fn draw_task_editor(f: &mut ratatui::Frame, area: Rect, description: &str, is_fo
     };
 
     let paragraph = Paragraph::new(description)
-        .block(Block::default().borders(Borders::ALL).style(block_style).title("Task Description (Ctrl+Up/Down to resize)"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(block_style)
+                .title("Task Description (Ctrl+Up/Down to resize)"),
+        )
         .wrap(ratatui::widgets::Wrap { trim: true });
 
     f.render_widget(paragraph, area);
@@ -223,10 +230,10 @@ pub fn draw_task_dashboard(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(9),  // Header with logo (10% larger for better visibility)
-            Constraint::Min(1),     // Previous tasks (takes remaining space)
-            Constraint::Length(6),  // New task entry area at bottom
-            Constraint::Length(1),  // Footer with shortcuts (single line, no borders)
+            Constraint::Length(9), // Header with logo (10% larger for better visibility)
+            Constraint::Min(1),    // Previous tasks (takes remaining space)
+            Constraint::Length(6), // New task entry area at bottom
+            Constraint::Length(1), // Footer with shortcuts (single line, no borders)
         ])
         .split(area);
 
@@ -238,9 +245,9 @@ pub fn draw_task_dashboard(
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(2),  // Left padding
-                Constraint::Min(1),     // Content area
-                Constraint::Length(2),  // Right padding
+                Constraint::Length(2), // Left padding
+                Constraint::Min(1),    // Content area
+                Constraint::Length(2), // Right padding
             ])
             .split(chunks[1]);
         horizontal_chunks[1]
@@ -252,9 +259,9 @@ pub fn draw_task_dashboard(
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(2),  // Left padding
-                Constraint::Min(1),     // Content area
-                Constraint::Length(2),  // Right padding
+                Constraint::Length(2), // Left padding
+                Constraint::Min(1),    // Content area
+                Constraint::Length(2), // Right padding
             ])
             .split(chunks[2]);
         horizontal_chunks[1]
@@ -266,9 +273,9 @@ pub fn draw_task_dashboard(
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(2),  // Left padding
-                Constraint::Min(1),     // Content area
-                Constraint::Length(2),  // Right padding
+                Constraint::Length(2), // Left padding
+                Constraint::Min(1),    // Content area
+                Constraint::Length(2), // Right padding
             ])
             .split(chunks[3]);
         horizontal_chunks[1]
@@ -287,12 +294,15 @@ pub fn draw_task_dashboard(
 
     // Draw modal if active
     if let Some(selected_task) = view_model.selected_task() {
-        if let crate::task::TaskState::New { modal_state: Some(modal), .. } = &selected_task.state {
+        if let crate::task::TaskState::New {
+            modal_state: Some(modal),
+            ..
+        } = &selected_task.state
+        {
             draw_modal(f, area, modal, &theme);
         }
     }
 }
-
 
 /// Draw the header (smaller, left-aligned)
 fn draw_header(
@@ -308,9 +318,9 @@ fn draw_header(
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // Top padding
-                Constraint::Min(1),     // Content area
-                Constraint::Length(1),  // Bottom padding
+                Constraint::Length(1), // Top padding
+                Constraint::Min(1),    // Content area
+                Constraint::Length(1), // Bottom padding
             ])
             .split(area);
 
@@ -319,9 +329,9 @@ fn draw_header(
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(2),  // Left padding
-                Constraint::Min(1),     // Content area
-                Constraint::Length(2),  // Right padding
+                Constraint::Length(2), // Left padding
+                Constraint::Min(1),    // Content area
+                Constraint::Length(2), // Right padding
             ])
             .split(middle_area);
 
@@ -359,14 +369,18 @@ fn draw_header(
         lines.push(line.clone());
     }
 
-    let paragraph = Paragraph::new(lines)
-        .alignment(ratatui::layout::Alignment::Left);
+    let paragraph = Paragraph::new(lines).alignment(ratatui::layout::Alignment::Left);
 
     f.render_widget(paragraph, content_area);
 }
 
 /// Draw modal dialogs with Charm styling
-fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::ModalState, theme: &Theme) {
+fn draw_modal(
+    f: &mut ratatui::Frame,
+    area: Rect,
+    modal_state: &crate::task::ModalState,
+    theme: &Theme,
+) {
     let modal_width = 60;
     let modal_height = 12;
     let modal_x = (area.width.saturating_sub(modal_width)) / 2;
@@ -403,24 +417,41 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
     let inner_area = block.inner(modal_area);
 
     match modal_state {
-        crate::task::ModalState::RepositorySelect { query, options, selected_index } => {
+        crate::task::ModalState::RepositorySelect {
+            query,
+            options,
+            selected_index,
+        } => {
             let title_area = Rect::new(inner_area.x, inner_area.y, inner_area.width, 1);
             let query_area = Rect::new(inner_area.x, inner_area.y + 1, inner_area.width, 1);
-            let options_area = Rect::new(inner_area.x, inner_area.y + 3, inner_area.width, inner_area.height - 3);
+            let options_area = Rect::new(
+                inner_area.x,
+                inner_area.y + 3,
+                inner_area.width,
+                inner_area.height - 3,
+            );
 
             // Title (using theme)
-            f.render_widget(Paragraph::new("Repository Selection").style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)), title_area);
+            f.render_widget(
+                Paragraph::new("Repository Selection")
+                    .style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                title_area,
+            );
 
             // Query input
             let query_text = if query.is_empty() {
-                Span::styled("Type to search repositories...", Style::default().fg(theme.muted))
+                Span::styled(
+                    "Type to search repositories...",
+                    Style::default().fg(theme.muted),
+                )
             } else {
                 Span::styled(query.clone(), Style::default().fg(theme.text))
             };
             f.render_widget(Paragraph::new(query_text), query_area);
 
             // Options list
-            let items: Vec<ListItem> = options.iter()
+            let items: Vec<ListItem> = options
+                .iter()
                 .enumerate()
                 .map(|(idx, repo)| {
                     let is_selected = idx == *selected_index;
@@ -433,28 +464,44 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
                 })
                 .collect();
 
-            let list = List::new(items)
-                .block(Block::default().borders(Borders::NONE));
+            let list = List::new(items).block(Block::default().borders(Borders::NONE));
             f.render_widget(list, options_area);
         }
-        crate::task::ModalState::BranchSelect { query, options, selected_index } => {
+        crate::task::ModalState::BranchSelect {
+            query,
+            options,
+            selected_index,
+        } => {
             let title_area = Rect::new(inner_area.x, inner_area.y, inner_area.width, 1);
             let query_area = Rect::new(inner_area.x, inner_area.y + 1, inner_area.width, 1);
-            let options_area = Rect::new(inner_area.x, inner_area.y + 3, inner_area.width, inner_area.height - 3);
+            let options_area = Rect::new(
+                inner_area.x,
+                inner_area.y + 3,
+                inner_area.width,
+                inner_area.height - 3,
+            );
 
             // Title (using theme)
-            f.render_widget(Paragraph::new("Branch Selection").style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)), title_area);
+            f.render_widget(
+                Paragraph::new("Branch Selection")
+                    .style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                title_area,
+            );
 
             // Query input
             let query_text = if query.is_empty() {
-                Span::styled("Type to search branches...", Style::default().fg(theme.muted))
+                Span::styled(
+                    "Type to search branches...",
+                    Style::default().fg(theme.muted),
+                )
             } else {
                 Span::styled(query.clone(), Style::default().fg(theme.text))
             };
             f.render_widget(Paragraph::new(query_text), query_area);
 
             // Options list
-            let items: Vec<ListItem> = options.iter()
+            let items: Vec<ListItem> = options
+                .iter()
                 .enumerate()
                 .map(|(idx, branch)| {
                     let is_selected = idx == *selected_index;
@@ -467,17 +514,29 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
                 })
                 .collect();
 
-            let list = List::new(items)
-                .block(Block::default().borders(Borders::NONE));
+            let list = List::new(items).block(Block::default().borders(Borders::NONE));
             f.render_widget(list, options_area);
         }
-        crate::task::ModalState::ModelSelect { query, options, selected_index } => {
+        crate::task::ModalState::ModelSelect {
+            query,
+            options,
+            selected_index,
+        } => {
             let title_area = Rect::new(inner_area.x, inner_area.y, inner_area.width, 1);
             let query_area = Rect::new(inner_area.x, inner_area.y + 1, inner_area.width, 1);
-            let options_area = Rect::new(inner_area.x, inner_area.y + 3, inner_area.width, inner_area.height - 3);
+            let options_area = Rect::new(
+                inner_area.x,
+                inner_area.y + 3,
+                inner_area.width,
+                inner_area.height - 3,
+            );
 
             // Title (using theme)
-            f.render_widget(Paragraph::new("Model Selection").style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)), title_area);
+            f.render_widget(
+                Paragraph::new("Model Selection")
+                    .style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                title_area,
+            );
 
             // Query input
             let query_text = if query.is_empty() {
@@ -488,7 +547,8 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
             f.render_widget(Paragraph::new(query_text), query_area);
 
             // Options list with instance counts
-            let items: Vec<ListItem> = options.iter()
+            let items: Vec<ListItem> = options
+                .iter()
                 .enumerate()
                 .map(|(idx, model)| {
                     let is_selected = idx == *selected_index;
@@ -506,8 +566,7 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
                 })
                 .collect();
 
-            let list = List::new(items)
-                .block(Block::default().borders(Borders::NONE));
+            let list = List::new(items).block(Block::default().borders(Borders::NONE));
             f.render_widget(list, options_area);
         }
     }
@@ -516,7 +575,9 @@ fn draw_modal(f: &mut ratatui::Frame, area: Rect, modal_state: &crate::task::Mod
 /// Draw previous tasks as bordered cards (excluding the new task entry)
 fn draw_previous_tasks(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, theme: &Theme) {
     // Filter out the new task - only show previous tasks
-    let previous_tasks: Vec<_> = view_model.tasks.iter()
+    let previous_tasks: Vec<_> = view_model
+        .tasks
+        .iter()
         .filter(|task| !matches!(task.state, crate::task::TaskState::New { .. }))
         .collect();
 
@@ -567,38 +628,49 @@ fn draw_task_card(f: &mut ratatui::Frame, area: Rect, task: &crate::task::Task, 
                     Span::styled("● ", Style::default().fg(theme.muted)),
                     Span::styled(title, Style::default().fg(theme.text)),
                 ]),
-                Line::from(vec![
-                    Span::styled(format!("Merged {}", time_ago), Style::default().fg(theme.muted)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("Merged {}", time_ago),
+                    Style::default().fg(theme.muted),
+                )]),
             ]
         }
         crate::task::TaskState::Completed { title, status, .. } => {
             let time_ago = task.time_ago();
             let title = task.display_title(50);
-            let status_short = if status.len() > 30 { format!("{}...", &status[..27]) } else { status.clone() };
+            let status_short = if status.len() > 30 {
+                format!("{}...", &status[..27])
+            } else {
+                status.clone()
+            };
             vec![
                 Line::from(vec![
                     Span::styled("✓ ", theme.success_style()),
                     Span::styled(title, Style::default().fg(theme.text)),
                 ]),
-                Line::from(vec![
-                    Span::styled(format!("{} • {}", status_short, time_ago), Style::default().fg(theme.muted)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("{} • {}", status_short, time_ago),
+                    Style::default().fg(theme.muted),
+                )]),
             ]
         }
-        crate::task::TaskState::Active { title, current_action, action_detail, progress, .. } => {
+        crate::task::TaskState::Active {
+            title,
+            current_action,
+            action_detail,
+            progress,
+            ..
+        } => {
             let title = task.display_title(50);
-            let progress_info = progress.as_ref()
-                .map(|p| format!(" [{}]", p))
-                .unwrap_or_default();
+            let progress_info = progress.as_ref().map(|p| format!(" [{}]", p)).unwrap_or_default();
             vec![
                 Line::from(vec![
                     Span::styled("● ", Style::default().fg(theme.warning)),
                     Span::styled(title, Style::default().fg(theme.text)),
                 ]),
-                Line::from(vec![
-                    Span::styled(format!("{}{}", current_action, progress_info), Style::default().fg(theme.primary)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("{}{}", current_action, progress_info),
+                    Style::default().fg(theme.primary),
+                )]),
             ]
         }
         crate::task::TaskState::Draft { description, .. } => {
@@ -614,9 +686,10 @@ fn draw_task_card(f: &mut ratatui::Frame, area: Rect, task: &crate::task::Task, 
                     Span::styled("📝 ", Style::default().fg(theme.warning)),
                     Span::styled(title, Style::default().fg(theme.text)),
                 ]),
-                Line::from(vec![
-                    Span::styled(format!("{} • {}", desc_preview, time_ago), Style::default().fg(theme.muted)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("{} • {}", desc_preview, time_ago),
+                    Style::default().fg(theme.muted),
+                )]),
             ]
         }
         crate::task::TaskState::New { .. } => {
@@ -632,7 +705,8 @@ fn draw_task_card(f: &mut ratatui::Frame, area: Rect, task: &crate::task::Task, 
 
     // Render content directly (temporarily ignore padding for debugging)
     for (i, line) in content.iter().enumerate() {
-        if i < 2 {  // Just render first 2 lines for debugging
+        if i < 2 {
+            // Just render first 2 lines for debugging
             let line_area = Rect::new(area.x + 2, area.y + 1 + i as u16, area.width - 4, 1);
             let para = Paragraph::new(line.clone());
             f.render_widget(para, line_area);
@@ -644,7 +718,15 @@ fn draw_task_card(f: &mut ratatui::Frame, area: Rect, task: &crate::task::Task, 
 fn draw_new_task_entry(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, theme: &Theme) {
     // Find the new task
     if let Some(new_task) = view_model.tasks.last() {
-        if let crate::task::TaskState::New { description, selected_repo, selected_branch, selected_models, focused_button, modal_state } = &new_task.state {
+        if let crate::task::TaskState::New {
+            description,
+            selected_repo,
+            selected_branch,
+            selected_models,
+            focused_button,
+            modal_state,
+        } = &new_task.state
+        {
             let is_selected = view_model.selected_task_index == view_model.tasks.len() - 1;
 
             let mut all_lines = Vec::new();
@@ -660,22 +742,27 @@ fn draw_new_task_entry(f: &mut ratatui::Frame, area: Rect, view_model: &ViewMode
             if description.is_empty() {
                 all_lines.push(Line::from(vec![
                     Span::raw("│ "),
-                    Span::styled("Enter task description...".to_string() + &" ".repeat(45), Style::default().bg(theme.surface).fg(theme.muted)),
+                    Span::styled(
+                        "Enter task description...".to_string() + &" ".repeat(45),
+                        Style::default().bg(theme.surface).fg(theme.muted),
+                    ),
                     Span::raw(" │"),
                 ]));
             } else {
                 // Split description into lines if it contains newlines
                 for line in description.lines() {
                     let padded_line = format!("│ {:<69} │", line);
-                    all_lines.push(Line::from(vec![
-                        Span::styled(padded_line, Style::default().bg(theme.surface)),
-                    ]));
+                    all_lines.push(Line::from(vec![Span::styled(
+                        padded_line,
+                        Style::default().bg(theme.surface),
+                    )]));
                 }
                 // Add empty line if description is short
                 if description.lines().count() < 2 {
-                    all_lines.push(Line::from(vec![
-                        Span::styled("│                                                                     │", Style::default().bg(theme.surface)),
-                    ]));
+                    all_lines.push(Line::from(vec![Span::styled(
+                        "│                                                                     │",
+                        Style::default().bg(theme.surface),
+                    )]));
                 }
             }
 
@@ -714,25 +801,52 @@ fn draw_new_task_entry(f: &mut ratatui::Frame, area: Rect, view_model: &ViewMode
             let repo_button = if matches!(focused_button, crate::task::ButtonFocus::Repository) {
                 Span::styled(format!(" {} ", repo_button_text), theme.focused_style())
             } else {
-                Span::styled(format!(" {} ", repo_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!(" {} ", repo_button_text),
+                    Style::default()
+                        .fg(theme.primary)
+                        .bg(theme.surface)
+                        .add_modifier(Modifier::BOLD),
+                )
             };
 
             let branch_button = if matches!(focused_button, crate::task::ButtonFocus::Branch) {
                 Span::styled(format!(" {} ", branch_button_text), theme.focused_style())
             } else {
-                Span::styled(format!(" {} ", branch_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!(" {} ", branch_button_text),
+                    Style::default()
+                        .fg(theme.primary)
+                        .bg(theme.surface)
+                        .add_modifier(Modifier::BOLD),
+                )
             };
 
             let models_button = if matches!(focused_button, crate::task::ButtonFocus::Models) {
                 Span::styled(format!(" {} ", models_button_text), theme.focused_style())
             } else {
-                Span::styled(format!(" {} ", models_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!(" {} ", models_button_text),
+                    Style::default()
+                        .fg(theme.primary)
+                        .bg(theme.surface)
+                        .add_modifier(Modifier::BOLD),
+                )
             };
 
             let go_button = if matches!(focused_button, crate::task::ButtonFocus::Go) {
-                Span::styled(format!(" {} ", go_button_text), Style::default().fg(Color::Black).bg(theme.accent).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!(" {} ", go_button_text),
+                    Style::default().fg(Color::Black).bg(theme.accent).add_modifier(Modifier::BOLD),
+                )
             } else {
-                Span::styled(format!(" {} ", go_button_text), Style::default().fg(theme.accent).bg(theme.surface).add_modifier(Modifier::BOLD))
+                Span::styled(
+                    format!(" {} ", go_button_text),
+                    Style::default()
+                        .fg(theme.accent)
+                        .bg(theme.surface)
+                        .add_modifier(Modifier::BOLD),
+                )
             };
 
             let button_line = Line::from(vec![
@@ -755,7 +869,8 @@ fn draw_new_task_entry(f: &mut ratatui::Frame, area: Rect, view_model: &ViewMode
             // Render each line of content within the inner area
             for (i, line) in all_lines.iter().enumerate() {
                 if i < inner_area.height as usize {
-                    let line_area = Rect::new(inner_area.x, inner_area.y + i as u16, inner_area.width, 1);
+                    let line_area =
+                        Rect::new(inner_area.x, inner_area.y + i as u16, inner_area.width, 1);
                     let para = Paragraph::new(line.clone());
                     f.render_widget(para, line_area);
                 }
@@ -768,7 +883,8 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
     // Create the main task list area with Charm styling
     let title_line = Line::from(vec![
         Span::raw("").fg(theme.primary),
-        Span::raw(" Recent Tasks ").style(Style::default().fg(theme.text).add_modifier(Modifier::BOLD)),
+        Span::raw(" Recent Tasks ")
+            .style(Style::default().fg(theme.text).add_modifier(Modifier::BOLD)),
         Span::raw("").fg(theme.primary),
     ]);
 
@@ -788,7 +904,9 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
     // Calculate available width for task titles (accounting for time indicators)
     let available_width = inner_area.width.saturating_sub(10) as usize; // Reserve space for time
 
-    let task_items: Vec<ListItem> = view_model.tasks.iter()
+    let task_items: Vec<ListItem> = view_model
+        .tasks
+        .iter()
         .enumerate()
         .map(|(idx, task)| {
             let is_selected = idx == view_model.selected_task_index;
@@ -823,7 +941,13 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
                         ListItem::new(line)
                     }
                 }
-                TaskState::Active { title, current_action, action_detail, progress, .. } => {
+                TaskState::Active {
+                    title,
+                    current_action,
+                    action_detail,
+                    progress,
+                    ..
+                } => {
                     let title = task.display_title(available_width);
                     let mut spans = vec![
                         Span::styled("● ", Style::default().fg(theme.warning)),
@@ -833,15 +957,19 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
                     // Add progress info if available
                     if let Some(progress) = progress {
                         spans.push(Span::raw(" "));
-                        spans.push(Span::styled(format!("[{}]", progress), Style::default().fg(theme.primary)));
+                        spans.push(Span::styled(
+                            format!("[{}]", progress),
+                            Style::default().fg(theme.primary),
+                        ));
                     }
 
                     let line1 = Line::from(spans);
 
                     // Second line with current action details
-                    let line2 = Line::from(vec![
-                        Span::styled(format!("  {}: {}", current_action, action_detail), Style::default().fg(theme.muted)),
-                    ]);
+                    let line2 = Line::from(vec![Span::styled(
+                        format!("  {}: {}", current_action, action_detail),
+                        Style::default().fg(theme.muted),
+                    )]);
 
                     let text = ratatui::text::Text::from(vec![line1, line2]);
 
@@ -858,7 +986,10 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
                         Span::styled("📝 ", Style::default().fg(theme.warning)),
                         Span::styled(title, Style::default().fg(theme.muted)),
                         Span::raw(" "),
-                        Span::styled(format!("(draft {})", time_ago), Style::default().fg(theme.muted)),
+                        Span::styled(
+                            format!("(draft {})", time_ago),
+                            Style::default().fg(theme.muted),
+                        ),
                     ]);
                     if is_selected {
                         ListItem::new(line).style(theme.selected_style())
@@ -866,20 +997,29 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
                         ListItem::new(line)
                     }
                 }
-                TaskState::New { description, selected_repo, selected_branch, selected_models, focused_button, modal_state } => {
+                TaskState::New {
+                    description,
+                    selected_repo,
+                    selected_branch,
+                    selected_models,
+                    focused_button,
+                    modal_state,
+                } => {
                     let mut all_lines = Vec::new();
 
                     // Description area (auto-expandable text area)
                     if description.is_empty() {
-                        all_lines.push(Line::from(vec![
-                            Span::styled("Enter task description...", Style::default().fg(theme.muted)),
-                        ]));
+                        all_lines.push(Line::from(vec![Span::styled(
+                            "Enter task description...",
+                            Style::default().fg(theme.muted),
+                        )]));
                     } else {
                         // Split description into lines if it contains newlines
                         for line in description.lines() {
-                            all_lines.push(Line::from(vec![
-                                Span::styled(line, Style::default().fg(theme.text)),
-                            ]));
+                            all_lines.push(Line::from(vec![Span::styled(
+                                line,
+                                Style::default().fg(theme.text),
+                            )]));
                         }
                     }
 
@@ -902,35 +1042,69 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
                     let models_button_text = if selected_models.is_empty() {
                         "🤖 Models".to_string()
                     } else {
-                        let total_instances: u32 = selected_models.iter().map(|m| m.instance_count).sum();
+                        let total_instances: u32 =
+                            selected_models.iter().map(|m| m.instance_count).sum();
                         format!("🤖 Models ({})", total_instances)
                     };
 
                     let go_button_text = "⏎ Go".to_string();
 
                     // Create button spans with focus styling using theme
-                    let repo_button = if matches!(focused_button, crate::task::ButtonFocus::Repository) {
-                        Span::styled(format!(" {} ", repo_button_text), theme.focused_style())
-                    } else {
-                        Span::styled(format!(" {} ", repo_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
-                    };
+                    let repo_button =
+                        if matches!(focused_button, crate::task::ButtonFocus::Repository) {
+                            Span::styled(format!(" {} ", repo_button_text), theme.focused_style())
+                        } else {
+                            Span::styled(
+                                format!(" {} ", repo_button_text),
+                                Style::default()
+                                    .fg(theme.primary)
+                                    .bg(theme.surface)
+                                    .add_modifier(Modifier::BOLD),
+                            )
+                        };
 
-                    let branch_button = if matches!(focused_button, crate::task::ButtonFocus::Branch) {
-                        Span::styled(format!(" {} ", branch_button_text), theme.focused_style())
-                    } else {
-                        Span::styled(format!(" {} ", branch_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
-                    };
+                    let branch_button =
+                        if matches!(focused_button, crate::task::ButtonFocus::Branch) {
+                            Span::styled(format!(" {} ", branch_button_text), theme.focused_style())
+                        } else {
+                            Span::styled(
+                                format!(" {} ", branch_button_text),
+                                Style::default()
+                                    .fg(theme.primary)
+                                    .bg(theme.surface)
+                                    .add_modifier(Modifier::BOLD),
+                            )
+                        };
 
-                    let models_button = if matches!(focused_button, crate::task::ButtonFocus::Models) {
-                        Span::styled(format!(" {} ", models_button_text), theme.focused_style())
-                    } else {
-                        Span::styled(format!(" {} ", models_button_text), Style::default().fg(theme.primary).bg(theme.surface).add_modifier(Modifier::BOLD))
-                    };
+                    let models_button =
+                        if matches!(focused_button, crate::task::ButtonFocus::Models) {
+                            Span::styled(format!(" {} ", models_button_text), theme.focused_style())
+                        } else {
+                            Span::styled(
+                                format!(" {} ", models_button_text),
+                                Style::default()
+                                    .fg(theme.primary)
+                                    .bg(theme.surface)
+                                    .add_modifier(Modifier::BOLD),
+                            )
+                        };
 
                     let go_button = if matches!(focused_button, crate::task::ButtonFocus::Go) {
-                        Span::styled(format!(" {} ", go_button_text), Style::default().fg(Color::Black).bg(theme.accent).add_modifier(Modifier::BOLD))
+                        Span::styled(
+                            format!(" {} ", go_button_text),
+                            Style::default()
+                                .fg(Color::Black)
+                                .bg(theme.accent)
+                                .add_modifier(Modifier::BOLD),
+                        )
                     } else {
-                        Span::styled(format!(" {} ", go_button_text), Style::default().fg(theme.accent).bg(theme.surface).add_modifier(Modifier::BOLD))
+                        Span::styled(
+                            format!(" {} ", go_button_text),
+                            Style::default()
+                                .fg(theme.accent)
+                                .bg(theme.surface)
+                                .add_modifier(Modifier::BOLD),
+                        )
                     };
 
                     let button_line = Line::from(vec![
@@ -958,8 +1132,8 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
         })
         .collect();
 
-    let list = List::new(task_items)
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White));
+    let list =
+        List::new(task_items).highlight_style(Style::default().bg(Color::Blue).fg(Color::White));
 
     f.render_widget(list, inner_area);
 }
@@ -967,7 +1141,11 @@ fn draw_task_list(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, th
 /// Draw the footer with contextual shortcuts (single line like Lazygit)
 fn draw_task_footer(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, theme: &Theme) {
     let shortcuts = if let Some(selected_task) = view_model.selected_task() {
-        if let crate::task::TaskState::New { modal_state: Some(_), .. } = &selected_task.state {
+        if let crate::task::TaskState::New {
+            modal_state: Some(_),
+            ..
+        } = &selected_task.state
+        {
             // Modal is active - show modal navigation shortcuts
             vec![
                 Span::styled("↑↓", theme.warning_style()),
@@ -1013,8 +1191,7 @@ fn draw_task_footer(f: &mut ratatui::Frame, area: Rect, view_model: &ViewModel, 
 
     // Render as a simple line without borders (like Lazygit)
     let line = Line::from(shortcuts);
-    let paragraph = Paragraph::new(line)
-        .style(Style::default().bg(theme.bg));
+    let paragraph = Paragraph::new(line).style(Style::default().bg(theme.bg));
 
     f.render_widget(paragraph, area);
 }
@@ -1077,23 +1254,57 @@ fn draw_footer(f: &mut ratatui::Frame, area: Rect, current_section: usize) {
 /// Generate ASCII logo for Agent Harbor
 pub fn generate_ascii_logo() -> Vec<Line<'static>> {
     vec![
-        Line::from("╔══════════════════════════════════════════════════════════════════════════════╗"),
-        Line::from("║                                                                              ║"),
-        Line::from("║                           █████╗  ██████╗ ███████╗███╗   ██╗████████╗         ║"),
-        Line::from("║                          ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝         ║"),
-        Line::from("║                          ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║            ║"),
-        Line::from("║                          ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║            ║"),
-        Line::from("║                          ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║            ║"),
-        Line::from("║                          ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝            ║"),
-        Line::from("║                                                                              ║"),
-        Line::from("║                              ██╗  ██╗ █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ║"),
-        Line::from("║                              ██║  ██║██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗║"),
-        Line::from("║                              ███████║███████║██████╔╝██████╔╝██║   ██║██████╔╝║"),
-        Line::from("║                              ██╔══██║██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗║"),
-        Line::from("║                              ██║  ██║██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║║"),
-        Line::from("║                              ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝║"),
-        Line::from("║                                                                              ║"),
-        Line::from("╚══════════════════════════════════════════════════════════════════════════════╝"),
+        Line::from(
+            "╔══════════════════════════════════════════════════════════════════════════════╗",
+        ),
+        Line::from(
+            "║                                                                              ║",
+        ),
+        Line::from(
+            "║                           █████╗  ██████╗ ███████╗███╗   ██╗████████╗         ║",
+        ),
+        Line::from(
+            "║                          ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝         ║",
+        ),
+        Line::from(
+            "║                          ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║            ║",
+        ),
+        Line::from(
+            "║                          ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║            ║",
+        ),
+        Line::from(
+            "║                          ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║            ║",
+        ),
+        Line::from(
+            "║                          ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝            ║",
+        ),
+        Line::from(
+            "║                                                                              ║",
+        ),
+        Line::from(
+            "║                              ██╗  ██╗ █████╗ ██████╗ ██████╗  ██████╗ ██████╗ ║",
+        ),
+        Line::from(
+            "║                              ██║  ██║██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗║",
+        ),
+        Line::from(
+            "║                              ███████║███████║██████╔╝██████╔╝██║   ██║██████╔╝║",
+        ),
+        Line::from(
+            "║                              ██╔══██║██╔══██║██╔══██╗██╔══██╗██║   ██║██╔══██╗║",
+        ),
+        Line::from(
+            "║                              ██║  ██║██║  ██║██║  ██║██████╔╝╚██████╔╝██║  ██║║",
+        ),
+        Line::from(
+            "║                              ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝║",
+        ),
+        Line::from(
+            "║                                                                              ║",
+        ),
+        Line::from(
+            "╚══════════════════════════════════════════════════════════════════════════════╝",
+        ),
     ]
 }
 

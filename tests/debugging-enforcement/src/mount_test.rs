@@ -60,7 +60,10 @@ fn create_user_namespace() -> anyhow::Result<Pid> {
             if result == 0 {
                 info!("Child: User namespace created successfully");
             } else {
-                error!("Child: Failed to create user namespace: {}", std::io::Error::last_os_error());
+                error!(
+                    "Child: Failed to create user namespace: {}",
+                    std::io::Error::last_os_error()
+                );
                 std::process::exit(1);
             }
 

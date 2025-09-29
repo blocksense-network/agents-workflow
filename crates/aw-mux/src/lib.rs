@@ -27,11 +27,15 @@ pub fn multiplexer_by_name(name: &str) -> Result<Box<dyn Multiplexer + Send + Sy
     match name {
         #[cfg(feature = "tmux")]
         "tmux" => {
-            let tmux = tmux::TmuxMultiplexer::new()
-                .map_err(|e| MuxError::Other(format!("Failed to create tmux multiplexer: {}", e)))?;
+            let tmux = tmux::TmuxMultiplexer::new().map_err(|e| {
+                MuxError::Other(format!("Failed to create tmux multiplexer: {}", e))
+            })?;
             Ok(Box::new(tmux))
         }
         // Add other multiplexers here
-        _ => Err(MuxError::Other(format!("Unsupported multiplexer: {}", name))),
+        _ => Err(MuxError::Other(format!(
+            "Unsupported multiplexer: {}",
+            name
+        ))),
     }
 }

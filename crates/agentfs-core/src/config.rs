@@ -1,7 +1,7 @@
 //! Configuration types for AgentFS Core
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Case sensitivity modes
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

@@ -14,10 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     info!("Testing Docker socket access prohibition in sandbox");
 
-    let docker_socket_paths = vec![
-        "/var/run/docker.sock",
-        "/run/docker.sock",
-    ];
+    let docker_socket_paths = vec!["/var/run/docker.sock", "/run/docker.sock"];
 
     let mut socket_found = false;
     let mut socket_accessible = false;
@@ -34,15 +31,25 @@ fn main() -> anyhow::Result<()> {
                     let mode = permissions.mode();
 
                     // Check if socket is readable/writable by others
-                    if mode & 0o002 != 0 {  // writable by others
+                    if mode & 0o002 != 0 {
+                        // writable by others
                         socket_accessible = true;
-                        error!("✗ Docker socket {} is accessible (mode: {:o})", socket_path, mode);
+                        error!(
+                            "✗ Docker socket {} is accessible (mode: {:o})",
+                            socket_path, mode
+                        );
                     } else {
-                        info!("✓ Docker socket {} exists but is not accessible (mode: {:o})", socket_path, mode);
+                        info!(
+                            "✓ Docker socket {} exists but is not accessible (mode: {:o})",
+                            socket_path, mode
+                        );
                     }
                 }
                 Err(e) => {
-                    info!("✓ Docker socket {} exists but metadata access failed: {}", socket_path, e);
+                    info!(
+                        "✓ Docker socket {} exists but metadata access failed: {}",
+                        socket_path, e
+                    );
                 }
             }
 

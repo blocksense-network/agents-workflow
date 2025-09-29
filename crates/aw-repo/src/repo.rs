@@ -1,6 +1,6 @@
+use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use regex::Regex;
 
 use crate::error::{VcsError, VcsResult};
 use crate::vcs_types::VcsType;
@@ -37,7 +37,9 @@ impl VcsRepo {
         let branch = output.trim().to_string();
 
         if branch.is_empty() {
-            return Err(VcsError::Other("Could not determine current branch".to_string()));
+            return Err(VcsError::Other(
+                "Could not determine current branch".to_string(),
+            ));
         }
 
         Ok(branch)
@@ -146,7 +148,10 @@ impl VcsRepo {
     pub fn commit_count(&self, base_branch: &str, branch: &str) -> VcsResult<usize> {
         let cmd = self.get_commit_count_command(base_branch, branch);
         let output = self.run_command(&cmd)?;
-        output.trim().parse().map_err(|_| VcsError::Other("Invalid commit count".to_string()))
+        output
+            .trim()
+            .parse()
+            .map_err(|_| VcsError::Other("Invalid commit count".to_string()))
     }
 
     /// Check if branch exists
@@ -159,7 +164,8 @@ impl VcsRepo {
     pub fn branches(&self) -> VcsResult<Vec<String>> {
         let cmd = self.get_branches_command();
         let output = self.run_command(&cmd)?;
-        let branches = output.lines()
+        let branches = output
+            .lines()
             .map(|line| line.trim_start_matches(|c: char| c == '*' || c == ' ').trim().to_string())
             .filter(|line| !line.is_empty())
             .collect();
@@ -225,7 +231,8 @@ impl VcsRepo {
         let cmd = self.get_files_in_commit_command(commit_hash);
         match self.run_command(&cmd) {
             Ok(output) => {
-                let files = output.lines()
+                let files = output
+                    .lines()
                     .map(|line| line.trim().to_string())
                     .filter(|line| !line.is_empty())
                     .map(|line| line.replace('\\', "/"))
@@ -256,29 +263,36 @@ impl VcsRepo {
     // Private helper methods
 
     fn find_repo_root<P: AsRef<Path>>(start_path: P) -> VcsResult<PathBuf> {
-        let mut current_dir = start_path.as_ref().canonicalize()
+        let mut current_dir = start_path
+            .as_ref()
+            .canonicalize()
             .map_err(|_| VcsError::RepositoryNotFound(start_path.as_ref().display().to_string()))?;
 
         // If the start path is a file, get its parent directory
         if current_dir.is_file() {
-            current_dir = current_dir.parent()
-                .ok_or_else(|| VcsError::RepositoryNotFound(start_path.as_ref().display().to_string()))?
+            current_dir = current_dir
+                .parent()
+                .ok_or_else(|| {
+                    VcsError::RepositoryNotFound(start_path.as_ref().display().to_string())
+                })?
                 .to_path_buf();
         }
 
         loop {
             // Check for VCS directories
-            if current_dir.join(".git").exists() ||
-               current_dir.join(".hg").exists() ||
-               current_dir.join(".bzr").exists() ||
-               current_dir.join(".fslckout").exists() ||
-               current_dir.join("_FOSSIL_").exists() {
+            if current_dir.join(".git").exists()
+                || current_dir.join(".hg").exists()
+                || current_dir.join(".bzr").exists()
+                || current_dir.join(".fslckout").exists()
+                || current_dir.join("_FOSSIL_").exists()
+            {
                 return Ok(current_dir);
             }
 
             // Move up to parent
-            let parent = current_dir.parent()
-                .ok_or_else(|| VcsError::RepositoryNotFound(start_path.as_ref().display().to_string()))?;
+            let parent = current_dir.parent().ok_or_else(|| {
+                VcsError::RepositoryNotFound(start_path.as_ref().display().to_string())
+            })?;
 
             if parent == current_dir {
                 break;
@@ -287,7 +301,9 @@ impl VcsRepo {
             current_dir = parent.to_path_buf();
         }
 
-        Err(VcsError::RepositoryNotFound(start_path.as_ref().display().to_string()))
+        Err(VcsError::RepositoryNotFound(
+            start_path.as_ref().display().to_string(),
+        ))
     }
 
     fn determine_vcs_type(root_path: &Path) -> VcsResult<VcsType> {
@@ -339,7 +355,9 @@ impl VcsRepo {
         if let Some(captures) = Regex::new(r"^git@([^:]+):(.+)$").unwrap().captures(url) {
             // Standard SSH format: git@host:path
             format!("https://{}/{}", &captures[1], &captures[2])
-        } else if let Some(captures) = Regex::new(r"^ssh://git@([^/]+?)(?::\d+)?/(.+)$").unwrap().captures(url) {
+        } else if let Some(captures) =
+            Regex::new(r"^ssh://git@([^/]+?)(?::\d+)?/(.+)$").unwrap().captures(url)
+        {
             // SSH protocol format: ssh://git@host[:port]/path
             format!("https://{}/{}", &captures[1], &captures[2])
         } else {
@@ -351,21 +369,54 @@ impl VcsRepo {
 
     fn get_current_branch_command(&self) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "rev-parse".to_string(), "--abbrev-ref".to_string(), "HEAD".to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "rev-parse".to_string(),
+                "--abbrev-ref".to_string(),
+                "HEAD".to_string(),
+            ],
             VcsType::Hg => vec!["hg".to_string(), "branch".to_string()],
             VcsType::Bzr => vec!["bzr".to_string(), "nick".to_string()],
-            VcsType::Fossil => vec!["sh".to_string(), "-c".to_string(), "fossil branch list | grep '*' | sed 's/* //'".to_string()],
+            VcsType::Fossil => vec![
+                "sh".to_string(),
+                "-c".to_string(),
+                "fossil branch list | grep '*' | sed 's/* //'".to_string(),
+            ],
         }
     }
 
     fn get_start_branch_commands(&self, branch_name: &str) -> Vec<Vec<String>> {
         match self.vcs_type {
-            VcsType::Git => vec![vec!["git".to_string(), "checkout".to_string(), "-b".to_string(), branch_name.to_string()]],
-            VcsType::Hg => vec![vec!["hg".to_string(), "branch".to_string(), branch_name.to_string()]],
-            VcsType::Bzr => vec![vec!["bzr".to_string(), "switch".to_string(), "-b".to_string(), branch_name.to_string()]],
+            VcsType::Git => vec![vec![
+                "git".to_string(),
+                "checkout".to_string(),
+                "-b".to_string(),
+                branch_name.to_string(),
+            ]],
+            VcsType::Hg => vec![vec![
+                "hg".to_string(),
+                "branch".to_string(),
+                branch_name.to_string(),
+            ]],
+            VcsType::Bzr => vec![vec![
+                "bzr".to_string(),
+                "switch".to_string(),
+                "-b".to_string(),
+                branch_name.to_string(),
+            ]],
             VcsType::Fossil => vec![
-                vec!["fossil".to_string(), "branch".to_string(), "new".to_string(), branch_name.to_string(), "trunk".to_string()],
-                vec!["fossil".to_string(), "update".to_string(), branch_name.to_string()],
+                vec![
+                    "fossil".to_string(),
+                    "branch".to_string(),
+                    "new".to_string(),
+                    branch_name.to_string(),
+                    "trunk".to_string(),
+                ],
+                vec![
+                    "fossil".to_string(),
+                    "update".to_string(),
+                    branch_name.to_string(),
+                ],
             ],
         }
     }
@@ -373,28 +424,74 @@ impl VcsRepo {
     fn get_commit_file_commands(&self, file_path: &str, message: &str) -> Vec<Vec<String>> {
         match self.vcs_type {
             VcsType::Git => vec![
-                vec!["git".to_string(), "add".to_string(), "--".to_string(), file_path.to_string()],
-                vec!["git".to_string(), "commit".to_string(), "-m".to_string(), message.to_string(), "--".to_string(), file_path.to_string()],
+                vec![
+                    "git".to_string(),
+                    "add".to_string(),
+                    "--".to_string(),
+                    file_path.to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "commit".to_string(),
+                    "-m".to_string(),
+                    message.to_string(),
+                    "--".to_string(),
+                    file_path.to_string(),
+                ],
             ],
             VcsType::Hg => vec![
                 vec!["hg".to_string(), "add".to_string(), file_path.to_string()],
-                vec!["hg".to_string(), "commit".to_string(), "-m".to_string(), message.to_string(), file_path.to_string()],
+                vec![
+                    "hg".to_string(),
+                    "commit".to_string(),
+                    "-m".to_string(),
+                    message.to_string(),
+                    file_path.to_string(),
+                ],
             ],
             VcsType::Bzr => vec![
                 vec!["bzr".to_string(), "add".to_string(), file_path.to_string()],
-                vec!["bzr".to_string(), "commit".to_string(), "-m".to_string(), message.to_string()],
+                vec![
+                    "bzr".to_string(),
+                    "commit".to_string(),
+                    "-m".to_string(),
+                    message.to_string(),
+                ],
             ],
             VcsType::Fossil => vec![
-                vec!["fossil".to_string(), "add".to_string(), file_path.to_string()],
-                vec!["fossil".to_string(), "commit".to_string(), "-m".to_string(), message.to_string(), "--".to_string(), file_path.to_string()],
+                vec![
+                    "fossil".to_string(),
+                    "add".to_string(),
+                    file_path.to_string(),
+                ],
+                vec![
+                    "fossil".to_string(),
+                    "commit".to_string(),
+                    "-m".to_string(),
+                    message.to_string(),
+                    "--".to_string(),
+                    file_path.to_string(),
+                ],
             ],
         }
     }
 
     fn get_push_branch_command(&self, branch_name: &str, remote: &str) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "push".to_string(), "-u".to_string(), remote.to_string(), branch_name.to_string()],
-            VcsType::Hg => vec!["hg".to_string(), "push".to_string(), "--new-branch".to_string(), "--rev".to_string(), branch_name.to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "push".to_string(),
+                "-u".to_string(),
+                remote.to_string(),
+                branch_name.to_string(),
+            ],
+            VcsType::Hg => vec![
+                "hg".to_string(),
+                "push".to_string(),
+                "--new-branch".to_string(),
+                "--rev".to_string(),
+                branch_name.to_string(),
+            ],
             VcsType::Bzr => vec!["bzr".to_string(), "push".to_string()],
             VcsType::Fossil => vec!["fossil".to_string(), "push".to_string()],
         }
@@ -402,37 +499,99 @@ impl VcsRepo {
 
     fn get_force_push_branch_command(&self, remote: &str, branch: &str) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "push".to_string(), remote.to_string(), format!("HEAD:{}", branch), "--force".to_string()],
-            VcsType::Hg => vec!["hg".to_string(), "push".to_string(), remote.to_string(), "--force".to_string(), "-b".to_string(), branch.to_string()],
-            VcsType::Bzr => vec!["bzr".to_string(), "push".to_string(), remote.to_string(), "--overwrite".to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "push".to_string(),
+                remote.to_string(),
+                format!("HEAD:{}", branch),
+                "--force".to_string(),
+            ],
+            VcsType::Hg => vec![
+                "hg".to_string(),
+                "push".to_string(),
+                remote.to_string(),
+                "--force".to_string(),
+                "-b".to_string(),
+                branch.to_string(),
+            ],
+            VcsType::Bzr => vec![
+                "bzr".to_string(),
+                "push".to_string(),
+                remote.to_string(),
+                "--overwrite".to_string(),
+            ],
             VcsType::Fossil => vec!["fossil".to_string(), "push".to_string(), remote.to_string()],
         }
     }
 
     fn get_checkout_branch_command(&self, branch_name: &str) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "checkout".to_string(), branch_name.to_string()],
-            VcsType::Hg => vec!["hg".to_string(), "update".to_string(), branch_name.to_string()],
-            VcsType::Bzr => vec!["bzr".to_string(), "switch".to_string(), branch_name.to_string()],
-            VcsType::Fossil => vec!["fossil".to_string(), "update".to_string(), branch_name.to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "checkout".to_string(),
+                branch_name.to_string(),
+            ],
+            VcsType::Hg => vec![
+                "hg".to_string(),
+                "update".to_string(),
+                branch_name.to_string(),
+            ],
+            VcsType::Bzr => vec![
+                "bzr".to_string(),
+                "switch".to_string(),
+                branch_name.to_string(),
+            ],
+            VcsType::Fossil => vec![
+                "fossil".to_string(),
+                "update".to_string(),
+                branch_name.to_string(),
+            ],
         }
     }
 
     fn get_create_local_branch_commands(&self, branch_name: &str) -> VcsResult<Vec<Vec<String>>> {
         match self.vcs_type {
-            VcsType::Git => Ok(vec![vec!["git".to_string(), "checkout".to_string(), "-b".to_string(), branch_name.to_string()]]),
+            VcsType::Git => Ok(vec![vec![
+                "git".to_string(),
+                "checkout".to_string(),
+                "-b".to_string(),
+                branch_name.to_string(),
+            ]]),
             VcsType::Hg => Ok(vec![
-                vec!["hg".to_string(), "bookmark".to_string(), branch_name.to_string()],
-                vec!["hg".to_string(), "update".to_string(), branch_name.to_string()],
+                vec![
+                    "hg".to_string(),
+                    "bookmark".to_string(),
+                    branch_name.to_string(),
+                ],
+                vec![
+                    "hg".to_string(),
+                    "update".to_string(),
+                    branch_name.to_string(),
+                ],
             ]),
             VcsType::Fossil => {
                 let current_branch = self.current_branch()?;
                 Ok(vec![
-                    vec!["fossil".to_string(), "branch".to_string(), "new".to_string(), branch_name.to_string(), current_branch],
-                    vec!["fossil".to_string(), "update".to_string(), branch_name.to_string()],
+                    vec![
+                        "fossil".to_string(),
+                        "branch".to_string(),
+                        "new".to_string(),
+                        branch_name.to_string(),
+                        current_branch,
+                    ],
+                    vec![
+                        "fossil".to_string(),
+                        "update".to_string(),
+                        branch_name.to_string(),
+                    ],
                 ])
-            },
-            VcsType::Bzr => Ok(vec![vec!["bzr".to_string(), "switch".to_string(), "-b".to_string(), branch_name.to_string()]]), // Bzr doesn't have local-only branches
+            }
+            VcsType::Bzr => Ok(vec![vec![
+                "bzr".to_string(),
+                "switch".to_string(),
+                "-b".to_string(),
+                branch_name.to_string(),
+            ]]), // Bzr doesn't have local-only branches
         }
     }
 
@@ -440,14 +599,22 @@ impl VcsRepo {
         match self.vcs_type {
             VcsType::Git => vec!["git".to_string(), "add".to_string(), file_path.to_string()],
             VcsType::Hg => vec!["hg".to_string(), "add".to_string(), file_path.to_string()],
-            VcsType::Fossil => vec!["fossil".to_string(), "add".to_string(), file_path.to_string()],
+            VcsType::Fossil => vec![
+                "fossil".to_string(),
+                "add".to_string(),
+                file_path.to_string(),
+            ],
             VcsType::Bzr => vec!["bzr".to_string(), "add".to_string(), file_path.to_string()],
         }
     }
 
     fn get_status_command(&self) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "status".to_string(), "--porcelain".to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "status".to_string(),
+                "--porcelain".to_string(),
+            ],
             VcsType::Hg => vec!["hg".to_string(), "status".to_string()],
             VcsType::Fossil => vec!["fossil".to_string(), "changes".to_string()],
             VcsType::Bzr => vec!["bzr".to_string(), "status".to_string()],
@@ -483,10 +650,18 @@ impl VcsRepo {
 
     fn get_branches_command(&self) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "branch".to_string(), "--list".to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "branch".to_string(),
+                "--list".to_string(),
+            ],
             VcsType::Hg => vec!["hg".to_string(), "branches".to_string()],
             VcsType::Bzr => vec!["bzr".to_string(), "branches".to_string()],
-            VcsType::Fossil => vec!["fossil".to_string(), "branch".to_string(), "list".to_string()],
+            VcsType::Fossil => vec![
+                "fossil".to_string(),
+                "branch".to_string(),
+                "list".to_string(),
+            ],
         }
     }
 
@@ -504,10 +679,23 @@ impl VcsRepo {
 
     fn get_default_remote_command(&self) -> Vec<String> {
         match self.vcs_type {
-            VcsType::Git => vec!["git".to_string(), "remote".to_string(), "get-url".to_string(), "origin".to_string()],
+            VcsType::Git => vec![
+                "git".to_string(),
+                "remote".to_string(),
+                "get-url".to_string(),
+                "origin".to_string(),
+            ],
             VcsType::Hg => vec!["hg".to_string(), "paths".to_string(), "default".to_string()],
-            VcsType::Bzr => vec!["bzr".to_string(), "config".to_string(), "parent_location".to_string()],
-            VcsType::Fossil => vec!["sh".to_string(), "-c".to_string(), "fossil remote | head -n 1".to_string()],
+            VcsType::Bzr => vec![
+                "bzr".to_string(),
+                "config".to_string(),
+                "parent_location".to_string(),
+            ],
+            VcsType::Fossil => vec![
+                "sh".to_string(),
+                "-c".to_string(),
+                "fossil remote | head -n 1".to_string(),
+            ],
         }
     }
 
@@ -558,7 +746,11 @@ impl VcsRepo {
         }
     }
 
-    fn get_setup_autopush_commands(&self, target_remote_url: &str, target_branch: &str) -> Vec<Vec<String>> {
+    fn get_setup_autopush_commands(
+        &self,
+        target_remote_url: &str,
+        target_branch: &str,
+    ) -> Vec<Vec<String>> {
         match self.vcs_type {
             VcsType::Git => vec![
                 vec!["git".to_string(), "config".to_string(), "--local".to_string(), "user.name".to_string(), "Agent".to_string()],

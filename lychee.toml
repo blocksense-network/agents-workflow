@@ -23,10 +23,12 @@ exclude = [
   "^https://stackoverflow.com/.*",
   "^https://opencode.dev/.*",
   "^https://docs.opencode.dev/.*",
+  "^https://www.trio.so/.*",
   "/en/docs/.*",
   "^https://www.electronjs.org/.*",
   "^https://lwn.net/.*",
   "^https://news.ycombinator.com/.*",
+  "com.apple.WebProcess.sb.in",
 ]
 
 accept = ["200..=299", "403"]

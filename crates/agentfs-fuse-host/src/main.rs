@@ -90,7 +90,10 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "fuse"))]
     {
         warn!("FUSE support not compiled in. This binary is for testing only.");
-        info!("AgentFS core initialized successfully with config: {:?}", config);
+        info!(
+            "AgentFS core initialized successfully with config: {:?}",
+            config
+        );
         info!("To enable FUSE support, compile with: cargo build --features fuse");
         // In a real implementation, we might want to keep the process running
         // or provide alternative functionality

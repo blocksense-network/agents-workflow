@@ -4,8 +4,8 @@
 //! (ZFS, Btrfs, etc.) to enable time travel capabilities in the AW system.
 
 // Re-export all types from the traits crate
-pub use aw_fs_snapshots_traits::*;
 use async_trait::async_trait;
+pub use aw_fs_snapshots_traits::*;
 use std::path::{Path, PathBuf};
 
 /// Auto-detect and return the appropriate provider for a given path.
@@ -60,10 +60,15 @@ fn validate_destination_path(dest: &Path) -> Result<()> {
         if !parent.exists() {
             // Try to create parent directory to validate permissions
             std::fs::create_dir_all(parent).map_err(|e| {
-                Error::provider(format!("Cannot create parent directory {}: {}", parent.display(), e))
+                Error::provider(format!(
+                    "Cannot create parent directory {}: {}",
+                    parent.display(),
+                    e
+                ))
             })?;
             // Clean up the test directory
-            if parent.exists() && std::fs::read_dir(parent).map_or(true, |mut d| d.next().is_none()) {
+            if parent.exists() && std::fs::read_dir(parent).map_or(true, |mut d| d.next().is_none())
+            {
                 let _ = std::fs::remove_dir(parent);
             }
         }
@@ -73,7 +78,10 @@ fn validate_destination_path(dest: &Path) -> Result<()> {
     let invalid_paths = ["/dev", "/proc", "/sys", "/run"];
     for invalid in &invalid_paths {
         if dest.starts_with(invalid) {
-            return Err(Error::provider(format!("Cannot create workspace in system directory: {}", dest.display())));
+            return Err(Error::provider(format!(
+                "Cannot create workspace in system directory: {}",
+                dest.display()
+            )));
         }
     }
 
@@ -84,8 +92,6 @@ fn validate_destination_path(dest: &Path) -> Result<()> {
 
     Ok(())
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -117,14 +123,23 @@ mod tests {
 
             // Test provider selection - should select Git provider for git repos
             let provider_result = provider_for(&repo.path);
-            assert!(provider_result.is_ok(), "Should find a provider for git repository");
+            assert!(
+                provider_result.is_ok(),
+                "Should find a provider for git repository"
+            );
 
             let provider = provider_result.unwrap();
             let capabilities = provider.detect_capabilities(&repo.path);
 
             // Should have selected Git provider (highest score for git repos)
-            assert_eq!(capabilities.kind, aw_fs_snapshots_traits::SnapshotProviderKind::Git);
-            assert!(capabilities.score > 0, "Git provider should have positive score for git repos");
+            assert_eq!(
+                capabilities.kind,
+                aw_fs_snapshots_traits::SnapshotProviderKind::Git
+            );
+            assert!(
+                capabilities.score > 0,
+                "Git provider should have positive score for git repos"
+            );
         }
 
         #[cfg(not(feature = "git"))]

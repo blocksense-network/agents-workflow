@@ -49,12 +49,18 @@ impl RestClient {
     }
 
     /// Create a task/session
-    pub async fn create_task(&self, request: &CreateTaskRequest) -> RestClientResult<CreateTaskResponse> {
+    pub async fn create_task(
+        &self,
+        request: &CreateTaskRequest,
+    ) -> RestClientResult<CreateTaskResponse> {
         self.post("/api/v1/tasks", request).await
     }
 
     /// List sessions with optional filtering
-    pub async fn list_sessions(&self, filters: Option<&FilterQuery>) -> RestClientResult<SessionListResponse> {
+    pub async fn list_sessions(
+        &self,
+        filters: Option<&FilterQuery>,
+    ) -> RestClientResult<SessionListResponse> {
         let mut url = self.base_url.join("/api/v1/sessions")?;
 
         if let Some(filters) = filters {
@@ -72,7 +78,11 @@ impl RestClient {
     }
 
     /// Stop a session
-    pub async fn stop_session(&self, session_id: &str, reason: Option<&str>) -> RestClientResult<()> {
+    pub async fn stop_session(
+        &self,
+        session_id: &str,
+        reason: Option<&str>,
+    ) -> RestClientResult<()> {
         let url = format!("/api/v1/sessions/{}/stop", session_id);
         let body = reason.map(|r| SessionControlRequest {
             reason: Some(r.to_string()),
@@ -99,7 +109,11 @@ impl RestClient {
     }
 
     /// Get session logs
-    pub async fn get_session_logs(&self, session_id: &str, query: Option<&LogQuery>) -> RestClientResult<SessionLogsResponse> {
+    pub async fn get_session_logs(
+        &self,
+        session_id: &str,
+        query: Option<&LogQuery>,
+    ) -> RestClientResult<SessionLogsResponse> {
         let mut url = format!("/api/v1/sessions/{}/logs", session_id);
 
         if let Some(query) = query {
@@ -112,12 +126,18 @@ impl RestClient {
     }
 
     /// Stream session events via SSE
-    pub async fn stream_session_events(&self, session_id: &str) -> RestClientResult<SessionEventStream> {
+    pub async fn stream_session_events(
+        &self,
+        session_id: &str,
+    ) -> RestClientResult<SessionEventStream> {
         SessionEventStream::connect(&self.base_url, session_id, &self.auth).await
     }
 
     /// Get session info (fleet and endpoints)
-    pub async fn get_session_info(&self, session_id: &str) -> RestClientResult<SessionInfoResponse> {
+    pub async fn get_session_info(
+        &self,
+        session_id: &str,
+    ) -> RestClientResult<SessionInfoResponse> {
         let url = format!("/api/v1/sessions/{}/info", session_id);
         self.get(&url).await
     }
@@ -163,7 +183,11 @@ impl RestClient {
     }
 
     /// List repositories
-    pub async fn list_repositories(&self, tenant_id: Option<&str>, project_id: Option<&str>) -> RestClientResult<Vec<Repository>> {
+    pub async fn list_repositories(
+        &self,
+        tenant_id: Option<&str>,
+        project_id: Option<&str>,
+    ) -> RestClientResult<Vec<Repository>> {
         let mut url = "/api/v1/repos".to_string();
         let mut params = Vec::new();
 
@@ -204,7 +228,11 @@ impl RestClient {
         self.request(Method::GET, path, None::<&()>).await
     }
 
-    async fn post<T: DeserializeOwned, B: serde::Serialize>(&self, path: &str, body: &B) -> RestClientResult<T> {
+    async fn post<T: DeserializeOwned, B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> RestClientResult<T> {
         self.request(Method::POST, path, Some(body)).await
     }
 
@@ -231,8 +259,7 @@ impl RestClient {
         let mut request = self.http_client.request(method, &url);
 
         // Add authentication headers
-        let auth_headers = self.auth.headers()
-            .map_err(|e| RestClientError::Auth(e.to_string()))?;
+        let auth_headers = self.auth.headers().map_err(|e| RestClientError::Auth(e.to_string()))?;
         request = request.headers(auth_headers);
 
         // Add body if provided
@@ -244,7 +271,10 @@ impl RestClient {
         self.handle_response(response).await
     }
 
-    async fn handle_response<T: DeserializeOwned>(&self, response: Response) -> RestClientResult<T> {
+    async fn handle_response<T: DeserializeOwned>(
+        &self,
+        response: Response,
+    ) -> RestClientResult<T> {
         let status = response.status();
 
         if status.is_success() {
@@ -253,7 +283,10 @@ impl RestClient {
         } else {
             let text = response.text().await?;
             match serde_json::from_str::<ProblemDetails>(&text) {
-                Ok(problem) => Err(RestClientError::ServerError { status, details: problem }),
+                Ok(problem) => Err(RestClientError::ServerError {
+                    status,
+                    details: problem,
+                }),
                 Err(_) => Err(RestClientError::UnexpectedResponse(text)),
             }
         }

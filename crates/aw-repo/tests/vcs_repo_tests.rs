@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process::Stdio;
 use tempfile::TempDir;
 
-use aw_repo::{VcsRepo, VcsType, VcsError};
+use aw_repo::{VcsError, VcsRepo, VcsType};
 
 fn check_git_available() -> bool {
     std::process::Command::new("git")
@@ -69,7 +69,7 @@ fn setup_git_repo() -> Result<(TempDir, TempDir), Box<dyn std::error::Error>> {
     Ok((temp_home, repo_dir))
 }
 
-    #[test]
+#[test]
 fn test_repository_detection() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -81,11 +81,14 @@ fn test_repository_detection() {
     fs::create_dir_all(&repo_path).unwrap();
 
     let vcs_repo = VcsRepo::new(&repo_path).unwrap();
-    assert_eq!(vcs_repo.root().canonicalize().unwrap(), repo.path().canonicalize().unwrap());
+    assert_eq!(
+        vcs_repo.root().canonicalize().unwrap(),
+        repo.path().canonicalize().unwrap()
+    );
     assert_eq!(vcs_repo.vcs_type(), VcsType::Git);
 }
 
-    #[test]
+#[test]
 fn test_current_branch() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -99,7 +102,7 @@ fn test_current_branch() {
     assert_eq!(branch, "main");
 }
 
-    #[test]
+#[test]
 fn test_branch_validation() {
     // Valid branch names
     assert!(VcsRepo::valid_branch_name("feature-branch"));
@@ -113,7 +116,7 @@ fn test_branch_validation() {
     assert!(!VcsRepo::valid_branch_name("feature@branch")); // @ symbol
 }
 
-    #[test]
+#[test]
 fn test_protected_branches() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -130,7 +133,7 @@ fn test_protected_branches() {
     assert!(!vcs_repo.is_protected_branch("feature-branch"));
 }
 
-    #[test]
+#[test]
 fn test_start_branch() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -152,7 +155,7 @@ fn test_start_branch() {
     assert!(matches!(result, Err(VcsError::ProtectedBranch(_))));
 }
 
-    #[test]
+#[test]
 fn test_commit_file() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -176,7 +179,7 @@ fn test_commit_file() {
     assert!(!status.contains("test.txt"));
 }
 
-    #[test]
+#[test]
 fn test_branches() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -197,7 +200,7 @@ fn test_branches() {
     assert!(branches.contains(&"branch2".to_string()));
 }
 
-    #[test]
+#[test]
 fn test_default_remote_http_url() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");
@@ -209,7 +212,12 @@ fn test_default_remote_http_url() {
 
     // Test HTTPS URL - add remote first
     std::process::Command::new("git")
-        .args(&["remote", "add", "origin", "https://github.com/user/repo.git"])
+        .args(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/user/repo.git",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -219,7 +227,12 @@ fn test_default_remote_http_url() {
 
     // Test SSH URL conversion
     std::process::Command::new("git")
-        .args(&["remote", "set-url", "origin", "git@github.com:user/repo.git"])
+        .args(&[
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:user/repo.git",
+        ])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -228,14 +241,14 @@ fn test_default_remote_http_url() {
     assert_eq!(url, Some("https://github.com/user/repo.git".to_string()));
 }
 
-    #[test]
+#[test]
 fn test_repository_not_found() {
     let temp_dir = TempDir::new().unwrap();
     let result = VcsRepo::new(temp_dir.path());
     assert!(matches!(result, Err(VcsError::RepositoryNotFound(_))));
 }
 
-    #[test]
+#[test]
 fn test_invalid_branch_name() {
     if !check_git_available() {
         eprintln!("Git not available, skipping test");

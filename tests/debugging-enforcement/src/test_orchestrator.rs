@@ -71,8 +71,12 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    info!("=== Summary: {}/{} tests passed, {} skipped ===",
-          passed, passed + failed + skipped, skipped);
+    info!(
+        "=== Summary: {}/{} tests passed, {} skipped ===",
+        passed,
+        passed + failed + skipped,
+        skipped
+    );
 
     if failed > 0 {
         std::process::exit(1);
@@ -85,7 +89,12 @@ fn test_ptrace_in_debug_mode(sbx_helper: &str) -> (bool, bool) {
     // Start a target process in the sandbox with debug mode enabled
     // The target will be a simple sleep process
     let target_cmd = Command::new(sbx_helper)
-        .args(&["--seccomp", "--seccomp-debug", "/nix/store/xbp2j3z0lhizr5vvzff4dgdcxgs8i2w7-coreutils-9.7/bin/sleep", "10"])
+        .args(&[
+            "--seccomp",
+            "--seccomp-debug",
+            "/nix/store/xbp2j3z0lhizr5vvzff4dgdcxgs8i2w7-coreutils-9.7/bin/sleep",
+            "10",
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn();
@@ -99,14 +108,20 @@ fn test_ptrace_in_debug_mode(sbx_helper: &str) -> (bool, bool) {
     };
 
     let target_pid = target_process.id() as i32;
-    info!("Started target process with PID {} in debug mode", target_pid);
+    info!(
+        "Started target process with PID {} in debug mode",
+        target_pid
+    );
 
     // Give the sandbox a moment to start up
     thread::sleep(Duration::from_millis(500));
 
     // Double-check that the process is still running
     if let Ok(Some(status)) = target_process.try_wait() {
-        error!("Target process exited before ptrace test with status: {}", status);
+        error!(
+            "Target process exited before ptrace test with status: {}",
+            status
+        );
         return (false, false);
     }
 
@@ -116,11 +131,16 @@ fn test_ptrace_in_debug_mode(sbx_helper: &str) -> (bool, bool) {
             // Process has already exited - likely due to permission error
             if status.code() == Some(1) {
                 info!("⚠️  Sandbox exited with permission error (expected in unprivileged environment)");
-                info!("   This test requires privileges to create namespaces and mount filesystems");
+                info!(
+                    "   This test requires privileges to create namespaces and mount filesystems"
+                );
                 info!("   Skipping ptrace test in debug mode");
                 return (true, true); // (success=true, skipped=true)
             } else {
-                error!("Sandbox process exited unexpectedly with status: {}", status);
+                error!(
+                    "Sandbox process exited unexpectedly with status: {}",
+                    status
+                );
                 return (false, false);
             }
         }
@@ -138,9 +158,11 @@ fn test_ptrace_in_debug_mode(sbx_helper: &str) -> (bool, bool) {
     // Now try to attach to it using our ptrace tester
     let test_result = Command::new(sbx_helper)
         .args(&[
-            "--seccomp", "--seccomp-debug",
+            "--seccomp",
+            "--seccomp-debug",
             "../../target/debug/ptrace_tester",
-            "--target-pid", &target_pid.to_string()
+            "--target-pid",
+            &target_pid.to_string(),
         ])
         .status();
 
@@ -172,7 +194,11 @@ fn test_ptrace_in_debug_mode(sbx_helper: &str) -> (bool, bool) {
 fn test_ptrace_in_normal_mode(sbx_helper: &str) -> (bool, bool) {
     // Start a target process in the sandbox with normal mode (no debug)
     let target_cmd = Command::new(sbx_helper)
-        .args(&["--seccomp", "/nix/store/xbp2j3z0lhizr5vvzff4dgdcxgs8i2w7-coreutils-9.7/bin/sleep", "10"])
+        .args(&[
+            "--seccomp",
+            "/nix/store/xbp2j3z0lhizr5vvzff4dgdcxgs8i2w7-coreutils-9.7/bin/sleep",
+            "10",
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn();
@@ -186,14 +212,20 @@ fn test_ptrace_in_normal_mode(sbx_helper: &str) -> (bool, bool) {
     };
 
     let target_pid = target_process.id() as i32;
-    info!("Started target process with PID {} in normal mode", target_pid);
+    info!(
+        "Started target process with PID {} in normal mode",
+        target_pid
+    );
 
     // Give the sandbox a moment to start up
     thread::sleep(Duration::from_millis(500));
 
     // Double-check that the process is still running
     if let Ok(Some(status)) = target_process.try_wait() {
-        error!("Target process exited before ptrace test with status: {}", status);
+        error!(
+            "Target process exited before ptrace test with status: {}",
+            status
+        );
         return (false, false);
     }
 
@@ -203,11 +235,16 @@ fn test_ptrace_in_normal_mode(sbx_helper: &str) -> (bool, bool) {
             // Process has already exited - likely due to permission error
             if status.code() == Some(1) {
                 info!("⚠️  Sandbox exited with permission error (expected in unprivileged environment)");
-                info!("   This test requires privileges to create namespaces and mount filesystems");
+                info!(
+                    "   This test requires privileges to create namespaces and mount filesystems"
+                );
                 info!("   Skipping ptrace test in normal mode");
                 return (true, true); // (success=true, skipped=true)
             } else {
-                error!("Sandbox process exited unexpectedly with status: {}", status);
+                error!(
+                    "Sandbox process exited unexpectedly with status: {}",
+                    status
+                );
                 return (false, false);
             }
         }
@@ -227,7 +264,8 @@ fn test_ptrace_in_normal_mode(sbx_helper: &str) -> (bool, bool) {
         .args(&[
             "--seccomp",
             "../../target/debug/ptrace_tester",
-            "--target-pid", &target_pid.to_string()
+            "--target-pid",
+            &target_pid.to_string(),
         ])
         .status();
 
@@ -247,7 +285,10 @@ fn test_ptrace_in_normal_mode(sbx_helper: &str) -> (bool, bool) {
             (true, true) // (success=true, skipped=true)
         }
         Ok(status) => {
-            error!("Ptrace attach failed with unexpected status in normal mode: {}", status);
+            error!(
+                "Ptrace attach failed with unexpected status in normal mode: {}",
+                status
+            );
             (false, false)
         }
         Err(e) => {
@@ -265,9 +306,11 @@ fn test_host_process_isolation(sbx_helper: &str) -> (bool, bool) {
     // Try to ptrace the host process from within the sandbox
     let test_result = Command::new(sbx_helper)
         .args(&[
-            "--seccomp", "--seccomp-debug",
+            "--seccomp",
+            "--seccomp-debug",
             "../../target/debug/process_visibility_tester",
-            "--host-pid", &host_pid.to_string()
+            "--host-pid",
+            &host_pid.to_string(),
         ])
         .status();
 

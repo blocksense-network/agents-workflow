@@ -31,8 +31,9 @@ impl std::str::FromStr for SnapshotId {
             if chunk.len() != 2 {
                 return Err("Invalid hex".to_string());
             }
-            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
-                .map_err(|_| "Invalid hex digit")?;
+            bytes[i] =
+                u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
+                    .map_err(|_| "Invalid hex digit")?;
         }
 
         Ok(SnapshotId(bytes))
@@ -45,10 +46,7 @@ impl SnapshotId {
     }
 
     fn generate_ulid() -> [u8; 16] {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
 
         // Simple ULID-like generation: timestamp + random bytes
         let mut bytes = [0u8; 16];
@@ -98,8 +96,9 @@ impl std::str::FromStr for BranchId {
             if chunk.len() != 2 {
                 return Err("Invalid hex".to_string());
             }
-            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
-                .map_err(|_| "Invalid hex digit")?;
+            bytes[i] =
+                u8::from_str_radix(std::str::from_utf8(chunk).map_err(|_| "Invalid UTF-8")?, 16)
+                    .map_err(|_| "Invalid hex digit")?;
         }
 
         Ok(BranchId(bytes))
@@ -112,10 +111,7 @@ impl BranchId {
     }
 
     fn generate_ulid() -> [u8; 16] {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
 
         // Simple ULID-like generation: timestamp + random bytes
         let mut bytes = [0u8; 16];
@@ -266,12 +262,27 @@ impl ContentId {
 /// Event kinds for filesystem change notifications
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventKind {
-    Created { path: String },
-    Removed { path: String },
-    Modified { path: String },
-    Renamed { from: String, to: String },
-    BranchCreated { id: BranchId, name: Option<String> },
-    SnapshotCreated { id: SnapshotId, name: Option<String> },
+    Created {
+        path: String,
+    },
+    Removed {
+        path: String,
+    },
+    Modified {
+        path: String,
+    },
+    Renamed {
+        from: String,
+        to: String,
+    },
+    BranchCreated {
+        id: BranchId,
+        name: Option<String>,
+    },
+    SnapshotCreated {
+        id: SnapshotId,
+        name: Option<String>,
+    },
 }
 
 /// Event sink trait for receiving filesystem change notifications

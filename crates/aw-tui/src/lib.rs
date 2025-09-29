@@ -4,24 +4,24 @@
 //! and managing agent coding sessions with seamless multiplexer integration.
 
 pub mod app;
-pub mod ui;
-pub mod event;
 pub mod error;
-pub mod msg;
-pub mod model;
-pub mod viewmodel;
-pub mod test_runtime;
+pub mod event;
 pub mod golden;
+pub mod model;
+pub mod msg;
 pub mod task;
+pub mod test_runtime;
+pub mod ui;
+pub mod viewmodel;
 
 pub use app::*;
 pub use error::*;
-pub use msg::*;
-pub use model::*;
-pub use viewmodel::*;
-pub use test_runtime::*;
 pub use golden::*;
+pub use model::*;
+pub use msg::*;
 pub use task::{ButtonFocus, ModalState, ModelSelection, Task, TaskState};
+pub use test_runtime::*;
+pub use viewmodel::*;
 
 use ratatui::{backend::TestBackend, Terminal};
 

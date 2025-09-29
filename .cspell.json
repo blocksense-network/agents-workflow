@@ -642,6 +642,12 @@
     "fobjc",
     "pjdfstest",
     "instrospection",
-    "setgid"
+    "setgid",
+    "SBPL",
+    "EACCESS",
+    "libsandbox",
+    "LLDB",
+    "killall",
+    "lldb"
   ]
 }

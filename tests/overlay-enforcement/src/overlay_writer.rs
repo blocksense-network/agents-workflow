@@ -21,7 +21,11 @@ fn main() {
         // Ensure parent directory exists
         if let Some(parent) = Path::new(path).parent() {
             if let Err(e) = fs::create_dir_all(parent) {
-                println!("❌ Failed to create parent directory {}: {}", parent.display(), e);
+                println!(
+                    "❌ Failed to create parent directory {}: {}",
+                    parent.display(),
+                    e
+                );
                 continue;
             }
         }
@@ -36,8 +40,10 @@ fn main() {
                         if read_content == content {
                             println!("✅ Content verification passed for {}", path);
                         } else {
-                            println!("❌ Content mismatch for {}: expected '{}', got '{}'",
-                                    path, content, read_content);
+                            println!(
+                                "❌ Content mismatch for {}: expected '{}', got '{}'",
+                                path, content, read_content
+                            );
                             process::exit(1);
                         }
                     }

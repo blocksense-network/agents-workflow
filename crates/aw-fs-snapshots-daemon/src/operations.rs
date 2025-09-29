@@ -12,30 +12,30 @@ pub async fn process_request(request: Request) -> Response {
             let snapshot_str = String::from_utf8_lossy(&snapshot).to_string();
             let clone_str = String::from_utf8_lossy(&clone).to_string();
             handle_zfs_clone(snapshot_str, clone_str).await
-        },
+        }
         Request::SnapshotZfs((source, snapshot)) => {
             let source_str = String::from_utf8_lossy(&source).to_string();
             let snapshot_str = String::from_utf8_lossy(&snapshot).to_string();
             handle_zfs_snapshot(source_str, snapshot_str).await
-        },
+        }
         Request::DeleteZfs(target) => {
             let target_str = String::from_utf8_lossy(&target).to_string();
             handle_zfs_delete(target_str).await
-        },
+        }
         Request::CloneBtrfs((source, destination)) => {
             let source_str = String::from_utf8_lossy(&source).to_string();
             let destination_str = String::from_utf8_lossy(&destination).to_string();
             handle_btrfs_clone(source_str, destination_str).await
-        },
+        }
         Request::SnapshotBtrfs((source, destination)) => {
             let source_str = String::from_utf8_lossy(&source).to_string();
             let destination_str = String::from_utf8_lossy(&destination).to_string();
             handle_btrfs_snapshot(source_str, destination_str).await
-        },
+        }
         Request::DeleteBtrfs(target) => {
             let target_str = String::from_utf8_lossy(&target).to_string();
             handle_btrfs_delete(target_str).await
-        },
+        }
     }
 }
 
@@ -75,8 +75,14 @@ async fn handle_zfs_clone(snapshot: String, clone: String) -> Response {
             }
         }
         Err(e) => {
-            error!("Failed to create ZFS clone {} from {}: {}", clone, snapshot, e);
-            Response::error(format!("Failed to create ZFS clone {} from {}: {}", clone, snapshot, e))
+            error!(
+                "Failed to create ZFS clone {} from {}: {}",
+                clone, snapshot, e
+            );
+            Response::error(format!(
+                "Failed to create ZFS clone {} from {}: {}",
+                clone, snapshot, e
+            ))
         }
     }
 }
@@ -123,7 +129,10 @@ async fn handle_zfs_delete(target: String) -> Response {
 }
 
 async fn handle_btrfs_clone(source: String, destination: String) -> Response {
-    debug!("Creating Btrfs subvolume snapshot {} from {}", destination, source);
+    debug!(
+        "Creating Btrfs subvolume snapshot {} from {}",
+        destination, source
+    );
 
     // Validate that the source subvolume exists
     if !btrfs_subvolume_exists(&source).await {
@@ -136,7 +145,12 @@ async fn handle_btrfs_clone(source: String, destination: String) -> Response {
     }
 
     // Execute btrfs subvolume snapshot with sudo
-    match run_command("sudo", &["btrfs", "subvolume", "snapshot", &source, &destination]).await {
+    match run_command(
+        "sudo",
+        &["btrfs", "subvolume", "snapshot", &source, &destination],
+    )
+    .await
+    {
         Ok(_) => {
             // Set ownership to the user who started the daemon
             if let Some(user) = get_sudo_user() {
@@ -145,8 +159,14 @@ async fn handle_btrfs_clone(source: String, destination: String) -> Response {
             Response::success_with_path(destination)
         }
         Err(e) => {
-            error!("Failed to create Btrfs snapshot {} from {}: {}", destination, source, e);
-            Response::error(format!("Failed to create Btrfs snapshot {} from {}: {}", destination, source, e))
+            error!(
+                "Failed to create Btrfs snapshot {} from {}: {}",
+                destination, source, e
+            );
+            Response::error(format!(
+                "Failed to create Btrfs snapshot {} from {}: {}",
+                destination, source, e
+            ))
         }
     }
 }
@@ -169,7 +189,10 @@ async fn handle_btrfs_delete(target: String) -> Response {
         Ok(_) => Response::success(),
         Err(e) => {
             error!("Failed to delete Btrfs subvolume {}: {}", target, e);
-            Response::error(format!("Failed to delete Btrfs subvolume {}: {}", target, e))
+            Response::error(format!(
+                "Failed to delete Btrfs subvolume {}: {}",
+                target, e
+            ))
         }
     }
 }

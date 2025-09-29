@@ -8,9 +8,9 @@ use sandbox_core::{NamespaceConfig, ProcessConfig, Sandbox};
 use sandbox_fs::{FilesystemConfig, FilesystemManager};
 
 #[cfg(target_os = "linux")]
-use tracing::{info};
+use tracing::info;
 
-use tracing::{error};
+use tracing::error;
 
 /// Command line arguments for sbx-helper
 #[derive(Parser, Debug)]
@@ -154,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Enable seccomp if requested
     if args.seccomp {
-        use sandbox_seccomp::{SeccompConfig};
+        use sandbox_seccomp::SeccompConfig;
         use tokio::sync::mpsc;
 
         // Create a channel for supervisor communication

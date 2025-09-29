@@ -45,7 +45,10 @@ impl XpcControlService {
     }
 
     /// Handle incoming XPC request
-    async fn handle_request(&self, request_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn handle_request(
+        &self,
+        request_data: &[u8],
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         // Decode SSZ request
         let request: Request = Request::from_ssz_bytes(request_data)
             .map_err(|e| format!("SSZ decode error: {:?}", e))?;
@@ -65,13 +68,17 @@ impl XpcControlService {
         }
     }
 
-    async fn handle_snapshot_create(&self, request: SnapshotCreateRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn handle_snapshot_create(
+        &self,
+        request: SnapshotCreateRequest,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let name_str = request.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
         match self.adapter.core().snapshot_create(name_str.as_deref()) {
             Ok(snapshot_id) => {
                 // Get snapshot name from the list
                 let snapshots = self.adapter.core().snapshot_list();
-                let name = snapshots.iter()
+                let name = snapshots
+                    .iter()
                     .find(|(id, _)| *id == snapshot_id)
                     .and_then(|(_, name)| name.clone());
 
@@ -88,7 +95,10 @@ impl XpcControlService {
         }
     }
 
-    async fn handle_snapshot_list(&self, _request: SnapshotListRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn handle_snapshot_list(
+        &self,
+        _request: SnapshotListRequest,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let snapshots = self.adapter.core().snapshot_list();
         let snapshot_infos: Vec<SnapshotInfo> = snapshots
             .into_iter()
@@ -102,19 +112,20 @@ impl XpcControlService {
         Ok(response.as_ssz_bytes())
     }
 
-    async fn handle_branch_create(&self, request: BranchCreateRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn handle_branch_create(
+        &self,
+        request: BranchCreateRequest,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let from_str = String::from_utf8_lossy(&request.from).to_string();
         let name_str = request.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
         match self.adapter.core().branch_create_from_snapshot(
             from_str.parse().map_err(|_| "Invalid snapshot ID")?,
-            name_str.as_deref()
+            name_str.as_deref(),
         ) {
             Ok(branch_id) => {
                 // Get branch info from the list
                 let branches = self.adapter.core().branch_list();
-                let info = branches.iter()
-                    .find(|b| b.id == branch_id)
-                    .ok_or("Branch not found")?;
+                let info = branches.iter().find(|b| b.id == branch_id).ok_or("Branch not found")?;
 
                 let response = Response::branch_create(BranchInfo {
                     id: info.id.to_string().into_bytes(),
@@ -130,7 +141,10 @@ impl XpcControlService {
         }
     }
 
-    async fn handle_branch_bind(&self, request: BranchBindRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn handle_branch_bind(
+        &self,
+        request: BranchBindRequest,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let pid = request.pid.unwrap_or(std::process::id());
         let branch_str = String::from_utf8_lossy(&request.branch).to_string();
         let branch_id = branch_str.parse().map_err(|_| "Invalid branch ID")?;
@@ -149,14 +163,14 @@ impl XpcControlService {
 
     fn map_error_code(&self, error: &agentfs_core::FsError) -> u32 {
         match error {
-            agentfs_core::FsError::NotFound => 2,      // ENOENT
-            agentfs_core::FsError::AlreadyExists => 17, // EEXIST
-            agentfs_core::FsError::AccessDenied => 13,  // EACCES
+            agentfs_core::FsError::NotFound => 2,         // ENOENT
+            agentfs_core::FsError::AlreadyExists => 17,   // EEXIST
+            agentfs_core::FsError::AccessDenied => 13,    // EACCES
             agentfs_core::FsError::InvalidArgument => 22, // EINVAL
-            agentfs_core::FsError::Busy => 16,          // EBUSY
-            agentfs_core::FsError::NoSpace => 28,       // ENOSPC
-            agentfs_core::FsError::Unsupported => 95,   // ENOTSUP
-            _ => 5, // EIO
+            agentfs_core::FsError::Busy => 16,            // EBUSY
+            agentfs_core::FsError::NoSpace => 28,         // ENOSPC
+            agentfs_core::FsError::Unsupported => 95,     // ENOTSUP
+            _ => 5,                                       // EIO
         }
     }
 }

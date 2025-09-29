@@ -81,11 +81,15 @@ impl AgentFsWinFsp {
     }
 
     #[cfg(target_os = "windows")]
-    fn convert_open_options(&self, create_options: CreateOptions, granted_access: u32) -> OpenOptions {
+    fn convert_open_options(
+        &self,
+        create_options: CreateOptions,
+        granted_access: u32,
+    ) -> OpenOptions {
         // Map WinFsp access flags to AgentFS options
         let read = (granted_access & winfsp::winfsp::FILE_READ_DATA) != 0;
-        let write = (granted_access & winfsp::winfsp::FILE_WRITE_DATA) != 0 ||
-                   (granted_access & winfsp::winfsp::FILE_APPEND_DATA) != 0;
+        let write = (granted_access & winfsp::winfsp::FILE_WRITE_DATA) != 0
+            || (granted_access & winfsp::winfsp::FILE_APPEND_DATA) != 0;
 
         // Map share modes (WinFsp uses inverse logic - 0 means exclusive)
         let share_read = (create_options.share_access & winfsp::winfsp::FILE_SHARE_READ) != 0;
@@ -106,10 +110,10 @@ impl AgentFsWinFsp {
         OpenOptions {
             read,
             write,
-            create: (create_options.create_options & winfsp::winfsp::FILE_CREATE) != 0 ||
-                   (create_options.create_options & winfsp::winfsp::FILE_OPEN_IF) != 0,
-            truncate: (create_options.create_options & winfsp::winfsp::FILE_OVERWRITE) != 0 ||
-                     (create_options.create_options & winfsp::winfsp::FILE_OVERWRITE_IF) != 0,
+            create: (create_options.create_options & winfsp::winfsp::FILE_CREATE) != 0
+                || (create_options.create_options & winfsp::winfsp::FILE_OPEN_IF) != 0,
+            truncate: (create_options.create_options & winfsp::winfsp::FILE_OVERWRITE) != 0
+                || (create_options.create_options & winfsp::winfsp::FILE_OVERWRITE_IF) != 0,
             append: (granted_access & winfsp::winfsp::FILE_APPEND_DATA) != 0,
             share,
             stream: None, // Will be set for ADS operations
@@ -145,11 +149,15 @@ impl AgentFsWinFsp {
 
 #[cfg(target_os = "windows")]
 impl FileSystem for AgentFsWinFsp {
-    fn get_volume_info(&self, _volume_info: &mut VolumeInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn get_volume_info(
+        &self,
+        _volume_info: &mut VolumeInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let stats = self.core.stats();
 
         _volume_info.total_size = 1024 * 1024 * 1024; // 1GB for demo
-        _volume_info.free_size = _volume_info.total_size - (stats.bytes_in_memory + stats.bytes_spilled) as u64;
+        _volume_info.free_size =
+            _volume_info.total_size - (stats.bytes_in_memory + stats.bytes_spilled) as u64;
 
         // Set volume label
         let label = self.volume_label.lock().unwrap();
@@ -161,13 +169,22 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn set_volume_label(&self, volume_label: &CStr, _volume_info: &mut VolumeInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_volume_label(
+        &self,
+        volume_label: &CStr,
+        _volume_info: &mut VolumeInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let label = volume_label.to_str()?.to_string();
         *self.volume_label.lock().unwrap() = label;
         Ok(())
     }
 
-    fn get_security_by_name(&self, file_name: &CStr, _p_file_attributes: Option<&mut FileAttributes>, _security_descriptor: Option<&mut SecurityDescriptor>) -> Result<(), Box<dyn std::error::Error>> {
+    fn get_security_by_name(
+        &self,
+        file_name: &CStr,
+        _p_file_attributes: Option<&mut FileAttributes>,
+        _security_descriptor: Option<&mut SecurityDescriptor>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.convert_path(file_name)?;
         let _attrs = self.core.getattr(path.as_ref())?;
 
@@ -176,7 +193,17 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn create(&self, file_name: &CStr, create_options: CreateOptions, granted_access: u32, _file_attributes: FileAttributes, _security_descriptor: Option<&SecurityDescriptor>, _allocation_size: u64, file_context: &mut winfsp::winfsp::FileContext, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn create(
+        &self,
+        file_name: &CStr,
+        create_options: CreateOptions,
+        granted_access: u32,
+        _file_attributes: FileAttributes,
+        _security_descriptor: Option<&SecurityDescriptor>,
+        _allocation_size: u64,
+        file_context: &mut winfsp::winfsp::FileContext,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.convert_path(file_name)?;
         let options = self.convert_open_options(create_options, granted_access);
 
@@ -187,15 +214,18 @@ impl FileSystem for AgentFsWinFsp {
             // Directory creation
             self.core.mkdir(path.as_ref(), 0o755)?;
             // For directories, we need to open a handle for readdir operations
-            self.core.open(path.as_ref(), &OpenOptions {
-                read: true,
-                write: false,
-                create: false,
-                truncate: false,
-                append: false,
-                share: vec![ShareMode::Read],
-                stream: None,
-            })?
+            self.core.open(
+                path.as_ref(),
+                &OpenOptions {
+                    read: true,
+                    write: false,
+                    create: false,
+                    truncate: false,
+                    append: false,
+                    share: vec![ShareMode::Read],
+                    stream: None,
+                },
+            )?
         } else {
             // File creation
             self.core.create(path.as_ref(), &options)?
@@ -216,7 +246,14 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn open(&self, file_name: &CStr, create_options: CreateOptions, granted_access: u32, file_context: &mut winfsp::winfsp::FileContext, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn open(
+        &self,
+        file_name: &CStr,
+        create_options: CreateOptions,
+        granted_access: u32,
+        file_context: &mut winfsp::winfsp::FileContext,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.convert_path(file_name)?;
         let options = self.convert_open_options(create_options, granted_access);
 
@@ -237,7 +274,14 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn overwrite(&self, file_context: winfsp::winfsp::FileContext, _file_attributes: FileAttributes, _replace_file_attributes: bool, _allocation_size: u64, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn overwrite(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        _file_attributes: FileAttributes,
+        _replace_file_attributes: bool,
+        _allocation_size: u64,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         // Truncate the file
@@ -251,7 +295,12 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn cleanup(&self, file_context: winfsp::winfsp::FileContext, file_name: Option<&CStr>, flags: u32) -> Result<(), Box<dyn std::error::Error>> {
+    fn cleanup(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        file_name: Option<&CStr>,
+        flags: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         // Handle delete-on-close
@@ -265,17 +314,30 @@ impl FileSystem for AgentFsWinFsp {
             let path = self.convert_path(file_name)?;
 
             // Update timestamps if requested
-            if (flags & winfsp::winfsp::FspCleanupSetAllocationSize) != 0 ||
-               (flags & winfsp::winfsp::FspCleanupSetArchive) != 0 ||
-               (flags & winfsp::winfsp::FspCleanupSetLastAccessTime) != 0 ||
-               (flags & winfsp::winfsp::FspCleanupSetLastWriteTime) != 0 ||
-               (flags & winfsp::winfsp::FspCleanupSetChangeTime) != 0 {
+            if (flags & winfsp::winfsp::FspCleanupSetAllocationSize) != 0
+                || (flags & winfsp::winfsp::FspCleanupSetArchive) != 0
+                || (flags & winfsp::winfsp::FspCleanupSetLastAccessTime) != 0
+                || (flags & winfsp::winfsp::FspCleanupSetLastWriteTime) != 0
+                || (flags & winfsp::winfsp::FspCleanupSetChangeTime) != 0
+            {
                 // For now, just touch the file to update mtime
                 let times = agentfs_core::FileTimes {
-                    atime: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
-                    mtime: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
-                    ctime: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
-                    birthtime: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
+                    atime: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64,
+                    mtime: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64,
+                    ctime: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64,
+                    birthtime: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64,
                 };
                 let _ = self.core.set_times(path.as_ref(), times);
             }
@@ -284,7 +346,10 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn close(&self, file_context: winfsp::winfsp::FileContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn close(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ctx) = self.get_file_context(file_context) {
             // Handle pending delete
             if ctx.pending_delete {
@@ -299,14 +364,27 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn read(&self, file_context: winfsp::winfsp::FileContext, buffer: &mut [u8], offset: u64) -> Result<u32, Box<dyn std::error::Error>> {
+    fn read(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        buffer: &mut [u8],
+        offset: u64,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         let bytes_read = self.core.read(ctx.handle_id, offset, buffer)?;
         Ok(bytes_read as u32)
     }
 
-    fn write(&self, file_context: winfsp::winfsp::FileContext, buffer: &[u8], offset: u64, _write_to_eof: bool, _constrained_io: bool, file_info: &mut FileInfo) -> Result<u32, Box<dyn std::error::Error>> {
+    fn write(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        buffer: &[u8],
+        offset: u64,
+        _write_to_eof: bool,
+        _constrained_io: bool,
+        file_info: &mut FileInfo,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         let bytes_written = self.core.write(ctx.handle_id, offset, buffer)?;
@@ -320,7 +398,11 @@ impl FileSystem for AgentFsWinFsp {
         Ok(bytes_written as u32)
     }
 
-    fn flush(&self, file_context: Option<winfsp::winfsp::FileContext>, file_info: Option<&mut FileInfo>) -> Result<(), Box<dyn std::error::Error>> {
+    fn flush(
+        &self,
+        file_context: Option<winfsp::winfsp::FileContext>,
+        file_info: Option<&mut FileInfo>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(file_context) = file_context {
             if let Some(ctx) = self.get_file_context(file_context) {
                 self.core.flush(ctx.handle_id)?;
@@ -333,7 +415,11 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn get_file_info(&self, file_context: winfsp::winfsp::FileContext, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn get_file_info(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         // TODO: Store path in context to get proper attributes
@@ -341,7 +427,16 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn set_basic_info(&self, file_context: winfsp::winfsp::FileContext, _file_attributes: FileAttributes, _creation_time: u64, _last_access_time: u64, _last_write_time: u64, _change_time: u64, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_basic_info(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        _file_attributes: FileAttributes,
+        _creation_time: u64,
+        _last_access_time: u64,
+        _last_write_time: u64,
+        _change_time: u64,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         // Convert Windows FILETIME to Unix timestamps
@@ -363,7 +458,13 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn set_file_size(&self, file_context: winfsp::winfsp::FileContext, new_size: u64, _set_allocation_size: bool, file_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_file_size(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        new_size: u64,
+        _set_allocation_size: bool,
+        file_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         self.core.truncate(ctx.handle_id, new_size)?;
@@ -373,7 +474,11 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn can_delete(&self, file_context: winfsp::winfsp::FileContext, file_name: &CStr) -> Result<(), Box<dyn std::error::Error>> {
+    fn can_delete(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        file_name: &CStr,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.convert_path(file_name)?;
 
         // Check if it's a directory and if it's empty
@@ -388,7 +493,13 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn rename(&self, file_context: winfsp::winfsp::FileContext, file_name: &CStr, new_file_name: &CStr, _replace_if_exists: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn rename(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        file_name: &CStr,
+        new_file_name: &CStr,
+        _replace_if_exists: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let old_path = self.convert_path(file_name)?;
         let new_path = self.convert_path(new_file_name)?;
 
@@ -396,17 +507,31 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn get_security(&self, file_context: winfsp::winfsp::FileContext, _security_descriptor: &mut SecurityDescriptor) -> Result<(), Box<dyn std::error::Error>> {
+    fn get_security(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        _security_descriptor: &mut SecurityDescriptor,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // TODO: Implement security descriptor mapping
         Ok(())
     }
 
-    fn set_security(&self, file_context: winfsp::winfsp::FileContext, _security_descriptor: &SecurityDescriptor) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_security(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        _security_descriptor: &SecurityDescriptor,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // TODO: Implement security descriptor setting
         Ok(())
     }
 
-    fn read_directory(&self, file_context: winfsp::winfsp::FileContext, pattern: Option<&CStr>, marker: Option<&CStr>, buffer: &mut DirBuffer) -> Result<(), Box<dyn std::error::Error>> {
+    fn read_directory(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        pattern: Option<&CStr>,
+        marker: Option<&CStr>,
+        buffer: &mut DirBuffer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ctx = self.get_file_context(file_context).ok_or("Invalid file context")?;
 
         // TODO: Need to track path in context
@@ -429,18 +554,30 @@ impl FileSystem for AgentFsWinFsp {
         Ok(())
     }
 
-    fn get_dir_info_by_name(&self, file_context: winfsp::winfsp::FileContext, file_name: &CStr, dir_info: &mut FileInfo) -> Result<(), Box<dyn std::error::Error>> {
+    fn get_dir_info_by_name(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        file_name: &CStr,
+        dir_info: &mut FileInfo,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.convert_path(file_name)?;
         let attrs = self.core.getattr(path.as_ref())?;
         *dir_info = self.convert_file_info(&attrs);
         Ok(())
     }
 
-    fn control(&self, file_context: winfsp::winfsp::FileContext, control_code: u32, input_buffer: &[u8], output_buffer: &mut [u8]) -> Result<u32, Box<dyn std::error::Error>> {
+    fn control(
+        &self,
+        file_context: winfsp::winfsp::FileContext,
+        control_code: u32,
+        input_buffer: &[u8],
+        output_buffer: &mut [u8],
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         // Handle AgentFS control messages via DeviceIoControl
         match control_code {
             // TODO: Define proper IOCTL codes for AgentFS operations
-            0x80000001 => { // AGENTFS_IOCTL_SNAPSHOT_CREATE
+            0x80000001 => {
+                // AGENTFS_IOCTL_SNAPSHOT_CREATE
                 let request: SnapshotCreateRequest = serde_json::from_slice(input_buffer)?;
                 let snapshot_id = self.core.snapshot_create(request.name.as_deref())?;
                 let response = agentfs_proto::SnapshotCreateResponse { snapshot_id };
@@ -450,9 +587,12 @@ impl FileSystem for AgentFsWinFsp {
                 output_buffer[..copy_len].copy_from_slice(&bytes[..copy_len]);
                 Ok(copy_len as u32)
             }
-            0x80000002 => { // AGENTFS_IOCTL_BRANCH_CREATE
+            0x80000002 => {
+                // AGENTFS_IOCTL_BRANCH_CREATE
                 let request: BranchCreateRequest = serde_json::from_slice(input_buffer)?;
-                let branch_id = self.core.branch_create_from_snapshot(request.from_snapshot, request.name.as_deref())?;
+                let branch_id = self
+                    .core
+                    .branch_create_from_snapshot(request.from_snapshot, request.name.as_deref())?;
                 let response = agentfs_proto::BranchCreateResponse { branch_id };
                 let json = serde_json::to_string(&response)?;
                 let bytes = json.as_bytes();
@@ -460,13 +600,14 @@ impl FileSystem for AgentFsWinFsp {
                 output_buffer[..copy_len].copy_from_slice(&bytes[..copy_len]);
                 Ok(copy_len as u32)
             }
-            0x80000003 => { // AGENTFS_IOCTL_BRANCH_BIND
+            0x80000003 => {
+                // AGENTFS_IOCTL_BRANCH_BIND
                 let request: BranchBindRequest = serde_json::from_slice(input_buffer)?;
                 let pid = request.pid.unwrap_or_else(|| std::process::id());
                 self.core.bind_process_to_branch_with_pid(request.branch_id, pid)?;
                 Ok(0)
             }
-            _ => Err(format!("Unknown control code: {:#x}", control_code).into())
+            _ => Err(format!("Unknown control code: {:#x}", control_code).into()),
         }
     }
 }

@@ -21,7 +21,10 @@ impl Default for AuthMethod {
 
 impl AuthMethod {
     /// Apply authentication headers to a request
-    pub fn apply_to_headers(&self, headers: &mut HeaderMap) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn apply_to_headers(
+        &self,
+        headers: &mut HeaderMap,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match self {
             AuthMethod::ApiKey(token) => {
                 let value = format!("ApiKey {}", token);

@@ -1,13 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
-use ssz::{Encode, Decode};
+use ssz::{Decode, Encode};
 use std::path::PathBuf;
 use tokio::signal::unix::{signal, SignalKind};
-use tracing::{info, error};
+use tracing::{error, info};
 
+mod operations;
 mod server;
 mod types;
-mod operations;
 
 use server::DaemonServer;
 
@@ -41,9 +41,7 @@ async fn main() -> Result<()> {
         _ => tracing::Level::INFO,
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(level)
-        .init();
+    tracing_subscriber::fmt().with_max_level(level).init();
 
     info!("Starting AW filesystem snapshots daemon");
 
@@ -51,7 +49,10 @@ async fn main() -> Result<()> {
         info!("Running in stdin mode");
         run_stdin_mode().await?;
     } else {
-        info!("Running in socket mode, socket path: {}", args.socket_path.display());
+        info!(
+            "Running in socket mode, socket path: {}",
+            args.socket_path.display()
+        );
         run_socket_mode(args.socket_path).await?;
     }
 
@@ -100,8 +101,12 @@ async fn run_stdin_mode() -> Result<()> {
 
         // Parse SSZ-encoded request from hex string
         let request_bytes = hex::decode(&line)?;
-        let request: Request = Request::from_ssz_bytes(&request_bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("SSZ decode error: {:?}", e)))?;
+        let request: Request = Request::from_ssz_bytes(&request_bytes).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("SSZ decode error: {:?}", e),
+            )
+        })?;
 
         // Process the request
         let response = operations::process_request(request).await;

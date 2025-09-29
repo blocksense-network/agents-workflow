@@ -1127,7 +1127,7 @@ The `aw agent sandbox` command provides a seamless workflow for launching the TU
 **Integration Points:**
 
 - **FS Snapshots**: Leverages the `aw-fs-snapshots-daemon` for sudo-less privileged operations
-- **Sandbox Core**: Uses Linux sandboxing implementation from [Local-Sandboxing-on-Linux.status.md](../Sandboxing/Local-Sandboxing-on-Linux.status.md)
+- **Sandbox Core**: Uses Linux sandboxing implementation from [Local-Sandboxing-on-Linux.status.md](Sandboxing/Local-Sandboxing-on-Linux.status.md)
 - **TUI Dashboard**: Provides the interactive interface described in [TUI-PRD.md](TUI-PRD.md)
 - **Security Model**: Maximum isolation by default with explicit opt-in for additional capabilities
 

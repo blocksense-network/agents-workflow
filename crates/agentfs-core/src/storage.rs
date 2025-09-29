@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::{ContentId, FsError};
 use crate::error::FsResult;
+use crate::{ContentId, FsError};
 
 /// Storage backend trait for content-addressable storage with copy-on-write
 pub trait StorageBackend: Send + Sync {
@@ -157,7 +157,10 @@ mod tests {
 
         // Allocate some content
         let id = backend.allocate(b"hello world").unwrap();
-        assert_eq!(backend.data.lock().unwrap().get(&id).unwrap().as_slice(), b"hello world");
+        assert_eq!(
+            backend.data.lock().unwrap().get(&id).unwrap().as_slice(),
+            b"hello world"
+        );
 
         // Read it back
         let mut buf = [0u8; 5];

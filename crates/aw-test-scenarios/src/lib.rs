@@ -12,11 +12,22 @@ pub struct ScenarioTerminal {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Step {
-    AdvanceMs { ms: u64 },
-    Key { key: String },
-    Sse { event: SessionEvent },
-    AssertVm { focus: String, selected: Option<usize> },
-    Snapshot { name: String },
+    AdvanceMs {
+        ms: u64,
+    },
+    Key {
+        key: String,
+    },
+    Sse {
+        event: SessionEvent,
+    },
+    AssertVm {
+        focus: String,
+        selected: Option<usize>,
+    },
+    Snapshot {
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,5 +42,3 @@ impl Scenario {
         Ok(serde_json::from_str(json)?)
     }
 }
-
-

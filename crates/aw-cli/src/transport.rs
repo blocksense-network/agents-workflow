@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Result};
 use agentfs_proto::*;
+use anyhow::{anyhow, Result};
 use ssz::{Decode, Encode};
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
@@ -54,17 +54,22 @@ impl ControlTransport {
             // Convert path to Windows volume format (e.g., "X:")
             let volume_path = mount_point.to_string_lossy().to_string();
             if !volume_path.ends_with(':') && !volume_path.ends_with(":\\") {
-                return Err(anyhow!("Windows mount point must be a drive letter (e.g., X:)"));
+                return Err(anyhow!(
+                    "Windows mount point must be a drive letter (e.g., X:)"
+                ));
             }
             Ok(ControlTransport::WinFsp {
-                volume_path: volume_path.trim_end_matches('\\').to_string()
+                volume_path: volume_path.trim_end_matches('\\').to_string(),
             })
         }
     }
 }
 
 /// Send a control request to the AgentFS adapter
-pub async fn send_control_request(transport: ControlTransport, request: Request) -> Result<Response> {
+pub async fn send_control_request(
+    transport: ControlTransport,
+    request: Request,
+) -> Result<Response> {
     match transport {
         #[cfg(unix)]
         ControlTransport::Fuse { mount_point } => {
@@ -87,7 +92,10 @@ async fn send_fuse_control_request(mount_point: PathBuf, request: Request) -> Re
 
     // Check if control file exists
     if !control_path.exists() {
-        return Err(anyhow!("AgentFS control file not found at {:?}", control_path));
+        return Err(anyhow!(
+            "AgentFS control file not found at {:?}",
+            control_path
+        ));
     }
 
     // Check permissions (should be restricted)
@@ -98,7 +106,10 @@ async fn send_fuse_control_request(mount_point: PathBuf, request: Request) -> Re
     // For security, the control file should have restricted permissions
     // (typically root:root with 0600 or similar)
     if mode & 0o077 != 0 {
-        eprintln!("Warning: control file has overly permissive permissions: {:o}", mode);
+        eprintln!(
+            "Warning: control file has overly permissive permissions: {:o}",
+            mode
+        );
     }
 
     // Encode request to SSZ
@@ -116,7 +127,8 @@ async fn send_fuse_control_request(mount_point: PathBuf, request: Request) -> Re
         &control_path,
         nix::fcntl::OFlag::O_RDWR,
         nix::sys::stat::Mode::empty(),
-    ).map_err(|e| anyhow!("Failed to open control file: {}", e))?;
+    )
+    .map_err(|e| anyhow!("Failed to open control file: {}", e))?;
 
     // Call ioctl with buffer containing request, ioctl will overwrite with response
     let result = unsafe {
@@ -146,12 +158,12 @@ async fn send_fuse_control_request(mount_point: PathBuf, request: Request) -> Re
 #[cfg(windows)]
 async fn send_winfsp_control_request(volume_path: String, request: Request) -> Result<Response> {
     use std::ffi::CString;
-    use winapi::um::fileapi::{CreateFileA, OPEN_EXISTING};
-    use winapi::um::handleapi::{INVALID_HANDLE_VALUE, CloseHandle};
-    use winapi::um::winioctl::DeviceIoControl;
-    use winapi::um::winnt::{GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE};
     use winapi::shared::minwindef::{DWORD, FALSE};
     use winapi::shared::ntdef::NULL;
+    use winapi::um::fileapi::{CreateFileA, OPEN_EXISTING};
+    use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
+    use winapi::um::winioctl::DeviceIoControl;
+    use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE};
 
     // Encode request to SSZ
     let request_bytes = request.as_ssz_bytes();
@@ -190,7 +202,10 @@ async fn send_winfsp_control_request(volume_path: String, request: Request) -> R
     unsafe { CloseHandle(handle) };
 
     // Return mock response for now
-    let mock_response = Response::error("WinFsp DeviceIoControl transport not implemented".to_string(), Some(-1));
+    let mock_response = Response::error(
+        "WinFsp DeviceIoControl transport not implemented".to_string(),
+        Some(-1),
+    );
 
     Ok(mock_response)
 }

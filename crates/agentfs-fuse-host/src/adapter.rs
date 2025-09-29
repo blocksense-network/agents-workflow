@@ -6,16 +6,19 @@
 compile_error!("This module requires the 'fuse' feature to be enabled");
 
 use agentfs_core::{
-    Attributes, DirEntry, FsConfig, FsCore, FsResult, HandleId, LockRange, OpenOptions,
-    ShareMode, FileTimes, FsError
+    Attributes, DirEntry, FileTimes, FsConfig, FsCore, FsError, FsResult, HandleId, LockRange,
+    OpenOptions, ShareMode,
 };
 use agentfs_proto::*;
 use fuser::{
-    FileAttr, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyBMap, ReplyCreate, ReplyData,
-    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyLock, ReplyLSeek, ReplyOpen, ReplyStatfs, ReplyWrite,
-    ReplyXattr, Request, TimeOrNow,
+    FileAttr, FileType, ReplyAttr, ReplyBMap, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
+    ReplyEntry, ReplyLSeek, ReplyLock, ReplyOpen, ReplyStatfs, ReplyWrite, ReplyXattr, Request,
+    TimeOrNow, FUSE_ROOT_ID,
 };
-use libc::{c_int, ENOENT, ENOTDIR, EISDIR, ENAMETOOLONG, EACCES, EEXIST, ENOTEMPTY, EBUSY, EINVAL, ENOTSUP, EIO};
+use libc::{
+    c_int, EACCES, EBUSY, EEXIST, EINVAL, EIO, EISDIR, ENAMETOOLONG, ENOENT, ENOTDIR, ENOTEMPTY,
+    ENOTSUP,
+};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Read;
@@ -95,7 +98,7 @@ impl AgentFsFuse {
 
     /// Convert FUSE flags to OpenOptions
     fn fuse_flags_to_options(&self, flags: i32) -> OpenOptions {
-        use libc::{O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_EXCL, O_TRUNC, O_APPEND};
+        use libc::{O_APPEND, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY};
 
         let mut options = OpenOptions::default();
 
@@ -130,11 +133,10 @@ impl AgentFsFuse {
     fn handle_control_ioctl(&self, data: &[u8]) -> Result<Vec<u8>, c_int> {
         use agentfs_proto::*;
 
-        let request: Request = Request::from_ssz_bytes(data)
-            .map_err(|e| {
-                error!("Failed to decode SSZ control request: {:?}", e);
-                EINVAL
-            })?;
+        let request: Request = Request::from_ssz_bytes(data).map_err(|e| {
+            error!("Failed to decode SSZ control request: {:?}", e);
+            EINVAL
+        })?;
 
         // Validate request structure
         if let Err(e) = validate_request(&request) {
@@ -150,7 +152,8 @@ impl AgentFsFuse {
                     Ok(snapshot_id) => {
                         // Get snapshot name from the list (inefficient but works for now)
                         let snapshots = self.core.snapshot_list();
-                        let name = snapshots.iter()
+                        let name = snapshots
+                            .iter()
                             .find(|(id, _)| *id == snapshot_id)
                             .and_then(|(_, name)| name.clone());
 
@@ -168,7 +171,8 @@ impl AgentFsFuse {
             }
             Request::SnapshotList(_) => {
                 let snapshots = self.core.snapshot_list();
-                let snapshot_infos: Vec<SnapshotInfo> = snapshots.into_iter()
+                let snapshot_infos: Vec<SnapshotInfo> = snapshots
+                    .into_iter()
                     .map(|(id, name)| SnapshotInfo {
                         id: id.to_string().into_bytes(),
                         name: name.map(|s| s.into_bytes()),
@@ -183,19 +187,21 @@ impl AgentFsFuse {
                 let name_str = req.name.as_ref().map(|n| String::from_utf8_lossy(n).to_string());
                 match self.core.branch_create_from_snapshot(
                     from_str.parse().map_err(|_| EINVAL)?,
-                    name_str.as_deref()
+                    name_str.as_deref(),
                 ) {
                     Ok(branch_id) => {
                         // Get branch info from the list
                         let branches = self.core.branch_list();
-                        let info = branches.iter()
-                            .find(|b| b.id == branch_id)
-                            .ok_or(EIO)?;
+                        let info = branches.iter().find(|b| b.id == branch_id).ok_or(EIO)?;
 
                         let response = Response::branch_create(BranchInfo {
                             id: info.id.to_string().into_bytes(),
                             name: info.name.clone().map(|s| s.into_bytes()),
-                            parent: info.parent.map(|p| p.to_string()).unwrap_or_default().into_bytes(),
+                            parent: info
+                                .parent
+                                .map(|p| p.to_string())
+                                .unwrap_or_default()
+                                .into_bytes(),
                         });
                         response.as_ssz_bytes().map_err(|_| EIO)
                     }
@@ -437,7 +443,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, size: u32, _flags: i32, reply: ReplyData) {
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        size: u32,
+        _flags: i32,
+        reply: ReplyData,
+    ) {
         // Special handling for control file - no data to read
         if ino == CONTROL_FILE_INO {
             reply.data(&[]);
@@ -457,7 +472,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn write(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], _write_flags: u32, reply: ReplyWrite) {
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        data: &[u8],
+        _write_flags: u32,
+        reply: ReplyWrite,
+    ) {
         // Control file is not writable
         if ino == CONTROL_FILE_INO {
             reply.error(EACCES);
@@ -475,7 +499,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn release(&mut self, _req: &Request, ino: u64, fh: u64, _flags: i32, _lock_owner: Option<u64>, _flush: bool, reply: ReplyEmpty) {
+    fn release(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        _flush: bool,
+        reply: ReplyEmpty,
+    ) {
         // Control file has no handle to release
         if ino == CONTROL_FILE_INO {
             reply.ok();
@@ -490,7 +523,14 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, mut reply: ReplyDirectory) {
+    fn readdir(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        mut reply: ReplyDirectory,
+    ) {
         if ino == AGENTFS_DIR_INO {
             // List the .agentfs directory contents
             if offset == 0 {
@@ -539,7 +579,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn create(&mut self, _req: &Request, parent: u64, name: &OsStr, mode: u32, _umask: u32, flags: i32, reply: ReplyCreate) {
+    fn create(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        mode: u32,
+        _umask: u32,
+        flags: i32,
+        reply: ReplyCreate,
+    ) {
         let parent_path = match self.inode_to_path(parent) {
             Some(p) => p,
             None => {
@@ -558,17 +607,21 @@ impl fuser::Filesystem for AgentFsFuse {
         let options = self.fuse_flags_to_options(flags);
 
         match self.core.create(path, &options) {
-            Ok(handle_id) => {
-                match self.core.getattr(path) {
-                    Ok(attr) => {
-                        let ino = full_path.len() as u64 + 1000;
-                        self.inodes.insert(ino, full_path);
-                        let fuse_attr = self.attr_to_fuse(&attr, ino);
-                        reply.created(&Duration::from_secs(1), &fuse_attr, 0, handle_id.0 as u64, 0);
-                    }
-                    Err(_) => reply.error(EIO),
+            Ok(handle_id) => match self.core.getattr(path) {
+                Ok(attr) => {
+                    let ino = full_path.len() as u64 + 1000;
+                    self.inodes.insert(ino, full_path);
+                    let fuse_attr = self.attr_to_fuse(&attr, ino);
+                    reply.created(
+                        &Duration::from_secs(1),
+                        &fuse_attr,
+                        0,
+                        handle_id.0 as u64,
+                        0,
+                    );
                 }
-            }
+                Err(_) => reply.error(EIO),
+            },
             Err(FsError::NotFound) => reply.error(ENOENT),
             Err(FsError::AlreadyExists) => reply.error(EEXIST),
             Err(FsError::PermissionDenied) => reply.error(EACCES),
@@ -576,7 +629,15 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn mkdir(&mut self, _req: &Request, parent: u64, name: &OsStr, mode: u32, _umask: u32, reply: ReplyEntry) {
+    fn mkdir(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        mode: u32,
+        _umask: u32,
+        reply: ReplyEntry,
+    ) {
         let parent_path = match self.inode_to_path(parent) {
             Some(p) => p,
             None => {
@@ -594,17 +655,15 @@ impl fuser::Filesystem for AgentFsFuse {
         let path = self.path_from_bytes(&full_path);
 
         match self.core.mkdir(path, mode) {
-            Ok(()) => {
-                match self.core.getattr(path) {
-                    Ok(attr) => {
-                        let ino = full_path.len() as u64 + 1000;
-                        self.inodes.insert(ino, full_path);
-                        let fuse_attr = self.attr_to_fuse(&attr, ino);
-                        reply.entry(&Duration::from_secs(1), &fuse_attr, 0);
-                    }
-                    Err(_) => reply.error(EIO),
+            Ok(()) => match self.core.getattr(path) {
+                Ok(attr) => {
+                    let ino = full_path.len() as u64 + 1000;
+                    self.inodes.insert(ino, full_path);
+                    let fuse_attr = self.attr_to_fuse(&attr, ino);
+                    reply.entry(&Duration::from_secs(1), &fuse_attr, 0);
                 }
-            }
+                Err(_) => reply.error(EIO),
+            },
             Err(FsError::NotFound) => reply.error(ENOENT),
             Err(FsError::AlreadyExists) => reply.error(EEXIST),
             Err(FsError::PermissionDenied) => reply.error(EACCES),
@@ -671,7 +730,17 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn ioctl(&mut self, _req: &Request, ino: u64, fh: u64, flags: u32, cmd: u32, data: &[u8], out_size: u32, reply: ReplyData) {
+    fn ioctl(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        flags: u32,
+        cmd: u32,
+        data: &[u8],
+        out_size: u32,
+        reply: ReplyData,
+    ) {
         // Only handle ioctl on the control file
         if ino != CONTROL_FILE_INO {
             reply.error(libc::ENOTTY);
@@ -695,7 +764,14 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn truncate(&mut self, _req: &Request, ino: u64, fh: Option<u64>, size: u64, reply: ReplyEmpty) {
+    fn truncate(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: Option<u64>,
+        size: u64,
+        reply: ReplyEmpty,
+    ) {
         if ino == CONTROL_FILE_INO {
             reply.error(libc::EACCES);
             return;
@@ -757,7 +833,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn setxattr(&mut self, _req: &Request, ino: u64, name: &OsStr, value: &[u8], flags: u32, position: u32, reply: ReplyEmpty) {
+    fn setxattr(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        name: &OsStr,
+        value: &[u8],
+        flags: u32,
+        position: u32,
+        reply: ReplyEmpty,
+    ) {
         if ino == CONTROL_FILE_INO {
             reply.error(libc::EPERM);
             return;
@@ -848,7 +933,14 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn utimens(&mut self, _req: &Request, ino: u64, atime: Option<TimeOrNow>, mtime: Option<TimeOrNow>, reply: ReplyEmpty) {
+    fn utimens(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        atime: Option<TimeOrNow>,
+        mtime: Option<TimeOrNow>,
+        reply: ReplyEmpty,
+    ) {
         if ino == CONTROL_FILE_INO {
             reply.error(libc::EPERM);
             return;
@@ -894,7 +986,16 @@ impl fuser::Filesystem for AgentFsFuse {
         }
     }
 
-    fn fallocate(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, length: i64, mode: u32, reply: ReplyEmpty) {
+    fn fallocate(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        length: i64,
+        mode: u32,
+        reply: ReplyEmpty,
+    ) {
         if ino == CONTROL_FILE_INO {
             reply.error(libc::EPERM);
             return;
@@ -904,7 +1005,15 @@ impl fuser::Filesystem for AgentFsFuse {
         reply.error(libc::ENOTSUP);
     }
 
-    fn lseek(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, whence: u32, reply: ReplyLSeek) {
+    fn lseek(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        whence: u32,
+        reply: ReplyLSeek,
+    ) {
         if ino == CONTROL_FILE_INO {
             reply.error(libc::EPERM);
             return;
@@ -914,7 +1023,19 @@ impl fuser::Filesystem for AgentFsFuse {
         reply.error(libc::ENOTSUP);
     }
 
-    fn copy_file_range(&mut self, _req: &Request, ino_in: u64, fh_in: u64, offset_in: i64, ino_out: u64, fh_out: u64, offset_out: i64, len: u64, flags: u32, reply: ReplyWrite) {
+    fn copy_file_range(
+        &mut self,
+        _req: &Request,
+        ino_in: u64,
+        fh_in: u64,
+        offset_in: i64,
+        ino_out: u64,
+        fh_out: u64,
+        offset_out: i64,
+        len: u64,
+        flags: u32,
+        reply: ReplyWrite,
+    ) {
         if ino_in == CONTROL_FILE_INO || ino_out == CONTROL_FILE_INO {
             reply.error(libc::EPERM);
             return;
@@ -923,5 +1044,4 @@ impl fuser::Filesystem for AgentFsFuse {
         // For now, we don't implement copy_file_range - return ENOTSUP
         reply.error(libc::ENOTSUP);
     }
-}
 }

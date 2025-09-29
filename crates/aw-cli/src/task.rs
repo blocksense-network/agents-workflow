@@ -1,15 +1,14 @@
-use std::path::PathBuf;
-use clap::{Args, Subcommand};
-use anyhow::{Result, Context};
-use aw_repo::VcsRepo;
+use crate::sandbox::{parse_bool_flag, prepare_workspace_with_fallback};
+use anyhow::{Context, Result};
 use aw_core::{
-    AgentTasks, DatabaseManager, PushHandler, PushOptions,
-    devshell_names, parse_push_to_remote_flag,
-    edit_content_interactive, EditorError
+    devshell_names, edit_content_interactive, parse_push_to_remote_flag, AgentTasks,
+    DatabaseManager, EditorError, PushHandler, PushOptions,
 };
 use aw_fs_snapshots::PreparedWorkspace;
-use aw_local_db::{SessionRecord, TaskRecord, FsSnapshotRecord};
-use crate::sandbox::{parse_bool_flag, prepare_workspace_with_fallback};
+use aw_local_db::{FsSnapshotRecord, SessionRecord, TaskRecord};
+use aw_repo::VcsRepo;
+use clap::{Args, Subcommand};
+use std::path::PathBuf;
 
 /// Task-related commands
 #[derive(Subcommand)]
@@ -96,20 +95,16 @@ impl TaskCreateArgs {
         }
 
         // Determine if we're creating a new branch or appending to existing
-        let branch_name = self.branch.as_ref()
-            .filter(|b| !b.trim().is_empty())
-            .cloned();
+        let branch_name = self.branch.as_ref().filter(|b| !b.trim().is_empty()).cloned();
         let start_new_branch = branch_name.is_some();
 
         // Get task content
         let prompt_content = self.get_prompt_content().await?;
 
         // Create VCS repository instance
-        let repo = VcsRepo::new(".")
-            .context("Failed to initialize VCS repository")?;
+        let repo = VcsRepo::new(".").context("Failed to initialize VCS repository")?;
 
-        let orig_branch = repo.current_branch()
-            .context("Failed to get current branch")?;
+        let orig_branch = repo.current_branch().context("Failed to get current branch")?;
 
         // Handle branch creation/validation
         let actual_branch_name = if start_new_branch {
@@ -155,34 +150,31 @@ impl TaskCreateArgs {
         }
 
         // Initialize database manager
-        let db_manager = DatabaseManager::new()
-            .context("Failed to initialize database")?;
+        let db_manager = DatabaseManager::new().context("Failed to initialize database")?;
 
         // Get or create repository record
-        let repo_id = db_manager.get_or_create_repo(&repo)
+        let repo_id = db_manager
+            .get_or_create_repo(&repo)
             .context("Failed to get or create repository record")?;
 
         // Get or create agent record (for now, use placeholder "codex" agent)
-        let agent_id = db_manager.get_or_create_agent("codex", "latest")
+        let agent_id = db_manager
+            .get_or_create_agent("codex", "latest")
             .context("Failed to get or create agent record")?;
 
         // Get or create runtime record
-        let runtime_id = db_manager.get_or_create_local_runtime()
+        let runtime_id = db_manager
+            .get_or_create_local_runtime()
             .context("Failed to get or create runtime record")?;
 
         // Generate session ID
         let session_id = DatabaseManager::generate_session_id();
 
         // Create task and commit
-        let tasks = AgentTasks::new(repo.root())
-            .context("Failed to initialize agent tasks")?;
+        let tasks = AgentTasks::new(repo.root()).context("Failed to initialize agent tasks")?;
 
         let commit_result = if start_new_branch {
-            tasks.record_initial_task(
-                &task_content,
-                &actual_branch_name,
-                self.devshell.as_deref()
-            )
+            tasks.record_initial_task(&task_content, &actual_branch_name, self.devshell.as_deref())
         } else {
             tasks.append_task(&task_content)
         };
@@ -219,7 +211,8 @@ impl TaskCreateArgs {
             ended_at: None,
         };
 
-        db_manager.create_session(&session_record)
+        db_manager
+            .create_session(&session_record)
             .context("Failed to create session record")?;
 
         // Create task record
@@ -237,7 +230,8 @@ impl TaskCreateArgs {
             codex_workspace: None,
         };
 
-        let task_id = db_manager.create_task_record(&task_record)
+        let task_id = db_manager
+            .create_task_record(&task_record)
             .context("Failed to create task record")?;
 
         // Log the created records for debugging
@@ -251,7 +245,10 @@ impl TaskCreateArgs {
         // 4. Store snapshot metadata in the database
         if !self.non_interactive {
             println!("Note: Automatic snapshot creation for time travel not yet implemented in this milestone");
-            println!("When implemented, an initial snapshot will be created here for session '{}'", actual_branch_name);
+            println!(
+                "When implemented, an initial snapshot will be created here for session '{}'",
+                actual_branch_name
+            );
         }
 
         // Validate and prepare sandbox if requested
@@ -268,8 +265,8 @@ impl TaskCreateArgs {
 
         // Handle push operations
         if let Some(push_flag) = &self.push_to_remote {
-            let push_bool = parse_push_to_remote_flag(push_flag)
-                .context("Invalid --push-to-remote value")?;
+            let push_bool =
+                parse_push_to_remote_flag(push_flag).context("Invalid --push-to-remote value")?;
             self.handle_push(&actual_branch_name, Some(push_bool)).await?;
         } else if !self.non_interactive {
             self.handle_push(&actual_branch_name, None).await?;
@@ -291,9 +288,9 @@ impl TaskCreateArgs {
         if let Some(prompt) = &self.prompt {
             Ok(Some(prompt.clone()))
         } else if let Some(file_path) = &self.prompt_file {
-            let content = tokio::fs::read_to_string(file_path)
-                .await
-                .with_context(|| format!("Error: Failed to read prompt file: {}", file_path.display()))?;
+            let content = tokio::fs::read_to_string(file_path).await.with_context(|| {
+                format!("Error: Failed to read prompt file: {}", file_path.display())
+            })?;
             Ok(Some(content))
         } else {
             Ok(None)
@@ -311,7 +308,8 @@ impl TaskCreateArgs {
                 anyhow::bail!("Error: Repository does not contain a flake.nix file");
             }
 
-            let shells = devshell_names(repo.root()).await
+            let shells = devshell_names(repo.root())
+                .await
                 .context("Failed to read devshells from flake.nix")?;
 
             if !shells.contains(&devshell.to_string()) {
@@ -324,13 +322,7 @@ impl TaskCreateArgs {
 
     /// Validate existing branch (not main branch, etc.)
     async fn validate_existing_branch(&self, repo: &VcsRepo, branch_name: &str) -> Result<()> {
-        let main_names = vec![
-            repo.default_branch(),
-            "main",
-            "master",
-            "trunk",
-            "default"
-        ];
+        let main_names = vec![repo.default_branch(), "main", "master", "trunk", "default"];
 
         if main_names.contains(&branch_name) {
             anyhow::bail!("Error: Refusing to run on the main branch");
@@ -354,13 +346,14 @@ impl TaskCreateArgs {
 
     /// Handle push operations
     async fn handle_push(&self, branch_name: &str, explicit_push: Option<bool>) -> Result<()> {
-        let push_handler = PushHandler::new(".").await
-            .context("Failed to initialize push handler")?;
+        let push_handler =
+            PushHandler::new(".").await.context("Failed to initialize push handler")?;
 
-        let options = PushOptions::new(branch_name.to_string())
-            .with_push_to_remote(explicit_push);
+        let options = PushOptions::new(branch_name.to_string()).with_push_to_remote(explicit_push);
 
-        push_handler.handle_push(&options).await
+        push_handler
+            .handle_push(&options)
+            .await
             .context("Failed to handle push operation")?;
 
         Ok(())
@@ -377,7 +370,6 @@ impl TaskCreateArgs {
             .current_dir(repo.root())
             .output();
     }
-
 }
 
 #[cfg(test)]
@@ -711,7 +703,10 @@ mod tests {
 
         // If nix is available, check the results
         if let Ok(devshells) = result {
-            assert!(devshells.contains(&"default".to_string()) || devshells.contains(&"custom".to_string()));
+            assert!(
+                devshells.contains(&"default".to_string())
+                    || devshells.contains(&"custom".to_string())
+            );
         } else {
             // If nix is not available, the function should still not panic
             // The error is expected in some test environments
@@ -795,7 +790,8 @@ mod tests {
         Ok(temp_dir)
     }
 
-    fn setup_git_repo_integration() -> Result<(tempfile::TempDir, tempfile::TempDir, tempfile::TempDir)> {
+    fn setup_git_repo_integration(
+    ) -> Result<(tempfile::TempDir, tempfile::TempDir, tempfile::TempDir)> {
         use std::process::Command;
 
         // Set HOME to a temporary directory to avoid accessing user git/ssh config
@@ -806,10 +802,7 @@ mod tests {
         let repo_dir = tempfile::TempDir::new()?;
 
         // Create bare remote repository
-        Command::new("git")
-            .args(["init", "--bare"])
-            .current_dir(&remote_dir)
-            .output()?;
+        Command::new("git").args(["init", "--bare"]).current_dir(&remote_dir).output()?;
 
         // Create local repository
         Command::new("git")
@@ -829,10 +822,7 @@ mod tests {
 
         // Create initial commit
         fs::write(repo_dir.path().join("README.md"), "initial")?;
-        Command::new("git")
-            .args(["add", "README.md"])
-            .current_dir(&repo_dir)
-            .output()?;
+        Command::new("git").args(["add", "README.md"]).current_dir(&repo_dir).output()?;
         Command::new("git")
             .args(["commit", "-m", "initial"])
             .current_dir(&repo_dir)
@@ -840,7 +830,12 @@ mod tests {
 
         // Add remote
         Command::new("git")
-            .args(["remote", "add", "origin", &remote_dir.path().to_string_lossy()])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                &remote_dir.path().to_string_lossy(),
+            ])
             .current_dir(&repo_dir)
             .output()?;
 
@@ -871,13 +866,18 @@ mod tests {
             let script_path = editor_dir.as_ref().unwrap().path().join("fake_editor.sh");
             let marker_path = editor_dir.as_ref().unwrap().path().join("called");
 
-            let script_content = format!(r#"#!/bin/bash
+            let script_content = format!(
+                r#"#!/bin/bash
 echo "yes" > "{}"
 cat > "$1" << 'EOF'
 {}
 EOF
 exit {}
-"#, marker_path.to_string_lossy(), editor_lines.join("\n"), editor_exit_code);
+"#,
+                marker_path.to_string_lossy(),
+                editor_lines.join("\n"),
+                editor_exit_code
+            );
 
             fs::write(&script_path, script_content)?;
             Command::new("chmod").args(["+x", &script_path.to_string_lossy()]).output()?;
@@ -893,21 +893,19 @@ exit {}
         // but workspace root when running --workspace
         let binary_path = if cargo_manifest_dir.contains("/crates/") {
             // Running individual crate test - go up to workspace root then to target
-            std::path::Path::new(&cargo_manifest_dir)
-                .join("../../target/debug/aw")
+            std::path::Path::new(&cargo_manifest_dir).join("../../target/debug/aw")
         } else {
             // Running workspace test - target is directly under workspace
-            std::path::Path::new(&cargo_manifest_dir)
-                .join("target/debug/aw")
+            std::path::Path::new(&cargo_manifest_dir).join("target/debug/aw")
         };
 
         let mut cmd = Command::new(&binary_path);
         cmd.args(["task", "create", branch])
-           .current_dir(repo_path)
-           .env("GIT_CONFIG_NOSYSTEM", "1")
-           .env("GIT_TERMINAL_PROMPT", "0")
-           .env("GIT_ASKPASS", "echo")
-           .env("SSH_ASKPASS", "echo");
+            .current_dir(repo_path)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_ASKPASS", "echo")
+            .env("SSH_ASKPASS", "echo");
 
         // Set HOME for git operations
         if let Ok(home) = std::env::var("HOME") {
@@ -1038,13 +1036,9 @@ exit {}
             "feature",
             Some("task"), // Use prompt instead of editor
             None,
-
             Some(false), // Don't push to remote
             None,
-
-
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor content needed
             0,
             Some(aw_home_dir.path()),
@@ -1054,7 +1048,12 @@ exit {}
         assert!(status.success());
 
         // Verify task branch was created
-        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "feature", false)?;
+        assert_task_branch_created_integration(
+            repo_dir.path(),
+            remote_dir.path(),
+            "feature",
+            false,
+        )?;
 
         Ok(())
     }
@@ -1069,13 +1068,9 @@ exit {}
             "p1",
             Some("prompt text"),
             None,
-
             Some(true), // Push to remote
             None,
-
-
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor content needed
             0,
             Some(aw_home_dir.path()),
@@ -1104,13 +1099,10 @@ exit {}
             repo_dir.path(),
             "pf1",
             None,
-            
             Some(&prompt_file),
             Some(true), // Push to remote
             None,
-            
-            
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor content needed
             0,
             Some(aw_home_dir.path()),
@@ -1136,15 +1128,12 @@ exit {}
             repo_dir.path(),
             "bad",
             None,
-            
             None,
-            
             Some(false), // Don't push to remote
             None,
-            
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // Empty editor content
-            1, // Editor fails
+            1,      // Editor fails
             None,
         )?;
 
@@ -1168,12 +1157,10 @@ exit {}
             repo_dir.path(),
             "empty",
             None,
-            
             Some(&prompt_file),
             Some(false), // Don't push to remote
             None,
-            
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             None,
@@ -1194,10 +1181,7 @@ exit {}
 
         // Create staged changes
         fs::write(repo_dir.path().join("foo.txt"), "foo")?;
-        Command::new("git")
-            .args(["add", "foo.txt"])
-            .current_dir(&repo_dir)
-            .output()?;
+        Command::new("git").args(["add", "foo.txt"]).current_dir(&repo_dir).output()?;
 
         // Check that we have staged changes
         let status_output = Command::new("git")
@@ -1211,11 +1195,9 @@ exit {}
             "s1",
             Some("task"), // Use prompt instead of editor
             None,
-
             Some(false), // Don't push to remote
             None,
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             Some(aw_home_dir.path()),
@@ -1261,11 +1243,9 @@ exit {}
             "s2",
             Some("task"), // Use prompt instead of editor
             None,
-
             Some(false), // Don't push to remote
             None,
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             Some(aw_home_dir.path()),
@@ -1311,10 +1291,9 @@ exit {}
             "ds1",
             Some("task"),
             None,
-
             Some(false), // Don't push to remote
             Some("custom"),
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             Some(aw_home_dir.path()),
@@ -1349,10 +1328,9 @@ exit {}
             "ds2",
             Some("task"),
             None,
-            
             Some(false), // Don't push to remote
             Some("missing"),
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             None,
@@ -1375,10 +1353,9 @@ exit {}
             "ds3",
             Some("task"),
             None,
-            
             Some(false), // Don't push to remote
             Some("any"),
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             None,
@@ -1401,11 +1378,9 @@ exit {}
             "poe",
             Some("   \n\t  "), // Empty/whitespace prompt
             None,
-
             Some(false), // Don't push to remote
             None,
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             None,
@@ -1431,12 +1406,10 @@ exit {}
             repo_dir.path(),
             "pfe",
             None,
-            
             Some(&prompt_file),
             Some(false), // Don't push to remote
             None,
-
-            None, // No sandbox
+            None,   // No sandbox
             vec![], // No editor needed
             0,
             None,
@@ -1458,13 +1431,10 @@ exit {}
             repo_dir.path(),
             "inv@lid name", // Invalid branch name
             None,
-            
             None,
-            
             Some(false), // Don't push to remote
             None,
-            
-            None, // No sandbox
+            None,         // No sandbox
             vec!["task"], // Editor content
             0,
             None,
@@ -1496,7 +1466,7 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", None, None, None, None)), // Basic sandbox without extra features
-            vec![], // No editor content needed
+            vec![],                                  // No editor content needed
             0,
             Some(aw_home_dir.path()),
         )?;
@@ -1508,7 +1478,12 @@ exit {}
         assert!(status.success());
 
         // Verify task branch was created
-        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-test", false)?;
+        assert_task_branch_created_integration(
+            repo_dir.path(),
+            remote_dir.path(),
+            "sandbox-test",
+            false,
+        )?;
 
         // Restore original working directory
         std::env::set_current_dir(original_cwd)?;
@@ -1529,7 +1504,7 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", Some("yes"), None, None, None)), // Sandbox with network access
-            vec![], // No editor content needed
+            vec![],                                         // No editor content needed
             0,
             None,
         )?;
@@ -1538,7 +1513,12 @@ exit {}
         assert!(status.success());
 
         // Verify task branch was created
-        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-net", false)?;
+        assert_task_branch_created_integration(
+            repo_dir.path(),
+            remote_dir.path(),
+            "sandbox-net",
+            false,
+        )?;
 
         Ok(())
     }
@@ -1556,7 +1536,7 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("local", None, None, None, Some("yes"))), // Sandbox with seccomp
-            vec![], // No editor content needed
+            vec![],                                         // No editor content needed
             0,
             None,
         )?;
@@ -1565,7 +1545,12 @@ exit {}
         assert!(status.success());
 
         // Verify task branch was created
-        assert_task_branch_created_integration(repo_dir.path(), remote_dir.path(), "sandbox-seccomp", false)?;
+        assert_task_branch_created_integration(
+            repo_dir.path(),
+            remote_dir.path(),
+            "sandbox-seccomp",
+            false,
+        )?;
 
         Ok(())
     }
@@ -1582,7 +1567,7 @@ exit {}
             Some(false), // Don't push to remote
             None,
             Some(("invalid", None, None, None, None)), // Invalid sandbox type
-            vec![], // No editor content needed
+            vec![],                                    // No editor content needed
             0,
             None,
         )?;
@@ -1592,7 +1577,6 @@ exit {}
 
         Ok(())
     }
-
 }
 
 /// Validate sandbox parameters and prepare workspace if sandbox is enabled
@@ -1603,22 +1587,21 @@ async fn validate_and_prepare_sandbox(args: &TaskCreateArgs) -> Result<PreparedW
     }
 
     // Parse boolean flags
-    let _allow_network = parse_bool_flag(&args.allow_network)
-        .context("Invalid --allow-network value")?;
-    let _allow_containers = parse_bool_flag(&args.allow_containers)
-        .context("Invalid --allow-containers value")?;
-    let _allow_kvm = parse_bool_flag(&args.allow_kvm)
-        .context("Invalid --allow-kvm value")?;
-    let _seccomp = parse_bool_flag(&args.seccomp)
-        .context("Invalid --seccomp value")?;
-    let _seccomp_debug = parse_bool_flag(&args.seccomp_debug)
-        .context("Invalid --seccomp-debug value")?;
+    let _allow_network =
+        parse_bool_flag(&args.allow_network).context("Invalid --allow-network value")?;
+    let _allow_containers =
+        parse_bool_flag(&args.allow_containers).context("Invalid --allow-containers value")?;
+    let _allow_kvm = parse_bool_flag(&args.allow_kvm).context("Invalid --allow-kvm value")?;
+    let _seccomp = parse_bool_flag(&args.seccomp).context("Invalid --seccomp value")?;
+    let _seccomp_debug =
+        parse_bool_flag(&args.seccomp_debug).context("Invalid --seccomp-debug value")?;
 
     // Get current working directory as the workspace to snapshot
-    let workspace_path = std::env::current_dir()
-        .context("Failed to get current working directory")?;
+    let workspace_path =
+        std::env::current_dir().context("Failed to get current working directory")?;
 
     // Prepare writable workspace using FS snapshots
-    prepare_workspace_with_fallback(&workspace_path).await
+    prepare_workspace_with_fallback(&workspace_path)
+        .await
         .context("Failed to prepare sandbox workspace")
 }

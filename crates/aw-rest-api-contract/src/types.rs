@@ -230,7 +230,10 @@ pub struct WorkspaceInfo {
     pub mount_path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
-    #[serde(rename = "devcontainerDetails", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "devcontainerDetails",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub devcontainer_details: Option<DevcontainerInfo>,
 }
 
@@ -349,7 +352,11 @@ pub struct RuntimeCapability {
     pub images: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub paths: Vec<String>,
-    #[serde(rename = "sandboxProfiles", skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(
+        rename = "sandboxProfiles",
+        skip_serializing_if = "Vec::is_empty",
+        default
+    )]
     pub sandbox_profiles: Vec<String>,
 }
 

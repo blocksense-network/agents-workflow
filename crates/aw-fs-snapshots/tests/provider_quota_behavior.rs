@@ -28,7 +28,10 @@ pub trait ProviderQuotaTestBehavior {
     }
 
     /// Verify quota behavior after testing.
-    fn verify_quota_behavior(&self, quota_exceeded: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn verify_quota_behavior(
+        &self,
+        quota_exceeded: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Override in subclasses for provider-specific quota verification
         if quota_exceeded {
             println!("Quota was properly enforced");
@@ -37,5 +40,4 @@ pub trait ProviderQuotaTestBehavior {
         }
         Ok(())
     }
-
 }

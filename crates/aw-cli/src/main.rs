@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aw_cli::{Cli, Commands, AgentCommands, Parser};
+use aw_cli::{AgentCommands, Cli, Commands, Parser};
 
 #[tokio::main]
 async fn main() -> Result<()> {

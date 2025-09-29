@@ -7,5 +7,9 @@ pub mod messages;
 pub mod validation;
 
 // Re-export key types
-pub use messages::{Request, Response, SnapshotCreateRequest, SnapshotCreateResponse, SnapshotListRequest, SnapshotListResponse, BranchCreateRequest, BranchCreateResponse, BranchBindRequest, BranchBindResponse, ErrorResponse, SnapshotInfo, BranchInfo};
+pub use messages::{
+    BranchBindRequest, BranchBindResponse, BranchCreateRequest, BranchCreateResponse, BranchInfo,
+    ErrorResponse, Request, Response, SnapshotCreateRequest, SnapshotCreateResponse, SnapshotInfo,
+    SnapshotListRequest, SnapshotListResponse,
+};
 pub use validation::*;

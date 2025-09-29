@@ -1,15 +1,15 @@
 //! tui-test runner CLI
 
-use clap::{Parser, Subcommand};
-use aw_test_scenarios::{Scenario, Step};
 use aw_rest_client_mock::MockClient;
-use aw_tui::{execute_scenario, TestRuntime, task::TaskState};
-use std::sync::Arc;
-use std::io::{self, Write};
+use aw_test_scenarios::{Scenario, Step};
+use aw_tui::{execute_scenario, task::TaskState, TestRuntime};
+use clap::{Parser, Subcommand};
+use crossterm::cursor;
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{self, Clear, ClearType};
-use crossterm::cursor;
+use std::io::{self, Write};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Parser, Debug)]
@@ -71,7 +71,11 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Run { scenario_path, update_goldens, .. } => {
+        Commands::Run {
+            scenario_path,
+            update_goldens,
+            ..
+        } => {
             let data = std::fs::read_to_string(&scenario_path)?;
             let scenario = Scenario::from_str(&data)?;
 
@@ -157,7 +161,12 @@ fn redraw_screen(
 fn cleanup_terminal() {
     let mut stdout = io::stdout();
     let _ = terminal::disable_raw_mode();
-    let _ = execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), cursor::Show);
+    let _ = execute!(
+        stdout,
+        Clear(ClearType::All),
+        cursor::MoveTo(0, 0),
+        cursor::Show
+    );
     let _ = io::stdout().flush();
 }
 
@@ -191,7 +200,11 @@ async fn run_interactive_player(
             let mut stdout = io::stdout();
             // Clear lines 24-26 where status and shortcuts appear
             for line in 24..=26 {
-                let _ = execute!(stdout, cursor::MoveTo(0, line), terminal::Clear(terminal::ClearType::CurrentLine));
+                let _ = execute!(
+                    stdout,
+                    cursor::MoveTo(0, line),
+                    terminal::Clear(terminal::ClearType::CurrentLine)
+                );
             }
             let _ = execute!(stdout, cursor::MoveTo(0, 24)); // Position cursor for command output
             io::stdout().flush()?;
@@ -201,7 +214,10 @@ async fn run_interactive_player(
                 KeyCode::Char('n') | KeyCode::Right => {
                     if current_step < scenario.steps.len() {
                         // Execute the current step
-                        match runtime.execute_step(&scenario.steps[current_step], &scenario.name).await {
+                        match runtime
+                            .execute_step(&scenario.steps[current_step], &scenario.name)
+                            .await
+                        {
                             Ok(()) => {
                                 executed_steps += 1;
                                 current_step += 1;
@@ -250,7 +266,10 @@ async fn run_interactive_player(
                     if target_step > executed_steps {
                         // Execute multiple steps at once
                         for step_idx in executed_steps..target_step {
-                            if let Err(e) = runtime.execute_step(&scenario.steps[step_idx], &scenario.name).await {
+                            if let Err(e) = runtime
+                                .execute_step(&scenario.steps[step_idx], &scenario.name)
+                                .await
+                            {
                                 println!("❌ Step {} failed: {}", step_idx + 1, e);
                                 std::thread::sleep(std::time::Duration::from_secs(2));
                                 break;
@@ -308,7 +327,11 @@ async fn run_interactive_player(
                             // Redraw after state change
                             redraw_screen(scenario, runtime, current_step, executed_steps);
                         } else {
-                            println!("❌ Invalid step number: {} (max: {})", step_num, scenario.steps.len());
+                            println!(
+                                "❌ Invalid step number: {} (max: {})",
+                                step_num,
+                                scenario.steps.len()
+                            );
                             std::thread::sleep(std::time::Duration::from_secs(2));
                         }
                     }
@@ -318,7 +341,8 @@ async fn run_interactive_player(
             }
         }
         Ok(())
-    }.await;
+    }
+    .await;
 
     // Always cleanup terminal, even on error
     cleanup_terminal();
@@ -343,11 +367,17 @@ async fn reset_and_replay(
     *runtime = TestRuntime::new(client, width, height, false); // Replay doesn't update goldens
 
     // Reload initial data
-    runtime.load_initial_data().await.map_err(|e| anyhow::anyhow!("Failed to load initial data: {}", e))?;
+    runtime
+        .load_initial_data()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to load initial data: {}", e))?;
 
     // Replay steps up to the target
     for i in 0..up_to_step {
-        runtime.execute_step(&scenario.steps[i], &scenario.name).await.map_err(|e| anyhow::anyhow!("Failed to execute step {}: {}", i, e))?;
+        runtime
+            .execute_step(&scenario.steps[i], &scenario.name)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to execute step {}: {}", i, e))?;
     }
 
     Ok(())
@@ -359,7 +389,9 @@ fn describe_step(step: &Step) -> String {
         Step::AdvanceMs { ms } => format!("Advance {}ms", ms),
         Step::Key { key } => format!("Press key '{}'", key),
         Step::Sse { .. } => "Receive SSE event".to_string(),
-        Step::AssertVm { focus, selected } => format!("Assert focus='{}' selected={:?}", focus, selected),
+        Step::AssertVm { focus, selected } => {
+            format!("Assert focus='{}' selected={:?}", focus, selected)
+        }
         Step::Snapshot { name } => format!("Take snapshot '{}'", name),
     }
 }
@@ -392,7 +424,11 @@ fn show_tui_display(runtime: &TestRuntime<MockClient>) {
 
     // Print each line at the correct position
     for (row, line) in buffer.lines().enumerate() {
-        let _ = execute!(stdout, cursor::MoveTo(0, row as u16), crossterm::style::Print(line));
+        let _ = execute!(
+            stdout,
+            cursor::MoveTo(0, row as u16),
+            crossterm::style::Print(line)
+        );
     }
 
     let _ = io::stdout().flush();
@@ -428,17 +464,34 @@ fn show_compact_status(
         "No task selected".to_string()
     };
 
-    let status_line = format!("📊 Step {}/{} | {} | Next: {}",
-                             current_step, scenario.steps.len(), task_info, next_desc);
-    let _ = execute!(stdout, cursor::MoveTo(0, 24), crossterm::style::Print(&status_line));
+    let status_line = format!(
+        "📊 Step {}/{} | {} | Next: {}",
+        current_step,
+        scenario.steps.len(),
+        task_info,
+        next_desc
+    );
+    let _ = execute!(
+        stdout,
+        cursor::MoveTo(0, 24),
+        crossterm::style::Print(&status_line)
+    );
 
     // Loading/error status on next line if present
     if vm.loading {
         let status_line = "   Loading...";
-        let _ = execute!(stdout, cursor::MoveTo(0, 25), crossterm::style::Print(status_line));
+        let _ = execute!(
+            stdout,
+            cursor::MoveTo(0, 25),
+            crossterm::style::Print(status_line)
+        );
     } else if let Some(error) = &vm.error_message {
         let status_line = format!("   Error: {}", error);
-        let _ = execute!(stdout, cursor::MoveTo(0, 25), crossterm::style::Print(&status_line));
+        let _ = execute!(
+            stdout,
+            cursor::MoveTo(0, 25),
+            crossterm::style::Print(&status_line)
+        );
     }
 }
 
@@ -446,7 +499,11 @@ fn show_compact_status(
 fn show_keyboard_shortcuts() {
     let mut stdout = io::stdout();
     let shortcuts = "🎮 n/→:next | b/←:prev | ↑:back 10 | ↓:forward 10 | r:reset | 0-9:jump | s:show | v:view | q:quit";
-    let _ = execute!(stdout, cursor::MoveTo(0, 26), crossterm::style::Print(shortcuts));
+    let _ = execute!(
+        stdout,
+        cursor::MoveTo(0, 26),
+        crossterm::style::Print(shortcuts)
+    );
 }
 
 /// Show detailed ViewModel state
@@ -468,7 +525,11 @@ fn show_viewmodel_details(runtime: &TestRuntime<MockClient>) {
     println!();
     println!("Task List:");
     for (i, task) in vm.tasks.iter().enumerate() {
-        let marker = if i == vm.selected_task_index { "▶" } else { " " };
+        let marker = if i == vm.selected_task_index {
+            "▶"
+        } else {
+            " "
+        };
         let status = match &task.state {
             TaskState::Merged { .. } => "Merged",
             TaskState::Completed { .. } => "Completed",

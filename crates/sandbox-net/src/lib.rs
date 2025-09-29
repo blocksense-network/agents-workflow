@@ -7,7 +7,7 @@ pub mod error;
 use nix::ifaddrs::getifaddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
-use tokio::process::{Command, Child};
+use tokio::process::{Child, Command};
 use tracing::{debug, info};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
@@ -84,12 +84,17 @@ impl NetworkManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(error::Error::Setup(format!("ip link set lo up failed: {}", stderr)));
+            return Err(error::Error::Setup(format!(
+                "ip link set lo up failed: {}",
+                stderr
+            )));
         }
 
         // Verify loopback is up
         if !self.is_interface_up("lo")? {
-            return Err(error::Error::Setup("Failed to verify loopback interface is up".to_string()));
+            return Err(error::Error::Setup(
+                "Failed to verify loopback interface is up".to_string(),
+            ));
         }
 
         debug!("Loopback interface setup complete");
@@ -98,8 +103,9 @@ impl NetworkManager {
 
     /// Check if a network interface is up
     fn is_interface_up(&self, interface_name: &str) -> Result<bool> {
-        let addrs = getifaddrs()
-            .map_err(|e| error::Error::Setup(format!("Failed to get interface addresses: {}", e)))?;
+        let addrs = getifaddrs().map_err(|e| {
+            error::Error::Setup(format!("Failed to get interface addresses: {}", e))
+        })?;
 
         for addr in addrs {
             if addr.interface_name == interface_name {
@@ -115,13 +121,19 @@ impl NetworkManager {
 
     /// Enable internet access via slirp4netns
     async fn enable_internet_access(&mut self) -> Result<()> {
-        let target_pid = self.config.target_pid
-            .ok_or_else(|| error::Error::Slirp4netns("Target PID not specified for slirp4netns".to_string()))?;
+        let target_pid = self.config.target_pid.ok_or_else(|| {
+            error::Error::Slirp4netns("Target PID not specified for slirp4netns".to_string())
+        })?;
 
-        info!("Enabling internet access via slirp4netns for PID {}", target_pid);
+        info!(
+            "Enabling internet access via slirp4netns for PID {}",
+            target_pid
+        );
 
         // Find slirp4netns binary
-        let slirp_path = self.config.slirp4netns_path
+        let slirp_path = self
+            .config
+            .slirp4netns_path
             .clone()
             .unwrap_or_else(|| PathBuf::from("slirp4netns"));
 
@@ -154,7 +166,9 @@ impl NetworkManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| error::Error::Slirp4netns(format!("Failed to spawn slirp4netns: {}", e)))?;
+            .map_err(|e| {
+                error::Error::Slirp4netns(format!("Failed to spawn slirp4netns: {}", e))
+            })?;
 
         self.slirp_process = Some(child);
 

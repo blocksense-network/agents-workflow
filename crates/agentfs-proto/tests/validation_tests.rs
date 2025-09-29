@@ -23,7 +23,10 @@ fn test_valid_snapshot_list_request() {
 
 #[test]
 fn test_valid_branch_create_request() {
-    let request = Request::branch_create("01HXXXXXXXXXXXXXXXXXXXXX".to_string(), Some("test-branch".to_string()));
+    let request = Request::branch_create(
+        "01HXXXXXXXXXXXXXXXXXXXXX".to_string(),
+        Some("test-branch".to_string()),
+    );
 
     assert!(validate_request(&request).is_ok());
 }

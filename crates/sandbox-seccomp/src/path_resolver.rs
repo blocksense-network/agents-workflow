@@ -56,9 +56,9 @@ impl PathResolver {
 
     /// Resolve a path to its canonical form using openat2
     pub fn resolve_path(&self, path: &Path) -> Result<PathBuf> {
-        let root_fd = self.root_fd.ok_or_else(|| {
-            Error::PathResolution("Path resolver not initialized".into())
-        })?;
+        let root_fd = self
+            .root_fd
+            .ok_or_else(|| Error::PathResolution("Path resolver not initialized".into()))?;
 
         let path_cstr = CString::new(path.as_os_str().as_bytes())
             .map_err(|_| Error::PathResolution("Invalid path".into()))?;
@@ -108,12 +108,10 @@ impl PathResolver {
                         std::io::Error::from_raw_os_error(errno)
                     )))
                 }
-                _ => {
-                    Err(Error::PathResolution(format!(
-                        "Path resolution failed: {}",
-                        std::io::Error::from_raw_os_error(errno)
-                    )))
-                }
+                _ => Err(Error::PathResolution(format!(
+                    "Path resolution failed: {}",
+                    std::io::Error::from_raw_os_error(errno)
+                ))),
             }
         }
     }

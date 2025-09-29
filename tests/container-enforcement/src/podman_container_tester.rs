@@ -3,8 +3,8 @@
 //! This binary tests running a podman container within the sandbox environment
 //! to verify that container workloads function correctly.
 
-use std::process::Command;
 use std::env;
+use std::process::Command;
 use tracing::{error, info};
 
 fn main() -> anyhow::Result<()> {
@@ -36,14 +36,14 @@ fn main() -> anyhow::Result<()> {
     // This requires podman to be available and the sandbox to allow container devices
     let output = Command::new(&sbx_helper_path)
         .args(&[
-            "--allow-containers",  // Enable container device access
-            "--debug",             // Enable debug logging
+            "--allow-containers", // Enable container device access
+            "--debug",            // Enable debug logging
             "podman",
             "run",
             "--rm",
             "docker.io/library/busybox:latest",
             "echo",
-            "Hello from container in sandbox!"
+            "Hello from container in sandbox!",
         ])
         .output();
 
@@ -60,7 +60,10 @@ fn main() -> anyhow::Result<()> {
                     info!("Sandbox stderr: {}", stderr);
                     std::process::exit(0);
                 } else {
-                    error!("✗ Container output not found. stdout: '{}', stderr: '{}'", stdout, stderr);
+                    error!(
+                        "✗ Container output not found. stdout: '{}', stderr: '{}'",
+                        stdout, stderr
+                    );
                     println!("FAIL: Expected container output not found");
                     println!("stdout: {}", stdout);
                     println!("stderr: {}", stderr);
@@ -69,7 +72,10 @@ fn main() -> anyhow::Result<()> {
             } else {
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 let stdout = String::from_utf8_lossy(&result.stdout);
-                error!("✗ Sandbox execution failed: exit code {:?}", result.status.code());
+                error!(
+                    "✗ Sandbox execution failed: exit code {:?}",
+                    result.status.code()
+                );
                 println!("FAIL: Sandbox execution failed");
                 println!("stdout: {}", stdout);
                 println!("stderr: {}", stderr);

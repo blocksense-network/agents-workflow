@@ -58,9 +58,9 @@ impl SupervisorClient for ChannelSupervisorClient {
 
     async fn send_audit(&self, entry: AuditEntry) -> Result<()> {
         let message = Message::Audit(entry);
-        self.tx.send(message).map_err(|e| {
-            Error::Notification(format!("Failed to send audit entry: {}", e))
-        })?;
+        self.tx
+            .send(message)
+            .map_err(|e| Error::Notification(format!("Failed to send audit entry: {}", e)))?;
         Ok(())
     }
 }
@@ -74,10 +74,7 @@ pub struct NotificationHandler {
 
 impl NotificationHandler {
     /// Create a new notification handler
-    pub fn new(
-        supervisor_tx: mpsc::UnboundedSender<Message>,
-        path_resolver: PathResolver,
-    ) -> Self {
+    pub fn new(supervisor_tx: mpsc::UnboundedSender<Message>, path_resolver: PathResolver) -> Self {
         let supervisor = Box::new(ChannelSupervisorClient::new(supervisor_tx));
 
         Self {
@@ -99,14 +96,18 @@ impl NotificationHandler {
         // Note: We need to pass NULL as context since we're using the global context
         let notify_fd = unsafe { seccomp_notify_fd(std::ptr::null()) };
         if notify_fd < 0 {
-            return Err(Error::Notification("Failed to get seccomp notify fd".into()));
+            return Err(Error::Notification(
+                "Failed to get seccomp notify fd".into(),
+            ));
         }
         self.notify_fd = Some(notify_fd);
 
         // Create epoll instance for monitoring the notify fd
         let epoll_fd = unsafe { libc::epoll_create1(libc::EPOLL_CLOEXEC) };
         if epoll_fd < 0 {
-            return Err(Error::Notification("Failed to create epoll instance".into()));
+            return Err(Error::Notification(
+                "Failed to create epoll instance".into(),
+            ));
         }
 
         // Add notify fd to epoll
@@ -117,7 +118,9 @@ impl NotificationHandler {
 
         if unsafe { libc::epoll_ctl(epoll_fd, libc::EPOLL_CTL_ADD, notify_fd, &mut event) } < 0 {
             unsafe { libc::close(epoll_fd) };
-            return Err(Error::Notification("Failed to add notify fd to epoll".into()));
+            return Err(Error::Notification(
+                "Failed to add notify fd to epoll".into(),
+            ));
         }
 
         let mut events = [libc::epoll_event { events: 0, u64: 0 }; 1];
@@ -163,21 +166,33 @@ impl NotificationHandler {
         let ret = unsafe { seccomp_notify_receive(self.notify_fd.unwrap(), &mut req) };
         if ret != 0 {
             return Err(Error::Notification(format!(
-                "Failed to receive seccomp notification: {}", ret
+                "Failed to receive seccomp notification: {}",
+                ret
             )));
         }
 
-        debug!("Received seccomp notification: syscall={}, pid={}", req.data.nr, req.pid);
+        debug!(
+            "Received seccomp notification: syscall={}, pid={}",
+            req.data.nr, req.pid
+        );
 
         // Process the notification based on syscall
-        let response = if req.data.nr == libc::SYS_openat as i32 || req.data.nr == libc::SYS_open as i32 {
+        let response = if req.data.nr == libc::SYS_openat as i32
+            || req.data.nr == libc::SYS_open as i32
+        {
             self.handle_open_request(&req, path_resolver).await
-        } else if req.data.nr == libc::SYS_stat as i32 || req.data.nr == libc::SYS_lstat as i32 ||
-                  req.data.nr == libc::SYS_fstat as i32 || req.data.nr == libc::SYS_newfstatat as i32 {
+        } else if req.data.nr == libc::SYS_stat as i32
+            || req.data.nr == libc::SYS_lstat as i32
+            || req.data.nr == libc::SYS_fstat as i32
+            || req.data.nr == libc::SYS_newfstatat as i32
+        {
             self.handle_stat_request(&req, path_resolver).await
-        } else if req.data.nr == libc::SYS_access as i32 || req.data.nr == libc::SYS_faccessat as i32 {
+        } else if req.data.nr == libc::SYS_access as i32
+            || req.data.nr == libc::SYS_faccessat as i32
+        {
             self.handle_access_request(&req, path_resolver).await
-        } else if req.data.nr == libc::SYS_execve as i32 || req.data.nr == libc::SYS_execveat as i32 {
+        } else if req.data.nr == libc::SYS_execve as i32 || req.data.nr == libc::SYS_execveat as i32
+        {
             self.handle_exec_request(&req, path_resolver).await
         } else {
             // Unknown syscall - deny
@@ -195,7 +210,8 @@ impl NotificationHandler {
         let ret = unsafe { seccomp_notify_respond(self.notify_fd.unwrap(), &mut response) };
         if ret != 0 {
             return Err(Error::Notification(format!(
-                "Failed to send seccomp response: {}", ret
+                "Failed to send seccomp response: {}",
+                ret
             )));
         }
 

@@ -28,9 +28,8 @@ impl Database {
         // Platform-specific defaults
         #[cfg(target_os = "linux")]
         {
-            let xdg_state_home = std::env::var("XDG_STATE_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| {
+            let xdg_state_home =
+                std::env::var("XDG_STATE_HOME").map(PathBuf::from).unwrap_or_else(|_| {
                     let home = std::env::var("HOME").expect("HOME environment variable not set");
                     PathBuf::from(home).join(".local").join("state")
                 });
@@ -49,11 +48,9 @@ impl Database {
 
         #[cfg(target_os = "windows")]
         {
-            let local_appdata = std::env::var("LOCALAPPDATA")
-                .expect("LOCALAPPDATA environment variable not set");
-            Ok(PathBuf::from(local_appdata)
-                .join("Agents-Workflow")
-                .join("state.db"))
+            let local_appdata =
+                std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable not set");
+            Ok(PathBuf::from(local_appdata).join("Agents-Workflow").join("state.db"))
         }
 
         #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]

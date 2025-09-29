@@ -29,7 +29,7 @@ impl TmuxMultiplexer {
     }
 
     pub fn with_session_name(session_name: String) -> Self {
-        Self { 
+        Self {
             session_name,
             assume_session_exists: false,
         }
@@ -58,16 +58,13 @@ impl TmuxMultiplexer {
 
     /// Run a tmux command and return its output
     fn run_tmux_command(&self, args: &[&str]) -> Result<String, MuxError> {
-        let output = Command::new("tmux")
-            .args(args)
-            .output()
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    MuxError::NotAvailable("tmux")
-                } else {
-                    MuxError::Io(e)
-                }
-            })?;
+        let output = Command::new("tmux").args(args).output().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                MuxError::NotAvailable("tmux")
+            } else {
+                MuxError::Io(e)
+            }
+        })?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -101,9 +98,7 @@ impl TmuxMultiplexer {
                         "-s",
                         &self.session_name,
                         "-c",
-                        &std::env::current_dir()
-                            .map_err(MuxError::Io)?
-                            .to_string_lossy(),
+                        &std::env::current_dir().map_err(MuxError::Io)?.to_string_lossy(),
                     ])?;
                     Ok(())
                 }
@@ -218,7 +213,12 @@ impl Multiplexer for TmuxMultiplexer {
         Ok(pane_id)
     }
 
-    fn run_command(&self, pane: &PaneId, cmd: &str, _opts: &CommandOptions) -> Result<(), MuxError> {
+    fn run_command(
+        &self,
+        pane: &PaneId,
+        cmd: &str,
+        _opts: &CommandOptions,
+    ) -> Result<(), MuxError> {
         // Send the command followed by Enter (C-m)
         self.run_tmux_command(&["send-keys", "-t", pane, cmd, "C-m"])?;
         Ok(())
@@ -242,7 +242,8 @@ impl Multiplexer for TmuxMultiplexer {
 
     fn list_windows(&self, title_substr: Option<&str>) -> Result<Vec<WindowId>, MuxError> {
         // List all windows in the specific session with format: session:window_index:window_name
-        let output = self.run_tmux_command(&["list-windows", "-t", &self.session_name, "-F", "#S:#I:#W"])?;
+        let output =
+            self.run_tmux_command(&["list-windows", "-t", &self.session_name, "-F", "#S:#I:#W"])?;
 
         let mut windows = Vec::new();
         for line in output.lines() {
@@ -255,7 +256,6 @@ impl Multiplexer for TmuxMultiplexer {
                 let session_name = parts[0];
                 let window_index = parts[1];
                 let window_name = parts[2];
-
 
                 // Filter by title substring if provided
                 if let Some(substr) = title_substr {
@@ -289,7 +289,13 @@ impl Multiplexer for TmuxMultiplexer {
         };
 
         // List panes in the specified window with format: full pane identifier
-        let output = self.run_tmux_command(&["list-panes", "-t", &window_target, "-F", "#{session_name}:#{window_index}.#{pane_index}"])?;
+        let output = self.run_tmux_command(&[
+            "list-panes",
+            "-t",
+            &window_target,
+            "-F",
+            "#{session_name}:#{window_index}.#{pane_index}",
+        ])?;
 
         let mut panes = Vec::new();
         for line in output.lines() {
@@ -307,8 +313,8 @@ impl Multiplexer for TmuxMultiplexer {
 mod tests {
     use super::*;
     use std::path::Path;
-    use std::time::Duration;
     use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_tmux_multiplexer_creation() {
@@ -445,17 +451,24 @@ mod tests {
             // Create tmux API that assumes session already exists
             let tmux = TmuxMultiplexer::with_existing_session(session_name.to_string());
 
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("split-test-003"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("split-test-003"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             let initial_pane = format!("{}.0", window_id);
 
             // Run command in initial pane
-            tmux.run_command(&initial_pane, "echo 'Left pane content'", &CommandOptions::default()).unwrap();
+            tmux.run_command(
+                &initial_pane,
+                "echo 'Left pane content'",
+                &CommandOptions::default(),
+            )
+            .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: before split
@@ -464,24 +477,31 @@ mod tests {
             }
 
             // Split horizontally
-            let new_pane = tmux.split_pane(
-                &window_id,
-                Some(&initial_pane),
-                SplitDirection::Horizontal,
-                Some(60), // 60% for left pane
-                &CommandOptions {
-                    cwd: Some(Path::new("/tmp")),
-                    env: None,
-                },
-                None,
-            ).unwrap();
+            let new_pane = tmux
+                .split_pane(
+                    &window_id,
+                    Some(&initial_pane),
+                    SplitDirection::Horizontal,
+                    Some(60), // 60% for left pane
+                    &CommandOptions {
+                        cwd: Some(Path::new("/tmp")),
+                        env: None,
+                    },
+                    None,
+                )
+                .unwrap();
 
             // The exact window/pane numbering can vary depending on how tmux starts
             // Just verify it's a valid pane ID format
             assert!(new_pane.starts_with(&format!("{}:", session_name)));
 
             // Run command in new pane
-            tmux.run_command(&new_pane, "echo 'Right pane content'", &CommandOptions::default()).unwrap();
+            tmux.run_command(
+                &new_pane,
+                "echo 'Right pane content'",
+                &CommandOptions::default(),
+            )
+            .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: after split
@@ -507,24 +527,28 @@ mod tests {
             // Clean up
             let _ = tmux.run_tmux_command(&["kill-session", "-t", "test-split-v-004"]);
 
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("split-v-test-004"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("split-v-test-004"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             let initial_pane = format!("{}.0", window_id);
 
             // Split vertically
-            let new_pane = tmux.split_pane(
-                &window_id,
-                Some(&initial_pane),
-                SplitDirection::Vertical,
-                Some(70),
-                &CommandOptions::default(),
-                None,
-            ).unwrap();
+            let new_pane = tmux
+                .split_pane(
+                    &window_id,
+                    Some(&initial_pane),
+                    SplitDirection::Vertical,
+                    Some(70),
+                    &CommandOptions::default(),
+                    None,
+                )
+                .unwrap();
 
             assert_eq!(new_pane, "test-split-v-004:1.1");
 
@@ -544,24 +568,28 @@ mod tests {
             // Clean up
             let _ = tmux.run_tmux_command(&["kill-session", "-t", "test-split-cmd"]);
 
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("split-cmd-test"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("split-cmd-test"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             let initial_pane = format!("{}.0", window_id);
 
             // Split with initial command that should keep the pane alive
-            let new_pane = tmux.split_pane(
-                &window_id,
-                Some(&initial_pane),
-                SplitDirection::Horizontal,
-                None,
-                &CommandOptions::default(),
-                Some("sleep 300"), // Long-running command to keep pane alive
-            ).unwrap();
+            let new_pane = tmux
+                .split_pane(
+                    &window_id,
+                    Some(&initial_pane),
+                    SplitDirection::Horizontal,
+                    None,
+                    &CommandOptions::default(),
+                    Some("sleep 300"), // Long-running command to keep pane alive
+                )
+                .unwrap();
 
             // Verify pane was created
             let panes = tmux.list_panes(&window_id).unwrap();
@@ -592,17 +620,20 @@ mod tests {
             // Create tmux API that assumes session already exists
             let tmux = TmuxMultiplexer::with_existing_session(session_name.to_string());
 
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("cmd-text-test"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("cmd-text-test"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             let pane_id = format!("{}.0", window_id);
 
             // Run a command
-            tmux.run_command(&pane_id, "echo 'hello world'", &CommandOptions::default()).unwrap();
+            tmux.run_command(&pane_id, "echo 'hello world'", &CommandOptions::default())
+                .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: after running command
@@ -637,20 +668,24 @@ mod tests {
             let _ = tmux.run_tmux_command(&["kill-session", "-t", "test-focus-005"]);
 
             // Create first window
-            let window1 = tmux.open_window(&WindowOptions {
-                title: Some("window1-005"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window1 = tmux
+                .open_window(&WindowOptions {
+                    title: Some("window1-005"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             // Create second window
-            let window2 = tmux.open_window(&WindowOptions {
-                title: Some("window2-005"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window2 = tmux
+                .open_window(&WindowOptions {
+                    title: Some("window2-005"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             // Test window focusing (don't check global state due to test interference)
             tmux.focus_window(&window1).unwrap();
@@ -658,7 +693,16 @@ mod tests {
 
             // Split a pane and test pane focusing
             let pane1 = format!("{}.0", window2);
-            let pane2 = tmux.split_pane(&window2, Some(&pane1), SplitDirection::Horizontal, None, &CommandOptions::default(), None).unwrap();
+            let pane2 = tmux
+                .split_pane(
+                    &window2,
+                    Some(&pane1),
+                    SplitDirection::Horizontal,
+                    None,
+                    &CommandOptions::default(),
+                    None,
+                )
+                .unwrap();
 
             // Test pane focusing (don't check global state due to test interference)
             tmux.focus_pane(&pane1).unwrap();
@@ -688,21 +732,24 @@ mod tests {
                 cwd: Some(Path::new("/tmp")),
                 profile: None,
                 focus: false,
-            }).unwrap();
+            })
+            .unwrap();
 
             tmux.open_window(&WindowOptions {
                 title: Some("beta-window-006"),
                 cwd: Some(Path::new("/tmp")),
                 profile: None,
                 focus: false,
-            }).unwrap();
+            })
+            .unwrap();
 
             tmux.open_window(&WindowOptions {
                 title: Some("alpha-other-006"),
                 cwd: Some(Path::new("/tmp")),
                 profile: None,
                 focus: false,
-            }).unwrap();
+            })
+            .unwrap();
 
             // List all windows in our session
             // Note: tmux creates a default window (index 0) when creating a session
@@ -745,12 +792,14 @@ mod tests {
             // Clean up
             let _ = tmux.run_tmux_command(&["kill-session", "-t", "test-error-pane"]);
 
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("error-test"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("error-test"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             // Try to focus non-existent pane
             let result = tmux.focus_pane(&format!("{}.999", window_id));
@@ -783,17 +832,20 @@ mod tests {
             let tmux = TmuxMultiplexer::with_existing_session(session_name.to_string());
 
             // Create window
-            let window_id = tmux.open_window(&WindowOptions {
-                title: Some("complex-layout-008"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let window_id = tmux
+                .open_window(&WindowOptions {
+                    title: Some("complex-layout-008"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             let pane0 = format!("{}.0", window_id);
 
             // Run initial command in editor pane
-            tmux.run_command(&pane0, "echo 'editor pane'", &CommandOptions::default()).unwrap();
+            tmux.run_command(&pane0, "echo 'editor pane'", &CommandOptions::default())
+                .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: initial single pane
@@ -802,17 +854,20 @@ mod tests {
             }
 
             // Create a 3-pane layout: editor (left), agent (top-right), logs (bottom-right)
-            let agent_pane = tmux.split_pane(
-                &window_id,
-                Some(&pane0),
-                SplitDirection::Horizontal,
-                Some(70), // 70% for editor
-                &CommandOptions::default(),
-                None,
-            ).unwrap();
+            let agent_pane = tmux
+                .split_pane(
+                    &window_id,
+                    Some(&pane0),
+                    SplitDirection::Horizontal,
+                    Some(70), // 70% for editor
+                    &CommandOptions::default(),
+                    None,
+                )
+                .unwrap();
 
             // Run command in agent pane
-            tmux.run_command(&agent_pane, "echo 'agent pane'", &CommandOptions::default()).unwrap();
+            tmux.run_command(&agent_pane, "echo 'agent pane'", &CommandOptions::default())
+                .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: after first split (2 panes)
@@ -820,17 +875,20 @@ mod tests {
                 snapshot_testing::assert_snapshot_optional("complex_layout_two_panes", snapshot);
             }
 
-            let logs_pane = tmux.split_pane(
-                &window_id,
-                Some(&agent_pane),
-                SplitDirection::Vertical,
-                Some(60), // 60% for agent, 40% for logs
-                &CommandOptions::default(),
-                None,
-            ).unwrap();
+            let logs_pane = tmux
+                .split_pane(
+                    &window_id,
+                    Some(&agent_pane),
+                    SplitDirection::Vertical,
+                    Some(60), // 60% for agent, 40% for logs
+                    &CommandOptions::default(),
+                    None,
+                )
+                .unwrap();
 
             // Run command in logs pane
-            tmux.run_command(&logs_pane, "echo 'logs pane'", &CommandOptions::default()).unwrap();
+            tmux.run_command(&logs_pane, "echo 'logs pane'", &CommandOptions::default())
+                .unwrap();
             std::thread::sleep(Duration::from_millis(200));
 
             // Strategic snapshot: final 3-pane layout
@@ -856,8 +914,8 @@ mod tests {
 
             // Clean up
             let _ = snapshot_testing::stop_continuous_session_by_name(&session_name);
+        }
     }
-}
 
     #[test]
     fn test_session_isolation() {
@@ -870,19 +928,23 @@ mod tests {
             let _ = tmux2.run_tmux_command(&["kill-session", "-t", "session2-007"]);
 
             // Create windows in different sessions
-            let _window1 = tmux1.open_window(&WindowOptions {
-                title: Some("session1-win-007"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let _window1 = tmux1
+                .open_window(&WindowOptions {
+                    title: Some("session1-win-007"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
-            let _window2 = tmux2.open_window(&WindowOptions {
-                title: Some("session2-win-007"),
-                cwd: Some(Path::new("/tmp")),
-                profile: None,
-                focus: false,
-            }).unwrap();
+            let _window2 = tmux2
+                .open_window(&WindowOptions {
+                    title: Some("session2-win-007"),
+                    cwd: Some(Path::new("/tmp")),
+                    profile: None,
+                    focus: false,
+                })
+                .unwrap();
 
             // Verify sessions are isolated - each should see their session's windows
             // Note: tmux creates a default window (index 0) when creating a session,
@@ -927,8 +989,8 @@ mod snapshot_testing {
     use super::*;
     use expectrl::spawn;
     use std::io::Write;
-    use vt100::Parser;
     use std::time::Duration;
+    use vt100::Parser;
 
     // Thread-local state for continuous tmux session during tests
     thread_local! {
@@ -1097,16 +1159,18 @@ set-environment -g ZDOTDIR ""
                    line.contains("zsh") ||
                    line.contains("sh") ||
                    line.contains("bash") ||
-                   line.trim().is_empty() {
+                   line.trim().is_empty()
+                {
                     None // Skip this line
                 } else {
                     // Normalize remaining content
-                    Some(line
-                        .replace("home-pc", "[HOSTNAME]")
-                        .replace("❯", "[PROMPT]")
-                        .replace("zsh", "[SHELL]")
-                        .replace("sh", "[SHELL]")
-                        .replace("bash", "[SHELL]"))
+                    Some(
+                        line.replace("home-pc", "[HOSTNAME]")
+                            .replace("❯", "[PROMPT]")
+                            .replace("zsh", "[SHELL]")
+                            .replace("sh", "[SHELL]")
+                            .replace("bash", "[SHELL]"),
+                    )
                 }
             })
             .collect();

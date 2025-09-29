@@ -1,9 +1,9 @@
 //! Main TUI application logic
 
-use crate::{ButtonFocus, ModalState, ModelSelection};
 use crate::task::create_default_models;
-use aw_rest_client::RestClient;
+use crate::{ButtonFocus, ModalState, ModelSelection};
 use aw_client_api::ClientApi;
+use aw_rest_client::RestClient;
 use crossterm::{
     event::KeyModifiers,
     execute,
@@ -17,9 +17,9 @@ use crate::error::TuiResult;
 use crate::event::{Event, EventHandler};
 use crate::task::{Task, TaskState};
 use crate::ui;
+use image::ImageReader;
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
-use image::ImageReader;
 
 /// Application state
 #[derive(Debug)]
@@ -135,7 +135,7 @@ impl App {
     pub async fn load_initial_data(&self) -> TuiResult<()> {
         // For now, we'll use sample data. In the future, this would load
         // real tasks from the REST API
-            let mut state = self.state.lock().await;
+        let mut state = self.state.lock().await;
         state.tasks = crate::task::create_sample_tasks();
         Ok(())
     }
@@ -165,7 +165,13 @@ impl App {
                     // Create ViewModel from current state
                     let view_model = crate::ViewModel::from_state(&state);
 
-                    ui::draw_task_dashboard(f, size, &view_model, self.image_picker.as_mut(), self.logo_protocol.as_mut());
+                    ui::draw_task_dashboard(
+                        f,
+                        size,
+                        &view_model,
+                        self.image_picker.as_mut(),
+                        self.logo_protocol.as_mut(),
+                    );
                 }
             })?;
 
@@ -196,21 +202,39 @@ impl App {
         let mut state = self.state.lock().await;
 
         match event {
-            Event::Key(KeyEvent { code, modifiers, .. }) => match code {
+            Event::Key(KeyEvent {
+                code, modifiers, ..
+            }) => match code {
                 KeyCode::Up => {
                     // Navigate up in task list or within modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ref mut modal), .. } = current_task.state {
+                        if let TaskState::New {
+                            modal_state: Some(ref mut modal),
+                            ..
+                        } = current_task.state
+                        {
                             // Navigate within modal
                             match modal {
-                                ModalState::RepositorySelect { ref mut selected_index, options, .. } |
-                                ModalState::BranchSelect { ref mut selected_index, options, .. } => {
+                                ModalState::RepositorySelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                }
+                                | ModalState::BranchSelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                } => {
                                     if *selected_index > 0 {
                                         *selected_index -= 1;
                                     }
                                 }
-                                ModalState::ModelSelect { ref mut selected_index, options, .. } => {
+                                ModalState::ModelSelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                } => {
                                     if *selected_index > 0 {
                                         *selected_index -= 1;
                                     }
@@ -233,29 +257,45 @@ impl App {
                     // Navigate down in task list or within modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ref mut modal), .. } = current_task.state {
+                        if let TaskState::New {
+                            modal_state: Some(ref mut modal),
+                            ..
+                        } = current_task.state
+                        {
                             // Navigate within modal
                             match modal {
-                                ModalState::RepositorySelect { ref mut selected_index, options, .. } => {
+                                ModalState::RepositorySelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                } => {
                                     let max_index = options.len().saturating_sub(1);
                                     if *selected_index < max_index {
                                         *selected_index += 1;
                                     }
                                 }
-                                ModalState::BranchSelect { ref mut selected_index, options, .. } => {
+                                ModalState::BranchSelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                } => {
                                     let max_index = options.len().saturating_sub(1);
                                     if *selected_index < max_index {
                                         *selected_index += 1;
                                     }
                                 }
-                                ModalState::ModelSelect { ref mut selected_index, options, .. } => {
+                                ModalState::ModelSelect {
+                                    ref mut selected_index,
+                                    options,
+                                    ..
+                                } => {
                                     let max_index = options.len().saturating_sub(1);
                                     if *selected_index < max_index {
                                         *selected_index += 1;
                                     }
                                 }
                             }
-                                } else {
+                        } else {
                             // Regular task navigation
                             let max_index = state.tasks.len().saturating_sub(1);
                             if selected_index < max_index {
@@ -268,7 +308,16 @@ impl App {
                     // Decrease model instance count in model selection modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            modal_state:
+                                Some(ModalState::ModelSelect {
+                                    selected_index: model_idx,
+                                    options,
+                                    ..
+                                }),
+                            ..
+                        } = &mut current_task.state
+                        {
                             if let Some(model) = options.get_mut(*model_idx) {
                                 if model.instance_count > 0 {
                                     model.instance_count -= 1;
@@ -281,7 +330,16 @@ impl App {
                     // Increase model instance count in model selection modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            modal_state:
+                                Some(ModalState::ModelSelect {
+                                    selected_index: model_idx,
+                                    options,
+                                    ..
+                                }),
+                            ..
+                        } = &mut current_task.state
+                        {
                             if let Some(model) = options.get_mut(*model_idx) {
                                 model.instance_count += 1;
                             }
@@ -292,7 +350,12 @@ impl App {
                     // Cycle between buttons in task creation
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: None, ref mut focused_button, .. } = current_task.state {
+                        if let TaskState::New {
+                            modal_state: None,
+                            ref mut focused_button,
+                            ..
+                        } = current_task.state
+                        {
                             *focused_button = match focused_button {
                                 ButtonFocus::Description => ButtonFocus::Repository,
                                 ButtonFocus::Repository => ButtonFocus::Branch,
@@ -307,7 +370,12 @@ impl App {
                     // Reverse cycle between buttons
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: None, ref mut focused_button, .. } = current_task.state {
+                        if let TaskState::New {
+                            modal_state: None,
+                            ref mut focused_button,
+                            ..
+                        } = current_task.state
+                        {
                             *focused_button = match focused_button {
                                 ButtonFocus::Description => ButtonFocus::Go,
                                 ButtonFocus::Repository => ButtonFocus::Description,
@@ -322,7 +390,16 @@ impl App {
                     // Alternative way to increase model count in modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            modal_state:
+                                Some(ModalState::ModelSelect {
+                                    selected_index: model_idx,
+                                    options,
+                                    ..
+                                }),
+                            ..
+                        } = &mut current_task.state
+                        {
                             if let Some(model) = options.get_mut(*model_idx) {
                                 model.instance_count += 1;
                             }
@@ -333,7 +410,16 @@ impl App {
                     // Alternative way to decrease model count in modal
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ModalState::ModelSelect { selected_index: model_idx, options, .. }), .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            modal_state:
+                                Some(ModalState::ModelSelect {
+                                    selected_index: model_idx,
+                                    options,
+                                    ..
+                                }),
+                            ..
+                        } = &mut current_task.state
+                        {
                             if let Some(model) = options.get_mut(*model_idx) {
                                 if model.instance_count > 0 {
                                     model.instance_count -= 1;
@@ -346,7 +432,12 @@ impl App {
                     // Handle text input when description is focused
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { focused_button, description, .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            focused_button,
+                            description,
+                            ..
+                        } = &mut current_task.state
+                        {
                             if matches!(focused_button, ButtonFocus::Description) {
                                 description.push(c);
                             }
@@ -357,7 +448,12 @@ impl App {
                     // Handle backspace when description is focused
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { focused_button, description, .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            focused_button,
+                            description,
+                            ..
+                        } = &mut current_task.state
+                        {
                             if matches!(focused_button, ButtonFocus::Description) {
                                 description.pop();
                             }
@@ -368,10 +464,23 @@ impl App {
                     // Handle Enter key based on context
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(ref modal), focused_button, selected_repo, selected_branch, selected_models, description, .. } = &mut current_task.state {
+                        if let TaskState::New {
+                            modal_state: Some(ref modal),
+                            focused_button,
+                            selected_repo,
+                            selected_branch,
+                            selected_models,
+                            description,
+                            ..
+                        } = &mut current_task.state
+                        {
                             // In modal: select current item
                             match modal {
-                                ModalState::RepositorySelect { selected_index: idx, options, .. } => {
+                                ModalState::RepositorySelect {
+                                    selected_index: idx,
+                                    options,
+                                    ..
+                                } => {
                                     if let Some(selected_repo_name) = options.get(*idx).cloned() {
                                         *selected_repo = selected_repo_name;
                                         current_task.state = TaskState::New {
@@ -384,7 +493,11 @@ impl App {
                                         };
                                     }
                                 }
-                                ModalState::BranchSelect { selected_index: idx, options, .. } => {
+                                ModalState::BranchSelect {
+                                    selected_index: idx,
+                                    options,
+                                    ..
+                                } => {
                                     if let Some(selected_branch_name) = options.get(*idx).cloned() {
                                         *selected_branch = selected_branch_name;
                                         current_task.state = TaskState::New {
@@ -398,7 +511,8 @@ impl App {
                                     }
                                 }
                                 ModalState::ModelSelect { options, .. } => {
-                                    let selected_models_new: Vec<ModelSelection> = options.iter()
+                                    let selected_models_new: Vec<ModelSelection> = options
+                                        .iter()
                                         .filter(|m| m.instance_count > 0)
                                         .cloned()
                                         .collect();
@@ -412,7 +526,15 @@ impl App {
                                     };
                                 }
                             }
-                        } else if let TaskState::New { focused_button, selected_repo, selected_branch, selected_models, description, .. } = &mut current_task.state {
+                        } else if let TaskState::New {
+                            focused_button,
+                            selected_repo,
+                            selected_branch,
+                            selected_models,
+                            description,
+                            ..
+                        } = &mut current_task.state
+                        {
                             // Not in modal: activate focused button
                             match focused_button {
                                 ButtonFocus::Repository => {
@@ -465,7 +587,7 @@ impl App {
                                 }
                                 ButtonFocus::Go => {
                                     // Launch task
-                        self.create_task(&mut state).await?;
+                                    self.create_task(&mut state).await?;
                                 }
                                 ButtonFocus::Description => {
                                     // Description is handled by direct typing, not button activation
@@ -482,7 +604,16 @@ impl App {
                     // Handle Escape key based on context
                     let selected_index = state.selected_task_index;
                     if let Some(current_task) = state.tasks.get_mut(selected_index) {
-                        if let TaskState::New { modal_state: Some(_), focused_button, selected_repo, selected_branch, selected_models, description, .. } = &current_task.state {
+                        if let TaskState::New {
+                            modal_state: Some(_),
+                            focused_button,
+                            selected_repo,
+                            selected_branch,
+                            selected_models,
+                            description,
+                            ..
+                        } = &current_task.state
+                        {
                             // Close modal
                             current_task.state = TaskState::New {
                                 description: String::new(),
@@ -514,26 +645,53 @@ impl App {
         state.error = None;
 
         // Get the task creation configuration from the New task state
-        let (selected_repo, selected_branch, selected_models) = if let Some(new_task) = state.tasks.last() {
-            if let TaskState::New { selected_repo, selected_branch, selected_models, .. } = &new_task.state {
-                let models = selected_models.iter()
-                    .filter(|m| m.instance_count > 0)
-                    .map(|m| format!("{} (x{})", m.model_name, m.instance_count))
-                    .collect::<Vec<_>>();
-                (selected_repo.clone(), selected_branch.clone(), models)
+        let (selected_repo, selected_branch, selected_models) =
+            if let Some(new_task) = state.tasks.last() {
+                if let TaskState::New {
+                    selected_repo,
+                    selected_branch,
+                    selected_models,
+                    ..
+                } = &new_task.state
+                {
+                    let models = selected_models
+                        .iter()
+                        .filter(|m| m.instance_count > 0)
+                        .map(|m| format!("{} (x{})", m.model_name, m.instance_count))
+                        .collect::<Vec<_>>();
+                    (selected_repo.clone(), selected_branch.clone(), models)
+                } else {
+                    (
+                        "Unknown".to_string(),
+                        "Unknown".to_string(),
+                        vec!["GPT-4 (x1)".to_string()],
+                    )
+                }
             } else {
-                ("Unknown".to_string(), "Unknown".to_string(), vec!["GPT-4 (x1)".to_string()])
-            }
-        } else {
-            ("Unknown".to_string(), "Unknown".to_string(), vec!["GPT-4 (x1)".to_string()])
-        };
+                (
+                    "Unknown".to_string(),
+                    "Unknown".to_string(),
+                    vec!["GPT-4 (x1)".to_string()],
+                )
+            };
 
         // Create a descriptive task title
-        let task_title = format!("Task on {}:{} with {}", selected_repo, selected_branch, selected_models.join(", "));
+        let task_title = format!(
+            "Task on {}:{} with {}",
+            selected_repo,
+            selected_branch,
+            selected_models.join(", ")
+        );
 
         // Create a new active task
         let new_task = Task::active(
-            format!("task_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
+            format!(
+                "task_{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+            ),
             task_title,
             std::time::SystemTime::now(),
             "Starting task".to_string(),
@@ -548,10 +706,19 @@ impl App {
 
         // Reset the task creation state
         if let Some(last_task) = state.tasks.last_mut() {
-            if let TaskState::New { ref mut selected_repo, ref mut selected_branch, ref mut selected_models, ref mut focused_button, ref mut modal_state, ref mut description } = last_task.state {
+            if let TaskState::New {
+                ref mut selected_repo,
+                ref mut selected_branch,
+                ref mut selected_models,
+                ref mut focused_button,
+                ref mut modal_state,
+                ref mut description,
+            } = last_task.state
+            {
                 *selected_repo = "agent-workflow".to_string();
                 *selected_branch = "main".to_string();
-                *selected_models = create_default_models().into_iter().filter(|m| m.selected).collect();
+                *selected_models =
+                    create_default_models().into_iter().filter(|m| m.selected).collect();
                 *focused_button = ButtonFocus::Description;
                 *modal_state = None;
                 *description = String::new();
@@ -575,11 +742,7 @@ impl Drop for App {
     fn drop(&mut self) {
         // Cleanup terminal
         let _ = disable_raw_mode();
-        let _ = execute!(
-            self.terminal.backend_mut(),
-            LeaveAlternateScreen
-        );
+        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
         let _ = self.terminal.show_cursor();
     }
 }
-

@@ -3,9 +3,9 @@
 //! This module provides the ability to save, load, and compare golden snapshots
 //! of TUI buffer content for regression testing.
 
+use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::{Path, PathBuf};
-use similar::{ChangeTag, TextDiff};
 
 /// Golden file management for golden file testing
 pub struct GoldenManager {
@@ -31,9 +31,7 @@ impl GoldenManager {
 
     /// Get the path for a golden file
     fn golden_path(&self, scenario_name: &str, step_name: &str) -> PathBuf {
-        self.base_dir
-            .join(scenario_name)
-            .join(format!("{}.golden", step_name))
+        self.base_dir.join(scenario_name).join(format!("{}.golden", step_name))
     }
 
     /// Ensure the directory for a golden exists
@@ -43,7 +41,12 @@ impl GoldenManager {
     }
 
     /// Save a golden to disk
-    pub fn save_golden(&self, scenario_name: &str, step_name: &str, content: &str) -> Result<(), String> {
+    pub fn save_golden(
+        &self,
+        scenario_name: &str,
+        step_name: &str,
+        content: &str,
+    ) -> Result<(), String> {
         self.ensure_golden_dir(scenario_name)
             .map_err(|e| format!("Failed to create golden directory: {}", e))?;
 
@@ -62,7 +65,12 @@ impl GoldenManager {
     }
 
     /// Compare a golden with expected content
-    pub fn compare_golden(&self, scenario_name: &str, step_name: &str, actual_content: &str) -> Result<(), String> {
+    pub fn compare_golden(
+        &self,
+        scenario_name: &str,
+        step_name: &str,
+        actual_content: &str,
+    ) -> Result<(), String> {
         if self.update_mode {
             // In update mode, save the new golden
             self.save_golden(scenario_name, step_name, actual_content)?;

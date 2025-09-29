@@ -1,11 +1,11 @@
 //! Database integration for task and session persistence.
 
-use std::path::Path;
 use aw_local_db::{
-    Database, RepoStore, AgentStore, RuntimeStore, SessionStore, TaskStore, FsSnapshotStore,
-    RepoRecord, AgentRecord, SessionRecord, TaskRecord, FsSnapshotRecord,
+    AgentRecord, AgentStore, Database, FsSnapshotRecord, FsSnapshotStore, RepoRecord, RepoStore,
+    RuntimeStore, SessionRecord, SessionStore, TaskRecord, TaskStore,
 };
 use aw_repo::VcsRepo;
+use std::path::Path;
 
 /// Database manager for AW core operations.
 pub struct DatabaseManager {
@@ -119,7 +119,12 @@ impl DatabaseManager {
     }
 
     /// Update session status.
-    pub fn update_session_status(&self, session_id: &str, status: &str, ended_at: Option<&str>) -> crate::Result<()> {
+    pub fn update_session_status(
+        &self,
+        session_id: &str,
+        status: &str,
+        ended_at: Option<&str>,
+    ) -> crate::Result<()> {
         let mut conn = self.db.connection().lock().map_err(|e| {
             crate::Error::generic(format!("Failed to acquire database lock: {}", e))
         })?;

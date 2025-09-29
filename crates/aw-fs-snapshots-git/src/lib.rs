@@ -5,7 +5,10 @@
 //! like ZFS or Btrfs. It uses shadow repositories with object sharing and
 //! git worktrees for efficient workspace management.
 
-use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
+use aw_fs_snapshots_traits::{
+    FsSnapshotProvider, PreparedWorkspace, ProviderCapabilities, Result, SnapshotProviderKind,
+    SnapshotRef, WorkingCopyMode,
+};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -37,7 +40,11 @@ impl GitProvider {
     }
 
     /// Create a new Git provider with custom configuration.
-    pub fn with_config(shadow_repo_dir: PathBuf, worktree_dir: PathBuf, include_untracked: bool) -> Self {
+    pub fn with_config(
+        shadow_repo_dir: PathBuf,
+        worktree_dir: PathBuf,
+        include_untracked: bool,
+    ) -> Self {
         Self {
             shadow_repo_dir,
             worktree_dir,
@@ -73,7 +80,10 @@ impl GitProvider {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        primary_repo.canonicalize().unwrap_or_else(|_| primary_repo.to_path_buf()).hash(&mut hasher);
+        primary_repo
+            .canonicalize()
+            .unwrap_or_else(|_| primary_repo.to_path_buf())
+            .hash(&mut hasher);
         let hash = hasher.finish();
 
         self.shadow_repo_dir.join(format!("{:x}", hash))
@@ -90,8 +100,12 @@ impl GitProvider {
 
         if !shadow_path.exists() {
             // Create shadow repository
-            std::fs::create_dir_all(&shadow_path)
-                .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create shadow repo directory: {}", e)))?;
+            std::fs::create_dir_all(&shadow_path).map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to create shadow repo directory: {}",
+                    e
+                ))
+            })?;
 
             // Initialize bare repository
             let status = Command::new("git")
@@ -100,10 +114,17 @@ impl GitProvider {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
-                .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to init shadow repo: {}", e)))?;
+                .map_err(|e| {
+                    aw_fs_snapshots_traits::Error::provider(format!(
+                        "Failed to init shadow repo: {}",
+                        e
+                    ))
+                })?;
 
             if !status.success() {
-                return Err(aw_fs_snapshots_traits::Error::provider("Failed to initialize shadow repository"));
+                return Err(aw_fs_snapshots_traits::Error::provider(
+                    "Failed to initialize shadow repository",
+                ));
             }
 
             // Configure shadow repository
@@ -119,10 +140,17 @@ impl GitProvider {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to configure shadow repo: {}", e)))?;
+                    .map_err(|e| {
+                        aw_fs_snapshots_traits::Error::provider(format!(
+                            "Failed to configure shadow repo: {}",
+                            e
+                        ))
+                    })?;
 
                 if !status.success() {
-                    return Err(aw_fs_snapshots_traits::Error::provider("Failed to configure shadow repository"));
+                    return Err(aw_fs_snapshots_traits::Error::provider(
+                        "Failed to configure shadow repository",
+                    ));
                 }
             }
 
@@ -132,12 +160,20 @@ impl GitProvider {
             // Add alternates to share objects with main repo
             let alternates_file = shadow_path.join("objects").join("info").join("alternates");
 
-            std::fs::create_dir_all(alternates_file.parent().unwrap())
-                .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create alternates dir: {}", e)))?;
+            std::fs::create_dir_all(alternates_file.parent().unwrap()).map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to create alternates dir: {}",
+                    e
+                ))
+            })?;
 
             let alternates_content = format!("{}\n", main_git_objects.display());
-            std::fs::write(&alternates_file, alternates_content)
-                .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to write alternates file: {}", e)))?;
+            std::fs::write(&alternates_file, alternates_content).map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to write alternates file: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(shadow_path)
@@ -152,10 +188,17 @@ impl GitProvider {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to get git common dir: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to get git common dir: {}",
+                    e
+                ))
+            })?;
 
         if !output.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to get git common directory"));
+            return Err(aw_fs_snapshots_traits::Error::provider(
+                "Failed to get git common directory",
+            ));
         }
 
         let common_dir = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
@@ -171,18 +214,21 @@ impl GitProvider {
     /// Generate a unique identifier for resources.
     fn generate_unique_id(&self) -> String {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         format!("aw_git_{}_{}", std::process::id(), timestamp)
     }
 
     /// Create a snapshot commit in the shadow repository.
-    fn create_snapshot_commit(&self, worktree_repo: &Path, shadow_repo: &Path, label: Option<&str>) -> Result<String> {
+    fn create_snapshot_commit(
+        &self,
+        worktree_repo: &Path,
+        shadow_repo: &Path,
+        label: Option<&str>,
+    ) -> Result<String> {
         // Create a temporary index for staging changes
-        let temp_index = tempfile::NamedTempFile::new()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create temp index: {}", e)))?;
+        let temp_index = tempfile::NamedTempFile::new().map_err(|e| {
+            aw_fs_snapshots_traits::Error::provider(format!("Failed to create temp index: {}", e))
+        })?;
         let temp_index_path = temp_index.path();
 
         // Get the current HEAD commit from worktree repo
@@ -192,10 +238,14 @@ impl GitProvider {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to get HEAD commit: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!("Failed to get HEAD commit: {}", e))
+            })?;
 
         if !head_commit.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to get HEAD commit from worktree repository"));
+            return Err(aw_fs_snapshots_traits::Error::provider(
+                "Failed to get HEAD commit from worktree repository",
+            ));
         }
 
         let head_commit = String::from_utf8_lossy(&head_commit.stdout).trim().to_string();
@@ -208,11 +258,19 @@ impl GitProvider {
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to initialize index: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to initialize index: {}",
+                    e
+                ))
+            })?;
 
         if !read_tree_output.status.success() {
             let stderr = String::from_utf8_lossy(&read_tree_output.stderr);
-            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to initialize index: {}", stderr)));
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Failed to initialize index: {}",
+                stderr
+            )));
         }
 
         // Stage all changes using git add
@@ -228,11 +286,16 @@ impl GitProvider {
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to stage changes: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!("Failed to stage changes: {}", e))
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to stage changes for snapshot: {}", stderr)));
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Failed to stage changes for snapshot: {}",
+                stderr
+            )));
         }
 
         // Create commit message
@@ -242,11 +305,7 @@ impl GitProvider {
         };
 
         // Create commit using git commit-tree
-        let mut commit_tree_args = vec![
-            "commit-tree",
-            "-m", &commit_message,
-            "-p", &head_commit,
-        ];
+        let mut commit_tree_args = vec!["commit-tree", "-m", &commit_message, "-p", &head_commit];
 
         // Read the tree from the temporary index
         let tree_output = Command::new("git")
@@ -256,11 +315,16 @@ impl GitProvider {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to write tree: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!("Failed to write tree: {}", e))
+            })?;
 
         if !tree_output.status.success() {
             let stderr = String::from_utf8_lossy(&tree_output.stderr);
-            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to write tree from index: {}", stderr)));
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Failed to write tree from index: {}",
+                stderr
+            )));
         }
 
         let tree_hash = String::from_utf8_lossy(&tree_output.stdout).trim().to_string();
@@ -272,11 +336,16 @@ impl GitProvider {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create commit: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!("Failed to create commit: {}", e))
+            })?;
 
         if !commit_output.status.success() {
             let stderr = String::from_utf8_lossy(&commit_output.stderr);
-            return Err(aw_fs_snapshots_traits::Error::provider(format!("Failed to create snapshot commit: {}", stderr)));
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Failed to create snapshot commit: {}",
+                stderr
+            )));
         }
 
         Ok(String::from_utf8_lossy(&commit_output.stdout).trim().to_string())
@@ -343,19 +412,27 @@ impl FsSnapshotProvider for GitProvider {
                 // Create worktree
                 let status = Command::new("git")
                     .args([
-                        "worktree", "add",
+                        "worktree",
+                        "add",
                         "--detach",
                         &worktree_path.to_string_lossy(),
-                        "HEAD"
+                        "HEAD",
                     ])
                     .current_dir(repo)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create worktree: {}", e)))?;
+                    .map_err(|e| {
+                        aw_fs_snapshots_traits::Error::provider(format!(
+                            "Failed to create worktree: {}",
+                            e
+                        ))
+                    })?;
 
                 if !status.success() {
-                    return Err(aw_fs_snapshots_traits::Error::provider("Failed to create git worktree"));
+                    return Err(aw_fs_snapshots_traits::Error::provider(
+                        "Failed to create git worktree",
+                    ));
                 }
 
                 Ok(PreparedWorkspace {
@@ -377,7 +454,10 @@ impl FsSnapshotProvider for GitProvider {
         let commit_hash = self.create_snapshot_commit(&ws.exec_path, &shadow_repo, label)?;
 
         let mut meta = HashMap::new();
-        meta.insert("shadow_repo".to_string(), shadow_repo.to_string_lossy().to_string());
+        meta.insert(
+            "shadow_repo".to_string(),
+            shadow_repo.to_string_lossy().to_string(),
+        );
         meta.insert("timestamp".to_string(), chrono::Utc::now().to_rfc3339());
 
         Ok(SnapshotRef {
@@ -390,27 +470,37 @@ impl FsSnapshotProvider for GitProvider {
 
     fn mount_readonly(&self, snap: &SnapshotRef) -> Result<PathBuf> {
         // For Git, create a temporary worktree at the snapshot commit
-        let shadow_repo = PathBuf::from(snap.meta.get("shadow_repo").as_ref()
-            .ok_or_else(|| aw_fs_snapshots_traits::Error::provider("Missing shadow_repo in snapshot metadata"))?);
+        let shadow_repo =
+            PathBuf::from(snap.meta.get("shadow_repo").as_ref().ok_or_else(|| {
+                aw_fs_snapshots_traits::Error::provider("Missing shadow_repo in snapshot metadata")
+            })?);
 
         let session_id = self.generate_unique_id();
         let worktree_path = self.worktree_path(&session_id, "readonly");
 
         let status = Command::new("git")
             .args([
-                "worktree", "add",
+                "worktree",
+                "add",
                 "--detach",
                 &worktree_path.to_string_lossy(),
-                &snap.id
+                &snap.id,
             ])
             .current_dir(&shadow_repo)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create readonly worktree: {}", e)))?;
+            .map_err(|e| {
+                aw_fs_snapshots_traits::Error::provider(format!(
+                    "Failed to create readonly worktree: {}",
+                    e
+                ))
+            })?;
 
         if !status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to create readonly worktree for snapshot"));
+            return Err(aw_fs_snapshots_traits::Error::provider(
+                "Failed to create readonly worktree for snapshot",
+            ));
         }
 
         Ok(worktree_path)
@@ -423,8 +513,12 @@ impl FsSnapshotProvider for GitProvider {
     ) -> Result<PreparedWorkspace> {
         match mode {
             WorkingCopyMode::Worktree => {
-                let shadow_repo = PathBuf::from(snap.meta.get("shadow_repo").as_ref()
-                    .ok_or_else(|| aw_fs_snapshots_traits::Error::provider("Missing shadow_repo in snapshot metadata"))?);
+                let shadow_repo =
+                    PathBuf::from(snap.meta.get("shadow_repo").as_ref().ok_or_else(|| {
+                        aw_fs_snapshots_traits::Error::provider(
+                            "Missing shadow_repo in snapshot metadata",
+                        )
+                    })?);
 
                 let session_id = self.generate_unique_id();
                 let branch_name = format!("aw-branch-{}", session_id);
@@ -433,19 +527,27 @@ impl FsSnapshotProvider for GitProvider {
                 // Create worktree from snapshot commit
                 let status = Command::new("git")
                     .args([
-                        "worktree", "add",
+                        "worktree",
+                        "add",
                         "--detach",
                         &worktree_path.to_string_lossy(),
-                        &snap.id
+                        &snap.id,
                     ])
                     .current_dir(&shadow_repo)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .map_err(|e| aw_fs_snapshots_traits::Error::provider(format!("Failed to create branch worktree: {}", e)))?;
+                    .map_err(|e| {
+                        aw_fs_snapshots_traits::Error::provider(format!(
+                            "Failed to create branch worktree: {}",
+                            e
+                        ))
+                    })?;
 
                 if !status.success() {
-                    return Err(aw_fs_snapshots_traits::Error::provider("Failed to create worktree for branch"));
+                    return Err(aw_fs_snapshots_traits::Error::provider(
+                        "Failed to create worktree for branch",
+                    ));
                 }
 
                 Ok(PreparedWorkspace {
@@ -455,7 +557,9 @@ impl FsSnapshotProvider for GitProvider {
                     cleanup_token: format!("git:branch:{}:{}", session_id, branch_name),
                 })
             }
-            _ => Err(aw_fs_snapshots_traits::Error::provider("Git branching only supports Worktree mode")),
+            _ => Err(aw_fs_snapshots_traits::Error::provider(
+                "Git branching only supports Worktree mode",
+            )),
         }
     }
 
@@ -504,7 +608,10 @@ impl FsSnapshotProvider for GitProvider {
             }
             Ok(())
         } else {
-            Err(aw_fs_snapshots_traits::Error::provider(format!("Invalid Git cleanup token: {}", token)))
+            Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Invalid Git cleanup token: {}",
+                token
+            )))
         }
     }
 }

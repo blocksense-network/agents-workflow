@@ -4,13 +4,13 @@
 //! as specified in REST-Service.md. It includes support for authentication,
 //! request/response handling, and SSE streaming for real-time updates.
 
-pub mod client;
 pub mod auth;
+pub mod client;
 pub mod error;
 pub mod sse;
 
-pub use client::*;
 pub use auth::*;
+pub use client::*;
 pub use error::*;
 
 use async_trait::async_trait;
@@ -36,12 +36,13 @@ impl ClientApi for client::RestClient {
     }
 
     async fn list_agents(&self) -> ClientApiResult<Vec<AgentCapability>> {
-        self.list_agents()
-            .await
-            .map_err(|e| ClientApiError::Server(e.to_string()))
+        self.list_agents().await.map_err(|e| ClientApiError::Server(e.to_string()))
     }
 
-    async fn create_task(&self, request: &CreateTaskRequest) -> ClientApiResult<CreateTaskResponse> {
+    async fn create_task(
+        &self,
+        request: &CreateTaskRequest,
+    ) -> ClientApiResult<CreateTaskResponse> {
         self.create_task(request)
             .await
             .map_err(|e| ClientApiError::Server(e.to_string()))

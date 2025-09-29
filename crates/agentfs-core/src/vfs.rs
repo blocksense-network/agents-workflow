@@ -2,20 +2,22 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 #[cfg(test)]
 use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::error::{FsError, FsResult};
+use crate::storage::StorageBackend;
 use crate::{
-    Attributes, BranchId, BranchInfo, ContentId, DirEntry, EventKind, EventSink, FileMode, FileTimes, FsConfig, FsStats, HandleId, LockKind, LockRange, OpenOptions, ShareMode, SnapshotId, StreamSpec, SubscriptionId,
+    Attributes, BranchId, BranchInfo, ContentId, DirEntry, EventKind, EventSink, FileMode,
+    FileTimes, FsConfig, FsStats, HandleId, LockKind, LockRange, OpenOptions, ShareMode,
+    SnapshotId, StreamSpec, SubscriptionId,
 };
 #[cfg(test)]
 use std::cell::RefCell;
 #[cfg(test)]
 use std::ops::Deref;
-use crate::error::{FsError, FsResult};
-use crate::storage::StorageBackend;
 
 /// Internal node ID for filesystem nodes
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -27,8 +29,12 @@ pub(crate) enum NodeKind {
     File {
         streams: HashMap<String, (ContentId, u64)>, // stream_name -> (content_id, size)
     },
-    Directory { children: HashMap<String, NodeId> },
-    Symlink { target: String },
+    Directory {
+        children: HashMap<String, NodeId>,
+    },
+    Symlink {
+        target: String,
+    },
 }
 
 /// Filesystem node
@@ -106,7 +112,6 @@ pub(crate) struct User {
     pub(crate) groups: Vec<u32>,
 }
 
-
 /// The main filesystem core implementation
 pub struct FsCore {
     config: FsConfig,
@@ -119,10 +124,10 @@ pub struct FsCore {
     next_handle_id: Mutex<u64>,
     next_subscription_id: Mutex<u64>,
     pub(crate) process_branches: Mutex<HashMap<u32, BranchId>>, // Process ID -> Branch ID mapping
-    process_identities: Mutex<HashMap<u32, User>>, // Process ID -> security identity
-    process_children: Mutex<HashMap<u32, Vec<u32>>>, // Parent PID -> list of child PIDs
-    process_parents: Mutex<HashMap<u32, u32>>, // Child PID -> parent PID
-    locks: Mutex<LockManager>, // Byte-range lock manager
+    process_identities: Mutex<HashMap<u32, User>>,              // Process ID -> security identity
+    process_children: Mutex<HashMap<u32, Vec<u32>>>,            // Parent PID -> list of child PIDs
+    process_parents: Mutex<HashMap<u32, u32>>,                  // Child PID -> parent PID
+    locks: Mutex<LockManager>,                                  // Byte-range lock manager
     event_subscriptions: Mutex<HashMap<SubscriptionId, Arc<dyn EventSink>>>,
 }
 
@@ -143,7 +148,7 @@ impl FsCore {
             process_branches: Mutex::new(HashMap::new()), // No processes initially bound
             process_identities: Mutex::new(HashMap::new()), // No processes initially registered
             process_children: Mutex::new(HashMap::new()), // No process hierarchy initially
-            process_parents: Mutex::new(HashMap::new()), // No process hierarchy initially
+            process_parents: Mutex::new(HashMap::new()),  // No process hierarchy initially
             locks: Mutex::new(LockManager {
                 locks: HashMap::new(),
             }),
@@ -204,10 +209,7 @@ impl FsCore {
     }
 
     fn current_timestamp() -> i64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
     }
 
     fn current_process_id() -> u32 {
@@ -314,7 +316,14 @@ impl FsCore {
         user.gid == gid || user.groups.iter().any(|g| *g == gid)
     }
 
-    fn allowed_for_user(&self, node: &Node, user: &User, want_read: bool, want_write: bool, want_exec: bool) -> bool {
+    fn allowed_for_user(
+        &self,
+        node: &Node,
+        user: &User,
+        want_read: bool,
+        want_write: bool,
+        want_exec: bool,
+    ) -> bool {
         if !self.config.security.enforce_posix_permissions {
             return true;
         }
@@ -394,7 +403,10 @@ impl FsCore {
                 NodeKind::File { .. } => {
                     if i == components.len() - 1 {
                         // Last component is a file
-                        return Ok((current_node_id, Some((current_node_id, component.to_string()))));
+                        return Ok((
+                            current_node_id,
+                            Some((current_node_id, component.to_string())),
+                        ));
                     } else {
                         return Err(FsError::NotADirectory);
                     }
@@ -402,7 +414,10 @@ impl FsCore {
                 NodeKind::Symlink { .. } => {
                     if i == components.len() - 1 {
                         // Last component is a symlink
-                        return Ok((current_node_id, Some((current_node_id, component.to_string()))));
+                        return Ok((
+                            current_node_id,
+                            Some((current_node_id, component.to_string())),
+                        ));
                     } else {
                         return Err(FsError::NotADirectory);
                     }
@@ -412,7 +427,6 @@ impl FsCore {
 
         Ok((current_node_id, parent_node_id.zip(parent_name)))
     }
-
 
     /// Create a new file node
     fn create_file_node(&self, content_id: ContentId) -> FsResult<NodeId> {
@@ -481,7 +495,9 @@ impl FsCore {
                 }
                 if gid != node.gid && user.uid != 0 {
                     // Owner may change gid only to a group they belong to
-                    if user.uid != node.uid || (user.gid != gid && !user.groups.iter().any(|g| *g == gid)) {
+                    if user.uid != node.uid
+                        || (user.gid != gid && !user.groups.iter().any(|g| *g == gid))
+                    {
                         return Err(FsError::AccessDenied);
                     }
                 }
@@ -563,10 +579,7 @@ impl FsCore {
             if let Some(n) = nodes.get_mut(&new_node_id) {
                 n.mode = mode;
                 // Preserve original raw name in xattr for later round-trip
-                n.xattrs.insert(
-                    "user.agentfs.rawname".to_string(),
-                    name_bytes.to_vec(),
-                );
+                n.xattrs.insert("user.agentfs.rawname".to_string(), name_bytes.to_vec());
             }
         }
 
@@ -584,7 +597,11 @@ impl FsCore {
     }
 
     /// Get attributes of a child under a parent directory by raw name bytes
-    pub fn getattr_child_by_id_name(&self, parent_id_u64: u64, name_bytes: &[u8]) -> FsResult<Attributes> {
+    pub fn getattr_child_by_id_name(
+        &self,
+        parent_id_u64: u64,
+        name_bytes: &[u8],
+    ) -> FsResult<Attributes> {
         let parent_id = NodeId(parent_id_u64);
         let internal_name = match std::str::from_utf8(name_bytes) {
             Ok(s) => s.to_string(),
@@ -594,7 +611,9 @@ impl FsCore {
         let nodes = self.nodes.lock().unwrap();
         let parent = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
         let child_id = match &parent.kind {
-            NodeKind::Directory { children } => children.get(&internal_name).ok_or(FsError::NotFound).copied()?,
+            NodeKind::Directory { children } => {
+                children.get(&internal_name).ok_or(FsError::NotFound).copied()?
+            }
             _ => return Err(FsError::NotADirectory),
         };
         drop(nodes);
@@ -602,7 +621,11 @@ impl FsCore {
     }
 
     /// Resolve child node id by parent id and raw name bytes
-    pub fn resolve_child_id_by_id_name(&self, parent_id_u64: u64, name_bytes: &[u8]) -> FsResult<u64> {
+    pub fn resolve_child_id_by_id_name(
+        &self,
+        parent_id_u64: u64,
+        name_bytes: &[u8],
+    ) -> FsResult<u64> {
         let parent_id = NodeId(parent_id_u64);
         let internal_name = match std::str::from_utf8(name_bytes) {
             Ok(s) => s.to_string(),
@@ -612,7 +635,9 @@ impl FsCore {
         let nodes = self.nodes.lock().unwrap();
         let parent = nodes.get(&parent_id).ok_or(FsError::NotFound)?;
         let child_id = match &parent.kind {
-            NodeKind::Directory { children } => children.get(&internal_name).ok_or(FsError::NotFound).copied()?,
+            NodeKind::Directory { children } => {
+                children.get(&internal_name).ok_or(FsError::NotFound).copied()?
+            }
             _ => return Err(FsError::NotADirectory),
         };
         Ok(child_id.0)
@@ -769,9 +794,7 @@ impl FsCore {
 
     pub fn snapshot_list(&self) -> Vec<(SnapshotId, Option<String>)> {
         let snapshots = self.snapshots.lock().unwrap();
-        snapshots.values()
-            .map(|s| (s.id, s.name.clone()))
-            .collect()
+        snapshots.values().map(|s| (s.id, s.name.clone())).collect()
     }
 
     pub fn snapshot_delete(&self, snapshot_id: SnapshotId) -> FsResult<()> {
@@ -779,8 +802,7 @@ impl FsCore {
         let branches = self.branches.lock().unwrap();
 
         // Check if any branches depend on this snapshot
-        let has_dependents = branches.values()
-            .any(|b| b.parent_snapshot == Some(snapshot_id));
+        let has_dependents = branches.values().any(|b| b.parent_snapshot == Some(snapshot_id));
 
         if has_dependents {
             return Err(FsError::Busy); // Cannot delete snapshot with dependent branches
@@ -791,7 +813,11 @@ impl FsCore {
     }
 
     // Branch operations
-    pub fn branch_create_from_snapshot(&self, snapshot_id: SnapshotId, name: Option<&str>) -> FsResult<BranchId> {
+    pub fn branch_create_from_snapshot(
+        &self,
+        snapshot_id: SnapshotId,
+        name: Option<&str>,
+    ) -> FsResult<BranchId> {
         let snapshots = self.snapshots.lock().unwrap();
         let snapshot = snapshots.get(&snapshot_id).ok_or(FsError::NotFound)?;
 
@@ -829,7 +855,7 @@ impl FsCore {
         let new_branch = Branch {
             id: branch_id,
             root_id: new_branch_root_id, // New branch gets its own copy of the directory structure
-            parent_snapshot: None, // Not based on a snapshot
+            parent_snapshot: None,       // Not based on a snapshot
             name: name.map(|s| s.to_string()),
         };
 
@@ -840,7 +866,8 @@ impl FsCore {
 
     pub fn branch_list(&self) -> Vec<BranchInfo> {
         let branches = self.branches.lock().unwrap();
-        branches.values()
+        branches
+            .values()
             .map(|b| BranchInfo {
                 id: b.id,
                 parent: b.parent_snapshot,
@@ -935,9 +962,7 @@ impl FsCore {
 
         // Get parent directory
         let parent_path = path.parent().ok_or(FsError::InvalidArgument)?;
-        let parent_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .ok_or(FsError::InvalidName)?;
+        let parent_name = path.file_name().and_then(|n| n.to_str()).ok_or(FsError::InvalidName)?;
 
         let (parent_id, _) = self.resolve_path(pid, parent_path)?;
 
@@ -1017,7 +1042,9 @@ impl FsCore {
                 let nodes = self.nodes.lock().unwrap();
                 let node = nodes.get(&node_id).ok_or(FsError::NotFound)?;
                 let allow = self.allowed_for_user(node, &user, opts.read, opts.write, false);
-                if !allow { return Err(FsError::AccessDenied); }
+                if !allow {
+                    return Err(FsError::AccessDenied);
+                }
             }
         }
 
@@ -1041,7 +1068,12 @@ impl FsCore {
     }
 
     /// Open by internal node id (adapter pathless open)
-    pub fn open_by_id(&self, pid: &PID, node_id_u64: u64, opts: &OpenOptions) -> FsResult<HandleId> {
+    pub fn open_by_id(
+        &self,
+        pid: &PID,
+        node_id_u64: u64,
+        opts: &OpenOptions,
+    ) -> FsResult<HandleId> {
         let node_id = NodeId(node_id_u64);
 
         // Verify node exists
@@ -1073,7 +1105,13 @@ impl FsCore {
         true
     }
 
-    pub fn read(&self, pid: &PID, handle_id: HandleId, offset: u64, buf: &mut [u8]) -> FsResult<usize> {
+    pub fn read(
+        &self,
+        pid: &PID,
+        handle_id: HandleId,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> FsResult<usize> {
         let handles = self.handles.lock().unwrap();
         let handle = handles.get(&handle_id).ok_or(FsError::InvalidArgument)?;
 
@@ -1082,7 +1120,9 @@ impl FsCore {
             if let Some(user) = self.user_for_process(pid) {
                 let nodes = self.nodes.lock().unwrap();
                 let node = nodes.get(&handle.node_id).ok_or(FsError::NotFound)?;
-                if !self.allowed_for_user(node, &user, true, false, false) { return Err(FsError::AccessDenied); }
+                if !self.allowed_for_user(node, &user, true, false, false) {
+                    return Err(FsError::AccessDenied);
+                }
             }
         }
 
@@ -1107,7 +1147,13 @@ impl FsCore {
         }
     }
 
-    pub fn write(&self, pid: &PID, handle_id: HandleId, offset: u64, data: &[u8]) -> FsResult<usize> {
+    pub fn write(
+        &self,
+        pid: &PID,
+        handle_id: HandleId,
+        offset: u64,
+        data: &[u8],
+    ) -> FsResult<usize> {
         let mut handles = self.handles.lock().unwrap();
         let handle = handles.get_mut(&handle_id).ok_or(FsError::InvalidArgument)?;
 
@@ -1116,7 +1162,9 @@ impl FsCore {
             if let Some(user) = self.user_for_process(pid) {
                 let nodes = self.nodes.lock().unwrap();
                 let node = nodes.get(&handle.node_id).ok_or(FsError::NotFound)?;
-                if !self.allowed_for_user(node, &user, false, true, false) { return Err(FsError::AccessDenied); }
+                if !self.allowed_for_user(node, &user, false, true, false) {
+                    return Err(FsError::AccessDenied);
+                }
             }
         }
 
@@ -1135,11 +1183,12 @@ impl FsCore {
         match &mut node.kind {
             NodeKind::File { streams } => {
                 // Get or create the stream
-                let (content_id, size) = streams.entry(stream_name.to_string()).or_insert_with(|| {
-                    // Create new stream if it doesn't exist
-                    let new_content_id = self.storage.allocate(&[]).unwrap();
-                    (new_content_id, 0)
-                });
+                let (content_id, size) =
+                    streams.entry(stream_name.to_string()).or_insert_with(|| {
+                        // Create new stream if it doesn't exist
+                        let new_content_id = self.storage.allocate(&[]).unwrap();
+                        (new_content_id, 0)
+                    });
 
                 let content_to_write = if self.is_content_shared(*content_id) {
                     // Clone the content for this branch
@@ -1180,21 +1229,27 @@ impl FsCore {
         if let Some(node_locks) = locks.locks.get(&node_id) {
             for existing_lock in node_locks {
                 // For POSIX semantics, same handle cannot have conflicting locks
-                if existing_lock.handle_id == handle_id &&
-                   Self::ranges_overlap(&existing_lock.range, new_lock) {
+                if existing_lock.handle_id == handle_id
+                    && Self::ranges_overlap(&existing_lock.range, new_lock)
+                {
                     // Same handle: exclusive locks cannot overlap with anything
                     // Shared locks cannot overlap with exclusive locks from same handle
-                    if existing_lock.range.kind == LockKind::Exclusive || new_lock.kind == LockKind::Exclusive {
+                    if existing_lock.range.kind == LockKind::Exclusive
+                        || new_lock.kind == LockKind::Exclusive
+                    {
                         return true;
                     }
                 }
 
                 // Different handles: check standard conflict rules
-                if existing_lock.handle_id != handle_id &&
-                   Self::ranges_overlap(&existing_lock.range, new_lock) {
+                if existing_lock.handle_id != handle_id
+                    && Self::ranges_overlap(&existing_lock.range, new_lock)
+                {
                     // Exclusive locks conflict with any overlapping lock
                     // Shared locks only conflict with exclusive locks
-                    if existing_lock.range.kind == LockKind::Exclusive || new_lock.kind == LockKind::Exclusive {
+                    if existing_lock.range.kind == LockKind::Exclusive
+                        || new_lock.kind == LockKind::Exclusive
+                    {
                         return true;
                     }
                 }
@@ -1250,9 +1305,8 @@ impl FsCore {
 
         // If this was the last handle to a deleted file, remove the node
         if was_deleted {
-            let remaining_handles: Vec<_> = handles.values()
-                .filter(|h| h.node_id == node_id)
-                .collect();
+            let remaining_handles: Vec<_> =
+                handles.values().filter(|h| h.node_id == node_id).collect();
 
             if remaining_handles.is_empty() {
                 let mut nodes = self.nodes.lock().unwrap();
@@ -1278,10 +1332,7 @@ impl FsCore {
         // Add the lock
         let mut locks = self.locks.lock().unwrap();
         let node_locks = locks.locks.entry(node_id).or_insert_with(Vec::new);
-        node_locks.push(ActiveLock {
-            handle_id,
-            range,
-        });
+        node_locks.push(ActiveLock { handle_id, range });
 
         Ok(())
     }
@@ -1297,10 +1348,10 @@ impl FsCore {
         if let Some(node_locks) = locks.locks.get_mut(&node_id) {
             // Remove locks that match the handle and range
             node_locks.retain(|lock| {
-                !(lock.handle_id == handle_id &&
-                  lock.range.offset == range.offset &&
-                  lock.range.len == range.len &&
-                  lock.range.kind == range.kind)
+                !(lock.handle_id == handle_id
+                    && lock.range.offset == range.offset
+                    && lock.range.len == range.len
+                    && lock.range.kind == range.kind)
             });
 
             // Clean up empty lock lists
@@ -1311,7 +1362,6 @@ impl FsCore {
 
         Ok(())
     }
-
 
     pub fn set_times(&self, pid: &PID, path: &Path, times: FileTimes) -> FsResult<()> {
         let (node_id, _) = self.resolve_path(pid, path)?;
@@ -1328,9 +1378,7 @@ impl FsCore {
 
         // Get parent directory
         let parent_path = path.parent().ok_or(FsError::InvalidArgument)?;
-        let dir_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .ok_or(FsError::InvalidName)?;
+        let dir_name = path.file_name().and_then(|n| n.to_str()).ok_or(FsError::InvalidName)?;
 
         let (parent_id, _) = self.resolve_path(pid, parent_path)?;
 
@@ -1484,9 +1532,21 @@ impl FsCore {
                         gid: child_node.gid,
                         is_dir,
                         is_symlink,
-                        mode_user: FileMode { read: (perm_bits & 0o400) != 0, write: (perm_bits & 0o200) != 0, exec: (perm_bits & 0o100) != 0 },
-                        mode_group: FileMode { read: (perm_bits & 0o040) != 0, write: (perm_bits & 0o020) != 0, exec: (perm_bits & 0o010) != 0 },
-                        mode_other: FileMode { read: (perm_bits & 0o004) != 0, write: (perm_bits & 0o002) != 0, exec: (perm_bits & 0o001) != 0 },
+                        mode_user: FileMode {
+                            read: (perm_bits & 0o400) != 0,
+                            write: (perm_bits & 0o200) != 0,
+                            exec: (perm_bits & 0o100) != 0,
+                        },
+                        mode_group: FileMode {
+                            read: (perm_bits & 0o040) != 0,
+                            write: (perm_bits & 0o020) != 0,
+                            exec: (perm_bits & 0o010) != 0,
+                        },
+                        mode_other: FileMode {
+                            read: (perm_bits & 0o004) != 0,
+                            write: (perm_bits & 0o002) != 0,
+                            exec: (perm_bits & 0o001) != 0,
+                        },
                     };
 
                     entries.push((dir_entry, attributes));
@@ -1538,9 +1598,21 @@ impl FsCore {
                         gid: child_node.gid,
                         is_dir,
                         is_symlink,
-                        mode_user: FileMode { read: true, write: true, exec: is_dir },
-                        mode_group: FileMode { read: true, write: false, exec: is_dir },
-                        mode_other: FileMode { read: true, write: false, exec: false },
+                        mode_user: FileMode {
+                            read: true,
+                            write: true,
+                            exec: is_dir,
+                        },
+                        mode_group: FileMode {
+                            read: true,
+                            write: false,
+                            exec: is_dir,
+                        },
+                        mode_other: FileMode {
+                            read: true,
+                            write: false,
+                            exec: false,
+                        },
                     };
 
                     // Prefer raw name bytes preserved at create time, fallback to internal name bytes
@@ -1594,7 +1666,8 @@ impl FsCore {
             NodeKind::File { streams } => {
                 let mut stream_specs = Vec::new();
                 for stream_name in streams.keys() {
-                    if !stream_name.is_empty() { // Skip the unnamed default stream
+                    if !stream_name.is_empty() {
+                        // Skip the unnamed default stream
                         stream_specs.push(StreamSpec {
                             name: stream_name.clone(),
                         });
@@ -1772,7 +1845,8 @@ impl FsCore {
 
         // Resolve parent directory
         let parent_path = linkpath.parent().ok_or(FsError::InvalidArgument)?;
-        let link_name = linkpath.file_name()
+        let link_name = linkpath
+            .file_name()
             .ok_or(FsError::InvalidArgument)?
             .to_string_lossy()
             .to_string();

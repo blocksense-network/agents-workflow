@@ -19,12 +19,16 @@ fn main() -> anyhow::Result<()> {
     // Try to curl the IP address with a short timeout
     let output = Command::new("curl")
         .args([
-            "--connect-timeout", "5",
-            "--max-time", "10",
+            "--connect-timeout",
+            "5",
+            "--max-time",
+            "10",
             "-s", // silent
-            "-o", "/dev/null", // don't save output
-            "-w", "%{http_code}", // output HTTP status code
-            &format!("http://{}", ip_address)
+            "-o",
+            "/dev/null", // don't save output
+            "-w",
+            "%{http_code}", // output HTTP status code
+            &format!("http://{}", ip_address),
         ])
         .output()?;
 
@@ -41,7 +45,11 @@ fn main() -> anyhow::Result<()> {
         }
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        println!("FAILED: Could not connect to {}: {}", ip_address, stderr.trim());
+        println!(
+            "FAILED: Could not connect to {}: {}",
+            ip_address,
+            stderr.trim()
+        );
         std::process::exit(1);
     }
 }

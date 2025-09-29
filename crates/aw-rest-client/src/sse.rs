@@ -6,8 +6,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 
-use crate::error::{RestClientError, RestClientResult};
 use crate::auth::AuthConfig;
+use crate::error::{RestClientError, RestClientResult};
 
 /// SSE event stream for session events
 pub struct SessionEventStream {
@@ -41,10 +41,7 @@ impl SessionEventStream {
 impl Stream for SessionEventStream {
     type Item = Result<SessionEvent, RestClientError>;
 
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.receiver.poll_recv(cx)
     }
 }

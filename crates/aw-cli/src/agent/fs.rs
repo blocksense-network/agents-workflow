@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
-use clap::{Args, Subcommand};
-use std::path::PathBuf;
 use aw_fs_snapshots::{provider_for, ProviderCapabilities, SnapshotProviderKind};
+use clap::{Args, Subcommand};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// JSON output for filesystem status
 #[derive(Serialize, Deserialize)]
@@ -113,22 +113,14 @@ pub enum AgentFsCommands {
 impl AgentFsCommands {
     pub async fn run(self) -> Result<()> {
         match self {
-            AgentFsCommands::Status(opts) => {
-                Self::status(opts).await
-            }
-            AgentFsCommands::InitSession(opts) => {
-                Self::init_session(opts).await
-            }
-            AgentFsCommands::Snapshots(opts) => {
-                Self::list_snapshots(opts).await
-            }
+            AgentFsCommands::Status(opts) => Self::status(opts).await,
+            AgentFsCommands::InitSession(opts) => Self::init_session(opts).await,
+            AgentFsCommands::Snapshots(opts) => Self::list_snapshots(opts).await,
             AgentFsCommands::Branch { subcommand } => match subcommand {
                 BranchCommands::Create { snapshot_id, name } => {
                     Self::branch_create(snapshot_id, name).await
                 }
-                BranchCommands::Bind { branch_id } => {
-                    Self::branch_bind(branch_id).await
-                }
+                BranchCommands::Bind { branch_id } => Self::branch_bind(branch_id).await,
                 BranchCommands::Exec { branch_id, command } => {
                     Self::branch_exec(branch_id, command).await
                 }
@@ -240,7 +232,10 @@ impl AgentFsCommands {
 
         let repo_path = opts.repo.unwrap_or_else(|| std::env::current_dir().unwrap());
 
-        println!("Initializing session snapshots for repository: {}", repo_path.display());
+        println!(
+            "Initializing session snapshots for repository: {}",
+            repo_path.display()
+        );
         if let Some(name) = &opts.name {
             println!("Snapshot name: {}", name);
         }
@@ -269,7 +264,10 @@ impl AgentFsCommands {
         println!("- Optional labels and metadata");
 
         // For now, show that the command structure is ready
-        println!("\nCommand parsing successful for session: {}", opts.session_id);
+        println!(
+            "\nCommand parsing successful for session: {}",
+            opts.session_id
+        );
 
         Ok(())
     }

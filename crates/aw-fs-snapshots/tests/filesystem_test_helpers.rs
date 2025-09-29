@@ -3,9 +3,9 @@
 //! This module provides utilities for setting up ZFS test environments,
 //! similar to the ZFS portions of the legacy Ruby filesystem_test_helper.rb but implemented in Rust.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::fs;
 use tempfile::TempDir;
 
 /// A ZFS test environment that manages test ZFS pools and cleanup.
@@ -68,7 +68,11 @@ impl ZfsTestEnvironment {
             .status()?;
 
         if !dd_status.success() {
-            return Err(format!("Failed to create ZFS device file: {}", device_file.display()).into());
+            return Err(format!(
+                "Failed to create ZFS device file: {}",
+                device_file.display()
+            )
+            .into());
         }
 
         // Create ZFS pool
@@ -85,10 +89,7 @@ impl ZfsTestEnvironment {
 
         // Create a dataset in the pool
         let dataset_name = format!("{}/test_dataset", pool_name);
-        let zfs_status = Command::new("zfs")
-            .arg("create")
-            .arg(&dataset_name)
-            .status()?;
+        let zfs_status = Command::new("zfs").arg("create").arg(&dataset_name).status()?;
 
         if !zfs_status.success() {
             // Cleanup pool on failure
@@ -107,7 +108,11 @@ impl ZfsTestEnvironment {
             // Cleanup on failure
             let _ = Command::new("zfs").arg("destroy").arg("-r").arg(&dataset_name).status();
             let _ = Command::new("zpool").arg("destroy").arg(pool_name).status();
-            return Err(format!("Failed to set mountpoint for ZFS dataset '{}'", dataset_name).into());
+            return Err(format!(
+                "Failed to set mountpoint for ZFS dataset '{}'",
+                dataset_name
+            )
+            .into());
         }
 
         // Track for cleanup
@@ -128,7 +133,10 @@ impl ZfsTestEnvironment {
     ///
     /// # Returns
     /// Used space in bytes.
-    pub fn get_filesystem_used_space(&self, mount_point: &Path) -> Result<u64, Box<dyn std::error::Error>> {
+    pub fn get_filesystem_used_space(
+        &self,
+        mount_point: &Path,
+    ) -> Result<u64, Box<dyn std::error::Error>> {
         let output = Command::new("df")
             .arg("-B1") // 1-byte blocks
             .arg(mount_point)
@@ -219,7 +227,10 @@ mod tests {
                 assert!(space_used.unwrap() > 0);
             }
             Err(e) => {
-                println!("ZFS pool creation failed (expected in some environments): {}", e);
+                println!(
+                    "ZFS pool creation failed (expected in some environments): {}",
+                    e
+                );
             }
         }
     }

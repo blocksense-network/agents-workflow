@@ -24,7 +24,10 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let host_pid = Pid::from_raw(args.host_pid);
 
-    info!("Attempting to ptrace host process {} (should fail due to namespace isolation)", host_pid);
+    info!(
+        "Attempting to ptrace host process {} (should fail due to namespace isolation)",
+        host_pid
+    );
 
     // First, verify the process exists by checking /proc/<pid>
     let proc_path = format!("/proc/{}", host_pid);
@@ -42,7 +45,10 @@ fn main() -> anyhow::Result<()> {
             process::exit(1);
         }
         Err(e) => {
-            info!("Failed to attach to host process {}: {} (expected due to namespace isolation)", host_pid, e);
+            info!(
+                "Failed to attach to host process {}: {} (expected due to namespace isolation)",
+                host_pid, e
+            );
             match e {
                 nix::errno::Errno::EPERM => {
                     info!("Permission denied - host process correctly isolated");

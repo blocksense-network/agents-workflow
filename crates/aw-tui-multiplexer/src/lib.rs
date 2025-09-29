@@ -15,9 +15,9 @@ pub struct LayoutHandle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PaneRole {
-    Editor,    // Left pane: editor or terminal
-    Agent,     // Right pane: agent activity and logs
-    Logs,      // Optional bottom pane for logs
+    Editor, // Left pane: editor or terminal
+    Agent,  // Right pane: agent activity and logs
+    Logs,   // Optional bottom pane for logs
 }
 
 /// Standard AW layout configuration
@@ -27,7 +27,7 @@ pub struct LayoutConfig<'a> {
     pub working_dir: &'a std::path::Path,
     pub editor_cmd: Option<&'a str>, // Default: $EDITOR or preferred editor
     pub agent_cmd: &'a str,
-    pub log_cmd: Option<&'a str>,   // Optional separate log command
+    pub log_cmd: Option<&'a str>, // Optional separate log command
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -163,7 +163,12 @@ impl<M: Multiplexer> AwMultiplexer<M> {
     }
 
     /// Send text to a specific pane in a layout
-    pub fn send_to_pane(&self, layout: &LayoutHandle, role: PaneRole, text: &str) -> Result<(), AwMuxError> {
+    pub fn send_to_pane(
+        &self,
+        layout: &LayoutHandle,
+        role: PaneRole,
+        text: &str,
+    ) -> Result<(), AwMuxError> {
         if let Some(pane_id) = layout.panes.get(&role) {
             self.mux.send_text(pane_id, text)?;
         }
@@ -174,11 +179,15 @@ impl<M: Multiplexer> AwMultiplexer<M> {
 /// Get the default multiplexer for the current system
 pub fn default_multiplexer() -> Result<Box<dyn Multiplexer + Send + Sync>, AwMuxError> {
     // This will be implemented when aw-mux provides the multiplexer implementations
-    Err(AwMuxError::Config("No multiplexer implementations available yet".to_string()))
+    Err(AwMuxError::Config(
+        "No multiplexer implementations available yet".to_string(),
+    ))
 }
 
 /// Get a multiplexer by name
 pub fn multiplexer_by_name(_name: &str) -> Result<Box<dyn Multiplexer + Send + Sync>, AwMuxError> {
     // This will be implemented when aw-mux provides the multiplexer implementations
-    Err(AwMuxError::Config("No multiplexer implementations available yet".to_string()))
+    Err(AwMuxError::Config(
+        "No multiplexer implementations available yet".to_string(),
+    ))
 }

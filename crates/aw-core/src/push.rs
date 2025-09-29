@@ -1,6 +1,6 @@
-use std::io::{self, Write};
+use anyhow::{Context, Result};
 use aw_repo::VcsRepo;
-use anyhow::{Result, Context};
+use std::io::{self, Write};
 
 /// Push options for controlling push behavior
 #[derive(Debug, Clone)]
@@ -44,8 +44,7 @@ pub struct PushHandler {
 impl PushHandler {
     /// Create a new push handler for the given repository
     pub async fn new<P: AsRef<std::path::Path>>(repo_path: P) -> Result<Self> {
-        let repo = VcsRepo::new(repo_path)
-            .context("Failed to create VCS repository instance")?;
+        let repo = VcsRepo::new(repo_path).context("Failed to create VCS repository instance")?;
         Ok(Self { repo })
     }
 
@@ -81,7 +80,9 @@ impl PushHandler {
         match io::stdin().read_line(&mut input) {
             Ok(0) => {
                 // EOF reached (non-interactive environment)
-                Err(anyhow::anyhow!("Error: Non-interactive environment, use --push-to-remote option."))
+                Err(anyhow::anyhow!(
+                    "Error: Non-interactive environment, use --push-to-remote option."
+                ))
             }
             Ok(_) => {
                 let answer = input.trim();

@@ -15,18 +15,41 @@ extern "C" {
     fn af_fs_destroy(fs: u64) -> i32;
     fn af_mkdir(fs: u64, path: *const libc::c_char, mode: u32) -> i32;
     fn af_snapshot_create(fs: u64, name: *const libc::c_char, out_id: *mut u8) -> i32;
-    fn af_branch_create_from_snapshot(fs: u64, snap: *const u8, name: *const libc::c_char, out_id: *mut u8) -> i32;
+    fn af_branch_create_from_snapshot(
+        fs: u64,
+        snap: *const u8,
+        name: *const libc::c_char,
+        out_id: *mut u8,
+    ) -> i32;
     fn af_bind_process_to_branch(fs: u64, branch: *const u8) -> i32;
-    fn af_open(fs: u64, path: *const libc::c_char, options_json: *const libc::c_char, out_h: *mut u64) -> i32;
+    fn af_open(
+        fs: u64,
+        path: *const libc::c_char,
+        options_json: *const libc::c_char,
+        out_h: *mut u64,
+    ) -> i32;
     fn af_read(fs: u64, h: u64, off: u64, buf: *mut u8, len: u32, out_read: *mut u32) -> i32;
     fn af_write(fs: u64, h: u64, off: u64, buf: *const u8, len: u32, out_written: *mut u32) -> i32;
     fn af_close(fs: u64, h: u64) -> i32;
-    fn af_control_request(fs: u64, request_data: *const u8, request_len: usize, response_data: *mut u8, response_max_len: usize, response_actual_len: *mut usize) -> i32;
-    fn af_getattr(fs: u64, path: *const libc::c_char, out_attrs: *mut u8, attrs_size: usize) -> i32;
+    fn af_control_request(
+        fs: u64,
+        request_data: *const u8,
+        request_len: usize,
+        response_data: *mut u8,
+        response_max_len: usize,
+        response_actual_len: *mut usize,
+    ) -> i32;
+    fn af_getattr(fs: u64, path: *const libc::c_char, out_attrs: *mut u8, attrs_size: usize)
+        -> i32;
     fn af_rmdir(fs: u64, path: *const libc::c_char) -> i32;
     fn af_unlink(fs: u64, path: *const libc::c_char) -> i32;
     fn af_symlink(fs: u64, target: *const libc::c_char, linkpath: *const libc::c_char) -> i32;
-    fn af_readlink(fs: u64, path: *const libc::c_char, out_target: *mut libc::c_char, target_size: usize) -> i32;
+    fn af_readlink(
+        fs: u64,
+        path: *const libc::c_char,
+        out_target: *mut libc::c_char,
+        target_size: usize,
+    ) -> i32;
 }
 
 // ============================================================================
@@ -85,7 +108,6 @@ pub struct AgentFsAttributes {
     pub birth_time_nsec: i64,
 }
 
-
 /// Errors that can occur in the bridge layer
 #[derive(Error, Debug)]
 pub enum BridgeError {
@@ -116,11 +138,17 @@ impl FsCore {
         let mut handle: u64 = 0;
 
         let result = unsafe {
-            af_fs_create(config_cstr.as_ptr() as *const c_char, &mut handle as *mut u64)
+            af_fs_create(
+                config_cstr.as_ptr() as *const c_char,
+                &mut handle as *mut u64,
+            )
         };
 
-        if result != 0 { // AfResult::AfOk = 0
-            return Err(BridgeError::OperationFailed("Failed to create FsCore".to_string()));
+        if result != 0 {
+            // AfResult::AfOk = 0
+            return Err(BridgeError::OperationFailed(
+                "Failed to create FsCore".to_string(),
+            ));
         }
 
         Ok(Self { handle })
@@ -132,10 +160,14 @@ impl FsCore {
 
         let result = unsafe { af_mkdir(self.handle, c_path.as_ptr(), mode) };
 
-        if result == 0 { // AfResult::AfOk = 0
+        if result == 0 {
+            // AfResult::AfOk = 0
             Ok(())
         } else {
-            Err(BridgeError::OperationFailed(format!("mkdir failed for path: {}", path)))
+            Err(BridgeError::OperationFailed(format!(
+                "mkdir failed for path: {}",
+                path
+            )))
         }
     }
 
@@ -153,18 +185,19 @@ impl FsCore {
             af_snapshot_create(
                 self.handle,
                 c_name.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
-                snapshot_id.as_mut_ptr()
+                snapshot_id.as_mut_ptr(),
             )
         };
 
-        if result == 0 { // AfResult::AfOk = 0
+        if result == 0 {
+            // AfResult::AfOk = 0
             let c_str = unsafe { CStr::from_ptr(snapshot_id.as_ptr() as *const c_char) };
-            let id_str = c_str.to_str()
-                .map_err(|_| BridgeError::InvalidUtf8)?
-                .to_string();
+            let id_str = c_str.to_str().map_err(|_| BridgeError::InvalidUtf8)?.to_string();
             Ok(id_str)
         } else {
-            Err(BridgeError::OperationFailed("snapshot creation failed".to_string()))
+            Err(BridgeError::OperationFailed(
+                "snapshot creation failed".to_string(),
+            ))
         }
     }
 
@@ -180,18 +213,20 @@ impl FsCore {
                 self.handle,
                 c_snapshot_id.as_ptr() as *const u8,
                 c_branch_name.as_ptr(),
-                branch_id.as_mut_ptr()
+                branch_id.as_mut_ptr(),
             )
         };
 
-        if result == 0 { // AfResult::AfOk = 0
+        if result == 0 {
+            // AfResult::AfOk = 0
             let c_str = unsafe { CStr::from_ptr(branch_id.as_ptr() as *const c_char) };
-            let id_str = c_str.to_str()
-                .map_err(|_| BridgeError::InvalidUtf8)?
-                .to_string();
+            let id_str = c_str.to_str().map_err(|_| BridgeError::InvalidUtf8)?.to_string();
             Ok(id_str)
         } else {
-            Err(BridgeError::OperationFailed(format!("branch creation failed: {}", branch_name)))
+            Err(BridgeError::OperationFailed(format!(
+                "branch creation failed: {}",
+                branch_name
+            )))
         }
     }
 
@@ -199,14 +234,17 @@ impl FsCore {
     pub fn bind_process(&self, branch_id: &str) -> Result<()> {
         let c_branch_id = CString::new(branch_id).map_err(|_| BridgeError::InvalidUtf8)?;
 
-        let result = unsafe {
-            af_bind_process_to_branch(self.handle, c_branch_id.as_ptr() as *const u8)
-        };
+        let result =
+            unsafe { af_bind_process_to_branch(self.handle, c_branch_id.as_ptr() as *const u8) };
 
-        if result == 0 { // AfResult::AfOk = 0
+        if result == 0 {
+            // AfResult::AfOk = 0
             Ok(())
         } else {
-            Err(BridgeError::OperationFailed(format!("process binding failed: {}", branch_id)))
+            Err(BridgeError::OperationFailed(format!(
+                "process binding failed: {}",
+                branch_id
+            )))
         }
     }
 }
@@ -285,7 +323,7 @@ impl FsAttributes {
 
 /// Create a new FsCore instance (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_core_create() -> *mut FsCore {
+pub unsafe extern "C" fn agentfs_bridge_core_create() -> *mut FsCore {
     match FsCore::new() {
         Ok(core) => {
             // Leak the box to return a raw pointer (Swift will manage cleanup)
@@ -297,7 +335,7 @@ pub extern "C" fn agentfs_bridge_core_create() -> *mut FsCore {
 
 /// Destroy an FsCore instance (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_core_destroy(core: *mut FsCore) {
+pub unsafe extern "C" fn agentfs_bridge_core_destroy(core: *mut FsCore) {
     if !core.is_null() {
         unsafe {
             // First destroy the Rust FsCore
@@ -309,7 +347,11 @@ pub extern "C" fn agentfs_bridge_core_destroy(core: *mut FsCore) {
 
 /// Create directory (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_mkdir(core: *mut FsCore, path: *const c_char, mode: u32) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_mkdir(
+    core: *mut FsCore,
+    path: *const c_char,
+    mode: u32,
+) -> i32 {
     if core.is_null() || path.is_null() {
         return -1;
     }
@@ -328,7 +370,12 @@ pub extern "C" fn agentfs_bridge_mkdir(core: *mut FsCore, path: *const c_char, m
 
 /// Create snapshot (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_snapshot_create(core: *mut FsCore, name: *const c_char, out_id: *mut u8, id_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_snapshot_create(
+    core: *mut FsCore,
+    name: *const c_char,
+    out_id: *mut u8,
+    id_size: usize,
+) -> i32 {
     if core.is_null() || out_id.is_null() || id_size < 32 {
         return -1; // 16 bytes hex encoded = 32 chars
     }
@@ -362,8 +409,19 @@ pub extern "C" fn agentfs_bridge_snapshot_create(core: *mut FsCore, name: *const
 
 /// Create branch (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_branch_create(core: *mut FsCore, snapshot_id: *const c_char, branch_name: *const c_char, out_id: *mut u8, id_size: usize) -> i32 {
-    if core.is_null() || snapshot_id.is_null() || branch_name.is_null() || out_id.is_null() || id_size < 32 {
+pub unsafe extern "C" fn agentfs_bridge_branch_create(
+    core: *mut FsCore,
+    snapshot_id: *const c_char,
+    branch_name: *const c_char,
+    out_id: *mut u8,
+    id_size: usize,
+) -> i32 {
+    if core.is_null()
+        || snapshot_id.is_null()
+        || branch_name.is_null()
+        || out_id.is_null()
+        || id_size < 32
+    {
         return -1;
     }
 
@@ -396,7 +454,10 @@ pub extern "C" fn agentfs_bridge_branch_create(core: *mut FsCore, snapshot_id: *
 
 /// Bind process to branch (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_bind_process(core: *mut FsCore, branch_id: *const c_char) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_bind_process(
+    core: *mut FsCore,
+    branch_id: *const c_char,
+) -> i32 {
     if core.is_null() || branch_id.is_null() {
         return -1;
     }
@@ -415,77 +476,102 @@ pub extern "C" fn agentfs_bridge_bind_process(core: *mut FsCore, branch_id: *con
 
 /// Open file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_open(core: *mut FsCore, path: *const c_char, options_json: *const c_char, out_handle: *mut u64) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_open(
+    core: *mut FsCore,
+    path: *const c_char,
+    options_json: *const c_char,
+    out_handle: *mut u64,
+) -> i32 {
     if core.is_null() || path.is_null() || options_json.is_null() || out_handle.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
 
-    let result = unsafe {
-        af_open(core_handle, path, options_json, out_handle)
-    };
+    let result = unsafe { af_open(core_handle, path, options_json, out_handle) };
 
     result
 }
 
 /// Read from file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_read(core: *mut FsCore, handle: u64, offset: u64, buffer: *mut u8, length: u32, out_read: *mut u32) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_read(
+    core: *mut FsCore,
+    handle: u64,
+    offset: u64,
+    buffer: *mut u8,
+    length: u32,
+    out_read: *mut u32,
+) -> i32 {
     if core.is_null() || buffer.is_null() || out_read.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
 
-    let result = unsafe {
-        af_read(core_handle, handle, offset, buffer, length, out_read)
-    };
+    let result = unsafe { af_read(core_handle, handle, offset, buffer, length, out_read) };
 
     result
 }
 
 /// Write to file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_write(core: *mut FsCore, handle: u64, offset: u64, buffer: *const u8, length: u32, out_written: *mut u32) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_write(
+    core: *mut FsCore,
+    handle: u64,
+    offset: u64,
+    buffer: *const u8,
+    length: u32,
+    out_written: *mut u32,
+) -> i32 {
     if core.is_null() || buffer.is_null() || out_written.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
 
-    let result = unsafe {
-        af_write(core_handle, handle, offset, buffer, length, out_written)
-    };
+    let result = unsafe { af_write(core_handle, handle, offset, buffer, length, out_written) };
 
     result
 }
 
 /// Close file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_close(core: *mut FsCore, handle: u64) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_close(core: *mut FsCore, handle: u64) -> i32 {
     if core.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
 
-    let result = unsafe {
-        af_close(core_handle, handle)
-    };
+    let result = unsafe { af_close(core_handle, handle) };
 
     result
 }
 
 /// Control request (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_control_request(fs: u64, request_data: *const u8, request_len: usize, response_data: *mut u8, response_max_len: usize, response_actual_len: *mut usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_control_request(
+    fs: u64,
+    request_data: *const u8,
+    request_len: usize,
+    response_data: *mut u8,
+    response_max_len: usize,
+    response_actual_len: *mut usize,
+) -> i32 {
     if request_data.is_null() || response_data.is_null() || response_actual_len.is_null() {
         return -1;
     }
 
     let result = unsafe {
-        af_control_request(fs, request_data, request_len, response_data, response_max_len, response_actual_len)
+        af_control_request(
+            fs,
+            request_data,
+            request_len,
+            response_data,
+            response_max_len,
+            response_actual_len,
+        )
     };
 
     result
@@ -494,7 +580,12 @@ pub extern "C" fn agentfs_bridge_control_request(fs: u64, request_data: *const u
 /// Get file statistics (Swift-callable)
 /// Returns JSON string with file attributes
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_stat(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_stat(
+    core: *mut FsCore,
+    path: *const c_char,
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> i32 {
     if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
         return -1;
     }
@@ -535,7 +626,11 @@ pub extern "C" fn agentfs_bridge_stat(core: *mut FsCore, path: *const c_char, bu
 /// Get filesystem statistics (Swift-callable)
 /// Returns JSON string with filesystem stats
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_statfs(core: *mut FsCore, buffer: *mut c_char, buffer_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_statfs(
+    core: *mut FsCore,
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> i32 {
     if core.is_null() || buffer.is_null() || buffer_size == 0 {
         return -1;
     }
@@ -563,7 +658,12 @@ pub extern "C" fn agentfs_bridge_statfs(core: *mut FsCore, buffer: *mut c_char, 
 /// Read directory contents (Swift-callable)
 /// Returns JSON array of directory entries
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_readdir(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_readdir(
+    core: *mut FsCore,
+    path: *const c_char,
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> i32 {
     if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
         return -1;
     }
@@ -588,89 +688,97 @@ pub extern "C" fn agentfs_bridge_readdir(core: *mut FsCore, path: *const c_char,
 
 /// Get file attributes (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_getattr(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_getattr(
+    core: *mut FsCore,
+    path: *const c_char,
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> i32 {
     if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
-    let result = unsafe {
-        af_getattr(core_handle, path, buffer as *mut u8, buffer_size)
-    };
+    let result = unsafe { af_getattr(core_handle, path, buffer as *mut u8, buffer_size) };
 
     result
 }
 
 /// Create symlink (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_symlink(core: *mut FsCore, target: *const c_char, linkpath: *const c_char) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_symlink(
+    core: *mut FsCore,
+    target: *const c_char,
+    linkpath: *const c_char,
+) -> i32 {
     if core.is_null() || target.is_null() || linkpath.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
-    let result = unsafe {
-        af_symlink(core_handle, target, linkpath)
-    };
+    let result = unsafe { af_symlink(core_handle, target, linkpath) };
 
     result
 }
 
 /// Read symlink (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_readlink(core: *mut FsCore, path: *const c_char, buffer: *mut c_char, buffer_size: usize) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_readlink(
+    core: *mut FsCore,
+    path: *const c_char,
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> i32 {
     if core.is_null() || path.is_null() || buffer.is_null() || buffer_size == 0 {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
-    let result = unsafe {
-        af_readlink(core_handle, path, buffer, buffer_size)
-    };
+    let result = unsafe { af_readlink(core_handle, path, buffer, buffer_size) };
 
     result
 }
 
 /// Rename/move file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_rename(_core: *mut FsCore, _oldpath: *const c_char, _newpath: *const c_char) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_rename(
+    _core: *mut FsCore,
+    _oldpath: *const c_char,
+    _newpath: *const c_char,
+) -> i32 {
     // TODO: Implement rename in Rust core
     -1
 }
 
 /// Remove directory (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_rmdir(core: *mut FsCore, path: *const c_char) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_rmdir(core: *mut FsCore, path: *const c_char) -> i32 {
     if core.is_null() || path.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
-    let result = unsafe {
-        af_rmdir(core_handle, path)
-    };
+    let result = unsafe { af_rmdir(core_handle, path) };
 
     result
 }
 
 /// Unlink file (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_unlink(core: *mut FsCore, path: *const c_char) -> i32 {
+pub unsafe extern "C" fn agentfs_bridge_unlink(core: *mut FsCore, path: *const c_char) -> i32 {
     if core.is_null() || path.is_null() {
         return -1;
     }
 
     let core_handle = unsafe { (*core).handle };
-    let result = unsafe {
-        af_unlink(core_handle, path)
-    };
+    let result = unsafe { af_unlink(core_handle, path) };
 
     result
 }
 
 /// Get error message from last operation (Swift-callable)
 #[no_mangle]
-pub extern "C" fn agentfs_bridge_get_error_message(
+pub unsafe extern "C" fn agentfs_bridge_get_error_message(
     buffer: *mut c_char,
     buffer_size: usize,
 ) -> usize {

@@ -1,8 +1,8 @@
+use anyhow::{Context, Result};
+use regex::Regex;
 use std::path::Path;
 use std::process::Stdio;
 use tokio::process::Command;
-use anyhow::{Result, Context};
-use regex::Regex;
 
 /// Extract devshell names from a flake.nix file
 ///
@@ -34,7 +34,13 @@ pub async fn devshell_names(root: &Path) -> Result<Vec<String>> {
 async fn devshell_names_for_current_system(flake_path: &Path) -> Result<Vec<String>> {
     // Get the current system first
     let system_output = Command::new("nix")
-        .args(["eval", "--impure", "--raw", "--expr", "builtins.currentSystem"])
+        .args([
+            "eval",
+            "--impure",
+            "--raw",
+            "--expr",
+            "builtins.currentSystem",
+        ])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .output()
@@ -59,7 +65,7 @@ async fn devshell_names_for_current_system(flake_path: &Path) -> Result<Vec<Stri
             "--no-warn-dirty",
             &flake_ref,
             "--apply",
-            "builtins.attrNames"
+            "builtins.attrNames",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -71,11 +77,11 @@ async fn devshell_names_for_current_system(flake_path: &Path) -> Result<Vec<Stri
         return Err(anyhow::anyhow!("nix eval failed for devShells"));
     }
 
-    let json_str = String::from_utf8(output.stdout)
-        .context("Invalid UTF-8 in nix eval devShells output")?;
+    let json_str =
+        String::from_utf8(output.stdout).context("Invalid UTF-8 in nix eval devShells output")?;
 
-    let names: Vec<String> = serde_json::from_str(&json_str)
-        .context("Failed to parse JSON output from nix eval")?;
+    let names: Vec<String> =
+        serde_json::from_str(&json_str).context("Failed to parse JSON output from nix eval")?;
 
     Ok(names)
 }
@@ -95,7 +101,7 @@ else builtins.attrNames (devShells.${builtins.head systems})"#;
             "--no-warn-dirty",
             &flake_ref,
             "--apply",
-            nix_expr
+            nix_expr,
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -104,7 +110,9 @@ else builtins.attrNames (devShells.${builtins.head systems})"#;
         .context("Failed to run nix eval for devShells (all systems)")?;
 
     if !output.status.success() {
-        return Err(anyhow::anyhow!("nix eval failed for devShells (all systems)"));
+        return Err(anyhow::anyhow!(
+            "nix eval failed for devShells (all systems)"
+        ));
     }
 
     let json_str = String::from_utf8(output.stdout)

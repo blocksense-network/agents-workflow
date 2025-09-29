@@ -21,29 +21,30 @@ fn test_dashboard_layout_small_terminal() -> Result<()> {
     terminal.draw(|f| {
         let size = f.size();
 
-          aw_tui::ui::draw_task_dashboard(
-              f,
-              size,
-              &view_model,
-              None,
-              None,
-          );
+        aw_tui::ui::draw_task_dashboard(f, size, &view_model, None, None);
     })?;
 
     let buffer = terminal.backend().buffer();
 
     // Check that the layout contains expected elements
-    let all_text = buffer.content().iter()
-        .map(|cell| cell.symbol())
-        .collect::<String>();
+    let all_text = buffer.content().iter().map(|cell| cell.symbol()).collect::<String>();
 
     // Should contain header (check for box drawing characters that indicate logo is rendered)
-    assert!(all_text.contains("╔"), "Should contain logo border characters");
-    assert!(all_text.contains("═"), "Should contain logo border characters");
+    assert!(
+        all_text.contains("╔"),
+        "Should contain logo border characters"
+    );
+    assert!(
+        all_text.contains("═"),
+        "Should contain logo border characters"
+    );
 
     // Should contain task data
     assert!(all_text.contains("Refactor"), "Should contain task titles");
-    assert!(all_text.contains("New Task"), "Should contain 'New Task' card");
+    assert!(
+        all_text.contains("New Task"),
+        "Should contain 'New Task' card"
+    );
 
     Ok(())
 }
@@ -59,13 +60,7 @@ fn test_dashboard_layout_large_terminal() -> Result<()> {
     terminal.draw(|f| {
         let size = f.size();
 
-          aw_tui::ui::draw_task_dashboard(
-              f,
-              size,
-              &view_model,
-              None,
-              None,
-          );
+        aw_tui::ui::draw_task_dashboard(f, size, &view_model, None, None);
     })?;
 
     let buffer = terminal.backend().buffer();
@@ -88,13 +83,7 @@ fn test_focus_indication() -> Result<()> {
     terminal.draw(|f| {
         let size = f.size();
 
-          aw_tui::ui::draw_task_dashboard(
-              f,
-              size,
-              &view_model,
-              None,
-              None,
-          );
+        aw_tui::ui::draw_task_dashboard(f, size, &view_model, None, None);
     })?;
 
     let buffer = terminal.backend().buffer();

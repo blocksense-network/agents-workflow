@@ -3,9 +3,9 @@
 //! This binary tests running a QEMU virtual machine within the sandbox environment
 //! to verify that VM workloads function correctly with KVM access.
 
-use std::process::Command;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
 use tracing::{error, info};
 
 fn main() -> anyhow::Result<()> {
@@ -30,8 +30,8 @@ fn main() -> anyhow::Result<()> {
     // but succeed if KVM is available (even though it will fail for other reasons)
     let output = Command::new("qemu-system-x86_64")
         .args(&[
-            "-enable-kvm",  // Use KVM acceleration
-            "-version",     // Just print version and exit - tests KVM access without full VM startup
+            "-enable-kvm", // Use KVM acceleration
+            "-version",    // Just print version and exit - tests KVM access without full VM startup
         ])
         .output();
 
@@ -55,7 +55,11 @@ fn main() -> anyhow::Result<()> {
             } else {
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 // Check if the error indicates KVM unavailability (expected in some environments)
-                if stderr.contains("KVM") && (stderr.contains("permission") || stderr.contains("not available") || stderr.contains("disabled")) {
+                if stderr.contains("KVM")
+                    && (stderr.contains("permission")
+                        || stderr.contains("not available")
+                        || stderr.contains("disabled"))
+                {
                     info!("✓ QEMU correctly reports KVM unavailability (expected in some test environments)");
                     println!("SUCCESS: KVM access properly managed (unavailable as expected)");
                     std::process::exit(0);

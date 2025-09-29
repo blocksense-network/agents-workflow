@@ -37,32 +37,37 @@ impl DaemonClient {
 
     /// Send a request to the daemon and wait for a response.
     pub fn send_request(&self, request: Request) -> Result<Response, DaemonError> {
-        let mut stream = UnixStream::connect(&self.socket_path)
-            .map_err(|e| DaemonError::ConnectionError(format!("Failed to connect to daemon socket: {}", e)))?;
+        let mut stream = UnixStream::connect(&self.socket_path).map_err(|e| {
+            DaemonError::ConnectionError(format!("Failed to connect to daemon socket: {}", e))
+        })?;
 
         // Encode request as SSZ bytes and hex
         let request_bytes = request.as_ssz_bytes();
         let request_hex = hex::encode(&request_bytes);
 
         // Send request
-        stream.write_all(format!("{}\n", request_hex).as_bytes())
-            .map_err(|e| DaemonError::CommunicationError(format!("Failed to send request: {}", e)))?;
+        stream.write_all(format!("{}\n", request_hex).as_bytes()).map_err(|e| {
+            DaemonError::CommunicationError(format!("Failed to send request: {}", e))
+        })?;
 
         // Read response
         let mut reader = BufReader::new(stream);
         let mut response_line = String::new();
 
-        reader.read_line(&mut response_line)
-            .map_err(|e| DaemonError::CommunicationError(format!("Failed to read response: {}", e)))?;
+        reader.read_line(&mut response_line).map_err(|e| {
+            DaemonError::CommunicationError(format!("Failed to read response: {}", e))
+        })?;
 
         let response_hex = response_line.trim();
 
         // Decode hex to bytes, then SSZ to Response
-        let response_bytes = hex::decode(response_hex)
-            .map_err(|e| DaemonError::ProtocolError(format!("Failed to decode hex response: {}", e)))?;
+        let response_bytes = hex::decode(response_hex).map_err(|e| {
+            DaemonError::ProtocolError(format!("Failed to decode hex response: {}", e))
+        })?;
 
-        let response = Response::from_ssz_bytes(&response_bytes)
-            .map_err(|e| DaemonError::ProtocolError(format!("Failed to decode SSZ response: {:?}", e)))?;
+        let response = Response::from_ssz_bytes(&response_bytes).map_err(|e| {
+            DaemonError::ProtocolError(format!("Failed to decode SSZ response: {:?}", e))
+        })?;
 
         Ok(response)
     }
@@ -73,31 +78,49 @@ impl DaemonClient {
 
         match response {
             Response::Success(_) => Ok(()),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to ping".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to ping".to_string(),
+            )),
         }
     }
 
     /// Create a ZFS snapshot.
     pub fn snapshot_zfs(&self, source: &str, snapshot: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::snapshot_zfs(source.to_string(), snapshot.to_string()))?;
+        let response = self.send_request(Request::snapshot_zfs(
+            source.to_string(),
+            snapshot.to_string(),
+        ))?;
 
         match response {
             Response::Success(_) => Ok(()),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to ZFS snapshot".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to ZFS snapshot".to_string(),
+            )),
         }
     }
 
     /// Clone a ZFS snapshot.
     pub fn clone_zfs(&self, snapshot: &str, clone: &str) -> Result<Option<String>, DaemonError> {
-        let response = self.send_request(Request::clone_zfs(snapshot.to_string(), clone.to_string()))?;
+        let response =
+            self.send_request(Request::clone_zfs(snapshot.to_string(), clone.to_string()))?;
 
         match response {
             Response::Success(_) => Ok(None),
-            Response::SuccessWithMountpoint(mountpoint) => Ok(Some(String::from_utf8_lossy(&mountpoint).to_string())),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to ZFS clone".to_string())),
+            Response::SuccessWithMountpoint(mountpoint) => {
+                Ok(Some(String::from_utf8_lossy(&mountpoint).to_string()))
+            }
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to ZFS clone".to_string(),
+            )),
         }
     }
 
@@ -107,31 +130,53 @@ impl DaemonClient {
 
         match response {
             Response::Success(_) => Ok(()),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to ZFS delete".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to ZFS delete".to_string(),
+            )),
         }
     }
 
     /// Create a Btrfs snapshot.
     pub fn snapshot_btrfs(&self, source: &str, destination: &str) -> Result<(), DaemonError> {
-        let response = self.send_request(Request::snapshot_btrfs(source.to_string(), destination.to_string()))?;
+        let response = self.send_request(Request::snapshot_btrfs(
+            source.to_string(),
+            destination.to_string(),
+        ))?;
 
         match response {
             Response::Success(_) => Ok(()),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to Btrfs snapshot".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to Btrfs snapshot".to_string(),
+            )),
         }
     }
 
     /// Clone a Btrfs subvolume.
-    pub fn clone_btrfs(&self, source: &str, destination: &str) -> Result<Option<String>, DaemonError> {
-        let response = self.send_request(Request::clone_btrfs(source.to_string(), destination.to_string()))?;
+    pub fn clone_btrfs(
+        &self,
+        source: &str,
+        destination: &str,
+    ) -> Result<Option<String>, DaemonError> {
+        let response = self.send_request(Request::clone_btrfs(
+            source.to_string(),
+            destination.to_string(),
+        ))?;
 
         match response {
             Response::Success(_) => Ok(None),
             Response::SuccessWithPath(path) => Ok(Some(String::from_utf8_lossy(&path).to_string())),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to Btrfs clone".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to Btrfs clone".to_string(),
+            )),
         }
     }
 
@@ -141,8 +186,12 @@ impl DaemonClient {
 
         match response {
             Response::Success(_) => Ok(()),
-            Response::Error(msg) => Err(DaemonError::DaemonError(String::from_utf8_lossy(&msg).to_string())),
-            _ => Err(DaemonError::ProtocolError("Unexpected response to Btrfs delete".to_string())),
+            Response::Error(msg) => Err(DaemonError::DaemonError(
+                String::from_utf8_lossy(&msg).to_string(),
+            )),
+            _ => Err(DaemonError::ProtocolError(
+                "Unexpected response to Btrfs delete".to_string(),
+            )),
         }
     }
 }

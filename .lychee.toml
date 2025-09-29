@@ -57,6 +57,7 @@ exclude = [
   "https://stackoverflow.com/.*",
   "https://www.microsoft.com/.*",
   "https://fruty.medium.com/.*",
+  "https://openai.com/codex",
 ]
 max_concurrency = 8
 timeout = 20

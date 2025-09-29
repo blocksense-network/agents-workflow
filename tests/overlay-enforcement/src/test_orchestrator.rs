@@ -35,23 +35,26 @@ impl OverlayTestType {
                 // Static mode with blacklist
                 vec![
                     "--static".to_string(),
-                    "--blacklist".to_string(), "/home".to_string(),
-                    "--blacklist".to_string(), "/etc/passwd".to_string(),
-                    "--blacklist".to_string(), "/var/log".to_string(),
+                    "--blacklist".to_string(),
+                    "/home".to_string(),
+                    "--blacklist".to_string(),
+                    "/etc/passwd".to_string(),
+                    "--blacklist".to_string(),
+                    "/var/log".to_string(),
                 ]
             }
             OverlayTestType::OverlayPersistence => {
                 // Dynamic mode with overlays
                 vec![
-                    "--overlay".to_string(), "/tmp".to_string(),
-                    "--overlay".to_string(), "/var/tmp".to_string(),
+                    "--overlay".to_string(),
+                    "/tmp".to_string(),
+                    "--overlay".to_string(),
+                    "/var/tmp".to_string(),
                 ]
             }
             OverlayTestType::OverlayCleanup => {
                 // Same as persistence but we'll check cleanup
-                vec![
-                    "--overlay".to_string(), "/tmp".to_string(),
-                ]
+                vec!["--overlay".to_string(), "/tmp".to_string()]
             }
         }
     }
@@ -64,10 +67,7 @@ fn run_overlay_test(
     println!("🧪 Running {} test", test_type.description());
     println!("   Binary: {}", test_type.binary_name());
 
-    let binary_path = sbx_helper_path
-        .parent()
-        .unwrap()
-        .join(test_type.binary_name());
+    let binary_path = sbx_helper_path.parent().unwrap().join(test_type.binary_name());
 
     if !binary_path.exists() {
         println!("❌ Test binary not found: {}", binary_path.display());
@@ -85,8 +85,7 @@ fn run_overlay_test(
 
     println!("   Command: {:?}", cmd);
 
-    let mut child = cmd.spawn()
-        .map_err(|e| format!("Failed to spawn sbx-helper: {}", e))?;
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn sbx-helper: {}", e))?;
 
     // Wait for completion with timeout
     let timeout = Duration::from_secs(30);
@@ -108,14 +107,26 @@ fn run_overlay_test(
                     println!("   Run with appropriate privileges (e.g., sudo) or in a privileged environment");
                     Ok(()) // Treat as success (skipped)
                 } else {
-                    println!("❌ {} test FAILED - exit code: {:?}",
-                            test_type.description(), status.code());
-                    Err(format!("Test {} failed with exit code {:?}", test_type.description(), status.code()).into())
+                    println!(
+                        "❌ {} test FAILED - exit code: {:?}",
+                        test_type.description(),
+                        status.code()
+                    );
+                    Err(format!(
+                        "Test {} failed with exit code {:?}",
+                        test_type.description(),
+                        status.code()
+                    )
+                    .into())
                 }
             }
         }
         Err(e) => {
-            println!("❌ {} test FAILED - wait error: {}", test_type.description(), e);
+            println!(
+                "❌ {} test FAILED - wait error: {}",
+                test_type.description(),
+                e
+            );
             Err(format!("Test {} failed: {}", test_type.description(), e).into())
         }
     }
@@ -141,7 +152,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("sbx-helper path: {}", sbx_helper_path.display());
 
     if !sbx_helper_path.exists() {
-        println!("❌ sbx-helper binary not found: {}", sbx_helper_path.display());
+        println!(
+            "❌ sbx-helper binary not found: {}",
+            sbx_helper_path.display()
+        );
         println!("   Build with: cargo build --bin sbx-helper");
         std::process::exit(1);
     }

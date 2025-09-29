@@ -57,7 +57,10 @@ impl ProcessManager {
 
     /// Execute the configured command as PID 1 in the sandbox
     pub fn exec_as_pid1(&self) -> Result<()> {
-        info!("Forking to enter PID namespace and execute as PID 1: {:?}", self.config.command);
+        info!(
+            "Forking to enter PID namespace and execute as PID 1: {:?}",
+            self.config.command
+        );
 
         // Prepare the command and arguments before forking
         if self.config.command.is_empty() {
@@ -88,7 +91,10 @@ impl ProcessManager {
                 // Set working directory if specified
                 if let Some(dir) = &self.config.working_dir {
                     std::env::set_current_dir(dir).map_err(|e| {
-                        Error::Execution(format!("Failed to set working directory to {}: {}", dir, e))
+                        Error::Execution(format!(
+                            "Failed to set working directory to {}: {}",
+                            dir, e
+                        ))
                     })?;
                 }
 
@@ -106,9 +112,7 @@ impl ProcessManager {
                 // This should never be reached
                 unreachable!();
             }
-            Err(e) => {
-                Err(Error::Execution(format!("Failed to fork: {}", e)))
-            }
+            Err(e) => Err(Error::Execution(format!("Failed to fork: {}", e))),
         }
     }
 
@@ -146,16 +150,28 @@ impl ProcessManager {
                 if code == 0 {
                     Ok(())
                 } else {
-                    Err(Error::Execution(format!("Child process exited with code {}", code)))
+                    Err(Error::Execution(format!(
+                        "Child process exited with code {}",
+                        code
+                    )))
                 }
             }
             Ok(wait::WaitStatus::Signaled(pid, signal, _)) => {
                 warn!("Child process {} terminated by signal {:?}", pid, signal);
-                Err(Error::Execution(format!("Child process terminated by signal {:?}", signal)))
+                Err(Error::Execution(format!(
+                    "Child process terminated by signal {:?}",
+                    signal
+                )))
             }
             Ok(other) => {
-                warn!("Unexpected wait status for child {}: {:?}", child_pid, other);
-                Err(Error::Execution(format!("Unexpected child exit status: {:?}", other)))
+                warn!(
+                    "Unexpected wait status for child {}: {:?}",
+                    child_pid, other
+                );
+                Err(Error::Execution(format!(
+                    "Unexpected child exit status: {:?}",
+                    other
+                )))
             }
             Err(e) => {
                 error!("Failed to wait for child process {}: {}", child_pid, e);

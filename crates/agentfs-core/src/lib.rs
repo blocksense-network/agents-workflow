@@ -24,7 +24,6 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
 
-
     #[test]
     fn test_chown_updates_uid_gid_and_ctime() {
         let core = test_core();
@@ -141,13 +140,33 @@ mod tests {
     fn test_core_posix() -> (FsCore, PID) {
         let cfg = FsConfig {
             case_sensitivity: CaseSensitivity::Sensitive,
-            memory: MemoryPolicy { max_bytes_in_memory: Some(1024 * 1024), spill_directory: None },
-            limits: FsLimits { max_open_handles: 1000, max_branches: 100, max_snapshots: 1000 },
-            cache: CachePolicy { attr_ttl_ms: 1000, entry_ttl_ms: 1000, negative_ttl_ms: 1000, enable_readdir_plus: true, auto_cache: true, writeback_cache: false },
+            memory: MemoryPolicy {
+                max_bytes_in_memory: Some(1024 * 1024),
+                spill_directory: None,
+            },
+            limits: FsLimits {
+                max_open_handles: 1000,
+                max_branches: 100,
+                max_snapshots: 1000,
+            },
+            cache: CachePolicy {
+                attr_ttl_ms: 1000,
+                entry_ttl_ms: 1000,
+                negative_ttl_ms: 1000,
+                enable_readdir_plus: true,
+                auto_cache: true,
+                writeback_cache: false,
+            },
             enable_xattrs: true,
             enable_ads: false,
             track_events: true,
-            security: crate::config::SecurityPolicy { enforce_posix_permissions: true, default_uid: 0, default_gid: 0, enable_windows_acl_compat: false, root_bypass_permissions: false },
+            security: crate::config::SecurityPolicy {
+                enforce_posix_permissions: true,
+                default_uid: 0,
+                default_gid: 0,
+                enable_windows_acl_compat: false,
+                root_bypass_permissions: false,
+            },
         };
         let core = FsCore::new(cfg).unwrap();
         // Register a neutral bootstrap process ID that will not collide with test-specific PIDs
@@ -365,7 +384,12 @@ mod tests {
 
         // Change mode and times
         core.set_mode(&pid, "/file".as_ref(), 0o600).unwrap();
-        let new_times = FileTimes { atime: before.times.atime + 10, mtime: before.times.mtime + 10, ctime: before.times.ctime + 10, birthtime: before.times.birthtime };
+        let new_times = FileTimes {
+            atime: before.times.atime + 10,
+            mtime: before.times.mtime + 10,
+            ctime: before.times.ctime + 10,
+            birthtime: before.times.birthtime,
+        };
         core.set_times(&pid, "/file".as_ref(), new_times).unwrap();
 
         // Verify
@@ -470,8 +494,8 @@ mod tests {
         let core = test_core();
 
         // Register two processes with different identities
-        let pid1 = core.register_process(1001, 1001, 0, 0);  // Process 1
-        let pid2 = core.register_process(1002, 1002, 0, 0);  // Process 2
+        let pid1 = core.register_process(1001, 1001, 0, 0); // Process 1
+        let pid2 = core.register_process(1002, 1002, 0, 0); // Process 2
 
         // Create a file with initial content (using pid1)
         let h = core.create(&pid1, "/shared.txt".as_ref(), &rw_create()).unwrap();
@@ -490,7 +514,10 @@ mod tests {
             let snapshot = snapshots.get(&snap).unwrap();
             let branches = core.branches.lock().unwrap();
             let branch_info = branches.get(&branch).unwrap();
-            assert_ne!(snapshot.root_id, branch_info.root_id, "Branch should have different root than snapshot");
+            assert_ne!(
+                snapshot.root_id, branch_info.root_id,
+                "Branch should have different root than snapshot"
+            );
         }
 
         // Bind process 1 to default branch (should see original content)
@@ -1048,13 +1075,33 @@ mod tests {
         // Build core with POSIX enforcement and root bypass enabled
         let cfg = FsConfig {
             case_sensitivity: CaseSensitivity::Sensitive,
-            memory: MemoryPolicy { max_bytes_in_memory: Some(1024 * 1024), spill_directory: None },
-            limits: FsLimits { max_open_handles: 1000, max_branches: 100, max_snapshots: 1000 },
-            cache: CachePolicy { attr_ttl_ms: 1000, entry_ttl_ms: 1000, negative_ttl_ms: 1000, enable_readdir_plus: true, auto_cache: true, writeback_cache: false },
+            memory: MemoryPolicy {
+                max_bytes_in_memory: Some(1024 * 1024),
+                spill_directory: None,
+            },
+            limits: FsLimits {
+                max_open_handles: 1000,
+                max_branches: 100,
+                max_snapshots: 1000,
+            },
+            cache: CachePolicy {
+                attr_ttl_ms: 1000,
+                entry_ttl_ms: 1000,
+                negative_ttl_ms: 1000,
+                enable_readdir_plus: true,
+                auto_cache: true,
+                writeback_cache: false,
+            },
             enable_xattrs: true,
             enable_ads: false,
             track_events: false,
-            security: crate::config::SecurityPolicy { enforce_posix_permissions: true, default_uid: 0, default_gid: 0, enable_windows_acl_compat: false, root_bypass_permissions: true },
+            security: crate::config::SecurityPolicy {
+                enforce_posix_permissions: true,
+                default_uid: 0,
+                default_gid: 0,
+                enable_windows_acl_compat: false,
+                root_bypass_permissions: true,
+            },
         };
         let core = FsCore::new(cfg).unwrap();
 
@@ -1321,9 +1368,9 @@ mod tests {
         let (core, _) = test_core_posix();
 
         // Register multiple users with different identities
-        let root_pid = core.register_process(1, 1, 0, 0);      // root: uid=0, gid=0
+        let root_pid = core.register_process(1, 1, 0, 0); // root: uid=0, gid=0
         let alice_pid = core.register_process(1000, 1, 1000, 1000); // alice: uid=1000, gid=1000
-        let bob_pid = core.register_process(1001, 1, 1001, 1000);   // bob: uid=1001, gid=1000 (in alice's group)
+        let bob_pid = core.register_process(1001, 1, 1001, 1000); // bob: uid=1001, gid=1000 (in alice's group)
         let charlie_pid = core.register_process(1002, 1, 1002, 1002); // charlie: uid=1002, gid=1002 (no group access)
 
         // Create directory structure
@@ -1437,7 +1484,13 @@ mod tests {
         core.mkdir(&root_pid, "/top/middle".as_ref(), 0o700).unwrap(); // Only owner can access
         core.mkdir(&root_pid, "/top/middle/bottom".as_ref(), 0o755).unwrap();
 
-        let h = core.create(&root_pid, "/top/middle/bottom/file.txt".as_ref(), &rw_create()).unwrap();
+        let h = core
+            .create(
+                &root_pid,
+                "/top/middle/bottom/file.txt".as_ref(),
+                &rw_create(),
+            )
+            .unwrap();
         core.close(&root_pid, h).unwrap();
 
         // Change ownership of middle directory to alice
@@ -1457,7 +1510,8 @@ mod tests {
         // Bob cannot access alice's directory
         assert!(core.readdir_plus(&bob_pid, "/top".as_ref()).is_ok()); // parent is 755
         assert!(core.readdir_plus(&bob_pid, "/top/middle".as_ref()).is_err()); // no permission
-        assert!(core.open(&bob_pid, "/top/middle/bottom/file.txt".as_ref(), &ro()).is_err()); // cannot traverse to it
+        assert!(core.open(&bob_pid, "/top/middle/bottom/file.txt".as_ref(), &ro()).is_err());
+        // cannot traverse to it
     }
 
     #[test]
@@ -1477,7 +1531,7 @@ mod tests {
         let result = core.open(&alice_pid, "/secret.txt".as_ref(), &ro());
         assert!(result.is_err());
         match result.unwrap_err() {
-            FsError::AccessDenied => {}, // Expected
+            FsError::AccessDenied => {} // Expected
             _ => panic!("Expected AccessDenied error"),
         }
 
@@ -1490,7 +1544,7 @@ mod tests {
         let result = core.write(&alice_pid, h, 0, b"should fail");
         assert!(result.is_err());
         match result.unwrap_err() {
-            FsError::AccessDenied => {}, // Expected
+            FsError::AccessDenied => {} // Expected
             _ => panic!("Expected AccessDenied error"),
         }
         core.close(&alice_pid, h).unwrap();
@@ -1512,9 +1566,30 @@ mod tests {
 
         // Verify the mode was set
         let attrs = core.getattr(&root_pid, "/setgid_file.txt".as_ref()).unwrap();
-        assert_eq!(attrs.mode_user, FileMode { read: true, write: true, exec: true });
-        assert_eq!(attrs.mode_group, FileMode { read: true, write: true, exec: true });
-        assert_eq!(attrs.mode_other, FileMode { read: false, write: false, exec: false });
+        assert_eq!(
+            attrs.mode_user,
+            FileMode {
+                read: true,
+                write: true,
+                exec: true
+            }
+        );
+        assert_eq!(
+            attrs.mode_group,
+            FileMode {
+                read: true,
+                write: true,
+                exec: true
+            }
+        );
+        assert_eq!(
+            attrs.mode_other,
+            FileMode {
+                read: false,
+                write: false,
+                exec: false
+            }
+        );
 
         // Both alice and bob should be able to access (alice owns, bob in group)
         assert!(core.open(&alice_pid, "/setgid_file.txt".as_ref(), &rw()).is_ok());
@@ -1533,11 +1608,23 @@ mod tests {
         core.mkdir(&root_pid, "/restricted".as_ref(), 0o700).unwrap(); // Only root
         core.mkdir(&root_pid, "/restricted/subdir".as_ref(), 0o755).unwrap();
 
-        let h = core.create(&root_pid, "/restricted/subdir/file.txt".as_ref(), &rw_create()).unwrap();
+        let h = core
+            .create(
+                &root_pid,
+                "/restricted/subdir/file.txt".as_ref(),
+                &rw_create(),
+            )
+            .unwrap();
         core.close(&root_pid, h).unwrap();
 
         // Root can do everything
-        assert!(core.rename(&root_pid, "/restricted/subdir/file.txt".as_ref(), "/restricted/subdir/renamed.txt".as_ref()).is_ok());
+        assert!(core
+            .rename(
+                &root_pid,
+                "/restricted/subdir/file.txt".as_ref(),
+                "/restricted/subdir/renamed.txt".as_ref()
+            )
+            .is_ok());
         core.unlink(&PID::new(1), "/restricted/subdir/renamed.txt".as_ref()).unwrap();
 
         // Alice cannot list the restricted directory (no r), and cannot traverse it (no x)
@@ -1545,6 +1632,12 @@ mod tests {
         // Traversal to subdir fails due to missing x on /restricted
         assert!(core.open(&alice_pid, "/restricted/subdir/file.txt".as_ref(), &ro()).is_err());
         assert!(core.open(&alice_pid, "/restricted/subdir/file.txt".as_ref(), &ro()).is_err());
-        assert!(core.rename(&alice_pid, "/restricted/subdir/file.txt".as_ref(), "/tmp.txt".as_ref()).is_err());
+        assert!(core
+            .rename(
+                &alice_pid,
+                "/restricted/subdir/file.txt".as_ref(),
+                "/tmp.txt".as_ref()
+            )
+            .is_err());
     }
 }

@@ -289,7 +289,10 @@ fn test_overlay_enforcement_e2e() {
     let orchestrator_path = project_root.join("target/debug/overlay_test_orchestrator");
     let sbx_helper_path = project_root.join("target/debug/sbx-helper");
 
-    println!("Looking for overlay orchestrator at: {:?}", orchestrator_path);
+    println!(
+        "Looking for overlay orchestrator at: {:?}",
+        orchestrator_path
+    );
     println!(
         "Current working directory: {:?}",
         std::env::current_dir().unwrap_or_default()
@@ -316,7 +319,9 @@ fn test_overlay_enforcement_e2e() {
 
     if !can_create_namespaces {
         println!("⚠️  Skipping E2E overlay enforcement test - no namespace privileges available");
-        println!("   This test requires privileges to create user namespaces and mount filesystems");
+        println!(
+            "   This test requires privileges to create user namespaces and mount filesystems"
+        );
         println!("   Run with appropriate privileges (e.g., sudo) or in a privileged environment");
         return;
     }
@@ -382,7 +387,10 @@ async fn test_filesystem_isolation_overlay() {
     fs::write(&test_file_path, original_content).expect("Failed to write test file");
 
     // Verify the file exists and has the original content outside the sandbox
-    assert_eq!(fs::read_to_string(&test_file_path).unwrap(), original_content);
+    assert_eq!(
+        fs::read_to_string(&test_file_path).unwrap(),
+        original_content
+    );
 
     // Create sandbox configuration with overlay on the temp directory
     let namespace_config = NamespaceConfig {
@@ -398,8 +406,11 @@ async fn test_filesystem_isolation_overlay() {
 
     // Create a simple command that modifies the test file
     let process_config = ProcessConfig {
-        command: vec!["sh".to_string(), "-c".to_string(),
-                      format!("echo '{}' > {}", modified_content, test_file_path.display())],
+        command: vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            format!("echo '{}' > {}", modified_content, test_file_path.display()),
+        ],
         working_dir: None,
         env: vec![],
     };
@@ -439,7 +450,9 @@ async fn test_filesystem_isolation_overlay() {
 
     // Check if overlay was actually mounted by looking for upper directory content
     let session_dir = temp_dir.path().join("overlay_session");
-    let upper_dir = session_dir.join("upper").join(test_file_path.strip_prefix(temp_dir.path()).unwrap());
+    let upper_dir = session_dir
+        .join("upper")
+        .join(test_file_path.strip_prefix(temp_dir.path()).unwrap());
 
     let overlay_was_mounted = if upper_dir.exists() {
         fs::read_to_string(&upper_dir).map_or(false, |content| content.trim() == modified_content)
@@ -457,8 +470,7 @@ async fn test_filesystem_isolation_overlay() {
         // After overlay is unmounted, verify that the file content is back to original
         // This proves the isolation worked - modifications were contained to the overlay
         assert_eq!(
-            final_content,
-            original_content,
+            final_content, original_content,
             "File content should be restored to original after overlay cleanup - isolation failed!"
         );
         println!("✅ Filesystem isolation test passed - overlay properly isolated writes and restored original state");
@@ -527,7 +539,10 @@ async fn test_filesystem_isolation_readonly_mount() {
     };
 
     let process_config = ProcessConfig {
-        command: vec!["bash".to_string(), script_path.to_string_lossy().to_string()],
+        command: vec![
+            "bash".to_string(),
+            script_path.to_string_lossy().to_string(),
+        ],
         working_dir: Some(temp_dir.path().to_string_lossy().to_string()),
         env: vec![],
     };
@@ -543,10 +558,9 @@ async fn test_filesystem_isolation_readonly_mount() {
     };
 
     // Initialize sandbox
-    let mut sandbox =
-        Sandbox::with_namespace_config(namespace_config)
-            .with_process_config(process_config)
-            .with_filesystem(fs_config);
+    let mut sandbox = Sandbox::with_namespace_config(namespace_config)
+        .with_process_config(process_config)
+        .with_filesystem(fs_config);
 
     // Run the sandbox process
     let result = sandbox.exec_process().await;
@@ -563,7 +577,9 @@ async fn test_filesystem_isolation_readonly_mount() {
         "Readonly file should not be modified by sandbox process"
     );
 
-    println!("✅ Readonly filesystem isolation test passed - sandbox could not modify readonly files");
+    println!(
+        "✅ Readonly filesystem isolation test passed - sandbox could not modify readonly files"
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -576,7 +592,10 @@ fn test_filesystem_config_overlay_setup() {
         readonly_paths: vec!["/etc".to_string()],
         bind_mounts: vec![],
         working_dir: Some("/tmp/test".to_string()),
-        overlay_paths: vec!["/tmp/workspace".to_string(), "/home/user/project".to_string()],
+        overlay_paths: vec![
+            "/tmp/workspace".to_string(),
+            "/home/user/project".to_string(),
+        ],
         blacklist_paths: vec![],
         session_state_dir: None,
         static_mode: false,
@@ -613,13 +632,27 @@ fn test_filesystem_isolation_principles() {
     sandbox_view.insert("new_file.txt", "created by sandbox");
 
     // Verify isolation: original filesystem should be unchanged
-    assert_eq!(original_filesystem.get("file1.txt").unwrap(), &"original content 1");
-    assert_eq!(original_filesystem.get("file2.txt").unwrap(), &"original content 2");
+    assert_eq!(
+        original_filesystem.get("file1.txt").unwrap(),
+        &"original content 1"
+    );
+    assert_eq!(
+        original_filesystem.get("file2.txt").unwrap(),
+        &"original content 2"
+    );
     assert!(original_filesystem.get("new_file.txt").is_none()); // New file shouldn't exist in original
 
     // Verify sandbox view has changes
-    assert_eq!(sandbox_view.get("file1.txt").unwrap(), &"modified by sandbox");
-    assert_eq!(sandbox_view.get("new_file.txt").unwrap(), &"created by sandbox");
+    assert_eq!(
+        sandbox_view.get("file1.txt").unwrap(),
+        &"modified by sandbox"
+    );
+    assert_eq!(
+        sandbox_view.get("new_file.txt").unwrap(),
+        &"created by sandbox"
+    );
 
-    println!("✅ Filesystem isolation principles test passed - conceptual overlay isolation verified");
+    println!(
+        "✅ Filesystem isolation principles test passed - conceptual overlay isolation verified"
+    );
 }

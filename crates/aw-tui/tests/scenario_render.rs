@@ -1,7 +1,7 @@
 //! Scenario-based initial render test
 
 use aw_test_scenarios::{Scenario, ScenarioTerminal};
-use aw_tui::{create_test_terminal, app::AppState, ViewModel};
+use aw_tui::{app::AppState, create_test_terminal, ViewModel};
 use ratatui::widgets::ListState;
 
 #[test]
@@ -31,24 +31,17 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
         // Build a default AppState via a lightweight path: reuse draw_dashboard with empty data
         let state = AppState::default();
         let view_model = ViewModel::from_state(&state);
-        aw_tui::ui::draw_task_dashboard(
-            f,
-            area,
-            &view_model,
-            None,
-            None,
-        );
+        aw_tui::ui::draw_task_dashboard(f, area, &view_model, None, None);
     })?;
 
     let buffer = term.backend().buffer();
-    let all_text = buffer
-        .content()
-        .iter()
-        .map(|c| c.symbol())
-        .collect::<String>();
+    let all_text = buffer.content().iter().map(|c| c.symbol()).collect::<String>();
 
     // Expect the static section titles to be present
-    assert!(all_text.contains("╔"), "Should render header with logo border");
+    assert!(
+        all_text.contains("╔"),
+        "Should render header with logo border"
+    );
     assert!(all_text.contains("New Task"));
     assert!(all_text.contains("Description"));
 
@@ -56,23 +49,30 @@ fn test_initial_render_from_minimal_scenario() -> anyhow::Result<()> {
 }
 
 /// Golden snapshot tests using expectrl + vt100 + insta
-
 use expectrl::spawn;
 use std::io::{Read, Write};
-use vt100::Parser;
 use std::time::Duration;
+use vt100::Parser;
 
 /// Capture a snapshot of the TUI screen using vt100 terminal emulation
 fn snapshot_screen() -> anyhow::Result<String> {
     // Get the path to the built aw-tui binary (assuming we're running from the project root)
     let binary_path = std::env::current_exe()?
-        .parent().unwrap()  // target/debug/deps
-        .parent().unwrap()  // target/debug
-        .parent().unwrap()  // target
-        .parent().unwrap()  // project root
+        .parent()
+        .unwrap() // target/debug/deps
+        .parent()
+        .unwrap() // target/debug
+        .parent()
+        .unwrap() // target
+        .parent()
+        .unwrap() // project root
         .join("target")
         .join("debug")
-        .join(if cfg!(windows) { "aw-tui.exe" } else { "aw-tui" });
+        .join(if cfg!(windows) {
+            "aw-tui.exe"
+        } else {
+            "aw-tui"
+        });
 
     // Spawn the TUI binary in local mode (no remote server)
     let mut p = spawn(binary_path.to_string_lossy().as_ref())?;
@@ -143,5 +143,3 @@ fn test_tui_initial_screen_snapshot() {
         eprintln!("Skipping TUI snapshot test (set TUI_SNAPSHOTS=1 to enable)");
     }
 }
-
-

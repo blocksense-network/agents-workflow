@@ -1,6 +1,9 @@
 //! Btrfs snapshot provider implementation for Agents Workflow.
 
-use aw_fs_snapshots_traits::{FsSnapshotProvider, ProviderCapabilities, PreparedWorkspace, Result, SnapshotProviderKind, SnapshotRef, WorkingCopyMode};
+use aw_fs_snapshots_traits::{
+    FsSnapshotProvider, PreparedWorkspace, ProviderCapabilities, Result, SnapshotProviderKind,
+    SnapshotRef, WorkingCopyMode,
+};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -43,7 +46,9 @@ impl BtrfsProvider {
             .output()?;
 
         if !output.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider("Failed to determine filesystem type"));
+            return Err(aw_fs_snapshots_traits::Error::provider(
+                "Failed to determine filesystem type",
+            ));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -59,7 +64,10 @@ impl BtrfsProvider {
             .output()?;
 
         if !output.status.success() {
-            return Err(aw_fs_snapshots_traits::Error::provider(format!("Path is not in a Btrfs subvolume: {}", path.display())));
+            return Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Path is not in a Btrfs subvolume: {}",
+                path.display()
+            )));
         }
 
         // The first line should contain the subvolume path
@@ -67,7 +75,9 @@ impl BtrfsProvider {
         if let Some(first_line) = output_str.lines().next() {
             Ok(first_line.trim().to_string())
         } else {
-            Err(aw_fs_snapshots_traits::Error::provider("Failed to parse btrfs subvolume show output"))
+            Err(aw_fs_snapshots_traits::Error::provider(
+                "Failed to parse btrfs subvolume show output",
+            ))
         }
     }
 
@@ -93,10 +103,7 @@ impl BtrfsProvider {
     /// Generate a unique identifier for Btrfs resources.
     fn generate_unique_id(&self) -> String {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         format!("aw_{}_{}", std::process::id(), timestamp)
     }
 }
@@ -117,22 +124,20 @@ impl FsSnapshotProvider for BtrfsProvider {
         }
 
         match Self::fs_type(repo) {
-            Ok(fs_type) if fs_type == "btrfs" => {
-                match self.get_subvolume_for_path(repo) {
-                    Ok(subvolume) => ProviderCapabilities {
-                        kind: self.kind(),
-                        score: 80,
-                        supports_cow_overlay: true,
-                        notes: vec![format!("Using Btrfs subvolume: {}", subvolume)],
-                    },
-                    Err(_) => ProviderCapabilities {
-                        kind: self.kind(),
-                        score: 0,
-                        supports_cow_overlay: false,
-                        notes: vec!["Path is not in a Btrfs subvolume".to_string()],
-                    },
-                }
-            }
+            Ok(fs_type) if fs_type == "btrfs" => match self.get_subvolume_for_path(repo) {
+                Ok(subvolume) => ProviderCapabilities {
+                    kind: self.kind(),
+                    score: 80,
+                    supports_cow_overlay: true,
+                    notes: vec![format!("Using Btrfs subvolume: {}", subvolume)],
+                },
+                Err(_) => ProviderCapabilities {
+                    kind: self.kind(),
+                    score: 0,
+                    supports_cow_overlay: false,
+                    notes: vec!["Path is not in a Btrfs subvolume".to_string()],
+                },
+            },
             Ok(fs_type) => ProviderCapabilities {
                 kind: self.kind(),
                 score: 0,
@@ -169,7 +174,13 @@ impl FsSnapshotProvider for BtrfsProvider {
                 let snapshot_path = repo.with_file_name(format!("aw_snapshot_{}", unique_id));
 
                 // Create readonly snapshot
-                self.execute_btrfs_command(&["subvolume", "snapshot", "-r", repo.to_str().unwrap(), snapshot_path.to_str().unwrap()])?;
+                self.execute_btrfs_command(&[
+                    "subvolume",
+                    "snapshot",
+                    "-r",
+                    repo.to_str().unwrap(),
+                    snapshot_path.to_str().unwrap(),
+                ])?;
 
                 Ok(PreparedWorkspace {
                     exec_path: snapshot_path.clone(),
@@ -180,21 +191,36 @@ impl FsSnapshotProvider for BtrfsProvider {
             }
             WorkingCopyMode::Worktree | WorkingCopyMode::Auto => {
                 // Fall back to worktree mode for Btrfs (simpler implementation)
-                Err(aw_fs_snapshots_traits::Error::provider("Btrfs worktree mode not implemented - use CowOverlay"))
+                Err(aw_fs_snapshots_traits::Error::provider(
+                    "Btrfs worktree mode not implemented - use CowOverlay",
+                ))
             }
         }
     }
 
     fn snapshot_now(&self, ws: &PreparedWorkspace, label: Option<&str>) -> Result<SnapshotRef> {
         let unique_id = self.generate_unique_id();
-        let snapshot_path = ws.exec_path.with_file_name(format!("aw_session_snapshot_{}", unique_id));
+        let snapshot_path =
+            ws.exec_path.with_file_name(format!("aw_session_snapshot_{}", unique_id));
 
         // Create readonly snapshot of the current workspace
-        self.execute_btrfs_command(&["subvolume", "snapshot", "-r", ws.exec_path.to_str().unwrap(), snapshot_path.to_str().unwrap()])?;
+        self.execute_btrfs_command(&[
+            "subvolume",
+            "snapshot",
+            "-r",
+            ws.exec_path.to_str().unwrap(),
+            snapshot_path.to_str().unwrap(),
+        ])?;
 
         let mut meta = HashMap::new();
-        meta.insert("source_path".to_string(), ws.exec_path.to_string_lossy().to_string());
-        meta.insert("snapshot_path".to_string(), snapshot_path.to_string_lossy().to_string());
+        meta.insert(
+            "source_path".to_string(),
+            ws.exec_path.to_string_lossy().to_string(),
+        );
+        meta.insert(
+            "snapshot_path".to_string(),
+            snapshot_path.to_string_lossy().to_string(),
+        );
         meta.insert("timestamp".to_string(), chrono::Utc::now().to_rfc3339());
 
         Ok(SnapshotRef {
@@ -212,10 +238,14 @@ impl FsSnapshotProvider for BtrfsProvider {
             if path.exists() {
                 Ok(path)
             } else {
-                Err(aw_fs_snapshots_traits::Error::provider("Btrfs snapshot path does not exist"))
+                Err(aw_fs_snapshots_traits::Error::provider(
+                    "Btrfs snapshot path does not exist",
+                ))
             }
         } else {
-            Err(aw_fs_snapshots_traits::Error::provider("Btrfs snapshot missing path metadata"))
+            Err(aw_fs_snapshots_traits::Error::provider(
+                "Btrfs snapshot missing path metadata",
+            ))
         }
     }
 
@@ -227,12 +257,19 @@ impl FsSnapshotProvider for BtrfsProvider {
         match mode {
             WorkingCopyMode::CowOverlay => {
                 let unique_id = self.generate_unique_id();
-                let branch_path = snap.meta.get("snapshot_path")
+                let branch_path = snap
+                    .meta
+                    .get("snapshot_path")
                     .map(|p| Path::new(p).with_file_name(format!("aw_branch_{}", unique_id)))
                     .unwrap_or_else(|| PathBuf::from(format!("aw_branch_{}", unique_id)));
 
                 // Create a writable snapshot from the readonly snapshot
-                self.execute_btrfs_command(&["subvolume", "snapshot", snap.meta.get("snapshot_path").unwrap(), branch_path.to_str().unwrap()])?;
+                self.execute_btrfs_command(&[
+                    "subvolume",
+                    "snapshot",
+                    snap.meta.get("snapshot_path").unwrap(),
+                    branch_path.to_str().unwrap(),
+                ])?;
 
                 Ok(PreparedWorkspace {
                     exec_path: branch_path.clone(),
@@ -241,7 +278,9 @@ impl FsSnapshotProvider for BtrfsProvider {
                     cleanup_token: format!("btrfs:branch:{}", branch_path.display()),
                 })
             }
-            _ => Err(aw_fs_snapshots_traits::Error::provider("Btrfs branching only supports CowOverlay mode")),
+            _ => Err(aw_fs_snapshots_traits::Error::provider(
+                "Btrfs branching only supports CowOverlay mode",
+            )),
         }
     }
 
@@ -270,7 +309,10 @@ impl FsSnapshotProvider for BtrfsProvider {
             }
             Ok(())
         } else {
-            Err(aw_fs_snapshots_traits::Error::provider(format!("Invalid Btrfs cleanup token: {}", token)))
+            Err(aw_fs_snapshots_traits::Error::provider(format!(
+                "Invalid Btrfs cleanup token: {}",
+                token
+            )))
         }
     }
 }

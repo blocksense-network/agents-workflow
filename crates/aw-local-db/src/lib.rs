@@ -49,13 +49,8 @@ pub use connection::Database;
 
 /// Database models and operations.
 pub use models::{
-    RepoRecord, RepoStore,
-    AgentRecord, AgentStore,
-    RuntimeRecord, RuntimeStore,
-    SessionRecord, SessionStore,
-    TaskRecord, TaskStore,
-    FsSnapshotRecord, FsSnapshotStore,
-    KvStore,
+    AgentRecord, AgentStore, FsSnapshotRecord, FsSnapshotStore, KvStore, RepoRecord, RepoStore,
+    RuntimeRecord, RuntimeStore, SessionRecord, SessionStore, TaskRecord, TaskStore,
 };
 
 /// Schema definitions and constants.

@@ -53,7 +53,10 @@ pub trait ProviderCoreTestBehavior {
     }
 
     /// Create a workspace destination path for testing.
-    fn create_workspace_destination(&self, suffix: Option<&str>) -> aw_fs_snapshots_traits::Result<PathBuf> {
+    fn create_workspace_destination(
+        &self,
+        suffix: Option<&str>,
+    ) -> aw_fs_snapshots_traits::Result<PathBuf> {
         let pid = std::process::id();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -69,7 +72,10 @@ pub trait ProviderCoreTestBehavior {
     }
 
     /// Cleanup a test workspace.
-    fn cleanup_test_workspace(&self, workspace_dir: &Path) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn cleanup_test_workspace(
+        &self,
+        workspace_dir: &Path,
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         if workspace_dir.exists() {
             fs::remove_dir_all(workspace_dir)?;
         }
@@ -77,7 +83,11 @@ pub trait ProviderCoreTestBehavior {
     }
 
     /// Verify cleanup behavior (to be implemented by specific provider tests).
-    fn verify_cleanup_behavior(&self, _workspace_dir: &Path, _result_path: &Path) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn verify_cleanup_behavior(
+        &self,
+        _workspace_dir: &Path,
+        _result_path: &Path,
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         // Default implementation - providers can override
         Ok(())
     }

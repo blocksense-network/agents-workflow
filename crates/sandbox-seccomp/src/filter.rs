@@ -15,7 +15,9 @@ impl SeccompFilter {
     pub fn new() -> Result<Self> {
         let ctx = unsafe { seccomp_init(SCMP_ACT_ALLOW) };
         if ctx.is_null() {
-            return Err(Error::FilterInstall("Failed to initialize seccomp context".into()));
+            return Err(Error::FilterInstall(
+                "Failed to initialize seccomp context".into(),
+            ));
         }
 
         Ok(Self { ctx })
@@ -48,7 +50,8 @@ impl SeccompFilter {
         let ret = unsafe { seccomp_load(self.ctx as scmp_filter_ctx) };
         if ret != 0 {
             return Err(Error::FilterInstall(format!(
-                "Failed to load seccomp filter: {}", ret
+                "Failed to load seccomp filter: {}",
+                ret
             )));
         }
 
@@ -179,7 +182,10 @@ impl FilterBuilder {
             for syscall in ptrace_syscalls.iter() {
                 debug!("Adding ALLOW rule for ptrace syscall {}", syscall);
                 self.filter.add_rule(*syscall as i32, SCMP_ACT_ALLOW, &[])?;
-                debug!("Successfully added ALLOW rule for ptrace syscall {}", syscall);
+                debug!(
+                    "Successfully added ALLOW rule for ptrace syscall {}",
+                    syscall
+                );
             }
             debug!("Debug mode enabled: allowing ptrace operations");
         } else {
@@ -193,7 +199,10 @@ impl FilterBuilder {
             for syscall in ptrace_syscalls.iter() {
                 debug!("Adding ERRNO rule for ptrace syscall {}", syscall);
                 self.filter.add_rule(*syscall as i32, SCMP_ACT_ERRNO(libc::EPERM as u16), &[])?;
-                debug!("Successfully added ERRNO rule for ptrace syscall {}", syscall);
+                debug!(
+                    "Successfully added ERRNO rule for ptrace syscall {}",
+                    syscall
+                );
             }
             debug!("Debug mode disabled: blocking ptrace operations");
         }

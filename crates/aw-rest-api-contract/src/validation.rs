@@ -1,7 +1,7 @@
 //! Validation helpers for API contract types
 
-use crate::types::*;
 use crate::error::ApiContractError;
+use crate::types::*;
 use validator::Validate;
 
 /// Validate a create task request
@@ -30,7 +30,9 @@ pub fn validate_repo_config(config: &RepoConfig) -> Result<(), ApiContractError>
     match config.mode {
         RepoMode::Git => {
             if config.url.is_none() {
-                return Err(ApiContractError::Validation(validator::ValidationErrors::new()));
+                return Err(ApiContractError::Validation(
+                    validator::ValidationErrors::new(),
+                ));
             }
         }
         RepoMode::Upload | RepoMode::None => {

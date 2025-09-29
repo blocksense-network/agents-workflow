@@ -35,10 +35,14 @@ fn main() -> anyhow::Result<()> {
     info!("Testing memory limits on container...");
     let memory_test = Command::new("podman")
         .args(&[
-            "run", "--rm",
-            "--memory", "10m",  // Limit to 10MB
+            "run",
+            "--rm",
+            "--memory",
+            "10m", // Limit to 10MB
             "docker.io/library/busybox:latest",
-            "sh", "-c", "dd if=/dev/zero of=/dev/null bs=1M count=50"  // Try to allocate 50MB
+            "sh",
+            "-c",
+            "dd if=/dev/zero of=/dev/null bs=1M count=50", // Try to allocate 50MB
         ])
         .output();
 
@@ -68,10 +72,14 @@ fn main() -> anyhow::Result<()> {
     info!("Testing PID limits on container...");
     let pid_test = Command::new("podman")
         .args(&[
-            "run", "--rm",
-            "--pids-limit", "5",  // Limit to 5 PIDs
+            "run",
+            "--rm",
+            "--pids-limit",
+            "5", // Limit to 5 PIDs
             "docker.io/library/busybox:latest",
-            "sh", "-c", "for i in $(seq 1 10); do (sleep 1 &) done; wait"
+            "sh",
+            "-c",
+            "for i in $(seq 1 10); do (sleep 1 &) done; wait",
         ])
         .output();
 
@@ -86,7 +94,9 @@ fn main() -> anyhow::Result<()> {
                     std::process::exit(1);
                 } else {
                     info!("⚠️  Container PID limit not enforced (expected in unprivileged environment)");
-                    info!("✓ PID limit test completed (limit not enforced due to unprivileged mode)");
+                    info!(
+                        "✓ PID limit test completed (limit not enforced due to unprivileged mode)"
+                    );
                 }
             }
         }
@@ -102,10 +112,14 @@ fn main() -> anyhow::Result<()> {
     let start = Instant::now();
     let cpu_test = Command::new("podman")
         .args(&[
-            "run", "--rm",
-            "--cpus", "0.1",  // Limit to 0.1 CPU cores
+            "run",
+            "--rm",
+            "--cpus",
+            "0.1", // Limit to 0.1 CPU cores
             "docker.io/library/busybox:latest",
-            "sh", "-c", "for i in $(seq 1 100); do echo $i > /dev/null; done"
+            "sh",
+            "-c",
+            "for i in $(seq 1 100); do echo $i > /dev/null; done",
         ])
         .output();
 

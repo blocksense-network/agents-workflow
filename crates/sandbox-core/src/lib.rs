@@ -15,23 +15,15 @@ pub use sandbox_cgroups::{
 };
 
 #[cfg(feature = "seccomp")]
-pub use sandbox_seccomp::{
-    SeccompConfig, SeccompManager,
-};
+pub use sandbox_seccomp::{SeccompConfig, SeccompManager};
 
 #[cfg(feature = "net")]
-pub use sandbox_net::{
-    NetworkConfig, NetworkManager,
-};
+pub use sandbox_net::{NetworkConfig, NetworkManager};
 
 #[cfg(feature = "devices")]
-pub use sandbox_devices::{
-    DeviceConfig, DeviceManager,
-};
+pub use sandbox_devices::{DeviceConfig, DeviceManager};
 
-pub use sandbox_fs::{
-    FilesystemConfig, FilesystemManager,
-};
+pub use sandbox_fs::{FilesystemConfig, FilesystemManager};
 
 use tracing::{debug, info};
 
@@ -312,7 +304,10 @@ impl Sandbox {
                 }
                 Err(e) => {
                     // In test environments, filesystem operations may fail due to permissions
-                    debug!("Filesystem setup failed (expected in test environment): {}", e);
+                    debug!(
+                        "Filesystem setup failed (expected in test environment): {}",
+                        e
+                    );
                 }
             }
         }
@@ -326,7 +321,10 @@ impl Sandbox {
                 }
                 Err(e) => {
                     // In test environments or systems without seccomp support, this may fail
-                    debug!("Seccomp filter installation failed (expected in some environments): {}", e);
+                    debug!(
+                        "Seccomp filter installation failed (expected in some environments): {}",
+                        e
+                    );
                 }
             }
         }
@@ -340,7 +338,10 @@ impl Sandbox {
                 }
                 Err(e) => {
                     // In test environments or systems without network tools, this may fail
-                    debug!("Network isolation setup failed (expected in some environments): {}", e);
+                    debug!(
+                        "Network isolation setup failed (expected in some environments): {}",
+                        e
+                    );
                 }
             }
         }
@@ -389,7 +390,10 @@ impl Sandbox {
                 }
                 Err(e) => {
                     // In test environments, filesystem operations may fail due to permissions
-                    debug!("Filesystem setup failed (expected in test environment): {}", e);
+                    debug!(
+                        "Filesystem setup failed (expected in test environment): {}",
+                        e
+                    );
                 }
             }
         }
@@ -431,7 +435,10 @@ impl Sandbox {
                 }
                 Err(e) => {
                     // In test environments, seccomp may not be available
-                    debug!("Seccomp filter installation failed (expected in some environments): {}", e);
+                    debug!(
+                        "Seccomp filter installation failed (expected in some environments): {}",
+                        e
+                    );
                 }
             }
         }

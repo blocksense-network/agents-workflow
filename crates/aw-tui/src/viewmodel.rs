@@ -23,7 +23,6 @@ pub struct ViewModel {
     pub error_message: Option<String>,
 }
 
-
 impl ViewModel {
     /// Create a ViewModel from the current AppState
     pub fn from_state(state: &AppState) -> Self {
@@ -43,7 +42,8 @@ impl ViewModel {
 
     /// Check if a specific task is selected by ID
     pub fn is_task_selected(&self, task_id: &str) -> bool {
-        self.tasks.get(self.selected_task_index)
+        self.tasks
+            .get(self.selected_task_index)
             .map(|t| t.id == task_id)
             .unwrap_or(false)
     }

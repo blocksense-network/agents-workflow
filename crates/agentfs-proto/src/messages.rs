@@ -1,7 +1,7 @@
 //! Control plane message types for AgentFS
 
-use ssz_derive::{Decode, Encode};
 use ssz::{Decode, Encode};
+use ssz_derive::{Decode, Encode};
 
 // SSZ Union-based request/response types for type-safe communication
 // Using Vec<u8> for strings as SSZ supports variable-length byte vectors
@@ -11,9 +11,9 @@ use ssz::{Decode, Encode};
 #[ssz(enum_behaviour = "union")]
 pub enum Request {
     SnapshotCreate((Vec<u8>, SnapshotCreateRequest)), // (version, request)
-    SnapshotList(Vec<u8>),                             // version
-    BranchCreate((Vec<u8>, BranchCreateRequest)),      // (version, request)
-    BranchBind((Vec<u8>, BranchBindRequest)),          // (version, request)
+    SnapshotList(Vec<u8>),                            // version
+    BranchCreate((Vec<u8>, BranchCreateRequest)),     // (version, request)
+    BranchBind((Vec<u8>, BranchBindRequest)),         // (version, request)
 }
 
 /// Response union - operation-specific success responses or errors

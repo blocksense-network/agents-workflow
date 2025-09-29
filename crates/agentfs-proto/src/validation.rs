@@ -15,9 +15,9 @@ pub enum ValidationError {
 /// Validate a decoded request against its logical schema
 pub fn validate_request(request: &Request) -> Result<(), ValidationError> {
     match request {
-        Request::SnapshotCreate((version, _)) |
-        Request::BranchCreate((version, _)) |
-        Request::BranchBind((version, _)) => {
+        Request::SnapshotCreate((version, _))
+        | Request::BranchCreate((version, _))
+        | Request::BranchBind((version, _)) => {
             if version != b"1" {
                 return Err(ValidationError::Schema("version must be '1'".to_string()));
             }
@@ -37,10 +37,10 @@ pub fn validate_response(response: &Response) -> Result<(), ValidationError> {
     // For union responses, the structure is validated by the SSZ decoding itself
     // Error responses are always valid, success responses have their structure enforced by the union
     match response {
-        Response::SnapshotCreate(_) |
-        Response::SnapshotList(_) |
-        Response::BranchCreate(_) |
-        Response::BranchBind(_) |
-        Response::Error(_) => Ok(()),
+        Response::SnapshotCreate(_)
+        | Response::SnapshotList(_)
+        | Response::BranchCreate(_)
+        | Response::BranchBind(_)
+        | Response::Error(_) => Ok(()),
     }
 }

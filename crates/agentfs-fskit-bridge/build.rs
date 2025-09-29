@@ -5,11 +5,20 @@ fn main() {
     // Only link against sys crate when feature is enabled
     if std::env::var("CARGO_FEATURE_LINK_SYS").is_ok() {
         // Build and link the sys crate as a static library
-        let sys_path = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("agentfs-fskit-sys");
+        let sys_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("agentfs-fskit-sys");
 
         // Tell cargo to link against the sys crate
         println!("cargo:rustc-link-lib=static=agentfs_fskit_sys");
-        println!("cargo:rustc-link-search=native={}", sys_path.join("target").join(env::var("PROFILE").unwrap_or_else(|_| "debug".to_string())).display());
+        println!(
+            "cargo:rustc-link-search=native={}",
+            sys_path
+                .join("target")
+                .join(env::var("PROFILE").unwrap_or_else(|_| "debug".to_string()))
+                .display()
+        );
     }
 
     // Generate Swift header for the bridge

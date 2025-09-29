@@ -257,7 +257,6 @@ pub fn initialize_git_repo(repo_path: &Path) -> Result<(), Box<dyn std::error::E
     initialize_git_repo_with_config(repo_path, &GitRepoConfig::default())
 }
 
-
 /// Create a commit in an existing git repository.
 pub async fn create_commit(
     repo_path: &Path,
@@ -444,7 +443,9 @@ mod tests {
 
         let repo = create_git_repo(None).await.unwrap();
 
-        let commit_hash = create_commit(&repo.path, "test.txt", "test content", "Test commit").await.unwrap();
+        let commit_hash = create_commit(&repo.path, "test.txt", "test content", "Test commit")
+            .await
+            .unwrap();
 
         // Verify commit exists
         let output = Command::new("git")
@@ -486,7 +487,9 @@ mod tests {
 
         let repo = create_git_repo(None).await.unwrap();
 
-        create_uncommitted_file(&repo.path, "uncommitted.txt", "uncommitted content").await.unwrap();
+        create_uncommitted_file(&repo.path, "uncommitted.txt", "uncommitted content")
+            .await
+            .unwrap();
 
         let status = git_status(&repo.path).await.unwrap();
         assert!(status.contains("?? uncommitted.txt"));
@@ -506,9 +509,18 @@ mod tests {
         let new_config = GitRepoConfig::new();
         assert_eq!(new_config.user_email, default_config.user_email);
         assert_eq!(new_config.user_name, default_config.user_name);
-        assert_eq!(new_config.disable_gpg_signing, default_config.disable_gpg_signing);
-        assert_eq!(new_config.create_initial_commit, default_config.create_initial_commit);
-        assert_eq!(new_config.initial_commit_message, default_config.initial_commit_message);
+        assert_eq!(
+            new_config.disable_gpg_signing,
+            default_config.disable_gpg_signing
+        );
+        assert_eq!(
+            new_config.create_initial_commit,
+            default_config.create_initial_commit
+        );
+        assert_eq!(
+            new_config.initial_commit_message,
+            default_config.initial_commit_message
+        );
 
         // Test fluent API with customizations
         let custom_config = GitRepoConfig::new()
@@ -522,11 +534,13 @@ mod tests {
         assert_eq!(custom_config.user_name, "Custom User");
         assert!(!custom_config.disable_gpg_signing);
         assert!(!custom_config.create_initial_commit);
-        assert_eq!(custom_config.initial_commit_message, "Custom initial commit");
+        assert_eq!(
+            custom_config.initial_commit_message,
+            "Custom initial commit"
+        );
 
         // Test partial customization (other fields should remain default)
-        let partial_config = GitRepoConfig::new()
-            .user_email("partial@example.com");
+        let partial_config = GitRepoConfig::new().user_email("partial@example.com");
 
         assert_eq!(partial_config.user_email, "partial@example.com");
         assert_eq!(partial_config.user_name, "Test User"); // default

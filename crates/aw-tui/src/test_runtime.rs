@@ -16,8 +16,8 @@ use crate::{
     create_test_terminal,
     model::Model,
     msg::{Msg, NetMsg, RestSuccessMsg},
-    viewmodel::ViewModel,
     ui,
+    viewmodel::ViewModel,
 };
 
 /// Test runtime that executes scenarios deterministically
@@ -121,7 +121,11 @@ impl<C: ClientApi> TestRuntime<C> {
     }
 
     /// Assert ViewModel state
-    fn assert_view_model(&self, expected_focus: &str, expected_selected: Option<usize>) -> Result<(), String> {
+    fn assert_view_model(
+        &self,
+        expected_focus: &str,
+        expected_selected: Option<usize>,
+    ) -> Result<(), String> {
         let vm = &self.current_view_model;
 
         // Check focus
@@ -138,10 +142,12 @@ impl<C: ClientApi> TestRuntime<C> {
             let actual_selected = match expected_focus {
                 "tasks" => vm.selected_task_index as i64,
                 _ => {
-                    return Err(format!("Cannot check selection for focus '{}'", expected_focus));
+                    return Err(format!(
+                        "Cannot check selection for focus '{}'",
+                        expected_focus
+                    ));
                 }
             };
-
 
             if actual_selected != expected_idx as i64 {
                 return Err(format!(

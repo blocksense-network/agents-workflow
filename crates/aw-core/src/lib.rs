@@ -35,7 +35,7 @@ pub use editor::{edit_content_interactive, EditorError, EDITOR_HINT};
 pub use devshell::devshell_names;
 
 /// Push operations and remote management utilities.
-pub use push::{PushHandler, PushOptions, parse_push_to_remote_flag};
+pub use push::{parse_push_to_remote_flag, PushHandler, PushOptions};
 
 /// Database integration for persistence.
 pub use db::DatabaseManager;

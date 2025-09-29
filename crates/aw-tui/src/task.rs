@@ -157,7 +157,10 @@ impl Task {
                 description: String::new(),
                 selected_repo: "agent-workflow".to_string(),
                 selected_branch: "main".to_string(),
-                selected_models: create_default_models().into_iter().filter(|m| m.selected).collect(),
+                selected_models: create_default_models()
+                    .into_iter()
+                    .filter(|m| m.selected)
+                    .collect(),
                 focused_button: ButtonFocus::Description,
                 modal_state: None,
             },
@@ -188,7 +191,11 @@ impl Task {
             TaskState::Completed { title, .. } => title.clone(),
             TaskState::Active { title, .. } => title.clone(),
             TaskState::Draft { description, .. } => description.clone(),
-            TaskState::New { selected_repo, selected_branch, .. } => {
+            TaskState::New {
+                selected_repo,
+                selected_branch,
+                ..
+            } => {
                 if selected_repo.is_empty() && selected_branch.is_empty() {
                     "New task".to_string()
                 } else {

@@ -3,8 +3,8 @@
 //! This binary provides a command-line interface for testing the FSKit adapter.
 //! In production, this would be an Xcode FSKit extension.
 
-use agentfs_fskit_host::{FsKitAdapter, FsKitConfig};
 use agentfs_core::config::SecurityPolicy;
+use agentfs_fskit_host::{FsKitAdapter, FsKitConfig};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -46,7 +46,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     match args.command {
-        Commands::Mount { mount_point, max_memory, spill_dir } => {
+        Commands::Mount {
+            mount_point,
+            max_memory,
+            spill_dir,
+        } => {
             println!("Mounting AgentFS at {:?}", mount_point);
 
             let config = FsKitConfig {
@@ -158,16 +162,24 @@ async fn run_smoke_tests(config: FsKitConfig) -> Result<(), Box<dyn std::error::
 
     // Test basic file operations
     println!("Testing file operations...");
-    core.mkdir(&agentfs_core::PID::new(0), std::path::Path::new("/testdir"), 0o755)?;
-    let handle = core.create(&agentfs_core::PID::new(0), std::path::Path::new("/testdir/hello.txt"), &agentfs_core::OpenOptions {
-        read: true,
-        write: true,
-        create: true,
-        truncate: false,
-        append: false,
-        share: vec![],
-        stream: None,
-    })?;
+    core.mkdir(
+        &agentfs_core::PID::new(0),
+        std::path::Path::new("/testdir"),
+        0o755,
+    )?;
+    let handle = core.create(
+        &agentfs_core::PID::new(0),
+        std::path::Path::new("/testdir/hello.txt"),
+        &agentfs_core::OpenOptions {
+            read: true,
+            write: true,
+            create: true,
+            truncate: false,
+            append: false,
+            share: vec![],
+            stream: None,
+        },
+    )?;
 
     let test_data = b"Hello, AgentFS FSKit!";
     core.write(&agentfs_core::PID::new(0), handle, 0, test_data)?;
@@ -180,7 +192,10 @@ async fn run_smoke_tests(config: FsKitConfig) -> Result<(), Box<dyn std::error::
     core.close(&agentfs_core::PID::new(0), handle)?;
 
     // Verify file contents
-    let attrs = core.getattr(&agentfs_core::PID::new(0), std::path::Path::new("/testdir/hello.txt"))?;
+    let attrs = core.getattr(
+        &agentfs_core::PID::new(0),
+        std::path::Path::new("/testdir/hello.txt"),
+    )?;
     assert_eq!(attrs.len, test_data.len() as u64);
 
     println!("File operations test passed!");

@@ -3,8 +3,8 @@
 #![cfg(target_os = "linux")]
 
 use nix::mount::{mount, umount2, MntFlags, MsFlags};
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 
 pub mod error;
@@ -168,9 +168,15 @@ impl FilesystemManager {
                 Ok(()) => debug!("Successfully unmounted overlay: {}", overlay_path),
                 Err(e) => {
                     // Try lazy unmount if regular unmount fails
-                    match umount2(overlay_path.as_str(), MntFlags::MNT_DETACH | MntFlags::MNT_FORCE) {
+                    match umount2(
+                        overlay_path.as_str(),
+                        MntFlags::MNT_DETACH | MntFlags::MNT_FORCE,
+                    ) {
                         Ok(()) => debug!("Successfully force-unmounted overlay: {}", overlay_path),
-                        Err(e2) => debug!("Failed to unmount overlay {}: {} (force unmount also failed: {})", overlay_path, e, e2),
+                        Err(e2) => debug!(
+                            "Failed to unmount overlay {}: {} (force unmount also failed: {})",
+                            overlay_path, e, e2
+                        ),
                     }
                 }
             }
@@ -188,21 +194,30 @@ impl FilesystemManager {
         // Clean up overlay directories if they exist
         if let Ok(session_dir) = self.ensure_session_state_dir() {
             for overlay_path in &self.config.overlay_paths {
-                let upper_dir = session_dir.join(format!("upper{}", overlay_path.replace('/', "_")));
+                let upper_dir =
+                    session_dir.join(format!("upper{}", overlay_path.replace('/', "_")));
                 let work_dir = session_dir.join(format!("work{}", overlay_path.replace('/', "_")));
 
                 // Try to remove overlay directories
                 if upper_dir.exists() {
                     match fs::remove_dir_all(&upper_dir) {
                         Ok(()) => debug!("Removed overlay upper dir: {}", upper_dir.display()),
-                        Err(e) => debug!("Failed to remove overlay upper dir {}: {}", upper_dir.display(), e),
+                        Err(e) => debug!(
+                            "Failed to remove overlay upper dir {}: {}",
+                            upper_dir.display(),
+                            e
+                        ),
                     }
                 }
 
                 if work_dir.exists() {
                     match fs::remove_dir_all(&work_dir) {
                         Ok(()) => debug!("Removed overlay work dir: {}", work_dir.display()),
-                        Err(e) => debug!("Failed to remove overlay work dir {}: {}", work_dir.display(), e),
+                        Err(e) => debug!(
+                            "Failed to remove overlay work dir {}: {}",
+                            work_dir.display(),
+                            e
+                        ),
                     }
                 }
             }
@@ -213,7 +228,10 @@ impl FilesystemManager {
                     Ok(()) => debug!("Removed session state directory: {}", session_dir.display()),
                     Err(_) => {
                         // Directory might not be empty or might have been removed already
-                        debug!("Session state directory {} may not be empty or already removed", session_dir.display());
+                        debug!(
+                            "Session state directory {} may not be empty or already removed",
+                            session_dir.display()
+                        );
                     }
                 }
             }
@@ -341,9 +359,11 @@ impl FilesystemManager {
 
         if !session_dir.exists() {
             fs::create_dir_all(&session_dir).map_err(|e| {
-                Error::Io(std::io::Error::other(
-                    format!("Failed to create session state directory {}: {}", session_dir.display(), e)
-                ))
+                Error::Io(std::io::Error::other(format!(
+                    "Failed to create session state directory {}: {}",
+                    session_dir.display(),
+                    e
+                )))
             })?;
         }
 
@@ -372,7 +392,9 @@ impl FilesystemManager {
 
         // Try to use mount_setattr with AT_RECURSIVE if available
         // For now, fall back to individual bind-remounts for common directories
-        let common_dirs = ["/etc", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/var", "/opt"];
+        let common_dirs = [
+            "/etc", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/var", "/opt",
+        ];
 
         for dir in &common_dirs {
             if Path::new(dir).exists() {
@@ -404,19 +426,25 @@ impl FilesystemManager {
         fs::create_dir_all(&upper_dir).map_err(|e| {
             Error::Overlay(format!(
                 "Failed to create upper directory {}: {}",
-                upper_dir.display(), e
+                upper_dir.display(),
+                e
             ))
         })?;
 
         fs::create_dir_all(&work_dir).map_err(|e| {
             Error::Overlay(format!(
                 "Failed to create work directory {}: {}",
-                work_dir.display(), e
+                work_dir.display(),
+                e
             ))
         })?;
 
-        info!("Setting up overlay for {}: upper={}, work={}",
-              overlay_path, upper_dir.display(), work_dir.display());
+        info!(
+            "Setting up overlay for {}: upper={}, work={}",
+            overlay_path,
+            upper_dir.display(),
+            work_dir.display()
+        );
 
         // Mount overlay filesystem
         // overlay syntax: mount -t overlay overlay -o lowerdir=host_path,upperdir=upper,workdir=work host_path
@@ -451,9 +479,10 @@ impl FilesystemManager {
             return false;
         }
 
-        self.config.blacklist_paths.iter().any(|blacklisted| {
-            path.starts_with(blacklisted) || path == blacklisted
-        })
+        self.config
+            .blacklist_paths
+            .iter()
+            .any(|blacklisted| path.starts_with(blacklisted) || path == blacklisted)
     }
 
     /// Get the current filesystem configuration

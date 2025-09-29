@@ -17,7 +17,10 @@ pub struct TuiArgs {
     api_key: Option<String>,
 
     /// Bearer token for authentication with remote server
-    #[arg(long, help = "JWT bearer token for authenticating with the remote server")]
+    #[arg(
+        long,
+        help = "JWT bearer token for authenticating with the remote server"
+    )]
     bearer_token: Option<String>,
 }
 

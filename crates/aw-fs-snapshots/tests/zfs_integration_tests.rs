@@ -44,7 +44,10 @@ mod tests {
                 assert_eq!(content, "ZFS test content");
             }
             Err(e) => {
-                println!("ZFS pool creation failed (expected in some environments): {}", e);
+                println!(
+                    "ZFS pool creation failed (expected in some environments): {}",
+                    e
+                );
             }
         }
     }
@@ -84,7 +87,8 @@ mod tests {
             use aw_fs_snapshots_zfs::ZfsProvider;
             let zfs_provider = ZfsProvider::new();
 
-            let ws_result = zfs_provider.prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree);
+            let ws_result =
+                zfs_provider.prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree);
             match ws_result {
                 Ok(ws) => {
                     println!("ZFS workspace created: {:?}", ws.exec_path);

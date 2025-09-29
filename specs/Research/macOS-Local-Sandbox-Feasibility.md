@@ -272,3 +272,57 @@ If the agent tries to _build_ new packages via Nix, note that Nix will attempt t
 [\[33\]](https://news.ycombinator.com/item?id=43796750#:~:text=Not%20trying%20to%20be%20condescending,derivations%20access%20to%20the) Not trying to be condescending but simply put the sandbox-exec ...
 
 [https://news.ycombinator.com/item?id=43796750](https://news.ycombinator.com/item?id=43796750)
+
+## Appendix - Extra Q&A
+
+Q: Can I configure a seatbelt sandbox in a way that programs like `killall` kill only processes started inside the sandbox?
+
+Short answer: you can get _close_ with a seatbelt (SBPL) profile, but you can't express "only processes that were _started inside the same sandbox_." Seatbelt's `signal` rule only knows three targets: _self_, _same process-group_, and _others_. There's no filter for "same sandbox profile." ([Reverse Engineering][1])
+
+## What you _can_ do
+
+Run the tools you want to control (including `killall`) and the processes they’re allowed to kill in the **same process group**, then write an SBPL profile that only permits sending signals to `self` and `same-group`, denying everything else.
+
+Example (minimal) profile:
+
+```scheme
+(version 1)
+(deny default)
+
+;; allow making your cohort
+(allow process-fork)
+(allow process-exec)              ; if you need to exec helpers
+
+;; only let us send signals to ourselves or our PGID
+(allow signal (target self))
+(allow signal (target same-group))
+(deny  signal (target others))    ; <- blocks killing anything outside the cohort
+
+;; optional hardening: limit process enumeration, so tools don’t see the world
+(deny process-info*)              ; default deny process info
+(allow process-info-pidinfo (target self))
+(allow process-info-setcontrol (target self))
+```
+
+* The `signal` semantics (including `target self | same-group | others`) are documented in Apple's "Apple Sandbox Guide" (reversed from seatbelt), with examples of denying signals to "others." ([Reverse Engineering][1])
+* macOS profiles commonly restrict _process-info_ operations (e.g., `process-info-listpids`), and you can selectively re-allow for `self` as WebKit's own profile does. This keeps a sandboxed `ps`/`killall` from listing global PIDs freely.
+
+### How to use it
+
+Launch your cohort in a new session/PGID (e.g., from a small launcher that calls `setsid()` or `setpgid()`), then run `killall` _under the same profile_. `killall` will still _try_ to find processes by name, but signals to processes outside the PGID will fail due to the `signal (target others)` deny. ([Reverse Engineering][1])
+
+## When that isn’t enough
+
+If you truly need "only processes that belong to _my_ isolated set," Seatbelt alone can't label membership that way. The robust route is an _Endpoint Security_ (ES) client that authorizes signal events (`ES_EVENT_TYPE_AUTH_SIGNAL`) and denies any signal unless both sender and target match your criteria (e.g., ancestry, audit token, code signature, or a runtime tag). ES lets you gate each `kill(2)` regardless of the caller, which cleanly enforces "inside → inside only." ([Apple Developer][3])
+
+## Caveats
+
+* `sandbox-exec`/SBPL are not first-class public APIs (Apple treats them as internal/deprecated), but they remain widely used (Chromium, Nix) and current profiles still work on modern macOS. Test on the exact OS you target. ([zameermanji.com][4])
+* Some tools bypass libc wrappers; denial happens at the kernel policy layer, but for best UX you may also want to hide global PIDs via the `process-info*` denies so commands don’t “see” things they can’t signal. ([Apple Developer][5])
+
+If you want, I can sketch a tiny launcher + profile that creates the process group and runs your workload + a sandboxed `killall` so it only succeeds against that cohort.
+
+[1]: https://reverse.put.as/wp-content/uploads/2011/09/Apple-Sandbox-Guide-v1.0.pdf?utm_source=chatgpt.com "Apple Sandbox Guide v1.0 - Reverse Engineering"
+[3]: https://docs.developer.apple.com/documentation/endpointsecurity/es_event_type_auth_signal?utm_source=chatgpt.com "ES_EVENT_TYPE_AUTH_SIGNAL | Apple Developer Documentation"
+[4]: https://zameermanji.com/blog/2025/4/1/sandboxing-subprocesses-in-python-on-macos/?utm_source=chatgpt.com "Sandboxing subprocesses in Python on macOS - Zameer Manji"
+[5]: https://developer.apple.com/forums/thread/661372?utm_source=chatgpt.com "Sandbox violation for process-info… | Apple Developer Forums"

@@ -50,7 +50,8 @@ fn test_zfs_provider_integration(env: &mut ZfsTestEnvironment) {
                 use aw_fs_snapshots_zfs::ZfsProvider;
                 let zfs_provider = ZfsProvider::new();
 
-                let ws_result = zfs_provider.prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree);
+                let ws_result = zfs_provider
+                    .prepare_writable_workspace(&mount_point, WorkingCopyMode::Worktree);
                 match ws_result {
                     Ok(ws) => {
                         println!("ZFS workspace created: {:?}", ws.exec_path);
@@ -70,12 +71,16 @@ fn test_zfs_provider_integration(env: &mut ZfsTestEnvironment) {
                                         assert!(readonly_path.join("README.md").exists());
                                     }
                                     Err(e) => {
-                                        println!("Readonly mount failed (may not be supported): {}", e);
+                                        println!(
+                                            "Readonly mount failed (may not be supported): {}",
+                                            e
+                                        );
                                     }
                                 }
 
                                 // Test branching from snapshot
-                                let branch_result = zfs_provider.branch_from_snapshot(&snap, WorkingCopyMode::Worktree);
+                                let branch_result = zfs_provider
+                                    .branch_from_snapshot(&snap, WorkingCopyMode::Worktree);
                                 match branch_result {
                                     Ok(branch_ws) => {
                                         println!("Branch created: {:?}", branch_ws.exec_path);
@@ -108,7 +113,10 @@ fn test_zfs_provider_integration(env: &mut ZfsTestEnvironment) {
             }
         }
         Err(e) => {
-            println!("ZFS pool creation failed (expected in some environments): {}", e);
+            println!(
+                "ZFS pool creation failed (expected in some environments): {}",
+                e
+            );
         }
     }
 }
@@ -158,12 +166,18 @@ fn test_git_provider_integration(repo_path: &Path) {
 
         // Test capabilities detection
         let capabilities = git_provider.detect_capabilities(repo_path);
-        println!("Git provider capabilities: score={}, supports_cow={}",
-                capabilities.score, capabilities.supports_cow_overlay);
-        assert!(capabilities.score > 0, "Git provider should be available for git repositories");
+        println!(
+            "Git provider capabilities: score={}, supports_cow={}",
+            capabilities.score, capabilities.supports_cow_overlay
+        );
+        assert!(
+            capabilities.score > 0,
+            "Git provider should be available for git repositories"
+        );
 
         // Test workspace creation
-        let ws_result = git_provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree);
+        let ws_result =
+            git_provider.prepare_writable_workspace(repo_path, WorkingCopyMode::Worktree);
         match ws_result {
             Ok(ws) => {
                 println!("Git workspace created: {:?}", ws.exec_path);
@@ -188,7 +202,9 @@ fn test_git_provider_integration(repo_path: &Path) {
                                 assert!(readonly_path.join("test_file.txt").exists());
 
                                 // Verify the modified content is in the snapshot
-                                let content = std::fs::read_to_string(readonly_path.join("test_file.txt")).unwrap();
+                                let content =
+                                    std::fs::read_to_string(readonly_path.join("test_file.txt"))
+                                        .unwrap();
                                 assert_eq!(content, "Modified content for snapshot");
                             }
                             Err(e) => {
@@ -197,13 +213,17 @@ fn test_git_provider_integration(repo_path: &Path) {
                         }
 
                         // Test branching from snapshot
-                        let branch_result = git_provider.branch_from_snapshot(&snap, WorkingCopyMode::Worktree);
+                        let branch_result =
+                            git_provider.branch_from_snapshot(&snap, WorkingCopyMode::Worktree);
                         match branch_result {
                             Ok(branch_ws) => {
                                 println!("Branch created: {:?}", branch_ws.exec_path);
 
                                 // Verify branch has the same content
-                                let branch_content = std::fs::read_to_string(branch_ws.exec_path.join("test_file.txt")).unwrap();
+                                let branch_content = std::fs::read_to_string(
+                                    branch_ws.exec_path.join("test_file.txt"),
+                                )
+                                .unwrap();
                                 assert_eq!(branch_content, "Modified content for snapshot");
 
                                 // Cleanup branch

@@ -38,11 +38,7 @@ impl Task {
     /// Convert to an aw-core Task if available.
     #[cfg(feature = "aw-core-integration")]
     pub fn to_aw_core_task(&self) -> crate::Result<aw_core::Task> {
-        let metadata = self
-            .metadata
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+        let metadata = self.metadata.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
 
         Ok(aw_core::Task {
             id: aw_core::TaskId(self.id.0),
@@ -264,16 +260,16 @@ impl<'a> AgentStore<'a> {
             INSERT INTO agents (name, version, metadata)
             VALUES (?, ?, ?)
             "#,
-            params![
-                record.name,
-                record.version,
-                record.metadata
-            ],
+            params![record.name, record.version, record.metadata],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn get_by_name_version(&self, name: &str, version: &str) -> crate::Result<Option<AgentRecord>> {
+    pub fn get_by_name_version(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> crate::Result<Option<AgentRecord>> {
         let mut stmt = self.conn.prepare(
             r#"
             SELECT id, name, version, metadata
@@ -314,11 +310,7 @@ impl<'a> RuntimeStore<'a> {
             INSERT INTO runtimes (type, devcontainer_path, metadata)
             VALUES (?, ?, ?)
             "#,
-            params![
-                record.type_,
-                record.devcontainer_path,
-                record.metadata
-            ],
+            params![record.type_, record.devcontainer_path, record.metadata],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -423,7 +415,12 @@ impl<'a> SessionStore<'a> {
         }
     }
 
-    pub fn update_status(&self, session_id: &str, status: &str, ended_at: Option<&str>) -> crate::Result<()> {
+    pub fn update_status(
+        &self,
+        session_id: &str,
+        status: &str,
+        ended_at: Option<&str>,
+    ) -> crate::Result<()> {
         self.conn.execute(
             r#"
             UPDATE sessions

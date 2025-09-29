@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use anyhow::{Context, Result};
+use aw_fs_snapshots::{FsSnapshotProvider, PreparedWorkspace, WorkingCopyMode};
 use clap::Args;
-use anyhow::{Result, Context};
-use aw_fs_snapshots::{WorkingCopyMode, FsSnapshotProvider, PreparedWorkspace};
+use std::path::PathBuf;
 
 #[cfg(target_os = "linux")]
 use sandbox_core::Sandbox;
@@ -54,7 +54,9 @@ impl SandboxRunArgs {
     pub async fn run(self) -> Result<()> {
         // Validate arguments
         if self.sandbox_type != "local" {
-            return Err(anyhow::anyhow!("Only 'local' sandbox type is currently supported"));
+            return Err(anyhow::anyhow!(
+                "Only 'local' sandbox type is currently supported"
+            ));
         }
 
         // Parse boolean flags
@@ -69,15 +71,19 @@ impl SandboxRunArgs {
         }
 
         // Get current working directory as the workspace to snapshot
-        let workspace_path = std::env::current_dir()
-            .context("Failed to get current working directory")?;
+        let workspace_path =
+            std::env::current_dir().context("Failed to get current working directory")?;
 
         // Prepare writable workspace using FS snapshots
         // Try providers in order of preference: ZFS -> Btrfs -> Git
-        let prepared_workspace = prepare_workspace_with_fallback(&workspace_path).await
+        let prepared_workspace = prepare_workspace_with_fallback(&workspace_path)
+            .await
             .context("Failed to prepare writable workspace with any provider")?;
 
-        println!("Prepared workspace at: {}", prepared_workspace.exec_path.display());
+        println!(
+            "Prepared workspace at: {}",
+            prepared_workspace.exec_path.display()
+        );
         println!("Working copy mode: {:?}", prepared_workspace.working_copy);
         println!("Provider: {:?}", prepared_workspace.provider);
 
@@ -102,25 +108,36 @@ impl SandboxRunArgs {
 }
 
 /// Prepare a writable workspace using FS snapshots with fallback logic
-pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -> Result<PreparedWorkspace> {
+pub async fn prepare_workspace_with_fallback(
+    workspace_path: &std::path::Path,
+) -> Result<PreparedWorkspace> {
     // Try providers in order of preference: ZFS -> Btrfs -> Git
     let mut providers_to_try: Vec<(&str, fn() -> Result<Box<dyn FsSnapshotProvider>>)> = Vec::new();
 
     #[cfg(feature = "zfs")]
-    providers_to_try.push(("ZFS", || -> Result<Box<dyn FsSnapshotProvider>> { Ok(Box::new(aw_fs_snapshots_zfs::ZfsProvider::new()) as Box<dyn FsSnapshotProvider>) }));
+    providers_to_try.push(("ZFS", || -> Result<Box<dyn FsSnapshotProvider>> {
+        Ok(Box::new(aw_fs_snapshots_zfs::ZfsProvider::new()) as Box<dyn FsSnapshotProvider>)
+    }));
 
     #[cfg(feature = "btrfs")]
-    providers_to_try.push(("Btrfs", || -> Result<Box<dyn FsSnapshotProvider>> { Ok(Box::new(aw_fs_snapshots_btrfs::BtrfsProvider::new()) as Box<dyn FsSnapshotProvider>) }));
+    providers_to_try.push(("Btrfs", || -> Result<Box<dyn FsSnapshotProvider>> {
+        Ok(Box::new(aw_fs_snapshots_btrfs::BtrfsProvider::new()) as Box<dyn FsSnapshotProvider>)
+    }));
 
     #[cfg(feature = "git")]
-    providers_to_try.push(("Git", || -> Result<Box<dyn FsSnapshotProvider>> { Ok(Box::new(aw_fs_snapshots_git::GitProvider::new()) as Box<dyn FsSnapshotProvider>) }));
-    
+    providers_to_try.push(("Git", || -> Result<Box<dyn FsSnapshotProvider>> {
+        Ok(Box::new(aw_fs_snapshots_git::GitProvider::new()) as Box<dyn FsSnapshotProvider>)
+    }));
+
     for (name, provider_fn) in providers_to_try {
         let provider = provider_fn()?;
         let capabilities = provider.detect_capabilities(workspace_path);
 
         if capabilities.score > 0 {
-            println!("Trying {} provider (score: {})...", name, capabilities.score);
+            println!(
+                "Trying {} provider (score: {})...",
+                name, capabilities.score
+            );
 
             // Try CoW overlay mode first if supported, otherwise try in-place mode
             let modes_to_try = if capabilities.supports_cow_overlay {
@@ -133,7 +150,10 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
                 println!("  Trying mode: {:?}", mode);
                 match provider.prepare_writable_workspace(workspace_path, mode) {
                     Ok(workspace) => {
-                        println!("Successfully prepared workspace with {} provider using {:?}", name, mode);
+                        println!(
+                            "Successfully prepared workspace with {} provider using {:?}",
+                            name, mode
+                        );
                         return Ok(workspace);
                     }
                     Err(e) => {
@@ -145,7 +165,9 @@ pub async fn prepare_workspace_with_fallback(workspace_path: &std::path::Path) -
         }
     }
 
-    Err(anyhow::anyhow!("No filesystem snapshot provider could prepare a workspace"))
+    Err(anyhow::anyhow!(
+        "No filesystem snapshot provider could prepare a workspace"
+    ))
 }
 
 /// Create a sandbox instance configured from CLI parameters
@@ -216,7 +238,9 @@ pub fn create_sandbox_from_args(
     _mount_rw: &[PathBuf],
     _overlay: &[PathBuf],
 ) -> Result<()> {
-    Err(anyhow::anyhow!("Sandbox functionality is only available on Linux"))
+    Err(anyhow::anyhow!(
+        "Sandbox functionality is only available on Linux"
+    ))
 }
 
 /// Parse a boolean flag string (yes/no, true/false, 1/0)
@@ -224,7 +248,10 @@ pub fn parse_bool_flag(s: &str) -> Result<bool> {
     match s.to_lowercase().as_str() {
         "yes" | "true" | "1" => Ok(true),
         "no" | "false" | "0" => Ok(false),
-        _ => Err(anyhow::anyhow!("Invalid boolean value: '{}'. Expected yes/no, true/false, or 1/0", s)),
+        _ => Err(anyhow::anyhow!(
+            "Invalid boolean value: '{}'. Expected yes/no, true/false, or 1/0",
+            s
+        )),
     }
 }
 
@@ -243,7 +270,6 @@ mod tests {
         assert!(parse_bool_flag("invalid").is_err());
     }
 
-
     #[test]
     fn test_sandbox_filesystem_isolation_cli_integration() {
         // Integration test for `aw agent sandbox` command CLI functionality
@@ -254,20 +280,23 @@ mod tests {
         let cargo_manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
             .unwrap_or_else(|_| "/Users/zahary/blocksense/agents-workflow/cli".to_string());
         let binary_path = if cargo_manifest_dir.contains("/crates/") {
-            std::path::Path::new(&cargo_manifest_dir)
-                .join("../../target/debug/aw")
+            std::path::Path::new(&cargo_manifest_dir).join("../../target/debug/aw")
         } else {
-            std::path::Path::new(&cargo_manifest_dir)
-                .join("target/debug/aw")
+            std::path::Path::new(&cargo_manifest_dir).join("target/debug/aw")
         };
 
         // Test 1: Basic sandbox command parsing and execution attempt
         let mut cmd = Command::new(&binary_path);
         cmd.args([
-            "agent", "sandbox",
-            "--type", "local",
-            "--allow-network", "no",
-            "--", "echo", "sandbox test"
+            "agent",
+            "sandbox",
+            "--type",
+            "local",
+            "--allow-network",
+            "no",
+            "--",
+            "echo",
+            "sandbox test",
         ]);
 
         let output = cmd.output().expect("Failed to run aw agent sandbox command");
@@ -287,11 +316,13 @@ mod tests {
             // - Insufficient permissions for sandboxing
             // - Missing kernel features
             assert!(
-                stderr.contains("Failed to prepare sandbox workspace") ||
-                stderr.contains("No filesystem snapshot provider") ||
-                stderr.contains("permission denied") ||
-                stderr.contains("Operation not permitted"),
-                "Unexpected failure: stdout={}, stderr={}", stdout, stderr
+                stderr.contains("Failed to prepare sandbox workspace")
+                    || stderr.contains("No filesystem snapshot provider")
+                    || stderr.contains("permission denied")
+                    || stderr.contains("Operation not permitted"),
+                "Unexpected failure: stdout={}, stderr={}",
+                stdout,
+                stderr
             );
             println!("⚠️  Sandbox command failed as expected in test environment (missing providers/permissions)");
         } else {
@@ -301,23 +332,35 @@ mod tests {
         // Test 2: Invalid sandbox type rejection
         let mut cmd_invalid = Command::new(&binary_path);
         cmd_invalid.args([
-            "agent", "sandbox",
-            "--type", "invalid-type",
-            "--", "echo", "test"
+            "agent",
+            "sandbox",
+            "--type",
+            "invalid-type",
+            "--",
+            "echo",
+            "test",
         ]);
 
         let output_invalid = cmd_invalid.output().expect("Failed to run invalid sandbox command");
-        assert!(!output_invalid.status.success(), "Invalid sandbox type should be rejected");
+        assert!(
+            !output_invalid.status.success(),
+            "Invalid sandbox type should be rejected"
+        );
 
         let stderr_invalid = String::from_utf8_lossy(&output_invalid.stderr);
-        assert!(stderr_invalid.contains("Only 'local' sandbox type is currently supported"),
-               "Should reject invalid sandbox type: {}", stderr_invalid);
+        assert!(
+            stderr_invalid.contains("Only 'local' sandbox type is currently supported"),
+            "Should reject invalid sandbox type: {}",
+            stderr_invalid
+        );
 
         println!("✅ CLI integration test for `aw agent sandbox` command completed");
         println!("   This test verifies that:");
         println!("   1. `aw agent sandbox` accepts CLI parameters");
         println!("   2. Invalid sandbox types are properly rejected");
         println!("   3. Command attempts execution (may fail in test environments)");
-        println!("   Note: Full sandbox execution requires ZFS/Btrfs providers and proper permissions");
+        println!(
+            "   Note: Full sandbox execution requires ZFS/Btrfs providers and proper permissions"
+        );
     }
 }

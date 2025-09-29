@@ -18,7 +18,10 @@ fn main() {
         println!("Attempting to access blacklisted path: {}", path);
         match fs::File::create(path) {
             Ok(_) => {
-                println!("❌ ERROR: Successfully created file at blacklisted path: {}", path);
+                println!(
+                    "❌ ERROR: Successfully created file at blacklisted path: {}",
+                    path
+                );
                 println!("   This indicates blacklist enforcement failed!");
                 process::exit(1);
             }

@@ -3,16 +3,16 @@
 // This crate implements a privileged daemon for handling filesystem snapshot operations
 // with proper privilege escalation using sudo.
 
-pub mod types;
+pub mod client;
 pub mod operations;
 pub mod server;
-pub mod client;
+pub mod types;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::{Request, Response};
-    use ssz::{Encode, Decode};
+    use ssz::{Decode, Encode};
 
     #[test]
     fn test_ssz_encoding_roundtrip() {
@@ -87,7 +87,10 @@ mod tests {
         let test_dataset_exists = tokio_test::block_on(zfs_dataset_exists(test_dataset));
 
         if !test_dataset_exists {
-            eprintln!("ZFS test dataset {} does not exist, skipping test", test_dataset);
+            eprintln!(
+                "ZFS test dataset {} does not exist, skipping test",
+                test_dataset
+            );
             return;
         }
 
@@ -95,12 +98,22 @@ mod tests {
         assert!(test_dataset_exists, "ZFS test dataset should exist");
 
         // Test with non-existent dataset
-        let nonexistent_exists = tokio_test::block_on(zfs_dataset_exists("agents_workflow_test_zfs/nonexistent"));
-        assert!(!nonexistent_exists, "Non-existent ZFS dataset should not exist");
+        let nonexistent_exists =
+            tokio_test::block_on(zfs_dataset_exists("agents_workflow_test_zfs/nonexistent"));
+        assert!(
+            !nonexistent_exists,
+            "Non-existent ZFS dataset should not exist"
+        );
 
         // Test with invalid snapshot
-        let invalid_snapshot = tokio_test::block_on(zfs_snapshot_exists(&format!("{}@nonexistent", test_dataset)));
-        assert!(!invalid_snapshot, "Non-existent ZFS snapshot should not exist");
+        let invalid_snapshot = tokio_test::block_on(zfs_snapshot_exists(&format!(
+            "{}@nonexistent",
+            test_dataset
+        )));
+        assert!(
+            !invalid_snapshot,
+            "Non-existent ZFS snapshot should not exist"
+        );
     }
 
     #[test]
@@ -109,15 +122,18 @@ mod tests {
 
         // Test with non-existent path (should return false gracefully)
         let nonexistent = tokio_test::block_on(btrfs_subvolume_exists("/nonexistent/path"));
-        assert!(!nonexistent, "Non-existent path should not be considered a Btrfs subvolume");
+        assert!(
+            !nonexistent,
+            "Non-existent path should not be considered a Btrfs subvolume"
+        );
     }
 }
 
 #[cfg(test)]
 mod integration_tests {
     use crate::types::{Request, Response};
-    use ssz::{Encode, Decode};
-    use tokio::io::{AsyncWriteExt, AsyncBufReadExt};
+    use ssz::{Decode, Encode};
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
     const DAEMON_SOCKET_PATH: &str = "/tmp/agent-workflow/aw-fs-snapshots-daemon";
 
@@ -186,8 +202,12 @@ mod integration_tests {
 
         let response_hex = response_line.trim();
         let response_bytes = hex::decode(response_hex)?;
-        let response = Response::from_ssz_bytes(&response_bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("SSZ decode error: {:?}", e)))?;
+        let response = Response::from_ssz_bytes(&response_bytes).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("SSZ decode error: {:?}", e),
+            )
+        })?;
 
         Ok(response)
     }
@@ -226,7 +246,11 @@ mod integration_tests {
         // Test ping request/response
         match send_daemon_request(Request::ping()).await {
             Ok(response) => {
-                assert!(matches!(response, Response::Success(_)), "Expected Success response, got {:?}", response);
+                assert!(
+                    matches!(response, Response::Success(_)),
+                    "Expected Success response, got {:?}",
+                    response
+                );
                 println!("✅ Ping test passed - daemon responds correctly to ping requests");
             }
             Err(e) => {
@@ -251,24 +275,24 @@ mod integration_tests {
         let test_dataset = "agents_workflow_test_zfs/test_dataset";
         match send_daemon_request(Request::snapshot_zfs(
             test_dataset.to_string(),
-            format!("{}@integration_test_{}", test_dataset, std::process::id())
-        )).await {
-            Ok(response) => {
-                match response {
-                    Response::Success(_) => {
-                        println!("✅ ZFS snapshot creation test passed");
-                    }
-                    Response::Error(msg) => {
-                        let error_msg = String::from_utf8_lossy(&msg);
-                        println!("⚠️  ZFS snapshot test failed with error: {}", error_msg);
-                        println!("💡 Ensure ZFS test filesystem is set up:");
-                        println!("   just create-test-filesystems");
-                    }
-                    _ => {
-                        println!("⚠️  Unexpected response for ZFS snapshot: {:?}", response);
-                    }
+            format!("{}@integration_test_{}", test_dataset, std::process::id()),
+        ))
+        .await
+        {
+            Ok(response) => match response {
+                Response::Success(_) => {
+                    println!("✅ ZFS snapshot creation test passed");
                 }
-            }
+                Response::Error(msg) => {
+                    let error_msg = String::from_utf8_lossy(&msg);
+                    println!("⚠️  ZFS snapshot test failed with error: {}", error_msg);
+                    println!("💡 Ensure ZFS test filesystem is set up:");
+                    println!("   just create-test-filesystems");
+                }
+                _ => {
+                    println!("⚠️  Unexpected response for ZFS snapshot: {:?}", response);
+                }
+            },
             Err(e) => {
                 println!("❌ Failed to send ZFS snapshot request: {}", e);
             }
@@ -291,19 +315,22 @@ mod integration_tests {
         // This is a placeholder for future comprehensive Btrfs testing
         match send_daemon_request(Request::snapshot_btrfs(
             "/tmp/test_source".to_string(),
-            "/tmp/test_snapshot".to_string()
-        )).await {
-            Ok(response) => {
-                match response {
-                    Response::Error(msg) => {
-                        let error_msg = String::from_utf8_lossy(&msg);
-                        println!("ℹ️  Btrfs snapshot test (expected to fail without setup): {}", error_msg);
-                    }
-                    _ => {
-                        println!("✅ Btrfs snapshot creation test passed (unexpected!)");
-                    }
+            "/tmp/test_snapshot".to_string(),
+        ))
+        .await
+        {
+            Ok(response) => match response {
+                Response::Error(msg) => {
+                    let error_msg = String::from_utf8_lossy(&msg);
+                    println!(
+                        "ℹ️  Btrfs snapshot test (expected to fail without setup): {}",
+                        error_msg
+                    );
                 }
-            }
+                _ => {
+                    println!("✅ Btrfs snapshot creation test passed (unexpected!)");
+                }
+            },
             Err(e) => {
                 println!("❌ Failed to send Btrfs snapshot request: {}", e);
             }

@@ -31,12 +31,16 @@ fn main() -> anyhow::Result<()> {
             info!("KVM device permissions: {:o}", mode);
 
             // Check if the device is accessible (readable/writable by user)
-            if mode & 0o200 != 0 {  // writable by owner/user
+            if mode & 0o200 != 0 {
+                // writable by owner/user
                 info!("✓ KVM device is accessible for VM operations");
                 println!("SUCCESS: KVM device accessible");
                 std::process::exit(0);
             } else {
-                info!("✓ KVM device exists but is not accessible (permissions: {:o})", mode);
+                info!(
+                    "✓ KVM device exists but is not accessible (permissions: {:o})",
+                    mode
+                );
                 println!("SUCCESS: KVM device access properly restricted");
                 std::process::exit(0);
             }

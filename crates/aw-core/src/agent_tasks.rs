@@ -4,11 +4,11 @@
 //! including creating initial tasks, appending follow-up tasks, and detecting task branches.
 //! This is a direct port of the Ruby AgentTasks class functionality.
 
-use std::path::{Path, PathBuf};
+use aw_repo::{VcsRepo, VcsResult};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use std::fs;
 use std::io::Write;
-use chrono::{DateTime, Utc, Datelike, Timelike};
-use aw_repo::{VcsRepo, VcsResult};
+use std::path::{Path, PathBuf};
 
 /// Manages agent task files in a VCS repository.
 ///
@@ -49,7 +49,9 @@ impl AgentTasks {
     pub fn agent_task_file_in_current_branch(&self) -> VcsResult<PathBuf> {
         let start_commit_hash = self.repo.latest_agent_branch_commit()?;
         if start_commit_hash.is_empty() {
-            return Err(aw_repo::VcsError::Other("You are not currently on an agent task branch".into()));
+            return Err(aw_repo::VcsError::Other(
+                "You are not currently on an agent task branch".into(),
+            ));
         }
 
         let files_in_commit = self.repo.files_in_commit(&start_commit_hash)?;
@@ -99,7 +101,13 @@ impl AgentTasks {
         let hour = format!("{:02}", now.hour());
         let min = format!("{:02}", now.minute());
 
-        let tasks_dir = self.repo.root().join(".agents").join("tasks").join(year.to_string()).join(month);
+        let tasks_dir = self
+            .repo
+            .root()
+            .join(".agents")
+            .join("tasks")
+            .join(year.to_string())
+            .join(month);
         fs::create_dir_all(&tasks_dir)?;
 
         let filename = format!("{}-{}{}-{}", day, hour, min, branch_name);
@@ -134,19 +142,21 @@ impl AgentTasks {
     pub fn append_task(&self, task_content: &str) -> VcsResult<()> {
         let start_commit = self.repo.latest_agent_branch_commit()?;
         if start_commit.is_empty() {
-            return Err(aw_repo::VcsError::Other("Error: Could not locate task start commit".into()));
+            return Err(aw_repo::VcsError::Other(
+                "Error: Could not locate task start commit".into(),
+            ));
         }
 
         let files = self.repo.files_in_commit(&start_commit)?;
         if files.len() != 1 {
-            return Err(aw_repo::VcsError::Other("Error: Task start commit should introduce exactly one file".into()));
+            return Err(aw_repo::VcsError::Other(
+                "Error: Task start commit should introduce exactly one file".into(),
+            ));
         }
 
         let task_file = self.repo.root().join(&files[0]);
 
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .open(&task_file)?;
+        let mut file = fs::OpenOptions::new().append(true).open(&task_file)?;
 
         write!(file, "\n--- FOLLOW UP TASK ---\n{}", task_content)?;
 
@@ -165,9 +175,7 @@ impl AgentTasks {
         // Use Google's connectivity check service - a lightweight endpoint designed for connectivity testing
         // This service is globally distributed and operated by Google, making it highly reliable
         // Reference: https://developers.google.com/speed/public-dns/docs/doh
-        let agent = ureq::AgentBuilder::new()
-            .timeout(std::time::Duration::from_secs(3))
-            .build();
+        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(3)).build();
 
         match agent.get("http://connectivitycheck.gstatic.com/generate_204").call() {
             Ok(response) => response.status() == 204,
@@ -185,31 +193,47 @@ impl AgentTasks {
     pub fn setup_autopush(&self) -> VcsResult<()> {
         let first_commit_hash = self.repo.latest_agent_branch_commit()?;
         if first_commit_hash.is_empty() {
-            return Err(aw_repo::VcsError::Other("Error: Could not find first commit in current branch".into()));
+            return Err(aw_repo::VcsError::Other(
+                "Error: Could not find first commit in current branch".into(),
+            ));
         }
 
         let commit_msg = self.repo.commit_message(&first_commit_hash)?;
         let commit_msg = match commit_msg {
             Some(msg) => msg,
-            None => return Err(aw_repo::VcsError::Other("Error: Could not retrieve commit message from first commit".into())),
+            None => {
+                return Err(aw_repo::VcsError::Other(
+                    "Error: Could not retrieve commit message from first commit".into(),
+                ))
+            }
         };
 
-        let remote_match = commit_msg.lines()
+        let remote_match = commit_msg
+            .lines()
             .find(|line| line.starts_with("Target-Remote:"))
             .and_then(|line| line.strip_prefix("Target-Remote:").map(str::trim));
 
         let target_remote = match remote_match {
             Some(remote) if !remote.is_empty() => remote,
-            _ => return Err(aw_repo::VcsError::Other("Error: Target-Remote not found in commit message".into())),
+            _ => {
+                return Err(aw_repo::VcsError::Other(
+                    "Error: Target-Remote not found in commit message".into(),
+                ))
+            }
         };
 
-        let branch_match = commit_msg.lines()
+        let branch_match = commit_msg
+            .lines()
             .find(|line| line.starts_with("Start-Agent-Branch:"))
             .and_then(|line| line.strip_prefix("Start-Agent-Branch:").map(str::trim));
 
         let target_branch = match branch_match {
             Some(branch) if !branch.is_empty() => branch,
-            _ => return Err(aw_repo::VcsError::Other("Error: Start-Agent-Branch not found in commit message".into())),
+            _ => {
+                return Err(aw_repo::VcsError::Other(
+                    "Error: Start-Agent-Branch not found in commit message".into(),
+                ))
+            }
         };
 
         self.repo.setup_autopush(target_remote, target_branch)?;
