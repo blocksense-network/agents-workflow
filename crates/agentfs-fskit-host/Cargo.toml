@@ -10,11 +10,11 @@ agentfs-ffi = { path = "../agentfs-ffi" }
 agentfs-proto = { path = "../agentfs-proto" }
 
 # External dependencies
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
-clap = { version = "4.0", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] }   # For async XPC operations
+clap = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["full"] }   # For async XPC operations
 libc = "0.2"
 # SSZ serialization (matching agentfs-proto)
 ethereum_ssz = "0.8"

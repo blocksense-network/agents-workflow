@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use agentfs_proto::*;
 use ssz::{Decode, Encode};
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 
 /// Convert String to Vec<u8> for SSZ encoding
@@ -120,7 +121,7 @@ async fn send_fuse_control_request(mount_point: PathBuf, request: Request) -> Re
     // Call ioctl with buffer containing request, ioctl will overwrite with response
     let result = unsafe {
         libc::ioctl(
-            fd,
+            fd.as_raw_fd(),
             AGENTFS_IOCTL_CMD as libc::c_ulong,
             buffer.as_mut_ptr() as *mut libc::c_void,
         )

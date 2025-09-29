@@ -30,6 +30,68 @@ test-rust:
 test-rust-verbose:
     cargo test --workspace --verbose
 
+# Snapshot Testing with Insta
+# ===========================
+
+# Accept all pending snapshot changes (use when snapshots have legitimately changed)
+# This is the most common command when developing - it accepts the current test output
+# as the new expected snapshots. Always review changes first with 'just insta-review'
+# to ensure the changes are correct and not regressions.
+insta-accept:
+    cargo insta accept
+
+# Interactively review snapshot changes before accepting them
+# This opens a terminal UI where you can see diffs between old and new snapshots,
+# and choose which ones to accept, reject, or skip. Use this instead of blindly
+# accepting all changes to avoid missing regressions.
+insta-review:
+    cargo insta review
+
+# Reject all pending snapshot changes (reverts to previous snapshots)
+# Useful when you've made changes that shouldn't affect snapshots, or when
+# you want to undo accidental snapshot updates.
+insta-reject:
+    cargo insta reject
+
+# Run tests and check snapshots without updating them
+# This verifies that current snapshots match expected state. Use this in CI
+# or when you want to ensure no unexpected snapshot changes occurred.
+insta-test:
+    cargo insta test
+
+# Show all pending snapshots that need to be reviewed
+# Useful for getting an overview of what snapshots have changed without
+# opening the interactive review interface.
+insta-pending:
+    cargo insta pending-snapshots
+
+# Run snapshot tests for specific packages (useful for focused testing)
+# Example: just insta-test-pkg aw-mux
+insta-test-pkg pkg:
+    cargo insta test -p {{pkg}}
+
+# Accept snapshots for specific packages (useful when only one package changed)
+# Example: just insta-accept-pkg aw-mux
+insta-accept-pkg pkg:
+    cargo insta accept -p {{pkg}}
+
+# Quick workflow: test snapshots, show status
+# This runs snapshot tests and reports whether snapshots are up to date or need review
+# Note: Some snapshots (like tmux golden snapshots) capture dynamic terminal output
+# and may need periodic acceptance due to timing/environment differences.
+insta-check:
+    #!/usr/bin/env bash
+    echo "🔍 Running snapshot tests..."
+    if cargo insta test --no-quiet >/dev/null 2>&1; then
+        echo "✅ All snapshots are up to date!"
+    else
+        echo "📝 Snapshots need review. Use 'just insta-review' to review changes."
+        echo "   Or use 'just insta-accept' to accept all changes blindly."
+        echo "   Or use 'just insta-pending' to see what changed."
+        echo "   Note: Dynamic snapshots (tmux terminal output) may need periodic updates."
+        exit 1
+    fi
+
 # Lint Rust code
 lint-rust:
     cargo clippy --workspace

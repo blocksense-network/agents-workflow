@@ -37,7 +37,7 @@ aw-fs-snapshots = { path = "../aw-fs-snapshots", features = [
 aw-fs-snapshots-zfs = { path = "../aw-fs-snapshots-zfs" }
 aw-fs-snapshots-btrfs = { path = "../aw-fs-snapshots-btrfs" }
 aw-fs-snapshots-git = { path = "../aw-fs-snapshots-git" }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true, features = ["serde"] }
 sandbox-core = { path = "../sandbox-core", features = [
   "cgroups",
   "seccomp",
@@ -57,7 +57,7 @@ ethereum_ssz_derive = "0.8"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.28", features = ["fs", "ioctl"] }
+nix = { workspace = true, features = ["fs", "ioctl"] }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]

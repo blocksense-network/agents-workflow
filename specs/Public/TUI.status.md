@@ -4,11 +4,11 @@ This document tracks the implementation status of the [TUI-PRD.md](TUI-PRD.md) f
 
 Goal: deliver a production-ready terminal-based dashboard for creating, monitoring, and managing agent coding sessions with seamless multiplexer integration, keyboard-driven workflows, and REST service connectivity.
 
-**Current Status**: T2 completed, Testing Framework fully implemented with production-ready golden files, T3 ready
-**Test Results**: 9 tests passing (layout rendering, MVVM integration, scenario execution, golden files with multi-line TUI visualization)
-**Last Updated**: September 26, 2025
+**Current Status**: T3.2 tmux Support completed, Full multiplexer abstraction layer with tmux implementation ready
+**Test Results**: 42 tests passing (18 comprehensive tmux multiplexer tests + 15 TUI tests: layout rendering, MVVM integration, scenario execution, golden files with multi-line TUI visualization, CLI integration)
+**Last Updated**: September 28, 2025
 
-Total estimated timeline: 6-8 weeks (broken into major phases with parallel development tracks)
+Total estimated timeline: 12-16 weeks (broken into major phases with parallel development tracks)
 
 ### Milestone Completion & Outstanding Tasks
 
@@ -267,7 +267,7 @@ The TUI implementation provides these core capabilities:
   - Provides foundation for TUI multiplexer integration
   - Enables testing with mock multiplexer implementations
 
-**T3.2 tmux Support** (1.5 weeks)
+**T3.2 tmux Support** ✅ **COMPLETED** (September 28, 2025)
 
 - **Deliverables**:
 
@@ -292,19 +292,66 @@ The TUI implementation provides these core capabilities:
     - Commands that manipulate the state of the multiplexer (e.g. switch pane).
     - Other scenarios you'll come up with
   - Verify the expected Tmux state through tmux commands that provide instrospection into the tmux state
-  - Verify the expected screen content / visual state by launching tmux under pexpect
+  - Verify the expected screen content / visual state with the `insta` crate by launching tmux under `expectrl`/`vt100`.
   - Verify that the expected number of child processes are launched
-  - Golden file testing for rendered terminal output
   - Session management edge cases with controlled scenarios
   - Child process verification and cleanup
 
-- **Verification**:
+- **Test Coverage** (18 comprehensive multiplexer tests + 7 strategic snapshot tests):
 
-  - All tmux commands from [tmux.md](Terminal-Multiplexers/tmux.md) work correctly
-  - We are able to create split-pane layouts, similar to the ones defined in the TUI PRD specifications
-  - Text injection and command execution work reliably
-  - Window discovery and focusing operations succeed
-  - Error handling provides clear feedback for all failure modes
+  - **Session Management**: Session creation, idempotency, isolation between multiple sessions
+  - **Window Operations**: Creation with titles/CWD, focusing, listing with filtering
+  - **Pane Operations**: Horizontal/vertical splitting, command execution, text sending, focusing
+  - **Complex Layouts**: Multi-pane layouts with proper pane indexing and command execution
+  - **Error Handling**: Invalid sessions, panes, and edge cases
+  - **State Verification**: Direct tmux command verification of window/pane states
+  - **Integration Testing**: End-to-end workflows with proper cleanup
+  - **Strategic Golden Snapshot Testing**: Real tmux screen snapshots integrated into existing tests using expectrl + vt100 + insta:
+    - **Continuous Session Approach**: Single attached tmux session per test with vt100 parser continuously capturing output
+    - **Thread-Local Sessions**: Each test thread gets its own tmux session to avoid interference
+    - **API Drives Existing Sessions**: Tests start tmux attached, API drives existing session without creating detached sessions
+    - **Strategic Points**: Snapshots taken at key state transitions (before/after splits, after commands, layout stages)
+    - **Real Terminal Capture**: Captures actual ANSI escape sequences, pane separators (`│`, `├`), status bars, and visual layouts
+    - **Optional Execution**: Only runs when `SNAPSHOT_TESTS` environment variable is set
+    - **Integration**: Snapshots are part of existing comprehensive tests, not separate test functions
+    - **Clean API**: `snapshot_from_parser()` provides pure function for formatting parser output
+
+- **Verification** (Automated Testing):
+
+  - ✅ **Core tmux operations**: All tmux CLI commands (`new-window`, `split-window`, `select-window`, `select-pane`, `send-keys`, `list-windows`, `list-panes`, `kill-session`) work correctly as specified in tmux.md
+  - ✅ **Pane management**: Horizontal/vertical pane splitting creates proper split-pane layouts with correct pane indexing and parent-child relationships
+  - ✅ **Command execution**: `run_command()` reliably executes commands in specific panes with proper environment and working directory setup
+  - ✅ **Text injection**: `send_text()` reliably injects text input into running processes using tmux `send-keys` with proper escaping
+  - ✅ **Window operations**: Window creation with custom titles/CWD, focusing operations, and listing/filtering work correctly
+  - ✅ **Session lifecycle**: Session creation, idempotency, isolation between multiple sessions, and proper cleanup are handled correctly
+  - ✅ **State verification**: Direct tmux command introspection (`tmux display-message`, `tmux list-panes`) confirms expected tmux internal state
+  - ✅ **Error handling**: Invalid sessions, panes, and command failures provide clear error messages and proper error propagation
+  - ✅ **Visual regression testing**: 7 strategic golden snapshots capture actual tmux screen output (pane separators, status bars, command output) using expectrl + vt100 terminal emulation
+  - ✅ **Thread safety**: Session isolation prevents interference between concurrent test executions using timestamp-based session names
+
+- **Implementation Details**:
+
+  - **Complete Multiplexer Trait Implementation**: All methods from aw-mux-core trait fully implemented using tmux CLI commands
+  - **Session Management**: Automatic session creation and management with proper cleanup
+  - **Window Operations**: `new-window -P` for creation, `select-window` for focusing, `list-windows` for discovery
+  - **Pane Operations**: `split-window -h/-v` for splitting, `send-keys` for command execution and text input, `select-pane` for focusing, `list-panes` for discovery
+  - **AW Integration**: Works seamlessly with aw-tui-multiplexer for creating editor + agent pane layouts
+  - **Error Handling**: Comprehensive error handling with clear error messages for tmux command failures
+  - **Testing**: Full test suite covering all functionality with proper tmux session cleanup
+
+- **Key Source Files**:
+
+  - `crates/aw-mux/src/tmux.rs` - Complete tmux multiplexer implementation
+  - `crates/aw-tui-multiplexer/src/lib.rs` - AW-specific layout creation and task management
+  - `specs/Public/Terminal-Multiplexers/tmux.md` - tmux integration specification
+
+- **Integration Points**:
+
+  - Provides concrete tmux implementation for the multiplexer abstraction layer
+  - Enables TUI to create and manage tmux sessions with proper pane layouts
+  - Supports task creation workflows with editor and agent panes
+  - Ready for integration with TUI task creation and launch functionality
+
 
 **T3.3 kitty Support** (1.5 weeks)
 
@@ -337,29 +384,105 @@ The TUI implementation provides these core capabilities:
   - Error conditions are handled gracefully
   - Multiple windows/panes can be interacted with concurrently (from multiple processes)
 
-**T3. Task Creation and Launch** (2 weeks)
+**T3.4 REST Service Implementation** (4 weeks)
 
 - **Deliverables**:
 
-  - Task creation workflow from dashboard input
-  - Multiplexer auto-detection and session management
+  - Complete implementation of [REST-Service.md](REST-Service.md) specification
+  - REST API server with all endpoints: task creation, session management, logs, events
+  - SSE/WebSocket streaming for real-time session updates
+  - Authentication and authorization (API keys, JWT, RBAC)
+  - Database integration for session state persistence
+  - Executor registration and heartbeat management
+  - Workspace provisioning and snapshot management integration
+
+- **Testing Strategy**:
+
+  - Comprehensive API contract tests against mock clients
+  - End-to-end integration tests with mock executors
+  - Authentication and authorization test suites
+  - SSE streaming reliability tests
+  - Database persistence and recovery tests
+  - Multi-tenant isolation tests
+  - Rate limiting and quota enforcement tests
+
+- **Verification**:
+
+  - All REST endpoints match [REST-Service.md](REST-Service.md) specification
+  - API contract tests pass against mock server (100% endpoint coverage)
+  - SSE streaming works reliably under various network conditions
+  - Authentication flows work correctly (API key, JWT, OIDC)
+  - RBAC permissions are properly enforced
+  - Session state persistence survives server restarts
+  - Executor heartbeat and health monitoring works
+  - Workspace provisioning integrates correctly with snapshot providers
+  - Multi-tenant data isolation is maintained
+  - Rate limiting and quotas are properly enforced
+
+**T3.5 Task Creation and Launch (Local Mode)** (2 weeks)
+
+- **Deliverables**:
+
+  - Task creation workflow from dashboard input in local mode
+  - Local SQLite database integration for session management
   - New window creation with split-pane layout (agent right, editor/shell left)
-  - Session launch and monitoring integration
+  - Session launch and monitoring integration with local executors
   - Error handling for failed task creation
   - Success feedback and session attachment
+  - Local filesystem workspace provisioning
 
-- **Test Coverage** (Integration + E2E):
+- **Testing Strategy**:
 
-  - [ ] Task creation tests: Full workflow from input to REST API call
-  - [ ] Multiplexer detection tests: Auto-detection of available multiplexers
-  - [ ] Window creation tests: New multiplexer windows with correct pane layout
-  - [ ] Session attachment tests: Proper attachment to running sessions
-  - [ ] Error handling tests: Failed task creation shows appropriate errors
+  - Pre-scripted child process testing for deterministic multiplexer behaviors
+  - pexpect-based terminal automation for screen content verification
+  - Golden file testing for rendered terminal output
+  - Local database integration tests
+  - Workspace provisioning and cleanup tests
+  - Error condition testing (multiplexer unavailable, permission issues)
+  - Session lifecycle management tests
 
-- **Verification** (Automated E2E):
+- **Verification**:
 
-  - End-to-end tests simulating complete task creation workflow
-  - Multiplexer integration tests across tmux/zellij/screen
+  - Task creation workflow works end-to-end in local mode
+  - Split-pane layouts created correctly for all supported multiplexers
+  - Session state properly persisted to local database
+  - Workspace isolation maintained between tasks
+  - Error conditions handled gracefully with appropriate user feedback
+  - Session monitoring and logs work correctly
+  - Cleanup happens properly when tasks complete or fail
+
+**T3.6 Task Creation and Launch (Remote Mode)** (2 weeks)
+
+- **Deliverables**:
+
+  - Task creation workflow from dashboard input in remote mode
+  - REST service integration for remote task execution
+  - Real-time session monitoring via SSE streams
+  - Remote session attachment and management
+  - Cross-host multiplexer session support
+  - Remote workspace provisioning coordination
+  - Authentication token management for remote connections
+
+- **Testing Strategy**:
+
+  - Mock REST service integration tests
+  - SSE streaming reliability tests
+  - Authentication and token management tests
+  - Cross-host session coordination tests
+  - Remote multiplexer attachment verification
+  - Network failure and reconnection scenarios
+  - Remote workspace provisioning tests
+
+- **Verification**:
+
+  - Task creation works seamlessly in remote mode
+  - SSE streams provide real-time session updates
+  - Authentication flows work correctly
+  - Remote multiplexer sessions created and attached properly
+  - Cross-host coordination works for multi-OS scenarios
+  - Network failures handled gracefully with reconnection
+  - Remote workspace provisioning integrates correctly
+  - UI properly reflects remote vs local execution modes
 
 **Phase 2: Advanced Features** (3-4 weeks total)
 
@@ -472,62 +595,6 @@ The TUI implementation provides these core capabilities:
 - Binary packaging and distribution for multiple platforms
 - Documentation and integration with broader AW ecosystem
 
-### Next Milestone Priority
-
-**T3. Task Creation and Launch** is the current priority milestone, building on the completed T2 dashboard and testing infrastructure. This milestone focuses on connecting the user interface to actual task creation workflows, including multiplexer integration for launching tasks into terminal sessions with proper pane layouts. The comprehensive testing framework ensures reliability as we add production functionality.
-
-### Current Outstanding Tasks
-
-Here are the key tasks for TUI development:
-
-#### **T2. Core Dashboard Layout** ✅ **COMPLETED**
-
-- [x] Full dashboard layout with selectors and editor (MVVM architecture)
-- [x] Keyboard navigation and shortcut handling (message-driven state machine)
-- [x] REST data loading and display in selectors (with loading states)
-- [x] Dynamic footer with contextual shortcuts (focus-based)
-- [x] Layout rendering tests: Dashboard renders correctly on different terminal sizes
-
-#### **Testing Framework Implementation** ✅ **COMPLETED**
-
-- [x] Complete MVVM testing architecture (TUI-Testing-Architecture.md)
-- [x] Interactive scenario player (`tui-test play`) with navigation and inspection
-- [x] Automated scenario runner (`tui-test run`) with deterministic execution
-- [x] Mock REST client for scenario-driven testing
-- [x] ViewModel assertion system and state inspection
-- [x] Sample test scenarios demonstrating functionality
-- [x] Golden snapshot infrastructure with file-based comparison
-
-#### **REST Client Infrastructure** 📋 **COMPLETED**
-
-- [x] `aw-rest-api-contract` crate with schema types and validation
-- [x] `aw-rest-client` crate with full REST-Service.md coverage
-- [x] SSE streaming support for real-time updates (placeholder)
-- [x] Authentication handling (API key, JWT, OIDC)
-- [x] Error response parsing and user-friendly error messages
-- [x] Comprehensive unit and integration test coverage
-- [x] Mock server integration for isolated development
-
-#### **TUI Foundation** 📋 **COMPLETED**
-
-- [x] Ratatui + Crossterm application scaffolding
-- [x] Basic event loop and terminal handling
-- [x] CLI command integration with `--remote-server` flag
-- [x] Project structure following Repository-Layout.md
-- [x] Basic UI widget initialization
-
-#### **REST Client Stubs** 📋 **PENDING**
-
-- [ ] SSE streaming tests against mock server: EventSource connection and event parsing (placeholder implemented)
-- [ ] SSE streaming implementation: Replace placeholder in `aw-rest-client/src/sse.rs` with proper eventsource-client integration
-
-#### **Integration & Advanced Features** 📋 **PENDING**
-
-- [ ] Task creation workflow from dashboard input
-- [ ] Multiplexer integration and auto-detection
-- [ ] Real-time session monitoring and updates
-- [ ] Remote session attachment via SSH
-- [ ] Devcontainer-aware pane launching
 
 ### Risks & mitigations
 

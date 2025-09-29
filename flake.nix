@@ -245,8 +245,6 @@
         pkgs.shfmt
         pkgs.taplo
 
-        # OpenSSL development libraries for Rust crates
-        pkgs.openssl.dev
 
         # pkgs.nodePackages."ajv-cli" # JSON Schema validator
 
@@ -271,6 +269,9 @@
 
         # ASCII art tools for logo conversion
         pkgs.chafa
+
+        # Cargo tools
+        pkgs.cargo-outdated
       ];
 
       # Linux-specific packages

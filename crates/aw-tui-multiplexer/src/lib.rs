@@ -73,6 +73,19 @@ impl<M: Multiplexer> AwMultiplexer<M> {
 
         let mut panes = HashMap::new();
 
+        // The window_id is session:window, the initial pane is session:window.0
+        let editor_pane = format!("{}.0", window_id);
+        let editor_cmd = config.editor_cmd.unwrap_or("bash");
+        self.mux.run_command(
+            &editor_pane,
+            editor_cmd,
+            &CommandOptions {
+                cwd: Some(config.working_dir),
+                env: None,
+            },
+        )?;
+        panes.insert(PaneRole::Editor, editor_pane);
+
         // Split for agent pane (right side)
         let agent_pane = self.mux.split_pane(
             &window_id,
@@ -86,19 +99,6 @@ impl<M: Multiplexer> AwMultiplexer<M> {
             Some(config.agent_cmd),
         )?;
         panes.insert(PaneRole::Agent, agent_pane);
-
-        // Left pane is the original window - set it up as editor
-        let editor_pane = format!("{}.1", window_id); // tmux-style pane addressing
-        let editor_cmd = config.editor_cmd.unwrap_or("bash");
-        self.mux.run_command(
-            &editor_pane,
-            editor_cmd,
-            &CommandOptions {
-                cwd: Some(config.working_dir),
-                env: None,
-            },
-        )?;
-        panes.insert(PaneRole::Editor, editor_pane);
 
         // Optional log pane at bottom
         if let Some(log_cmd) = config.log_cmd {
